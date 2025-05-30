@@ -1,0 +1,79 @@
+.dropper {
+  border: 1px dashed var(--border-color);
+  padding: calc(var(--margin) * 2);
+  text-align: center;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  background-color: var(--dark-color);
+}
+.dropper:not(:disabled) {
+  cursor: pointer;
+}
+.dropper:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.dropper:hover {
+  border-color: white;
+}
+
+.dropper:hover > .icons > i:nth-child(1),
+.dropper:hover > .icons > i:nth-child(2) {
+  opacity: 0.5;
+}
+
+.dropper:hover > .icons > i:nth-child(1) {
+  transform: rotate(-15deg) translateY(-120%);
+}
+
+.dropper:hover > .icons > i:nth-child(2) {
+  transform: rotate(15deg) translate(+130%, -142%);
+}
+
+.dropper > .icons {
+  position: relative;
+  height: 40px;
+  width: 40px;
+  margin: 0 auto var(--margin) auto;
+}
+.dropper > .icons > i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.2s ease-in-out;
+  color: white;
+}
+
+.dropper > .icons > i:nth-child(1),
+.dropper > .icons > i:nth-child(2) {
+  font-size: 30px;
+  opacity: 0;
+}
+
+.dropper > .icons > i:nth-child(1) {
+  transform-origin: 100px 100px;
+}
+
+.dropper > .icons > i:nth-child(2) {
+  transform-origin: -100px -100px;
+}
+
+.dropper > .icons > i:nth-child(3) {
+  font-size: 40px;
+  background: black;
+}
+
+.dropper > p {
+  margin: 0;
+  color: var(--main-color);
+}
+.dropper > input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}

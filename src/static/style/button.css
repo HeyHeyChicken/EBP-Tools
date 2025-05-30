@@ -1,0 +1,201 @@
+button:not(.default):not(.toast-close),
+.btn:not(.default):not(.toast-close) {
+  text-align: center;
+  min-height: var(--form-height);
+  min-width: var(--form-height);
+  border: 1px solid var(--border-color);
+  color: white;
+  position: relative;
+  text-transform: uppercase;
+  background-color: var(--dark-color);
+  background-position: center center;
+  background-repeat: no-repeat;
+  display: block;
+  text-decoration: none;
+  width: fit-content;
+  line-height: calc(var(--form-height) - 2px);
+  box-sizing: border-box;
+}
+button:not(.default):not(.toast-close):not(.squared),
+.btn:not(.default):not(.toast-close):not(.squared) {
+  font-family: DukeFill, sans-serif;
+  letter-spacing: calc(var(--margin) * 0.3) !important;
+  font-size: calc(var(--margin) * 2.2) !important;
+  padding: 0 24px;
+}
+button:not(.default):not(.toast-close):not(.squared) > i,
+.btn:not(.default):not(.toast-close):not(.squared) > i {
+  margin-right: calc(var(--margin) / 2);
+  transform: translateY(-3px);
+}
+button:not(.default):not(.toast-close).squared,
+.btn:not(.default):not(.toast-close).squared {
+  max-width: var(--form-height);
+  max-height: var(--form-height);
+  text-align: center;
+}
+button:not(.default):not(.toast-close).white,
+.btn:not(.default):not(.toast-close).white {
+  border-color: #ffffff;
+  color: var(--dark-color);
+  background-color: #ffffff;
+}
+button:not(.default):not(.toast-close).white:not([disabled]):active,
+.btn:not(.default):not(.toast-close).white:not([disabled]):active {
+  color: #ffffff;
+  background-color: var(--dark-color);
+}
+button:not(.default):not(.toast-close).white:not(:active):before,
+button:not(.default):not(.toast-close).white:not(:active):after,
+.btn:not(.default):not(.toast-close).white:not(:active):before,
+.btn:not(.default):not(.toast-close).white:not(:active):after {
+  border-color: black;
+}
+button:not(.default):not(.toast-close).green,
+.btn:not(.default):not(.toast-close).green {
+  border-color: #4caf50;
+  color: #4caf50;
+}
+button:not(.default):not(.toast-close).green:not([disabled]):active,
+.btn:not(.default):not(.toast-close).green:not([disabled]):active {
+  color: var(--dark-color);
+  background-color: #4caf50;
+}
+button:not(.default):not(.toast-close).red,
+.btn:not(.default):not(.toast-close).red {
+  border-color: #f44336;
+  color: #f44336;
+}
+button:not(.default):not(.toast-close).red:not([disabled]):active,
+.btn:not(.default):not(.toast-close).red:not([disabled]):active {
+  color: var(--dark-color);
+  background-color: #f44336;
+}
+button:not(.default):not(.toast-close).orange,
+.btn:not(.default):not(.toast-close).orange {
+  border-color: #ff9800;
+  color: #ff9800;
+}
+button:not(.default):not(.toast-close).orange:not([disabled]):active,
+.btn:not(.default):not(.toast-close).orange:not([disabled]):active {
+  color: var(--dark-color);
+  background-color: #ff9800;
+}
+button:not(.default):not(.toast-close).primary,
+.btn:not(.default):not(.toast-close).primary {
+  border-color: var(--main-color);
+  color: var(--main-color);
+}
+button:not(.default):not(.toast-close).primary:not([disabled]):active,
+.btn:not(.default):not(.toast-close).primary:not([disabled]):active {
+  color: var(--dark-color);
+  background-color: var(--main-color);
+}
+button:not(.default):not(.toast-close).discord,
+.btn:not(.default):not(.toast-close).discord {
+  border-color: #7289da;
+  color: #7289da;
+}
+button:not(.default):not(.toast-close).discord:not([disabled]):active,
+.btn:not(.default):not(.toast-close).discord:not([disabled]):active {
+  color: var(--dark-color);
+  background-color: #7289da;
+}
+button:not(.default):not(.toast-close):not(:disabled),
+.btn:not(.default):not(.toast-close):not(:disabled) {
+  cursor: pointer;
+}
+button:not(.default):not(.toast-close):disabled,
+button:not(.default):not(.toast-close).disabled,
+.btn:not(.default):not(.toast-close):disabled,
+.btn:not(.default):not(.toast-close).disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+button:not(.default):not(.toast-close).selected,
+.btn:not(.default):not(.toast-close).selected {
+  background-color: var(--main-color);
+  color: black;
+}
+button:not(.default):not(.toast-close) > .beta,
+.btn:not(.default):not(.toast-close) > .beta {
+  color: #f44336;
+  border: 1px solid #f44336;
+  border-radius: 1000px;
+  background-color: var(--dark-color);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  cursor: pointer;
+  z-index: 1;
+  padding: 0 3px;
+}
+button:not(.default):not(.toast-close) > i,
+.btn:not(.default):not(.toast-close) > i {
+  font-size: 15px;
+}
+button:not(.default):not(.toast-close) > i.fa-sharp.fa-solid.fa-star,
+.btn:not(.default):not(.toast-close) > i.fa-sharp.fa-solid.fa-star {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
+}
+button:not(.default):not(.toast-close)
+  > i.fa-sharp.fa-solid.fa-star:nth-child(1),
+.btn:not(.default):not(.toast-close)
+  > i.fa-sharp.fa-solid.fa-star:nth-child(1) {
+  color: var(--main-color);
+  font-size: calc(13px + 5px);
+}
+button:not(.default):not(.toast-close)
+  > i.fa-sharp.fa-solid.fa-star:nth-child(2),
+.btn:not(.default):not(.toast-close)
+  > i.fa-sharp.fa-solid.fa-star:nth-child(2) {
+  color: var(--dark-color);
+  font-size: 13px;
+}
+button:not(.default):not(.toast-close) > span,
+.btn:not(.default):not(.toast-close) > span {
+  margin-left: var(--margin);
+}
+button:not(.default):not(.toast-close):after,
+button:not(.default):not(.toast-close):before,
+.btn:not(.default):not(.toast-close):after,
+.btn:not(.default):not(.toast-close):before {
+  content: "";
+  position: absolute;
+  height: 7px;
+  width: 7px;
+  box-sizing: border-box;
+  border-style: solid;
+  border-color: white;
+  opacity: 0.5;
+}
+button:not(.default):not(.toast-close):not([disabled]):active,
+.btn:not(.default):not(.toast-close):not([disabled]):active {
+  color: var(--dark-color);
+  background-color: white;
+}
+button:not(.default):not(.toast-close):not([disabled]):active:not(.white):after,
+button:not(.default):not(.toast-close):not([disabled]):active:not(
+    .white
+  ):before,
+.btn:not(.default):not(.toast-close):not([disabled]):active:not(.white):after,
+.btn:not(.default):not(.toast-close):not([disabled]):active:not(.white):before {
+  border-color: black;
+}
+button:not(.default):not(.toast-close):before,
+.btn:not(.default):not(.toast-close):before {
+  top: 5px;
+  left: 5px;
+  border-width: 2px 0 0 2px;
+}
+button:not(.default):not(.toast-close):after,
+.btn:not(.default):not(.toast-close):after {
+  bottom: 5px;
+  right: 5px;
+  border-width: 0 2px 2px 0;
+}

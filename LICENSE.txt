@@ -1,0 +1,15 @@
+Copyright (c) 2025, Antoine Duval
+
+This software is provided solely for the purpose of review and contribution on this public repository.
+
+The following actions are explicitly prohibited without prior written permission:
+- Use of the code in any product or service,
+- Reproduction or distribution of all or part of the code,
+- Execution of the code outside of a review or testing context,
+- Integration of the code into any third-party project.
+
+Contributions (commits, pull requests) are welcome. Any contribution implies acceptance of a non-exclusive rights transfer to the project owner.
+
+For any other use, please contact: contact@evabattleplan.com
+
+This project is source-visible, but not free and not open source.

@@ -1,0 +1,108 @@
+<!-- Copyright (c) 2025, Antoine Duval -->
+<!-- This file is part of a source-visible project. -->
+<!-- See LICENSE for terms. Unauthorized use is prohibited. -->
+
+<title>EBP - Replay cutter</title>
+<link rel="stylesheet" href="/style/fontawesome/all.css" />
+<link rel="stylesheet" href="/style/fontawesome/sharp-regular.css" />
+<link rel="stylesheet" href="/style/fontawesome/sharp-solid.css" />
+<link rel="stylesheet" href="/style/toastify/toastify.css" />
+<link rel="stylesheet" href="/style/index.css" />
+<link rel="stylesheet" href="/style/button.css" />
+<link rel="stylesheet" href="/style/display.css" />
+<link rel="stylesheet" href="/style/input-file.css" />
+<link rel="stylesheet" href="/style/loader.css" />
+<link rel="stylesheet" href="/style/message.css" />
+<link rel="stylesheet" href="/style/scroll-bar.css" />
+<link rel="stylesheet" href="/style/spinner.css" />
+<header>
+  <a>
+    <img src="/img/logo.webp" />
+  </a>
+</header>
+<main>
+  <div>
+    <div class="right">
+      <div class="center">
+        <div id="disconnected">
+          <a id="loginURL"><button>cut a replay</button></a>
+        </div>
+        <div id="connected">
+          <div>
+            <button class="default dropper" id="inputFile">
+              <div class="icons">
+                <i class="fa-sharp fa-solid fa-file-arrow-up"></i
+                ><i class="fa-sharp fa-solid fa-file"></i
+                ><i class="fa-sharp fa-solid fa-file-video"></i>
+              </div>
+              <p>Click here to cut your video file</p>
+            </button>
+            <div class="loader t0 d-none" id="loader">
+              <span></span>
+              <div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+              </div>
+            </div>
+            <div class="message d-none" id="message">
+              Please wait, the video is being cut...<br />
+              Number of games found:<b id="nbGames">0</b>
+            </div>
+            <table id="games"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<footer></footer>
+<script src="/script/toastify.js"></script>
+<script src="/script/client.js"></script>
