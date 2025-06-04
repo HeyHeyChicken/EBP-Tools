@@ -5,7 +5,7 @@
   "main": ".webpack/main",
   "scripts": {
     "make": "electron-forge make",
-    "start": "electron ./src/main.js"
+    "start": "concurrently \"sass --watch src/scss:src/static/style --style=compressed\" \"electron ./src/main.js\""
   },
   "repository": "https://github.com/HeyHeyChicken/EBP-Replay-Cutter",
   "keywords": [],
@@ -22,10 +22,13 @@
     "@electron-forge/plugin-fuses": "^7.8.0",
     "@electron-forge/plugin-webpack": "^7.8.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^13.0.0",
     "electron": "^36.2.1",
     "electron-squirrel-startup": "^1.0.1",
-    "node-addon-api": "^8.3.1"
+    "node-addon-api": "^8.3.1",
+    "nodemon": "^3.1.10",
+    "sass": "^1.89.1"
   },
   "dependencies": {
     "express": "^5.1.0",

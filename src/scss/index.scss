@@ -1,0 +1,179 @@
+:root {
+  --margin: 12px;
+  --form-height: 36px;
+
+  --dark-color: #0c0c10;
+  --border-color: #6c757d;
+  --main-color: #ebac78;
+  --orange-color: #b86d00;
+  --blue-color: #0073bb;
+}
+
+@font-face {
+  font-family: DukeFill;
+  src: url("/font/dukeFill/Duke Fill.otf") format("opentype");
+}
+
+html > body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue,
+    Noto Sans, Liberation Sans, Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", Segoe UI Symbol, "Noto Color Emoji";
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  a {
+    text-decoration: none;
+  }
+
+  .orange {
+    color: var(--orange-color);
+  }
+  .blue {
+    color: var(--blue-color);
+  }
+
+  > header {
+    height: 60px;
+    background-color: var(--dark-color);
+    border-bottom: 1px solid var(--border-color);
+
+    > a {
+      display: block;
+      width: fit-content;
+      margin: 0 auto;
+
+      > img {
+        height: 24px;
+        margin: 18px 24px;
+      }
+    }
+  }
+
+  > main {
+    background-image: url(/img/wallpaper.webp);
+    background-size: cover;
+    background-position: center center;
+    flex: 1;
+    position: relative;
+
+    > div {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      display: flex;
+    }
+
+    #spinner {
+      margin-bottom: calc(var(--margin) * 2);
+    }
+  }
+
+  > footer {
+    padding: calc(var(--margin) / 2) var(--margin);
+    border-top: 1px solid var(--border-color);
+    background-color: var(--dark-color);
+    color: white;
+    display: flex;
+
+    > .alert {
+      color: #f44336;
+      margin-left: var(--margin);
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+.right {
+  margin-left: auto;
+  width: 50%;
+  height: 100%;
+  right: 5%;
+  padding: calc(var(--margin) * 2);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  text-align: center;
+
+  > .center {
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+
+    > div {
+      display: none;
+      overflow-y: auto;
+      overflow-x: hidden;
+
+      > div {
+        display: flex;
+        flex-direction: column;
+        gap: var(--margin);
+        padding-right: var(--margin);
+
+        > .box {
+          display: flex;
+          flex-direction: column;
+          gap: var(--margin);
+          background-color: var(--dark-color);
+          border: 1px solid var(--border-color);
+          box-sizing: border-box;
+          padding: calc(var(--margin) * 2);
+          color: white;
+          text-align: center;
+
+          > p {
+            margin: 0;
+          }
+        }
+
+        > #games {
+          background-color: var(--dark-color);
+          color: white;
+          border-collapse: collapse;
+
+          > tbody > tr {
+            > * {
+              padding: calc(var(--margin) / 2) var(--margin);
+              border: 1px solid var(--border-color);
+            }
+
+            > th {
+              background-position: center center;
+              background-size: cover;
+              text-align: center;
+              font-weight: 700;
+              text-transform: uppercase;
+            }
+
+            > td {
+              &.infos {
+                width: 100%;
+              }
+
+              &.buttons {
+                padding: calc(var(--margin) / 2);
+
+                > div {
+                  display: flex;
+                  gap: calc(var(--margin) / 2);
+                }
+              }
+
+              > p {
+                margin: 0;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

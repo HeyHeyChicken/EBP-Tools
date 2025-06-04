@@ -2,9 +2,8 @@
 /out
 /.webpack
 .DS_Store
-src/detector/*
+src/static/style/*.map
 vcpkg
-!src/detector/script.cpp
 ALL_BUILD.vcxproj
 ALL_BUILD.vcxproj.filters
 cmake_install.cmake

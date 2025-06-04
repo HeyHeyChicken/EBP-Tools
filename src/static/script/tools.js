@@ -143,9 +143,17 @@ function setVideoCurrentTime(video, time, games, videoPath, discordServerURL) {
  */
 function onVideoEnded(games, videoPath, discordServerURL) {
   if (games.length == 0) {
+    const INPUT_FILE = document.getElementById("inputFile");
+    const GAMES_PERCENT = document.getElementById("loader");
+    const MESSAGE = document.getElementById("message");
+
+    MESSAGE.classList.add("d-none");
+    INPUT_FILE.classList.remove("d-none");
+    GAMES_PERCENT.classList.add("d-none");
+
     const TOAST = Toastify({
       text: "No games were found in your video. If you think this is a mistake, please let me know.",
-      duration: 30 * 1000,
+      duration: 10 * 1000,
       close: true,
       gravity: "bottom",
       position: "right",

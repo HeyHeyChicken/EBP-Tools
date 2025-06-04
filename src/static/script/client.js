@@ -17,8 +17,7 @@
     },
   });
 
-  const VIDEO /* HTMLElement */ = document.getElementById("video");
-  VIDEO.addEventListener("loadeddata", videoLoadedData);
+  let video /* HTMLElement */;
 
   // List of games detected in a video file.
   let games /* Game[] */ = [];
@@ -30,8 +29,8 @@
     if (event.target) {
       let found /* boolean */ = false;
       const DEFAULT_STEP /* number */ = 2;
-      if (VIDEO.currentTime > 0) {
-        const NOW /* number */ = VIDEO.currentTime;
+      if (video.currentTime > 0) {
+        const NOW /* number */ = video.currentTime;
 
         const PERCENT = Math.ceil(100 - (NOW / video.duration) * 100);
         setLoaderPercentOnHMI(PERCENT);
@@ -39,7 +38,7 @@
         //#region Détéction de la fin d'une game
 
         if (!found) {
-          if (detectGameScoreFrame(VIDEO, games)) {
+          if (detectGameScoreFrame(video, games)) {
             found = true;
             const GAME /* Game */ = new Game();
             GAME.end = NOW;
@@ -50,7 +49,7 @@
             //#region Orange team
 
             const ORANGE_TEAM_NAME /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               390,
               187,
@@ -63,7 +62,7 @@
             }
 
             const ORANGE_TEAM_SCORE /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               530,
               89,
@@ -79,7 +78,7 @@
             }
 
             const ORANGE_PLAYER_1 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               259,
@@ -92,7 +91,7 @@
             }
 
             const ORANGE_PLAYER_2 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               312,
@@ -105,7 +104,7 @@
             }
 
             const ORANGE_PLAYER_3 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               365,
@@ -118,7 +117,7 @@
             }
 
             const ORANGE_PLAYER_4 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               418,
@@ -135,7 +134,7 @@
             //#region Blue team
 
             const BLUE_TEAM_NAME /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               390,
               637,
@@ -148,7 +147,7 @@
             }
 
             const BLUE_TEAM_SCORE /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               1294,
               89,
@@ -164,7 +163,7 @@
             }
 
             const BLUE_PLAYER_1 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               712,
@@ -177,7 +176,7 @@
             }
 
             const BLUE_PLAYER_2 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               765,
@@ -190,7 +189,7 @@
             }
 
             const BLUE_PLAYER_3 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               818,
@@ -203,7 +202,7 @@
             }
 
             const BLUE_PLAYER_4 /* string */ = await getTextFromImage(
-              VIDEO,
+              video,
               TESSERACT_WORKER,
               PLAYER_NAME_X,
               871,
@@ -227,14 +226,14 @@
         //#region Détéction du début d'une game
 
         if (!found) {
-          if (detectGameLoadingFrame(VIDEO, games)) {
+          if (detectGameLoadingFrame(video, games)) {
             found = true;
             games[0].start = NOW + 2 /* On vire le bout de loader de map. */;
           }
         }
 
         if (!found) {
-          if (detectGameIntro(VIDEO, games)) {
+          if (detectGameIntro(video, games)) {
             found = true;
             games[0].start = NOW + 2 /* On vire le bout d'animation de map. */;
           }
@@ -245,11 +244,11 @@
         //#region Détéction du nom de la carte en cours de partie.
 
         if (!found) {
-          if (detectGamePlaying(VIDEO, games)) {
+          if (detectGamePlaying(video, games)) {
             // On cherche le nom de la carte.
             if (games[0].map == "") {
               const TEXT /* string */ = await getTextFromImage(
-                VIDEO,
+                video,
                 TESSERACT_WORKER,
                 825,
                 81,
@@ -269,7 +268,7 @@
             // On cherche le nom de l'équipe orange.
             if (games[0].orangeTeam.name == "") {
               const TEXT /* string */ = await getTextFromImage(
-                VIDEO,
+                video,
                 TESSERACT_WORKER,
                 686,
                 22,
@@ -287,7 +286,7 @@
             // On cherche le nom de l'équipe bleu.
             if (games[0].blueTeam.name == "") {
               const TEXT /* string */ = await getTextFromImage(
-                VIDEO,
+                video,
                 TESSERACT_WORKER,
                 1087,
                 22,
@@ -306,7 +305,7 @@
             if (!found) {
               if (!games[0].__debug__jumped) {
                 const TEXT /* string */ = await getTextFromImage(
-                  VIDEO,
+                  video,
                   TESSERACT_WORKER,
                   935,
                   0,
@@ -326,7 +325,7 @@
                         games[0].__debug__jumped = true;
                         console.log("Jumping to the game's start !");
                         setVideoCurrentTime(
-                          VIDEO,
+                          video,
                           NOW - DIFFERENCE,
                           games,
                           videoPath,
@@ -345,7 +344,7 @@
         //#endregion
 
         setVideoCurrentTime(
-          VIDEO,
+          video,
           NOW - DEFAULT_STEP,
           games,
           videoPath,
@@ -356,7 +355,6 @@
       }
     }
   }
-  VIDEO.addEventListener("timeupdate", videoTimeUpdate);
 
   // The server asks the frontend to display an error.
   window.electronAPI.error((error) => {
@@ -368,7 +366,11 @@
     INPUT_FILE.disabled = false;
     videoPath = path;
     if (path) {
-      VIDEO.setAttribute("src", "/file?path=" + path);
+      video = document.createElement("video");
+      video.addEventListener("loadeddata", videoLoadedData);
+      video.addEventListener("timeupdate", videoTimeUpdate);
+
+      video.setAttribute("src", "/file?path=" + path);
       setLoaderPercentOnHMI(0);
       GAMES_PERCENT.classList.remove("d-none");
       INPUT_FILE.classList.add("d-none");
