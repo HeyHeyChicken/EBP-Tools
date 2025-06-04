@@ -95,7 +95,7 @@ jobs:
       # On récupère le numéro de version de l'application.
       - name: Get version from package.json
         id: get_version
-        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+        run: echo "VERSION=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
 
       # - name: Download linux artifact
       #   uses: actions/download-artifact@v4
