@@ -4,12 +4,7 @@ const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: [
-      "./src/views/",
-      "./src/static/",
-      "./src/detector/",
-      "./src/ffmpeg/",
-    ],
+    extraResource: ["./src/views/", "./src/static/", "./src/ffmpeg/"],
     icon: "assets/icon",
     name: "EBP - Replay Cutter",
   },
@@ -19,10 +14,8 @@ module.exports = {
       // Windows
       name: "@electron-forge/maker-squirrel",
       config: {
-        // An URL to an ICO file to use as the application icon (displayed in Control Panel > Programs and Features).
-        iconUrl: "https://url/to/icon.ico",
-        // The ICO file to use as the icon for the generated Setup.exe
-        setupIcon: "/path/to/icon.ico",
+        setupIcon: "./assets/icon.ico",
+        description: "EBP Replay Cutter Tool",
       },
     },
     {

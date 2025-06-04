@@ -5,23 +5,32 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  //#region Client -> Server
+
+  // The front-end asks the server to return the web server port.
   getExpressPort: () => ipcRenderer.invoke("get-express-port"),
+  // The front-end asks the server to return the project version.
   getVersion: () => ipcRenderer.invoke("get-version"),
+  // The front-end asks the server to return the user's login status.
   getLoginState: () => ipcRenderer.invoke("get-login-state"),
-  cutVideoFile: (game, time) =>
-    ipcRenderer.invoke("cut-video-file", game, time),
+  // The front-end asks the server to cut a video file.
+  cutVideoFile: (game, videoPath) =>
+    ipcRenderer.invoke("cut-video-file", game, videoPath),
+  // The front-end asks the server to play a video file that has just been cut.
   readVideoFile: (path) => ipcRenderer.invoke("read-video-file", path),
+  // The front-end asks the server to ask the user to select a video file.
   openVideoFile: () => ipcRenderer.invoke("open-video-file"),
-  workingNbGames: (callback) =>
-    ipcRenderer.on("working-nb-games", (event, value) => callback(value)),
-  log: (callback) => ipcRenderer.on("log", (event, value) => callback(value)),
+
+  //#endregion
+
+  //#region Server -> Client
+
+  // The server gives the path of the video file selected by the user.
+  setVideoFile: (callback) =>
+    ipcRenderer.on("set-video-file", (event, value) => callback(value)),
+  // The server asks the font to display an error.
   error: (callback) =>
     ipcRenderer.on("error", (event, value) => callback(value)),
-  workingPercent: (callback) =>
-    ipcRenderer.on("working-percent", (event, value) => callback(value)),
-  games: (callback) =>
-    ipcRenderer.on("games", (event, value) => callback(value)),
-});
-window.addEventListener("DOMContentLoaded", () => {
-  //alert("lol");
+
+  //#endregion
 });

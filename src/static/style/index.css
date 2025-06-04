@@ -96,6 +96,15 @@ html > body > main > div {
   gap: var(--margin);
   padding-right: var(--margin);
 }
+.right > .center > div > div > video {
+  width: fit-content;
+  height: fit-content;
+  position: absolute;
+  opacity: 0;
+  cursor: default;
+  top: -10000vh;
+  left: -10000vw;
+}
 .right > .center > div > div > .box {
   display: flex;
   flex-direction: column;

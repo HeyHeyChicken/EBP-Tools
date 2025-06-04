@@ -2,35 +2,59 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
+//#region Imports
+
 const { app, BrowserWindow, ipcMain, session, dialog } = require("electron");
+
+// run this as early in the main process as possible
+if (require("electron-squirrel-startup")) {
+  app.quit();
+}
+
 const path = require("node:path");
 const express = require("express");
 const os = require("os");
-const { spawn, exec } = require("child_process");
+const { exec } = require("child_process");
 const { default: getPort } = require("get-port");
-const downloadsFolder = require("downloads-folder");
-const fs = require("fs");
-
 const { version } = require("../package.json");
+const https = require("https");
+
+//#endregion
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const ROOT_PATH = IS_PROD ? process.resourcesPath : __dirname;
 const FFMPEG_PATH = path.join(ROOT_PATH, "ffmpeg", os.platform());
 let mainWindow;
-let videoPath;
-
-//#region Express
+let projectLatestVersion /* string */ = "";
 
 (async () => {
+  getProjectLatestVersion((version) => {
+    projectLatestVersion = version;
+    console.log("A");
+    console.log(version);
+    console.log("B");
+  });
+
+  //#region Express
+
   const PORT = await getPort();
   const APP = express();
-  APP.set("env", "development");
-  //APP.set("view engine", "pug");
-  //APP.set("views", VIEW_PATH);
+  if (!IS_PROD) {
+    APP.set("env", "development");
+  }
   APP.use(express.static(path.join(ROOT_PATH, "static")));
 
   APP.get("/", (request, response) => {
     response.sendFile(path.join(ROOT_PATH, "views", "index.html"));
+  });
+
+  // Allows the application's front-end to access local files on the user's device.
+  APP.get("/file", (req, res) => {
+    const FILE_PATH = req.query.path;
+    if (!FILE_PATH) {
+      return res.status(400).send("Missing path");
+    }
+    res.sendFile(FILE_PATH);
   });
 
   APP.listen(PORT, () => {
@@ -42,73 +66,59 @@ let videoPath;
   //#endregion
 
   /**
-   * Cette fonction permet de récupérer la résolution et la durée d'un fichier vidéo.
-   * @param {*} ffmpegPath
-   * @param {*} videoPath
-   * @param {*} callback
+   * Cette fonction récupère le numéro de la dernière version publiée du projet.
+   * @param {Function} callback
    */
-  function getVideoInfo(ffmpegPath, videoPath, callback) {
+  function getProjectLatestVersion(callback) {
+    const OPTIONS = {
+      hostname: "api.github.com",
+      path: "/repos/heyheychicken/ebp-replay-cutter/releases/latest",
+      method: "GET",
+      headers: { "User-Agent": "Node.js" },
+    };
+
+    const REQUEST = https.request(OPTIONS, (res) => {
+      let data = "";
+
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try {
+          const json = JSON.parse(data);
+          callback(json.tag_name);
+        } catch (err) {
+          console.error(err);
+        }
+      });
+    });
+
+    REQUEST.on("error", (err) => callback(err));
+    REQUEST.end();
+  }
+
+  /**
+   * This function retrieves the resolution of a video file.
+   * @param {string} ffmpegPath Path of the ffmpeg binary.
+   * @param {string} videoPath Path of the video file.
+   * @param {Function} callback Callback function with width and height information.
+   */
+  function getVideoResolution(ffmpegPath, videoPath, callback) {
     const COMMAND = `${ffmpegPath} -i "${videoPath}" 2>&1`;
     exec(COMMAND, (err, stdout, stderr) => {
       const OUTPUT = stderr || stdout;
       const RESOLUTION = OUTPUT.match(/, (\d+)x(\d+)[ ,]/);
-      const DURATION = OUTPUT.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
-      console.log(RESOLUTION, DURATION);
-      if (!RESOLUTION || !DURATION) {
+      if (!RESOLUTION) {
         console.error("Info not found");
       }
-      const width = +RESOLUTION[1];
-      const height = +RESOLUTION[2];
-      const duration = +DURATION[1] * 3600 + +DURATION[2] * 60 + +DURATION[3];
-      callback(width, height, duration);
+      const WIDTH = +RESOLUTION[1];
+      const HEIGHT = +RESOLUTION[2];
+      callback(WIDTH, HEIGHT);
     });
   }
 
-  async function detectGamesInVideo(filePath) {
-    const BINARY_PATH = path.join(ROOT_PATH, "detector", os.platform());
-    const FFMPEG_PATH = path.join(ROOT_PATH, "ffmpeg", os.platform());
-
-    getVideoInfo(FFMPEG_PATH, filePath, (width, height, duration) => {
-      if (width == 1920 && height == 1080) {
-        const child = spawn(BINARY_PATH, [
-          filePath,
-          os.platform(),
-          !IS_PROD,
-          FFMPEG_PATH,
-          duration,
-        ]);
-        mainWindow.webContents.send("log", "B");
-
-        child.stdout.on("data", (data) => {
-          mainWindow.webContents.send("log", "C: Data");
-          try {
-            const DATA = JSON.parse(data.toString().trim());
-            console.log(DATA);
-            if (DATA.nbGames) {
-              mainWindow.webContents.send("working-nb-games", DATA.nbGames);
-            }
-            if (DATA.percent) {
-              mainWindow.webContents.send("working-percent", DATA.percent);
-            } else if (Array.isArray(DATA)) {
-              mainWindow.webContents.send("games", DATA);
-            }
-          } catch (e) {
-            console.error(e);
-          }
-        });
-
-        child.stderr.on("data", (stderr) => {
-          mainWindow.webContents.send("error", stderr.toString().trim());
-          mainWindow.webContents.send("games", []);
-        });
-      } else {
-        mainWindow.webContents.send("error", "Resolution must be 1920x1080");
-      }
-    });
-  }
-
+  /**
+   * This function initializes the front-end.
+   */
   function createWindow() {
-    // Create the browser window.
     mainWindow = new BrowserWindow({
       width: 800 + (!IS_PROD ? 540 : 0),
       height: 800,
@@ -120,77 +130,96 @@ let videoPath;
       },
     });
 
+    // Hides the menu bar displayed in the top left corner on Windows.
     mainWindow.setMenuBarVisibility(false);
 
-    // and load the index.html of the app.
+    // Loads the application's index.html.
     mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
-    //if (!IS_PROD) {
-    mainWindow.webContents.openDevTools();
-    //}
-
-    // Open the DevTools.
-    // mainWindow.webContents.openDevTools()
+    if (!IS_PROD) {
+      mainWindow.webContents.openDevTools();
+    }
   }
 
-  // This method will be called when Electron has finished
-  // initialization and is ready to create browser windows.
-  // Some APIs can only be used after this event occurs.
+  /**
+   * This method will be called when Electron has finished initialization and is ready to create browser windows.
+   */
   app.whenReady().then(() => {
     createWindow();
 
+    // The front-end asks the server to return the web server port.
     ipcMain.handle("get-express-port", async () => {
       return PORT;
     });
 
+    // The front-end asks the server to return the project version.
     ipcMain.handle("get-version", async () => {
       return version;
     });
 
+    // The front-end asks the server to return the user's login status.
     ipcMain.handle("get-login-state", async () => {
       return session.defaultSession.cookies
         .get({ domain: "evabattleplan.com" })
         .then((cookies) => {
-          // Cherche le cookie wordpress_logged_in...
-          const wpCookie = cookies.find((c) =>
+          const WORDPRESS_COOKIE = cookies.find((c) =>
             c.name.startsWith("wordpress_logged_in")
           );
           if (!IS_PROD) {
             return true;
           }
-          return !!wpCookie;
+          return !!WORDPRESS_COOKIE;
         });
     });
 
+    // The front-end asks the server to ask the user to choose a video file.
     ipcMain.handle("open-video-file", async () => {
       const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ["openFile"],
-        filters: [{ name: "MP4 videos", extensions: ["mp4"] }],
+        filters: [{ name: "EVA MP4 video", extensions: ["mp4"] }],
       });
       if (canceled) {
-        return null;
+        mainWindow.webContents.send("set-video-file", "");
       } else {
-        videoPath = filePaths[0];
-        detectGamesInVideo(videoPath);
-        return videoPath;
+        // Check that the video file resolution is correct.
+        getVideoResolution(
+          FFMPEG_PATH,
+          filePaths[0],
+          (width, height, duration) => {
+            const EXPECTED_WIDTH /* number */ = 1920;
+            const EXPECTED_HEIGHT /* number */ = 1080;
+            if (width == EXPECTED_WIDTH && height == EXPECTED_HEIGHT) {
+              mainWindow.webContents.send("set-video-file", filePaths[0]);
+            } else {
+              mainWindow.webContents.send(
+                "error",
+                `Resolution must be ${EXPECTED_WIDTH}x${EXPECTED_HEIGHT}`
+              );
+              mainWindow.webContents.send("set-video-file", "");
+            }
+          }
+        );
       }
     });
 
-    ipcMain.handle("cut-video-file", async (event, game, time) => {
-      const OUTPUT_FILE_PATH = path.join(
-        downloadsFolder(),
-        "EBP_" + game.map + "_" + time + ".mp4"
+    // The front-end asks the server to cut a video file.
+    ipcMain.handle("cut-video-file", async (event, game, videoPath) => {
+      // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
+      const NOW = new Date().getTime();
+      const OUTPUT_FILE_PATH /* string */ = path.join(
+        path.join(os.homedir(), "Downloads"),
+        `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map} (${NOW}).mp4`
       );
-      const COMMAND = `"${FFMPEG_PATH}" -ss ${
-        game.start
+      const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
+        game._start
       } -i "${videoPath}" -t ${
-        game.end.time - game.start
+        game._end - game._start
       } -c copy "${OUTPUT_FILE_PATH}"`;
-      mainWindow.webContents.send("log", COMMAND);
 
       exec(COMMAND);
       return OUTPUT_FILE_PATH;
     });
 
+    // The front-end asks the server to open a video file.
     ipcMain.handle("read-video-file", async (event, path) => {
       const COMMAND =
         process.platform === "win32"
@@ -203,19 +232,14 @@ let videoPath;
     });
 
     app.on("activate", function () {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
+      // On macOS it's common to re-create a window in the app when the dock icon is clicked and there are no other windows open.
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
   });
 
-  // Quit when all windows are closed, except on macOS. There, it's common
-  // for applications and their menu bar to stay active until the user quits
-  // explicitly with Cmd + Q.
+  // Quit when all windows are closed, except on macOS.
+  // There, it's common for applications and their menu bar to stay active until the user quits explicitly with Cmd + Q.
   app.on("window-all-closed", function () {
     if (process.platform !== "darwin") app.quit();
   });
-
-  // In this file you can include the rest of your app's specific main process
-  // code. You can also put them in separate files and require them here.
 })();

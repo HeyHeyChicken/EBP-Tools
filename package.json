@@ -5,23 +5,12 @@
   "main": ".webpack/main",
   "scripts": {
     "make": "electron-forge make",
-    "mac_compile_c++": "g++ -std=c++17 ./src/detector/script.cpp -o ./src/detector/darwin -I/opt/homebrew/include/opencv4 -I/opt/homebrew/include $(pkg-config --cflags --libs opencv4) -L/opt/homebrew/lib -ltesseract -lleptonica",
-    "start_mac": "npm run mac_compile_c++ && electron ./src/main.js",
-    "ubuntu_compile_c++": "g++ -std=c++17 ./src/detector/script.cpp -o ./src/detector/darwin $(pkg-config --cflags --libs opencv4) -ltesseract -lleptonica",
-    "start_ubuntu": "npm run ubuntu_compile_c++ && electron ./src/main.js",
-    "windows_compile_c++": "g++ -std=c++17 ./src/detector/script.cpp -o ./src/detector/win32 -I C:/Users/Antoine/Documents/GitHub/EBP-Replay-Cutter/vcpkg/installed/x64-mingw-static/include -I C:/Users/Antoine/Documents/GitHub/EBP-Replay-Cutter/vcpkg/installed/x64-mingw-static/include/opencv4 -L C:/Users/Antoine/Documents/GitHub/EBP-Replay-Cutter/vcpkg/installed/x64-mingw-static/lib -lopencv_imgproc4 -lopencv_imgcodecs4 -lopencv_videoio4 -lopencv_imgcodecs4 -lopencv_imgproc4 -lopencv_highgui4 -ltesseract55 -larchive -lbz2 -lzstd -lcrypto -lws2_32 -lcrypt32 -lleptonica -ljpeg -lopenjp2 -lgif -ltiff -llzma -lwebp -lwebpdemux -lwebpmux -lsharpyuv -lpng -lzlib -lcurl -lcrypt32 -lsecur32 -lws2_32 -llz4 -lbcrypt -lole32 -loleaut32 -luuid -lopencv_core4 -lzlib",
-    "start_windows": "npm run windows_compile_c++ && electron ./src/main.js"
+    "start": "electron ./src/main.js"
   },
-  "repository": "https://github.com/electron/electron-quick-start",
-  "keywords": [
-    "Electron",
-    "quick",
-    "start",
-    "tutorial",
-    "demo"
-  ],
-  "author": "GitHub",
-  "license": "CC0-1.0",
+  "repository": "https://github.com/HeyHeyChicken/EBP-Replay-Cutter",
+  "keywords": [],
+  "author": "Antoine Duval",
+  "license": "See LICENSE.txt",
   "devDependencies": {
     "@electron-forge/cli": "^7.8.0",
     "@electron-forge/maker-deb": "^7.8.0",
@@ -34,13 +23,15 @@
     "@electron-forge/plugin-webpack": "^7.8.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
     "copy-webpack-plugin": "^13.0.0",
-    "electron": "^36.2.1"
+    "electron": "^36.2.1",
+    "electron-squirrel-startup": "^1.0.1",
+    "node-addon-api": "^8.3.1"
   },
   "dependencies": {
-    "downloads-folder": "^3.0.3",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",
     "get-port": "^7.1.0",
-    "pug": "^3.0.3"
+    "pug": "^3.0.3",
+    "registry-js": "^1.16.1"
   }
 }
