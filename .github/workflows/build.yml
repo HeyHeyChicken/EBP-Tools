@@ -9,6 +9,8 @@ name: Build cross-platform
 
 on:
   push:
+    tags:
+      - "*"
     branches:
       - main
 
