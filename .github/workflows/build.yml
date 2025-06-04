@@ -64,6 +64,14 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
+      # On récupère le numéro de version de l'application.
+      - name: Get version from package.json
+        id: get_version
+        run: |
+          VERSION=$(cat package.json | grep '"version":' | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Echo version
+        run: echo "Version: ${{ steps.get_version.outputs.version }}"
       # Installation de Node.js pour construire l'app Electron
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -95,7 +103,11 @@ jobs:
       # On récupère le numéro de version de l'application.
       - name: Get version from package.json
         id: get_version
-        run: echo "VERSION=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION=$(cat package.json | grep '"version":' | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Echo version
+        run: echo "Version: ${{ steps.get_version.outputs.version }}"
 
       # - name: Download linux artifact
       #   uses: actions/download-artifact@v4
@@ -153,5 +165,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./release/windows.exe
-          asset_name: EBP - Replay Cutter.exe
+          asset_name: EBP-ReplayCutter.exe
           asset_content_type: application/octet-stream
