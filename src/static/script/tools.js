@@ -154,7 +154,7 @@ function onVideoEnded(games, videoPath, discordServerURL) {
         background: "#F44336",
       },
       onClick: function () {
-        window.open(discordServerURL, "_blank")?.focus();
+        window.electronAPI.openURL(discordServerURL);
         TOAST.hideToast();
       },
     }).showToast();

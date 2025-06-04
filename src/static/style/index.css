@@ -55,8 +55,9 @@ html > body > footer {
   display: flex;
 }
 html > body > footer > .alert {
-  color: red;
+  color: #f44336;
   margin-left: var(--margin);
+  cursor: pointer;
 }
 html > body > footer > .alert:hover {
   text-decoration: underline;

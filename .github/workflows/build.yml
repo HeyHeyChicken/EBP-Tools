@@ -79,7 +79,7 @@ jobs:
       - name: Rename .exe
         run: |
           $file = Get-ChildItem -Path "out/make/squirrel.windows/x64/" -Filter *.exe | Select-Object -First 1
-          Rename-Item -Path $file.FullName -NewName "EBP - Replay Cutter.exe"
+          Rename-Item -Path $file.FullName -NewName "windows.exe"
       # Upload du setup.exe
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -152,6 +152,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/EBP - Replay Cutter.exe
-          asset_name: windows.exe
+          asset_path: ./release/windows.exe
+          asset_name: EBP - Replay Cutter.exe
           asset_content_type: application/octet-stream

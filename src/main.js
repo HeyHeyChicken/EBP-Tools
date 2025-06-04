@@ -4,7 +4,14 @@
 
 //#region Imports
 
-const { app, BrowserWindow, ipcMain, session, dialog } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  session,
+  dialog,
+  shell,
+} = require("electron");
 
 // run this as early in the main process as possible
 if (require("electron-squirrel-startup")) {
@@ -142,6 +149,11 @@ let projectLatestVersion /* string */ = "";
    */
   app.whenReady().then(() => {
     createWindow();
+
+    // The front-end asks the server to open an url in the default browser.
+    ipcMain.handle("open-url", async (event, url) => {
+      shell.openExternal(url);
+    });
 
     // The front-end asks the server to return the web server port.
     ipcMain.handle("get-express-port", async () => {
