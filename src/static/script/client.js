@@ -11,11 +11,28 @@
   const GAMES /* HTMLElement */ = document.querySelector("#result > table");
   const MESSAGE /* HTMLElement */ = document.getElementById("message");
   const FOOTER /* HTMLElement */ = document.querySelector("footer");
-  const TESSERACT_WORKER = await Tesseract.createWorker("eng", 1, {
-    logger: function (m) {
-      //console.log(m);
-    },
-  });
+
+  (async function () {
+    document.tesseractWorker = await Tesseract.createWorker("eng");
+    document.tesseractWorkerNumber = await Tesseract.createWorker("eng");
+    document.tesseractWorkerLetter = await Tesseract.createWorker("eng");
+    document.tesseractWorkerTime = await Tesseract.createWorker("eng");
+    document.tesseractWorker.setParameters({
+      tessedit_char_whitelist:
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+    });
+    document.tesseractWorkerNumber.setParameters({
+      tessedit_char_whitelist: "0123456789",
+    });
+    document.tesseractWorkerLetter.setParameters({
+      tessedit_char_whitelist:
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ",
+    });
+    document.tesseractWorkerTime.setParameters({
+      tessedit_char_whitelist: "0123456789:",
+    });
+    INPUT_FILE.disabled = false;
+  })();
 
   let video /* HTMLElement */;
 
@@ -25,7 +42,12 @@
   // Path to the video file.
   let videoPath /* string */ = "";
 
+  let start = 0;
+
   async function videoTimeUpdate(event) {
+    if (start == 0) {
+      start = Date.now();
+    }
     if (event.target) {
       let found /* boolean */ = false;
       const DEFAULT_STEP /* number */ = 2;
@@ -50,20 +72,20 @@
 
             const ORANGE_TEAM_NAME /* string */ = await getTextFromImage(
               video,
-              TESSERACT_WORKER,
+              document.tesseractWorker,
               390,
               187,
               620,
               217,
               7
             );
-            if (ORANGE_TEAM_NAME) {
+            if (ORANGE_TEAM_NAME && ORANGE_TEAM_NAME.length >= 2) {
               GAME.orangeTeam.name = ORANGE_TEAM_NAME.toUpperCase();
             }
 
             const ORANGE_TEAM_SCORE /* string */ = await getTextFromImage(
               video,
-              TESSERACT_WORKER,
+              document.tesseractWorkerNumber,
               530,
               89,
               620,
@@ -77,57 +99,57 @@
               }
             }
 
-            const ORANGE_PLAYER_1 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              259,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              282,
-              7
-            );
-            if (ORANGE_PLAYER_1) {
-              GAME.orangeTeam.players.push(new Player(1, ORANGE_PLAYER_1));
-            }
+            // const ORANGE_PLAYER_1 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   259,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   282,
+            //   7
+            // );
+            // if (ORANGE_PLAYER_1) {
+            //   GAME.orangeTeam.players.push(new Player(1, ORANGE_PLAYER_1));
+            // }
 
-            const ORANGE_PLAYER_2 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              312,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              335,
-              7
-            );
-            if (ORANGE_PLAYER_2) {
-              GAME.orangeTeam.players.push(new Player(2, ORANGE_PLAYER_2));
-            }
+            // const ORANGE_PLAYER_2 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   312,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   335,
+            //   7
+            // );
+            // if (ORANGE_PLAYER_2) {
+            //   GAME.orangeTeam.players.push(new Player(2, ORANGE_PLAYER_2));
+            // }
 
-            const ORANGE_PLAYER_3 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              365,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              388,
-              7
-            );
-            if (ORANGE_PLAYER_3) {
-              GAME.orangeTeam.players.push(new Player(3, ORANGE_PLAYER_3));
-            }
+            // const ORANGE_PLAYER_3 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   365,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   388,
+            //   7
+            // );
+            // if (ORANGE_PLAYER_3) {
+            //   GAME.orangeTeam.players.push(new Player(3, ORANGE_PLAYER_3));
+            // }
 
-            const ORANGE_PLAYER_4 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              418,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              441,
-              7
-            );
-            if (ORANGE_PLAYER_4) {
-              GAME.orangeTeam.players.push(new Player(4, ORANGE_PLAYER_4));
-            }
+            // const ORANGE_PLAYER_4 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   418,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   441,
+            //   7
+            // );
+            // if (ORANGE_PLAYER_4) {
+            //   GAME.orangeTeam.players.push(new Player(4, ORANGE_PLAYER_4));
+            // }
 
             //#endregion
 
@@ -135,20 +157,20 @@
 
             const BLUE_TEAM_NAME /* string */ = await getTextFromImage(
               video,
-              TESSERACT_WORKER,
+              document.tesseractWorker,
               390,
               637,
               620,
               667,
               7
             );
-            if (BLUE_TEAM_NAME) {
+            if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
               GAME.blueTeam.name = BLUE_TEAM_NAME.toUpperCase();
             }
 
             const BLUE_TEAM_SCORE /* string */ = await getTextFromImage(
               video,
-              TESSERACT_WORKER,
+              document.tesseractWorkerNumber,
               1294,
               89,
               1384,
@@ -162,57 +184,57 @@
               }
             }
 
-            const BLUE_PLAYER_1 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              712,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              735,
-              7
-            );
-            if (BLUE_PLAYER_1) {
-              GAME.blueTeam.players.push(new Player(6, BLUE_PLAYER_1));
-            }
+            // const BLUE_PLAYER_1 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   712,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   735,
+            //   7
+            // );
+            // if (BLUE_PLAYER_1) {
+            //   GAME.blueTeam.players.push(new Player(6, BLUE_PLAYER_1));
+            // }
 
-            const BLUE_PLAYER_2 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              765,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              788,
-              7
-            );
-            if (BLUE_PLAYER_2) {
-              GAME.blueTeam.players.push(new Player(7, BLUE_PLAYER_2));
-            }
+            // const BLUE_PLAYER_2 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   765,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   788,
+            //   7
+            // );
+            // if (BLUE_PLAYER_2) {
+            //   GAME.blueTeam.players.push(new Player(7, BLUE_PLAYER_2));
+            // }
 
-            const BLUE_PLAYER_3 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              818,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              841,
-              7
-            );
-            if (BLUE_PLAYER_3) {
-              GAME.blueTeam.players.push(new Player(8, BLUE_PLAYER_3));
-            }
+            // const BLUE_PLAYER_3 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   818,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   841,
+            //   7
+            // );
+            // if (BLUE_PLAYER_3) {
+            //   GAME.blueTeam.players.push(new Player(8, BLUE_PLAYER_3));
+            // }
 
-            const BLUE_PLAYER_4 /* string */ = await getTextFromImage(
-              video,
-              TESSERACT_WORKER,
-              PLAYER_NAME_X,
-              871,
-              PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              894,
-              7
-            );
-            if (BLUE_PLAYER_4) {
-              GAME.blueTeam.players.push(new Player(9, BLUE_PLAYER_4));
-            }
+            // const BLUE_PLAYER_4 /* string */ = await getTextFromImage(
+            //   video,
+            //   document.tesseractWorker,
+            //   PLAYER_NAME_X,
+            //   871,
+            //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+            //   894,
+            //   7
+            // );
+            // if (BLUE_PLAYER_4) {
+            //   GAME.blueTeam.players.push(new Player(9, BLUE_PLAYER_4));
+            // }
 
             //#endregion
 
@@ -241,7 +263,7 @@
 
         //#endregion
 
-        //#region Détéction du nom de la carte en cours de partie.
+        //#region Detecting card name during game.
 
         if (!found) {
           if (detectGamePlaying(video, games)) {
@@ -249,7 +271,7 @@
             if (games[0].map == "") {
               const TEXT /* string */ = await getTextFromImage(
                 video,
-                TESSERACT_WORKER,
+                document.tesseractWorkerLetter,
                 825,
                 81,
                 1093,
@@ -265,48 +287,54 @@
                 }
               }
             }
-            // On cherche le nom de l'équipe orange.
+
+            // We are looking for the name of the orange team.
             if (games[0].orangeTeam.name == "") {
               const TEXT /* string */ = await getTextFromImage(
                 video,
-                TESSERACT_WORKER,
+                document.tesseractWorker,
                 686,
                 22,
                 833,
                 68,
                 6
               );
-              if (TEXT) {
+              if (TEXT && TEXT.length >= 2) {
                 found = true;
                 if (games[0].orangeTeam.name == "") {
                   games[0].orangeTeam.name = TEXT.toUpperCase();
                 }
               }
             }
-            // On cherche le nom de l'équipe bleu.
+
+            // We are looking for the name of the blue team.
             if (games[0].blueTeam.name == "") {
               const TEXT /* string */ = await getTextFromImage(
                 video,
-                TESSERACT_WORKER,
+                document.tesseractWorker,
                 1087,
                 22,
                 1226,
                 68,
                 6
               );
-              if (TEXT) {
+              if (TEXT && TEXT.length >= 2) {
                 found = true;
                 if (games[0].blueTeam.name == "") {
                   games[0].blueTeam.name = TEXT.toUpperCase();
                 }
               }
             }
-            // Si tout a été trouvé, on cherche à gagner du temps.
-            if (!found) {
+
+            if (
+              games[0].orangeTeam.name &&
+              games[0].blueTeam.name &&
+              games[0].map
+            ) {
               if (!games[0].__debug__jumped) {
                 const TEXT /* string */ = await getTextFromImage(
                   video,
-                  TESSERACT_WORKER,
+                  document.tesseractWorkerTime,
                   935,
                   0,
                   985,
@@ -352,6 +380,18 @@
         );
       } else {
         onVideoEnded(games, videoPath, DISCORD_SERVER_URL);
+
+        const DIFFERENCE = Date.now() - start;
+        const MINUTES = Math.floor(DIFFERENCE / 60000);
+        const SECONDS = Math.floor((DIFFERENCE % 60000) / 1000);
+
+        console.log(
+          `${MINUTES.toString().padStart(
+            2,
+            "0"
+          )}m ${SECONDS.toString().padStart(2, "0")}s`
+        );
+        start = 0;
       }
     }
   }
