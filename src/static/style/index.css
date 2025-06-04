@@ -52,6 +52,14 @@ html > body > footer {
   border-top: 1px solid var(--border-color);
   background-color: var(--dark-color);
   color: white;
+  display: flex;
+}
+html > body > footer > .alert {
+  color: red;
+  margin-left: var(--margin);
+}
+html > body > footer > .alert:hover {
+  text-decoration: underline;
 }
 html > body > main {
   background-image: url(/img/wallpaper.webp);

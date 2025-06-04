@@ -380,7 +380,19 @@
 
   // Getting the project version.
   window.electronAPI.getVersion().then((version) => {
-    FOOTER.innerText = "v" + version;
+    FOOTER.innerText = "v" + version.current;
+    if (version.current != version.last && version.last) {
+      const ALERT = document.createElement("a");
+      ALERT.setAttribute(
+        "href",
+        "https://github.com/HeyHeyChicken/EBP-Replay-Cutter"
+      );
+      ALERT.setAttribute("target", "_blank");
+      ALERT.classList.add("alert");
+      ALERT.innerHTML =
+        "A new update is available, download it by clicking here.";
+      FOOTER.append(ALERT);
+    }
   });
 
   // Getting the web server port.

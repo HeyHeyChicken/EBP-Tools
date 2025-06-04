@@ -30,9 +30,6 @@ let projectLatestVersion /* string */ = "";
 (async () => {
   getProjectLatestVersion((version) => {
     projectLatestVersion = version;
-    console.log("A");
-    console.log(version);
-    console.log("B");
   });
 
   //#region Express
@@ -153,7 +150,10 @@ let projectLatestVersion /* string */ = "";
 
     // The front-end asks the server to return the project version.
     ipcMain.handle("get-version", async () => {
-      return version;
+      return {
+        current: version,
+        last: projectLatestVersion,
+      };
     });
 
     // The front-end asks the server to return the user's login status.
