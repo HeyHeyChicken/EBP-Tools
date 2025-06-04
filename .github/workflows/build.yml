@@ -72,9 +72,6 @@ jobs:
       # Installation des dépendances NPM
       - name: Install Node dependencies
         run: npm install
-      # Remove useless ffmpeg binaries
-      - name: Clean src\ffmpeg (keep only .exe)
-        run: Get-ChildItem -Path src\ffmpeg -File | Where-Object { $_.Extension -ne ".exe" } | Remove-Item -Force
       # Build de l'application Electron
       - name: Build Electron app
         run: npm run make

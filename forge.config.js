@@ -1,10 +1,20 @@
 const { FusesPlugin } = require("@electron-forge/plugin-fuses");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
+const os = process.env.TARGET_OS || process.platform;
+
+const FFMPEG_PATH_BY_OS = {
+  win32: ["./src/ffmpeg/win32.exe"],
+  darwin: ["./src/ffmpeg/darwin"],
+  //linux: ["./src/ffmpeg/linux"],
+};
 
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: ["./src/views/", "./src/static/", "./src/ffmpeg/"],
+    extraResource: [
+      ...["./src/views/", "./src/static/"],
+      ...FFMPEG_PATH_BY_OS[os],
+    ],
     icon: "assets/icon",
     name: "EBP - Replay Cutter",
   },
