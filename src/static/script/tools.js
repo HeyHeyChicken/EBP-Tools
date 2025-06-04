@@ -153,7 +153,7 @@ function onVideoEnded(games, videoPath, discordServerURL) {
 
     const TOAST = Toastify({
       text: "No games were found in your video. If you think this is a mistake, please let me know.",
-      duration: 10 * 1000,
+      duration: 5 * 1000,
       close: true,
       gravity: "bottom",
       position: "right",
@@ -563,11 +563,13 @@ async function getTextFromImage(
 function showGamesOnHMI(games, videoPath) {
   const INPUT_FILE = document.getElementById("inputFile");
   const GAMES_PERCENT = document.getElementById("loader");
-  const GAMES = document.getElementById("games");
   const MESSAGE = document.getElementById("message");
+  const RESULT = document.getElementById("result");
+  const GAMES = RESULT.querySelector("table");
 
-  MESSAGE.classList.add("d-none");
+  RESULT.classList.remove("d-none");
   INPUT_FILE.classList.remove("d-none");
+  MESSAGE.classList.add("d-none");
   GAMES_PERCENT.classList.add("d-none");
 
   const TBODY = document.createElement("tbody");
@@ -603,7 +605,7 @@ function showGamesOnHMI(games, videoPath) {
       const FILE_PATH = await window.electronAPI.cutVideoFile(game, videoPath);
       const TOAST = Toastify({
         text: "Your video has been cut here: " + FILE_PATH,
-        duration: 10 * 1000,
+        duration: 5 * 1000,
         close: true,
         gravity: "bottom",
         position: "right",
@@ -651,7 +653,7 @@ function displayErrorOnHMI(error) {
   console.error(error);
   const TOAST = Toastify({
     text: error,
-    duration: 10 * 1000,
+    duration: 5 * 1000,
     close: true,
     gravity: "bottom",
     position: "right",

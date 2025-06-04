@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to cut a video file.
   cutVideoFile: (game, videoPath) =>
     ipcRenderer.invoke("cut-video-file", game, videoPath),
+  // The front-end asks the server to cut all video files.
+  cutVideoFiles: (game, videoPath) =>
+    ipcRenderer.invoke("cut-video-files", game, videoPath),
   // The front-end asks the server to play a video file that has just been cut.
   readVideoFile: (path) => ipcRenderer.invoke("read-video-file", path),
   // The front-end asks the server to ask the user to select a video file.

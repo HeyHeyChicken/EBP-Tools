@@ -8,7 +8,7 @@
   const INPUT_FILE /* HTMLElement */ = document.getElementById("inputFile");
   const GAMES_PERCENT /* HTMLElement */ = document.getElementById("loader");
   const GAMES_COUNTER /* HTMLElement */ = document.getElementById("nbGames");
-  const GAMES /* HTMLElement */ = document.getElementById("games");
+  const GAMES /* HTMLElement */ = document.querySelector("#result > table");
   const MESSAGE /* HTMLElement */ = document.getElementById("message");
   const FOOTER /* HTMLElement */ = document.querySelector("footer");
   const TESSERACT_WORKER = await Tesseract.createWorker("eng", 1, {
@@ -415,6 +415,31 @@
     }
   });
 
+  // When the user clicks the save all button.
+  document
+    .querySelector("#result > button")
+    .addEventListener("click", async function () {
+      const FILE_PATH = await window.electronAPI.cutVideoFiles(
+        games,
+        videoPath
+      );
+      const TOAST = Toastify({
+        text: "Your videos have been cut here: " + FILE_PATH,
+        duration: 5 * 1000,
+        close: true,
+        gravity: "bottom",
+        position: "right",
+        stopOnFocus: true,
+        style: {
+          background: "#4caf50",
+        },
+        onClick: function () {
+          window.electronAPI.readVideoFile(FILE_PATH);
+          TOAST.hideToast();
+        },
+      }).showToast();
+    });
+
   // When the user clicks the login button, it is locked to prevent spam.
   LOGIN_BUTTON.addEventListener("click", function () {
     this.firstChild.disabled = true;
@@ -422,6 +447,9 @@
 
   // When the user clicks on the input to select the video file...
   INPUT_FILE.addEventListener("click", async function () {
+    const RESULT = document.getElementById("result");
+    RESULT.classList.add("d-none");
+
     games = [];
     GAMES.innerHTML = "";
     GAMES_COUNTER.innerText = "0";

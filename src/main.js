@@ -70,6 +70,29 @@ let projectLatestVersion /* string */ = "";
   //#endregion
 
   /**
+   * This function cuts out a part of a video to get one file per game.
+   * @param {Game} game Game's data.
+   * @param {string} videoPath Full video path.
+   * @returns {string} Cutted video path.
+   */
+  function cutVideoFile(game, videoPath) {
+    // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
+    const NOW = new Date().getTime();
+    const OUTPUT_FILE_PATH /* string */ = path.join(
+      path.join(os.homedir(), "Downloads"),
+      `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map} (${NOW}).mp4`
+    );
+    const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
+      game._start
+    } -i "${videoPath}" -t ${
+      game._end - game._start
+    } -c copy "${OUTPUT_FILE_PATH}"`;
+
+    exec(COMMAND);
+    return OUTPUT_FILE_PATH;
+  }
+
+  /**
    * Cette fonction récupère le numéro de la dernière version publiée du projet.
    * @param {Function} callback
    */
@@ -214,21 +237,16 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to cut a video file.
-    ipcMain.handle("cut-video-file", async (event, game, videoPath) => {
-      // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
-      const NOW = new Date().getTime();
-      const OUTPUT_FILE_PATH /* string */ = path.join(
-        path.join(os.homedir(), "Downloads"),
-        `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map} (${NOW}).mp4`
-      );
-      const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
-        game._start
-      } -i "${videoPath}" -t ${
-        game._end - game._start
-      } -c copy "${OUTPUT_FILE_PATH}"`;
+    ipcMain.handle("cut-video-files", async (event, games, videoPath) => {
+      games.forEach((game) => {
+        return cutVideoFile(game, videoPath);
+      });
+      return path.join(os.homedir(), "Downloads");
+    });
 
-      exec(COMMAND);
-      return OUTPUT_FILE_PATH;
+    // The front-end asks the server to cut a video file.
+    ipcMain.handle("cut-video-file", async (event, game, videoPath) => {
+      return cutVideoFile(game, videoPath);
     });
 
     // The front-end asks the server to open a video file.

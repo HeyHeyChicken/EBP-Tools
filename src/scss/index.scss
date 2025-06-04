@@ -134,41 +134,51 @@ html > body {
           }
         }
 
-        > #games {
-          background-color: var(--dark-color);
-          color: white;
-          border-collapse: collapse;
+        > #result {
+          display: flex;
+          flex-direction: column;
+          gap: var(--margin);
 
-          > tbody > tr {
-            > * {
-              padding: calc(var(--margin) / 2) var(--margin);
-              border: 1px solid var(--border-color);
-            }
+          > button {
+            margin: 0 auto;
+          }
 
-            > th {
-              background-position: center center;
-              background-size: cover;
-              text-align: center;
-              font-weight: 700;
-              text-transform: uppercase;
-            }
+          > table {
+            background-color: var(--dark-color);
+            color: white;
+            border-collapse: collapse;
 
-            > td {
-              &.infos {
-                width: 100%;
+            > tbody > tr {
+              > * {
+                padding: calc(var(--margin) / 2) var(--margin);
+                border: 1px solid var(--border-color);
               }
 
-              &.buttons {
-                padding: calc(var(--margin) / 2);
+              > th {
+                background-position: center center;
+                background-size: cover;
+                text-align: center;
+                font-weight: 700;
+                text-transform: uppercase;
+              }
 
-                > div {
-                  display: flex;
-                  gap: calc(var(--margin) / 2);
+              > td {
+                &.infos {
+                  width: 100%;
                 }
-              }
 
-              > p {
-                margin: 0;
+                &.buttons {
+                  padding: calc(var(--margin) / 2);
+
+                  > div {
+                    display: flex;
+                    gap: calc(var(--margin) / 2);
+                  }
+                }
+
+                > p {
+                  margin: 0;
+                }
               }
             }
           }
