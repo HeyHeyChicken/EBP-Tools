@@ -72,6 +72,9 @@ jobs:
       # Installation des dépendances NPM
       - name: Install Node dependencies
         run: npm install
+      # Remove useless ffmpeg binaries
+      - name: Clean src\ffmpeg (keep only .exe)
+        run: Get-ChildItem -Path src\ffmpeg -File | Where-Object { $_.Extension -ne ".exe" } | Remove-Item -Force
       # Build de l'application Electron
       - name: Build Electron app
         run: npm run make
@@ -93,7 +96,7 @@ jobs:
     needs: [build-windows] # build-linux, build-macos,
     steps:
       # On récupère le numéro de version de l'application.
-      - name: Get version from package.json
+      - name: Get version
         id: get_version
         run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
