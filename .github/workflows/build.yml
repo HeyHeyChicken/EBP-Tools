@@ -11,8 +11,6 @@ on:
   push:
     tags:
       - "*"
-    branches:
-      - main
 
 jobs:
   # On créé la version Linux de l'application.
