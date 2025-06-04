@@ -75,7 +75,12 @@ class Game {
     const HOURS = Math.floor(seconds / 3600);
     const MINUTES = Math.floor(seconds / 60) - HOURS * 60;
     const SECONDS = Math.round(seconds - HOURS * 3600 - MINUTES * 60);
-    return (HOURS === 0 ? "" : HOURS + "h ") + MINUTES + "m " + SECONDS + "s";
+    return (
+      (HOURS === 0 ? "" : HOURS + ":") +
+      String(MINUTES).padStart(2, "0") +
+      ":" +
+      String(SECONDS).padStart(2, "0")
+    );
   }
 
   _twoDigits(input) {

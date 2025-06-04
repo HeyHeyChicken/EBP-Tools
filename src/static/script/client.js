@@ -457,7 +457,7 @@
 
   // When the user clicks the save all button.
   document
-    .querySelector("#result > button")
+    .getElementById("saveAll")
     .addEventListener("click", async function () {
       const FILE_PATH = await window.electronAPI.cutVideoFiles(
         games,
@@ -465,6 +465,33 @@
       );
       const TOAST = Toastify({
         text: "Your videos have been cut here: " + FILE_PATH,
+        duration: 5 * 1000,
+        close: true,
+        gravity: "bottom",
+        position: "right",
+        stopOnFocus: true,
+        style: {
+          background: "#4caf50",
+        },
+        onClick: function () {
+          window.electronAPI.readVideoFile(FILE_PATH);
+          TOAST.hideToast();
+        },
+      }).showToast();
+    });
+
+  // When the user clicks the copy datas button.
+  document
+    .getElementById("copyDatas")
+    .addEventListener("click", async function () {
+      let result = "";
+      games.forEach((game) => {
+        console.log();
+        result += `${game.readableStart} ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map}\n`;
+      });
+      navigator.clipboard.writeText(result);
+      const TOAST = Toastify({
+        text: "Data has been added to your clipboard.",
         duration: 5 * 1000,
         close: true,
         gravity: "bottom",
