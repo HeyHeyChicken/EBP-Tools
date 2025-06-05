@@ -3,7 +3,8 @@
 // See LICENSE for terms. Unauthorized use is prohibited.
 
 class Game {
-  constructor() {
+  constructor(mode /* number */) {
+    this.mode = mode;
     this.ID = undefined;
     this.__debug__jumped = false;
     this._readableStart = "";

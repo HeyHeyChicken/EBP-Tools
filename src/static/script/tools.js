@@ -96,25 +96,31 @@ function getMapByName(search) {
  * This function detects the end of a game via the score display.
  * @param {HTMLVideoElement} video HTML DOM of the video element to be analyzed.
  * @param {Game[]} games List of games already detected.
- * @returns {boolean} Is the current frame a game score frame?
+ * @returns {number} Is the current frame a game score frame?
  */
+// prettier-ignore
 function detectGameScoreFrame(video, games) {
   if (games.length == 0 || games[0].start != -1) {
     if (
-      /* Orange logo */ colorSimilarity(
-        getPixelColor(video, 325, 153),
-        new RGB(239, 203, 14)
-      ) &&
-      /* Blue logo */ colorSimilarity(
-        getPixelColor(video, 313, 613),
-        new RGB(50, 138, 230)
-      )
+        /* Orange logo */
+        colorSimilarity(getPixelColor(video, 325, 153), new RGB(239, 203, 14)) &&
+        /* Blue logo */
+        colorSimilarity(getPixelColor(video, 313, 613), new RGB(50, 138, 230))
     ) {
-      console.log("Detect game score frame");
-      return true;
+      console.log("Detect game score frame (mode 1)");
+      return 1;
+    }
+    if (
+        /* Orange logo */
+        colorSimilarity(getPixelColor(video, 325, 123), new RGB(239, 203, 14)) &&
+        /* Blue logo */
+        colorSimilarity(getPixelColor(video, 313, 618), new RGB(50, 138, 230))
+    ) {
+      console.log("Detect game score frame (mode 2)");
+      return 2;
     }
   }
-  return false;
+  return 0;
 }
 
 /**
@@ -180,42 +186,47 @@ function onVideoEnded(games, videoPath, discordServerURL) {
  */
 function detectGameLoadingFrame(video, games) /*  */ {
   if (games.length > 0 && games[0].end != -1 && games[0].start == -1) {
-    if (
-      /* Logo top */ colorSimilarity(
-        getPixelColor(video, 958, 427),
-        new RGB(255, 255, 255)
-      ) &&
-      /* Logo left */ colorSimilarity(
-        getPixelColor(video, 857, 653),
-        new RGB(255, 255, 255)
-      ) &&
-      /* Logo right */ colorSimilarity(
-        getPixelColor(video, 1060, 653),
-        new RGB(255, 255, 255)
-      ) &&
-      /* Logo middle */ colorSimilarity(
-        getPixelColor(video, 958, 642),
-        new RGB(255, 255, 255)
-      ) &&
-      /* Logo black 1 */ colorSimilarity(
-        getPixelColor(video, 958, 463),
-        new RGB(0, 0, 0)
-      ) &&
-      /* Logo black 2 */ colorSimilarity(
-        getPixelColor(video, 880, 653),
-        new RGB(0, 0, 0)
-      ) &&
-      /* Logo black 3 */ colorSimilarity(
-        getPixelColor(video, 1037, 653),
-        new RGB(0, 0, 0)
-      ) &&
-      /* Logo black 4 */ colorSimilarity(
-        getPixelColor(video, 958, 610),
-        new RGB(0, 0, 0)
-      )
-    ) {
-      console.log("Detect game loading frame");
-      return true;
+    switch (games[0].mode) {
+      case 1:
+      case 2:
+        if (
+          /* Logo top */ colorSimilarity(
+            getPixelColor(video, 958, 427),
+            new RGB(255, 255, 255)
+          ) &&
+          /* Logo left */ colorSimilarity(
+            getPixelColor(video, 857, 653),
+            new RGB(255, 255, 255)
+          ) &&
+          /* Logo right */ colorSimilarity(
+            getPixelColor(video, 1060, 653),
+            new RGB(255, 255, 255)
+          ) &&
+          /* Logo middle */ colorSimilarity(
+            getPixelColor(video, 958, 642),
+            new RGB(255, 255, 255)
+          ) &&
+          /* Logo black 1 */ colorSimilarity(
+            getPixelColor(video, 958, 463),
+            new RGB(0, 0, 0)
+          ) &&
+          /* Logo black 2 */ colorSimilarity(
+            getPixelColor(video, 880, 653),
+            new RGB(0, 0, 0)
+          ) &&
+          /* Logo black 3 */ colorSimilarity(
+            getPixelColor(video, 1037, 653),
+            new RGB(0, 0, 0)
+          ) &&
+          /* Logo black 4 */ colorSimilarity(
+            getPixelColor(video, 958, 610),
+            new RGB(0, 0, 0)
+          )
+        ) {
+          console.log("Detect game loading frame");
+          return true;
+        }
+        break;
     }
   }
   return false;
@@ -433,14 +444,46 @@ function detectGameIntro(video, games) {
 function detectGamePlaying(video, games) {
   if (games.length > 0 && games[0].start == -1) {
     // Trying to detect the color of all players' life bars.
-    const J1_PIXEL /* RGB */ = getPixelColor(video, 118, 742);
-    const J2_PIXEL /* RGB */ = getPixelColor(video, 118, 825);
-    const J3_PIXEL /* RGB */ = getPixelColor(video, 118, 907);
-    const J4_PIXEL /* RGB */ = getPixelColor(video, 118, 991);
-    const J5_PIXEL /* RGB */ = getPixelColor(video, 1801, 742);
-    const J6_PIXEL /* RGB */ = getPixelColor(video, 1801, 825);
-    const J7_PIXEL /* RGB */ = getPixelColor(video, 1801, 907);
-    const J8_PIXEL /* RGB */ = getPixelColor(video, 1801, 991);
+    const J1_PIXEL /* RGB */ = getPixelColor(
+      video,
+      118,
+      games[0].mode == 1 ? 742 : 717
+    );
+    const J2_PIXEL /* RGB */ = getPixelColor(
+      video,
+      118,
+      games[0].mode == 1 ? 825 : 806
+    );
+    const J3_PIXEL /* RGB */ = getPixelColor(
+      video,
+      118,
+      games[0].mode == 1 ? 907 : 896
+    );
+    const J4_PIXEL /* RGB */ = getPixelColor(
+      video,
+      118,
+      games[0].mode == 1 ? 991 : 985
+    );
+    const J5_PIXEL /* RGB */ = getPixelColor(
+      video,
+      1801,
+      games[0].mode == 1 ? 742 : 717
+    );
+    const J6_PIXEL /* RGB */ = getPixelColor(
+      video,
+      1801,
+      games[0].mode == 1 ? 825 : 806
+    );
+    const J7_PIXEL /* RGB */ = getPixelColor(
+      video,
+      1801,
+      games[0].mode == 1 ? 907 : 896
+    );
+    const J8_PIXEL /* RGB */ = getPixelColor(
+      video,
+      1801,
+      games[0].mode == 1 ? 991 : 985
+    );
     if (
       //#region Orange team
       // Player 1
@@ -583,7 +626,7 @@ function showGamesOnHMI(games, videoPath) {
     MAP.innerText = game.map;
     MAP.style.backgroundImage = `url('https://evabattleplan.com/back/wp-content/uploads/${game.map
       .replaceAll(" ", "-")
-      .toLowerCase()}-300x169.jpg')`;
+      .toLowerCase()}-300x169.webp')`;
     TR.append(MAP);
 
     const TD = document.createElement("td");

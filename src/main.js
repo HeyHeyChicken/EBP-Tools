@@ -135,10 +135,12 @@ let projectLatestVersion /* string */ = "";
       const RESOLUTION = OUTPUT.match(/, (\d+)x(\d+)[ ,]/);
       if (!RESOLUTION) {
         console.error("Info not found");
+        callback(0, 0);
+      } else {
+        const WIDTH = +RESOLUTION[1];
+        const HEIGHT = +RESOLUTION[2];
+        callback(WIDTH, HEIGHT);
       }
-      const WIDTH = +RESOLUTION[1];
-      const HEIGHT = +RESOLUTION[2];
-      callback(WIDTH, HEIGHT);
     });
   }
 

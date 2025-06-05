@@ -60,9 +60,10 @@
         //#region Détéction de la fin d'une game
 
         if (!found) {
-          if (detectGameScoreFrame(video, games)) {
+          const MODE = detectGameScoreFrame(video, games);
+          if (MODE > 0) {
             found = true;
-            const GAME /* Game */ = new Game();
+            const GAME /* Game */ = new Game(MODE);
             GAME.end = NOW;
 
             const PLAYER_NAME_X /* number */ = 475;
@@ -73,10 +74,10 @@
             const ORANGE_TEAM_NAME /* string */ = await getTextFromImage(
               video,
               document.tesseractWorker,
-              390,
-              187,
-              620,
-              217,
+              GAME.mode == 1 ? 390 : 388,
+              GAME.mode == 1 ? 187 : 159,
+              GAME.mode == 1 ? 620 : 618,
+              GAME.mode == 1 ? 217 : 189,
               7
             );
             if (ORANGE_TEAM_NAME && ORANGE_TEAM_NAME.length >= 2) {
@@ -87,9 +88,9 @@
               video,
               document.tesseractWorkerNumber,
               530,
-              89,
+              GAME.mode == 1 ? 89 : 54,
               620,
-              127,
+              GAME.mode == 1 ? 127 : 92,
               7
             );
             if (ORANGE_TEAM_SCORE) {
@@ -159,9 +160,9 @@
               video,
               document.tesseractWorker,
               390,
-              637,
+              GAME.mode == 1 ? 637 : 629,
               620,
-              667,
+              GAME.mode == 1 ? 667 : 679,
               7
             );
             if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
@@ -171,10 +172,10 @@
             const BLUE_TEAM_SCORE /* string */ = await getTextFromImage(
               video,
               document.tesseractWorkerNumber,
-              1294,
-              89,
-              1384,
-              127,
+              GAME.mode == 1 ? 1294 : 1286,
+              GAME.mode == 1 ? 89 : 54,
+              GAME.mode == 1 ? 1384 : 1376,
+              GAME.mode == 1 ? 127 : 93,
               7
             );
             if (BLUE_TEAM_SCORE) {
@@ -273,9 +274,9 @@
                 video,
                 document.tesseractWorkerLetter,
                 825,
-                81,
+                games[0].mode == 1 ? 81 : 89,
                 1093,
-                102,
+                games[0].mode == 1 ? 102 : 110,
                 7
               );
               if (TEXT) {
