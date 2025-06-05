@@ -1,0 +1,205 @@
+@use "../../imports/variables" as variables;
+@use "../../imports/material_colors" as material_colors;
+
+$button_decoration_position: 5px;
+$button_decoration_width: 2px;
+
+button,
+.btn {
+  &:not(.default) {
+    text-align: center;
+    $border_color: variables.$border_color;
+    min-height: variables.$form_height;
+    min-width: variables.$form_height;
+    border: 1px solid $border_color;
+    color: white;
+    position: relative;
+    text-transform: uppercase;
+    background-color: variables.$dark_color;
+    background-position: center center;
+    background-repeat: no-repeat;
+    display: block;
+    text-decoration: none;
+    width: fit-content;
+    line-height: calc(#{variables.$form_height} - 1px * 2);
+    box-sizing: border-box;
+
+    &:not(.squared) {
+      font-family: DukeFill, sans-serif;
+      letter-spacing: calc(#{variables.$margin} * 0.3) !important;
+      font-size: calc(#{variables.$margin} * 2.2) !important;
+      padding: 0 calc(12px * 2);
+
+      > i {
+        margin-right: calc(#{variables.$margin} / 2);
+        transform: translateY(-3px);
+      }
+    }
+
+    &.squared {
+      max-width: 36px;
+      max-height: variables.$form_height;
+      text-align: center;
+    }
+
+    &.white {
+      border-color: material_colors.$white;
+      color: variables.$dark_color;
+      background-color: material_colors.$white;
+
+      &:not([disabled]):active {
+        color: material_colors.$white;
+        background-color: variables.$dark_color;
+      }
+
+      &:not(:active) {
+        &:before,
+        &:after {
+          border-color: black;
+        }
+      }
+    }
+
+    &.green {
+      border-color: material_colors.$material_green_500;
+      color: material_colors.$material_green_500;
+
+      &:not([disabled]):active {
+        color: variables.$dark_color;
+        background-color: material_colors.$material_green_500;
+      }
+    }
+
+    &.red {
+      border-color: material_colors.$material_red_500;
+      color: material_colors.$material_red_500;
+
+      &:not([disabled]):active {
+        color: variables.$dark_color;
+        background-color: material_colors.$material_red_500;
+      }
+    }
+
+    &.orange {
+      border-color: material_colors.$material_orange_500;
+      color: material_colors.$material_orange_500;
+
+      &:not([disabled]):active {
+        color: variables.$dark_color;
+        background-color: material_colors.$material_orange_500;
+      }
+    }
+
+    &.primary {
+      border-color: variables.$main_color;
+      color: variables.$main_color;
+
+      &:not([disabled]):active {
+        color: variables.$dark_color;
+        background-color: variables.$main_color;
+      }
+    }
+
+    &.discord {
+      border-color: variables.$discord_color;
+      color: variables.$discord_color;
+
+      &:not([disabled]):active {
+        color: variables.$dark_color;
+        background-color: variables.$discord_color;
+      }
+    }
+
+    &:not(:disabled) {
+      cursor: pointer;
+    }
+
+    &:disabled,
+    &.disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    &.selected {
+      background-color: variables.$main_color;
+      color: black;
+    }
+
+    > .beta {
+      color: material_colors.$material_red_500;
+      border: 1px solid material_colors.$material_red_500;
+      border-radius: 1000px;
+      background-color: variables.$dark_color;
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 9px;
+      cursor: pointer;
+      z-index: 1;
+      padding: 0 3px;
+    }
+
+    > i {
+      font-size: 15px;
+
+      &.fa-sharp.fa-solid.fa-star {
+        $font-size: 13px;
+        position: absolute;
+        top: 0;
+        right: 0;
+        transform: translate(50%, -50%);
+
+        &:nth-child(1) {
+          color: variables.$main_color;
+          font-size: calc(#{$font-size} + 5px);
+        }
+
+        &:nth-child(2) {
+          color: variables.$dark_color;
+          font-size: $font-size;
+        }
+      }
+    }
+
+    > span {
+      margin-left: 12px;
+    }
+
+    &:after,
+    &:before {
+      content: "";
+      position: absolute;
+      height: 7px;
+      width: 7px;
+      box-sizing: border-box;
+      border-style: solid;
+      border-color: white;
+      opacity: 0.5;
+    }
+
+    &:not([disabled]):active {
+      color: variables.$dark_color;
+      background-color: white;
+
+      &:not(.white) {
+        &:after,
+        &:before {
+          border-color: black;
+        }
+      }
+    }
+
+    &:before {
+      top: $button_decoration_position;
+      left: $button_decoration_position;
+      border-width: $button_decoration_width 0 0 $button_decoration_width;
+    }
+
+    &:after {
+      bottom: $button_decoration_position;
+      right: $button_decoration_position;
+      border-width: 0 $button_decoration_width $button_decoration_width 0;
+    }
+  }
+}

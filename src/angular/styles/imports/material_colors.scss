@@ -1,0 +1,529 @@
+//- ###################################################
+//- ### WHITE #########################################
+//- ###################################################
+
+$white: #ffffff;
+
+//- ###################################################
+//- ### BLACK #########################################
+//- ###################################################
+
+$black: #000000;
+
+//- ###################################################
+//- ### RED ###########################################
+//- ###################################################
+
+$material_red_0: #ffebee;
+$material_red_100: #ffcdd2;
+$material_red_200: #ef9a9a;
+$material_red_300: #e57373;
+$material_red_400: #ef5350;
+$material_red_500: #f44336;
+$material_red_600: #e53935;
+$material_red_700: #d32f2f;
+$material_red_800: #c62828;
+$material_red_900: #b71c1c;
+
+//- ###################################################
+//- ### PINK ##########################################
+//- ###################################################
+
+$material_pink_0: #fce4ec;
+$material_pink_100: #f8bbd0;
+$material_pink_200: #f48fb1;
+$material_pink_300: #f06292;
+$material_pink_400: #ec407a;
+$material_pink_500: #e91e63;
+$material_pink_600: #d81b60;
+$material_pink_700: #c2185b;
+$material_pink_800: #ad1457;
+$material_pink_900: #880e4f;
+
+//- ###################################################
+//- ### PURPLE ########################################
+//- ###################################################
+
+$material_purple_0: #f3e5f5;
+$material_purple_100: #e1bee7;
+$material_purple_200: #ce93d8;
+$material_purple_300: #ba68c8;
+$material_purple_400: #ab47bc;
+$material_purple_500: #9c27b0;
+$material_purple_600: #8e24aa;
+$material_purple_700: #7b1fa2;
+$material_purple_800: #6a1b9a;
+$material_purple_900: #4a148c;
+
+//- ###################################################
+//- ### DEEP PURPLE ###################################
+//- ###################################################
+
+$material_deep_purple_0: #ede7f6;
+$material_deep_purple_100: #d1c4e9;
+$material_deep_purple_200: #b39ddb;
+$material_deep_purple_300: #9575cd;
+$material_deep_purple_400: #7e57c2;
+$material_deep_purple_500: #673ab7;
+$material_deep_purple_600: #5e35b1;
+$material_deep_purple_700: #512da8;
+$material_deep_purple_800: #4527a0;
+$material_deep_purple_900: #311b92;
+
+//- ###################################################
+//- ### INDIGO ########################################
+//- ###################################################
+
+$material_indigo_0: #e8eaf6;
+$material_indigo_100: #c5cae9;
+$material_indigo_200: #9fa8da;
+$material_indigo_300: #7986cb;
+$material_indigo_400: #5c6bc0;
+$material_indigo_500: #3f51b5;
+$material_indigo_600: #3949ab;
+$material_indigo_700: #303f9f;
+$material_indigo_800: #283593;
+$material_indigo_900: #1a237e;
+
+//- ###################################################
+//- ### BLUE ##########################################
+//- ###################################################
+
+$material_blue_0: #e3f2fd;
+$material_blue_100: #bbdefb;
+$material_blue_200: #90caf9;
+$material_blue_300: #64b5f6;
+$material_blue_400: #42a5f5;
+$material_blue_500: #2196f3;
+$material_blue_600: #1e88e5;
+$material_blue_700: #1976d2;
+$material_blue_800: #1565c0;
+$material_blue_900: #0d47a1;
+
+//- ###################################################
+//- ### LIGHT BLUE ####################################
+//- ###################################################
+
+$material_light_blue_0: #e1f5fe;
+$material_light_blue_100: #b3e5fc;
+$material_light_blue_200: #81d4fa;
+$material_light_blue_300: #4fc3f7;
+$material_light_blue_400: #29b6f6;
+$material_light_blue_500: #03a9f4;
+$material_light_blue_600: #039be5;
+$material_light_blue_700: #0288d1;
+$material_light_blue_800: #0277bd;
+$material_light_blue_900: #01579b;
+
+//- ###################################################
+//- ### CYAN ##########################################
+//- ###################################################
+
+$material_cyan_0: #e0f7fa;
+$material_cyan_100: #b2ebf2;
+$material_cyan_200: #80deea;
+$material_cyan_300: #4dd0e1;
+$material_cyan_400: #26c6da;
+$material_cyan_500: #00bcd4;
+$material_cyan_600: #00acc1;
+$material_cyan_700: #0097a7;
+$material_cyan_800: #00838f;
+$material_cyan_900: #006064;
+
+//- ###################################################
+//- ### TEAL ##########################################
+//- ###################################################
+
+$material_teal_0: #e0f2f1;
+$material_teal_100: #b2dfdb;
+$material_teal_200: #80cbc4;
+$material_teal_300: #4db6ac;
+$material_teal_400: #26a69a;
+$material_teal_500: #009688;
+$material_teal_600: #00897b;
+$material_teal_700: #00796b;
+$material_teal_800: #00695c;
+$material_teal_900: #004d40;
+
+//- ###################################################
+//- ### GREEN #########################################
+//- ###################################################
+
+$material_green_0: #e8f5e9;
+$material_green_100: #c8e6c9;
+$material_green_200: #a5d6a7;
+$material_green_300: #81c784;
+$material_green_400: #66bb6a;
+$material_green_500: #4caf50;
+$material_green_600: #43a047;
+$material_green_700: #388e3c;
+$material_green_800: #2e7d32;
+$material_green_900: #1b5e20;
+
+//- ###################################################
+//- ### LIGHT GREEN ###################################
+//- ###################################################
+
+$material_light_green_0: #f1f8e9;
+$material_light_green_100: #dcedc8;
+$material_light_green_200: #c5e1a5;
+$material_light_green_300: #aed581;
+$material_light_green_400: #9ccc65;
+$material_light_green_500: #8bc34a;
+$material_light_green_600: #7cb342;
+$material_light_green_700: #689f38;
+$material_light_green_800: #558b2f;
+$material_light_green_900: #33691e;
+
+//- ###################################################
+//- ### LIME ##########################################
+//- ###################################################
+
+$material_lime_0: #f9fbe7;
+$material_lime_100: #f0f4c3;
+$material_lime_200: #e6ee9c;
+$material_lime_300: #dce775;
+$material_lime_400: #d4e157;
+$material_lime_500: #cddc39;
+$material_lime_600: #c0ca33;
+$material_lime_700: #afb42b;
+$material_lime_800: #9e9d24;
+$material_lime_900: #827717;
+
+//- ###################################################
+//- ### YELLOW ########################################
+//- ###################################################
+
+$material_yellow_0: #fffde7;
+$material_yellow_100: #fff9c4;
+$material_yellow_200: #fff59d;
+$material_yellow_300: #fff176;
+$material_yellow_400: #ffee58;
+$material_yellow_500: #ffeb3b;
+$material_yellow_600: #fdd835;
+$material_yellow_700: #fbc02d;
+$material_yellow_800: #f9a825;
+$material_yellow_900: #f57f17;
+
+//- ###################################################
+//- ### AMBER #########################################
+//- ###################################################
+
+$material_amber_0: #fff8e1;
+$material_amber_100: #ffecb3;
+$material_amber_200: #ffe082;
+$material_amber_300: #ffd54f;
+$material_amber_400: #ffca28;
+$material_amber_500: #ffc107;
+$material_amber_600: #ffb300;
+$material_amber_700: #ffa000;
+$material_amber_800: #ff8f00;
+$material_amber_900: #ff6f00;
+
+//- ###################################################
+//- ### ORANGE ########################################
+//- ###################################################
+
+$material_orange_0: #fff3e0;
+$material_orange_100: #ffe0b2;
+$material_orange_200: #ffcc80;
+$material_orange_300: #ffb74d;
+$material_orange_400: #ffa726;
+$material_orange_500: #ff9800;
+$material_orange_600: #fb8c00;
+$material_orange_700: #f57c00;
+$material_orange_800: #ef6c00;
+$material_orange_900: #e65100;
+
+//- ###################################################
+//- ### DEEP ORANGE ###################################
+//- ###################################################
+
+$material_deep_orange_0: #fbe9e7;
+$material_deep_orange_100: #ffccbc;
+$material_deep_orange_200: #ffab91;
+$material_deep_orange_300: #ff8a65;
+$material_deep_orange_400: #ff7043;
+$material_deep_orange_500: #ff5722;
+$material_deep_orange_600: #f4511e;
+$material_deep_orange_700: #e64a19;
+$material_deep_orange_800: #d84315;
+$material_deep_orange_900: #bf360c;
+
+//- ###################################################
+//- ### BROWN #########################################
+//- ###################################################
+
+$material_brown_0: #efebe9;
+$material_brown_100: #d7ccc8;
+$material_brown_200: #bcaaa4;
+$material_brown_300: #a1887f;
+$material_brown_400: #8d6e63;
+$material_brown_500: #795548;
+$material_brown_600: #6d4c41;
+$material_brown_700: #5d4037;
+$material_brown_800: #4e342e;
+$material_brown_900: #3e2723;
+
+//- ###################################################
+//- ### GRAY ##########################################
+//- ###################################################
+
+$material_gray_0: #fafafa;
+$material_gray_100: #f5f5f5;
+$material_gray_200: #eeeeee;
+$material_gray_300: #e0e0e0;
+$material_gray_400: #bdbdbd;
+$material_gray_500: #9e9e9e;
+$material_gray_600: #757575;
+$material_gray_700: #616161;
+$material_gray_800: #424242;
+$material_gray_900: #212121;
+
+//- ###################################################
+//- ### BLUE GRAY #####################################
+//- ###################################################
+
+$material_blue_gray_0: #eceff1;
+$material_blue_gray_100: #cfd8dc;
+$material_blue_gray_200: #b0bec5;
+$material_blue_gray_300: #90a4ae;
+$material_blue_gray_400: #78909c;
+$material_blue_gray_500: #607d8b;
+$material_blue_gray_600: #546e7a;
+$material_blue_gray_700: #455a64;
+$material_blue_gray_800: #37474f;
+$material_blue_gray_900: #263238;
+
+//- ###################################################
+//- ### CLASSES #######################################
+//- ###################################################
+
+$material_colors: (
+  white: $white,
+
+  black: $black,
+
+  red_0: $material_red_0,
+  red_100: $material_red_100,
+  red_200: $material_red_200,
+  red_300: $material_red_300,
+  red_400: $material_red_400,
+  red_500: $material_red_500,
+  red_600: $material_red_600,
+  red_700: $material_red_700,
+  red_800: $material_red_800,
+  red_900: $material_red_900,
+
+  pink_0: $material_pink_0,
+  pink_100: $material_pink_100,
+  pink_200: $material_pink_200,
+  pink_300: $material_pink_300,
+  pink_400: $material_pink_400,
+  pink_500: $material_pink_500,
+  pink_600: $material_pink_600,
+  pink_700: $material_pink_700,
+  pink_800: $material_pink_800,
+  pink_900: $material_pink_900,
+
+  purple_0: $material_purple_0,
+  purple_100: $material_purple_100,
+  purple_200: $material_purple_200,
+  purple_300: $material_purple_300,
+  purple_400: $material_purple_400,
+  purple_500: $material_purple_500,
+  purple_600: $material_purple_600,
+  purple_700: $material_purple_700,
+  purple_800: $material_purple_800,
+  purple_900: $material_purple_900,
+
+  deep_purple_0: $material_deep_purple_0,
+  deep_purple_100: $material_deep_purple_100,
+  deep_purple_200: $material_deep_purple_200,
+  deep_purple_300: $material_deep_purple_300,
+  deep_purple_400: $material_deep_purple_400,
+  deep_purple_500: $material_deep_purple_500,
+  deep_purple_600: $material_deep_purple_600,
+  deep_purple_700: $material_deep_purple_700,
+  deep_purple_800: $material_deep_purple_800,
+  deep_purple_900: $material_deep_purple_900,
+
+  indigo_0: $material_indigo_0,
+  indigo_100: $material_indigo_100,
+  indigo_200: $material_indigo_200,
+  indigo_300: $material_indigo_300,
+  indigo_400: $material_indigo_400,
+  indigo_500: $material_indigo_500,
+  indigo_600: $material_indigo_600,
+  indigo_700: $material_indigo_700,
+  indigo_800: $material_indigo_800,
+  indigo_900: $material_indigo_900,
+
+  blue_0: $material_blue_0,
+  blue_100: $material_blue_100,
+  blue_200: $material_blue_200,
+  blue_300: $material_blue_300,
+  blue_400: $material_blue_400,
+  blue_500: $material_blue_500,
+  blue_600: $material_blue_600,
+  blue_700: $material_blue_700,
+  blue_800: $material_blue_800,
+  blue_900: $material_blue_900,
+
+  light_blue_0: $material_light_blue_0,
+  light_blue_100: $material_light_blue_100,
+  light_blue_200: $material_light_blue_200,
+  light_blue_300: $material_light_blue_300,
+  light_blue_400: $material_light_blue_400,
+  light_blue_500: $material_light_blue_500,
+  light_blue_600: $material_light_blue_600,
+  light_blue_700: $material_light_blue_700,
+  light_blue_800: $material_light_blue_800,
+  light_blue_900: $material_light_blue_900,
+
+  cyan_0: $material_cyan_0,
+  cyan_100: $material_cyan_100,
+  cyan_200: $material_cyan_200,
+  cyan_300: $material_cyan_300,
+  cyan_400: $material_cyan_400,
+  cyan_500: $material_cyan_500,
+  cyan_600: $material_cyan_600,
+  cyan_700: $material_cyan_700,
+  cyan_800: $material_cyan_800,
+  cyan_900: $material_cyan_900,
+
+  teal_0: $material_teal_0,
+  teal_100: $material_teal_100,
+  teal_200: $material_teal_200,
+  teal_300: $material_teal_300,
+  teal_400: $material_teal_400,
+  teal_500: $material_teal_500,
+  teal_600: $material_teal_600,
+  teal_700: $material_teal_700,
+  teal_800: $material_teal_800,
+  teal_900: $material_teal_900,
+
+  green_0: $material_green_0,
+  green_100: $material_green_100,
+  green_200: $material_green_200,
+  green_300: $material_green_300,
+  green_400: $material_green_400,
+  green_500: $material_green_500,
+  green_600: $material_green_600,
+  green_700: $material_green_700,
+  green_800: $material_green_800,
+  green_900: $material_green_900,
+
+  light_green_0: $material_light_green_0,
+  light_green_100: $material_light_green_100,
+  light_green_200: $material_light_green_200,
+  light_green_300: $material_light_green_300,
+  light_green_400: $material_light_green_400,
+  light_green_500: $material_light_green_500,
+  light_green_600: $material_light_green_600,
+  light_green_700: $material_light_green_700,
+  light_green_800: $material_light_green_800,
+  light_green_900: $material_light_green_900,
+
+  lime_0: $material_lime_0,
+  lime_100: $material_lime_100,
+  lime_200: $material_lime_200,
+  lime_300: $material_lime_300,
+  lime_400: $material_lime_400,
+  lime_500: $material_lime_500,
+  lime_600: $material_lime_600,
+  lime_700: $material_lime_700,
+  lime_800: $material_lime_800,
+  lime_900: $material_lime_900,
+
+  yellow_0: $material_yellow_0,
+  yellow_100: $material_yellow_100,
+  yellow_200: $material_yellow_200,
+  yellow_300: $material_yellow_300,
+  yellow_400: $material_yellow_400,
+  yellow_500: $material_yellow_500,
+  yellow_600: $material_yellow_600,
+  yellow_700: $material_yellow_700,
+  yellow_800: $material_yellow_800,
+  yellow_900: $material_yellow_900,
+
+  amber_0: $material_amber_0,
+  amber_100: $material_amber_100,
+  amber_200: $material_amber_200,
+  amber_300: $material_amber_300,
+  amber_400: $material_amber_400,
+  amber_500: $material_amber_500,
+  amber_600: $material_amber_600,
+  amber_700: $material_amber_700,
+  amber_800: $material_amber_800,
+  amber_900: $material_amber_900,
+
+  orange_0: $material_orange_0,
+  orange_100: $material_orange_100,
+  orange_200: $material_orange_200,
+  orange_300: $material_orange_300,
+  orange_400: $material_orange_400,
+  orange_500: $material_orange_500,
+  orange_600: $material_orange_600,
+  orange_700: $material_orange_700,
+  orange_800: $material_orange_800,
+  orange_900: $material_orange_900,
+
+  deep_orange_0: $material_deep_orange_0,
+  deep_orange_100: $material_deep_orange_100,
+  deep_orange_200: $material_deep_orange_200,
+  deep_orange_300: $material_deep_orange_300,
+  deep_orange_400: $material_deep_orange_400,
+  deep_orange_500: $material_deep_orange_500,
+  deep_orange_600: $material_deep_orange_600,
+  deep_orange_700: $material_deep_orange_700,
+  deep_orange_800: $material_deep_orange_800,
+  deep_orange_900: $material_deep_orange_900,
+
+  brown_0: $material_brown_0,
+  brown_100: $material_brown_100,
+  brown_200: $material_brown_200,
+  brown_300: $material_brown_300,
+  brown_400: $material_brown_400,
+  brown_500: $material_brown_500,
+  brown_600: $material_brown_600,
+  brown_700: $material_brown_700,
+  brown_800: $material_brown_800,
+  brown_900: $material_brown_900,
+
+  gray_0: $material_gray_0,
+  gray_100: $material_gray_100,
+  gray_200: $material_gray_200,
+  gray_300: $material_gray_300,
+  gray_400: $material_gray_400,
+  gray_500: $material_gray_500,
+  gray_600: $material_gray_600,
+  gray_700: $material_gray_700,
+  gray_800: $material_gray_800,
+  gray_900: $material_gray_900,
+
+  blue_gray_0: $material_blue_gray_0,
+  blue_gray_100: $material_blue_gray_100,
+  blue_gray_200: $material_blue_gray_200,
+  blue_gray_300: $material_blue_gray_300,
+  blue_gray_400: $material_blue_gray_400,
+  blue_gray_500: $material_blue_gray_500,
+  blue_gray_600: $material_blue_gray_600,
+  blue_gray_700: $material_blue_gray_700,
+  blue_gray_800: $material_blue_gray_800,
+  blue_gray_900: $material_blue_gray_900,
+);
+
+@each $color-key, $color-var in $material_colors {
+  .color-#{"" + $color-key} {
+    color: $color-var !important;
+  }
+
+  .background-color-#{"" + $color-key} {
+    background-color: $color-var !important;
+  }
+
+  .border-color-#{"" + $color-key} {
+    border-color: $color-var !important;
+  }
+}

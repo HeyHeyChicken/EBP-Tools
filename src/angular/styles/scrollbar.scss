@@ -1,0 +1,22 @@
+@use "./imports/variables" as variables;
+
+/* width */
+::-webkit-scrollbar {
+	width: variables.$margin;
+	height: variables.$margin;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+	background: variables.$dark_color;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+	background: variables.$main_color;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+	background: #be8c63;
+}

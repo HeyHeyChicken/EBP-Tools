@@ -1,0 +1,943 @@
+{
+  "common": {
+    "level": "Livello",
+    "copied": "Copiato",
+    "charts": "Grafici",
+    "clipboard": "Appunti",
+    "download": "Scaricare",
+    "shared": "Condivisi",
+    "toggleTopValues": "Mostra/nascondi i valori migliori.",
+    "teams": "Squadre",
+    "export": "Esporta",
+    "url_cant_be_copied": "Impossibile copiare l'URL negli appunti.",
+    "theme": "Tema",
+    "logo": "Logo",
+    "playerName": "Nome del giocatore",
+    "both": "Entrambi",
+    "side": "Lato",
+    "reset": "Resetta",
+    "averageAssistances": "Assistenze medie",
+    "orange": "Arancione",
+    "blue": "blu",
+    "linkCopiedClipboard": "Il collegamento è stato copiato negli appunti.",
+    "filter": "Filtro",
+    "from": "Da",
+    "to": "A",
+    "tags": "Tag",
+    "map": "Mappa",
+    "maps": "Mappe",
+    "date": "Data",
+    "duration": "Durata",
+    "teamName": "Nome della squadra",
+    "compareSides": "Confronta lati",
+    "winRatio": "Rapporto vittorie",
+    "playedRatio": "Rapporto giocate",
+    "opponent": "Avversario",
+    "selectAnOpponent": "Seleziona un avversario",
+    "played": "Giocate",
+    "killsDeathsRatio": "Rapporto U/M",
+    "players": "Giocatori",
+    "share": "Condividi",
+    "disable": "Disabilita",
+    "duplicate": "Duplicato",
+    "name": "Nome",
+    "ok": "OK",
+    "yes": "Sì",
+    "no": "No",
+    "edit": "Modifica",
+    "support": "Supporto",
+    "save": "Salva",
+    "update": "Aggiorna",
+    "create": "Crea",
+    "rename": "Rinomina",
+    "delete": "Elimina",
+    "cancel": "Annulla",
+    "close": "Chiudi",
+    "move": "Sposta",
+    "gotIt": "Capito",
+    "floor": "Piano",
+    "learnMore": "Scopri di più",
+    "consoleWarn": "Questa scheda è una funzione del browser progettata per sviluppatori.\nSe qualcuno ti ha detto di copiare e incollare qualcosa qui per abilitare una funzione, sappi che si tratta di una truffa che consente a quella persona di accedere al tuo account.",
+    "header": {
+      "logInButton": "Accedi",
+      "logOutButton": "Esci"
+    },
+    "socket": {
+      "disconnected": "La connessione con il server multi è stata persa.",
+      "connected": "La connessione con il server multi è stata ripristinata."
+    },
+    "start": "Avvia",
+    "check": "Controlla",
+    "validate": "Convalida",
+    "player": "Giocatore",
+    "team": "Squadra",
+    "isSomethingWrong": "C'è qualcosa che non va?",
+    "askItHere": "Non esitare a chiedere qui.",
+    "print": "Stampare"
+  },
+  "shared": {
+    "header": {
+      "leadYourTeam": "Guida il tuo team",
+      "tools": "Strumenti",
+      "wiki": "Wiki",
+      "myAccount": "Il mio conto",
+      "joinUsOnDiscord": "Unisciti a noi su Discord",
+      "chooseATeam": "Scegli una squadra",
+      "dialogs": {
+        "coaching": {
+          "title": "Informazioni sul coaching",
+          "team": {
+            "title": "Siete un team e volete essere allenati?",
+            "ol1": "Accedete alla <a href='{{ href }}'>pagina di gestione del team</a>.",
+            "ol2": "In fondo alla pagina, inserite il nickname Discord del vostro coach (entrambi dovete supportare EBP).",
+            "ol3": "Fatto! Il vostro coach avrà accesso in lettura e scrittura alle vostre strategie e statistiche."
+          },
+          "coach": {
+            "title": "Sei un coach?",
+            "ol1": "Quando un team ti aggiunge come coach, riceverai una mail di conferma.",
+            "ol2": "Da lì, potrai cambiare team tramite il piccolo popup in basso a destra."
+          }
+        }
+      }
+    },
+    "paginator": {
+      "gamesPerPage": "Articoli per pagina:"
+    },
+    "footer": {
+      "thirdParties": {
+        "start": "Tutti",
+        "middle": "i marchi",
+        "end": "menzionati appartengono ai rispettivi proprietari."
+      },
+      "privacyPolicy": "Politica sulla privacy",
+      "cgu_cgs": "CGU / CGS",
+      "legalNotice": "Nota legale",
+      "cookiePolicy": "Politica sui cookie"
+    },
+    "maintainers-popup": {
+      "arenas": "Grazie ai volontari che mantengono aggiornate le arene:",
+      "weapons": "Grazie ai volontari che mantengono aggiornate le informazioni sulle armi:",
+      "heroes": "Grazie ai volontari che tengono aggiornata la lista delle skin:"
+    }
+  },
+  "view": {
+    "404": {
+      "title": "Non trovata",
+      "mainPage": "Pagina principale",
+      "p1": "Purtroppo sei arrivato su una pagina 404 - pagina non trovata.",
+      "p2": "Potresti aver inserito un indirizzo errato, oppure la pagina è stata eliminata o spostata. Verifica l'indirizzo nel tuo browser e prova di nuovo.",
+      "p3": "Se il problema persiste, contattami in modo che possa aiutarti a trovare le informazioni di cui hai bisogno."
+    },
+    "chromium": {
+      "title": "Estensione Chromium",
+      "h1": "Estensione Chromium EBP",
+      "p1": "Potenzia l'analisi delle tue partite con l'estensione Chromium di EBP!",
+      "p2": "Esporta le tue partite EVA in formato Excel con un solo clic, crea le tue statistiche o reintegrale nello strumento \"<a>statistiche</a>\" di EBP.",
+      "p3": "Prendi il pieno controllo dei tuoi dati e usali come preferisci!",
+      "button": "Installa l'estensione Chromium",
+      "h2": "Domande frequenti",
+      "q1": "Posso esportare le partite di un altro giocatore?",
+      "r1": "Sì, è possibile!<br/>Basta accedere all'URL del suo profilo pubblico, andare alla sua pagina \"storico\" e avviare l'esportazione tramite l'estensione.",
+      "q2": "A cosa servono \"Max pages\" e \"Time between actions\"?",
+      "r2": "\"Max pages\" definisce il numero massimo di pagine che possono essere esportate in un unico file.<br />\"Time between actions\" determina il tempo di attesa (in millisecondi) tra ogni azione del bot.<br />Se l'esportazione incontra problemi, prova a ridurre il numero di pagine o ad aumentare il tempo tra le azioni."
+    },
+    "map": {
+      "title": "BattlePlan",
+      "customColors": "Colori personalizzati",
+      "screenVertical": "Sembra che il tuo dispositivo sia in modalità verticale, ti invitiamo a girarlo per sfruttarlo al meglio.",
+      "step": "Passo",
+      "steps": "Passi",
+      "environment": "Ambiente",
+      "addStep": "Aggiungi un passo",
+      "leftStep": "Sposta il passo a sinistra",
+      "rightStep": "Sposta il passo a destra",
+      "moveToleftStep": "Spostarsi al passo sinistro",
+      "moveTorightStep": "Spostarsi al passo destro",
+      "setStep": "Vai al passo {{ index }}",
+      "deleteStep": "Elimina passo",
+      "playSteps": "Riproduci/pausa la sequenza",
+      "language": "Lingua",
+      "maps": "Mappe",
+      "games": "Storia dei giochi",
+      "colors": "Colori",
+      "elements": "Elementi",
+      "tools": "Strumenti",
+      "players": "Giocatori",
+      "stayInTheSameElementAfterUse": "Mantieni l'elemento dopo l'uso",
+      "icons": "Icone",
+      "noFinished": "Le mappe contrassegnate con \"!\" non sono finite.",
+      "watermark": "EBP - EVA Battle Plan",
+      "tooltip": {
+        "_tuto": "Comprendere come funzionano gli strumenti",
+        "draw": "Disegna",
+        "draw_description": "Disegna liberamente con un pennello...",
+        "team": "Squadre",
+        "team_description": "Gestisci i membri del tuo team...",
+        "chrono": "Cronometro",
+        "chrono_description": "Stima il tempo di viaggio tra due posizioni... (8km/h)",
+        "text": "Testo",
+        "text_description": "Aggiungi testo...",
+        "square": "Quadrato",
+        "square_description": "Disegna rettangoli...",
+        "line": "Linea",
+        "line_description": "Disegna linee rette...",
+        "arrow": "Freccia",
+        "arrow_description": "Disegna frecce dritte...",
+        "explanations": "Spiegazioni",
+        "explanations_description": "Dettaglia la tua strategia ai tuoi compagni di squadra...",
+        "explanationsPlaceholder": "Indica qui le spiegazioni della tua strategia...\n\nPasso 1:\n- ...\n- ...\n\nPasso 2:\n- ...",
+        "circle": "Cerchio",
+        "circle_description": "Disegna cerchi...",
+        "triangle": "Triangolo",
+        "triangle_description": "Disegna triangoli...",
+        "multi": "Multi",
+        "speciality": "Specialità",
+        "speciality_description": "Aggiungi granate o scudi...",
+        "immersive": "Vista immersiva",
+        "immersive_description": "Muoviti attraverso le mappe di gioco...",
+        "icon": "Icona",
+        "icon_description": "Metti icone...",
+        "select": "Seleziona",
+        "select_description": "Lo strumento base per selezionare ciò che vuoi...",
+        "save": "Salva come immagine",
+        "video": "Salva come video",
+        "import": "Importa",
+        "clone": "Clona",
+        "clone_description": "Duplica i tuoi elementi all'infinito...",
+        "fullScreen": "Schermo intero",
+        "fullScreen_description": "Ottieni più spazio di lavoro...",
+        "yellowTeam": "Giocatore giallo",
+        "blueTeam": "Giocatore blu",
+        "delete": "Elimina",
+        "distance": "Distanza",
+        "distance_description": "Determina le distanze in metri tra due posizioni...",
+        "default_text": "Chiamate",
+        "default_text_description": "Impara i nomi delle aree della comunità...",
+        "plan": "I miei piani",
+        "plan_description": "Salva i tuoi piani in un luogo sicuro...",
+        "custom-color": "Colori personalizzati",
+        "custom-color_description": "Personalizza il colore dei tuoi elementi..."
+      },
+      "dialog": {
+        "screen": {
+          "choice": {
+            "description": "Desidera scaricare l'immagine o aggiungerla agli appunti?",
+            "description2": "Il passaggio attuale? O tutti i passaggi?",
+            "currentStep": "Il passaggio attuale",
+            "allSteps": "Tutti i passaggi",
+            "description3": "In ZIP o in GIF?",
+            "allStepsAsZip": "ZIP (archivio contenente un'immagine per fase)",
+            "allStepsAsGif": "GIF (immagine animata della strategia)"
+          }
+        },
+        "tuto": {
+          "intro": "Alcuni strumenti hanno funzioni avanzate, non esitare a scoprirle:",
+          "pc": "Su PC: Tenendo il mouse su un pulsante dello strumento per 1 secondo.",
+          "mobile": "Su telefono: Tenendo premuto un pulsante dello strumento per 1 secondo."
+        },
+        "text": {
+          "text": "Testo",
+          "bold": "Grassetto",
+          "italic": "Corsivo",
+          "underline": "Sottolineato"
+        },
+        "premium": {
+          "title": "Supporta \"EBP - EVA Battle Plan\"",
+          "content": "Alcune funzionalità sono riservate ai membri che supportano il progetto.<br/>Tuttavia, rimangono tutte liberamente accessibili sulla mappa \"Atlantis\".",
+          "steps": "<b>Passi</b>: Sviluppa piani strategici complessi, in più fasi, per ottimizzare il tuo approccio.",
+          "multi": "Multi",
+          "video": "<b>Video</b>: Trasforma le tue strategie in video per accedervi da qualsiasi dispositivo.",
+          "storage": "<b>Database</b>: Salva i tuoi piani in un database crittografato, garantendo accesso sicuro e immediato da qualsiasi luogo.",
+          "immersiveDraw": "<b>Disegnatore immersivo</b>: Chiarisci ulteriormente le tue strategie annotando direttamente sulle tue viste immersive, consentendo comprensione visiva e pratica per l'intero team!",
+          "wallCollisions": "<b>Collisioni</b>: Analizzando i coni di collisione, determina le posizioni più strategiche e massimizza l'efficacia delle tue granate.",
+          "team": "<b>Team</b>: Condividi il tuo abbonamento con gli altri tre membri del tuo team affinché possano beneficiare di tutti i vantaggi della modalità \"supporto\" e collaborare a piani condivisi all'interno del team.",
+          "noThanks": "No grazie",
+          "default_text": "<b>Chiamate</b>: Modifica le chiamate della comunità, crea i tuoi codici per disturbare i tuoi avversari.",
+          "engine": "<b>Engine</b>: Ruota le mura e crea strategie complesse in base all'angolo di rotazione del centro della mappa.",
+          "arrow": "<b>Freccia</b>: Guida facilmente i tuoi compagni o indica un punto di interesse."
+        },
+        "iOSFullscreen": {
+          "title": "Schermo intero su dispositivi iOS",
+          "content": "Su un dispositivo iOS, per utilizzare l'applicazione a schermo intero, devi:<br/>1) Cliccare sul pulsante <img src='/assets/img/icon/ios-share.svg' /> (in alto a destra su iPad, in basso al centro su iPhone).<br/>2) Cliccare su \"Aggiungi alla schermata principale\".<br/>3) Cliccare su \"Aggiungi\".<br/>4) Aprire il collegamento creato."
+        },
+        "iOSVideo": {
+          "title": "Salva come video su dispositivi iOS",
+          "content": "Non puoi salvare come video su un dispositivo iOS."
+        },
+        "speciality": {
+          "visibleRay": "Raggio visibile",
+          "owner": "Proprietario"
+        },
+        "default_text": {
+          "saved": "Chiamate salvate",
+          "deleted": "Chiamate resettate"
+        },
+        "video": {
+          "wait": {
+            "title": "Esportazione video",
+            "description": "Attendere mentre il tuo piano viene esportato in video.",
+            "recording": "Registrazione...",
+            "encoding": "Codifica...",
+            "downloading": "Download in corso...",
+            "video_codec": "Codec video",
+            "options_description": "Se non hai problemi con l'esportazione video, lascia le impostazioni predefinite.",
+            "reencode": "Ricodificare"
+          },
+          "bug": {
+            "title": "C'è stato un problema con la codifica video",
+            "description": "Si è verificato un errore durante la codifica del video.<br/>Ti invitiamo a segnalare il problema.<br/><br/>Vuoi scaricare la versione non codificata? (iPhone e iPad potrebbero non essere in grado di leggerla)."
+          }
+        },
+        "team": {
+          "contacts": "Contatti",
+          "orangeTeam": "Squadra arancione",
+          "blueTeam": "Squadra blu",
+          "inputLabel": "Nome giocatore",
+          "inputPlaceholder": "\"NomeGiocatore\" o \"NomeGiocatore#EVA_ID\"",
+          "noContact": "1) Aggiungi un contatto nel campo sopra.<br/>2) Assegna questo contatto a una squadra.<br/>3) Assegna un'arma a questo contatto.<br/>4) Clicca su \"OK\"...",
+          "selectAWeapon": "Seleziona l'arma del giocatore...",
+          "learnMoreAboutWeapons": "Scopri di più sulle armi",
+          "tooltip": {
+            "add": "Aggiungi un contatto",
+            "remove": "Rimuovi questo contatto",
+            "changePosition": "Cambia la posizione di questo contatto",
+            "left": "Assegna questo contatto alla squadra arancione",
+            "right": "Assegna questo contatto alla squadra blu",
+            "eva": "Apri la pagina delle statistiche EVA di questo contatto",
+            "reset": "Rimuovi questo giocatore dalla squadra"
+          },
+          "reverseTeams": "Inverti le squadre"
+        },
+        "player": {
+          "title": "Giocatore",
+          "dead": "Morto",
+          "target": "Obiettivo",
+          "alwaysShowTarget": "Mostra sempre l'obiettivo",
+          "hideCone": "Nascondi il cono di visione",
+          "hideLine": "Nascondi la linea di vista",
+          "aimingDistance": "Distanza di mira (m)",
+          "hero": "Eroe",
+          "note": "Nota",
+          "notePlaceholder": "Imposta una nota per questo passo...",
+          "shooting": "Sparo"
+        },
+        "line": {
+          "dashed": "Tratteggiata"
+        },
+        "colors": {
+          "title": "Colori personalizzati",
+          "step1": "<b>Passo 1:</b> Clicca sul grande rettangolo nero per scegliere un colore.",
+          "step2": "<b>Passo 2:</b> Clicca sul pulsante \"+\".",
+          "step3": "<b>Passo 3:</b> Clicca sul pulsante \"OK\" per utilizzare i tuoi nuovi colori personalizzati!",
+          "add": "Aggiungi questo colore personalizzato",
+          "delete": "Elimina questo colore personalizzato"
+        },
+        "multi": {
+          "title": "Lavora con gli amici",
+          "description": "Con \"EBP - EVA Battle Plan\", puoi fare strategia con i tuoi amici. Uno di voi deve ospitare la sessione condividendo il proprio codice di sessione.",
+          "connectionLost": "La connessione con il server multi è stata persa. Contatta l'amministratore se il problema persiste.",
+          "host": "Ospita",
+          "join": "Unisciti",
+          "leaveTheSession": "Esci dalla sessione",
+          "hostDescription": "Condividi il tuo codice di sessione.",
+          "joinDescription": "Inserisci il codice di sessione del tuo amico.",
+          "copy": "Copia",
+          "toast": {
+            "asking": "In attesa di accettazione dall'ospite...",
+            "yourSession": "Non puoi unirti alla tua stessa sessione.",
+            "friendJoined": "\"{{ friendName }}\" si è unito alla tua sessione.",
+            "friendLeaved": "\"{{ friendName }}\" ha lasciato la tua sessione.",
+            "joined": "Ti sei unito alla sessione del tuo amico."
+          },
+          "dialog": {
+            "ask": {
+              "title": "Un utente vuole unirsi alla tua sessione",
+              "description": "\"{{ friendName }}\" vuole lavorare con te, accetti?"
+            }
+          }
+        },
+        "plan": {
+          "title": "I miei piani",
+          "planName": "Il nome del tuo nuovo piano/cartella",
+          "createPlan": "Crea nuovo piano",
+          "createFolder": "Crea nuova cartella",
+          "createdPlan": "Il tuo piano è stato creato.",
+          "createdFolder": "La tua cartella è stata creata.",
+          "saved": "Il tuo piano è stato aggiornato.",
+          "planDeleted": "Il tuo piano è stato eliminato.",
+          "folderDeleted": "La tua cartella è stata eliminata.",
+          "exportThisPlan": "Esporta questo piano",
+          "importAPlan": "Importa un piano",
+          "saveAsImage": "Esporta come immagine",
+          "saveAsVideo": "Esporta come video",
+          "visualize": "Visualizza",
+          "search": "Cerca in :",
+          "refresh": "Aggiorna piani e cartelle",
+          "back": "Torna alla cartella precedente",
+          "shareSuccess": "Il link della strategia è stato copiato negli appunti.",
+          "deleteConfirmation": "Sei sicuro di voler eliminare questo piano? Questa azione è irreversibile.",
+          "moved": "Spostato"
+        },
+        "renamePlan": {
+          "label": "Nuovo nome",
+          "renamed": "Rinominato"
+        },
+        "stepDetails": {
+          "title": "Dettagli del passo"
+        }
+      }
+    },
+    "thanks": {
+      "title": "Grazie",
+      "h1": {
+        "start": "Grazie",
+        "end": "a tutti"
+      },
+      "h2": "Ci sono persone che vorrei ringraziare...",
+      "h3": "Squadre",
+      "p1": "Grazie a queste squadre che supportano EBP come sostenitori!",
+      "add": "Aggiungi la tua squadra qui",
+      "h4": "Amici",
+      "p2": "Grazie alle seguenti persone, che partecipano/ hanno partecipato a migliorare EBP!",
+      "dialog": {
+        "p": "Manca qualcuno?",
+        "a": "Non esitare a farmelo sapere."
+      }
+    },
+    "home": {
+      "title": "Home",
+      "maintenance": {
+        "title": "In manutenzione",
+        "description": "EBP è attualmente in manutenzione.<br/>La pagina si aggiornerà automaticamente, l'operazione non dovrebbe richiedere più di {{ duration }} minuti...",
+        "hexagon_alt": "Esagono dell'animazione di distribuzione",
+        "skull_alt": "Icona del teschio dell'animazione di distribuzione"
+      },
+      "wallpaper": {
+        "title": {
+          "h1": "Guida il tuo team",
+          "h2": "alla vittoria!"
+        },
+        "btn": "Provalo gratis",
+        "logoAlt": "Logo di EBP"
+      },
+      "h1": {
+        "start": "Uno",
+        "middle": "strumento sicuro",
+        "end": "per i pro giocatori EVA<br/>"
+      },
+      "p1": "Fai un passo avanti rispetto ai team avversari, anticipa tutte le loro azioni e superale.<br/>EBP è uno strumento che ti consente di modificare strategie attorno alle mappe del gioco EVA.<br/>Prevedi i movimenti dei tuoi avversari, dì ai tuoi compagni di squadra dove posizionarsi e come reagire in diverse situazioni.",
+      "howMyPlansAreSecured": "Come sono protetti i miei piani?",
+      "h2": "Unisciti alla<br/>comunita EBP",
+      "dialog": {
+        "p": "Pensi che manchi una funzione?",
+        "a": "Suggeriscila qui"
+      },
+      "p2": "EBP è un lavoro d'amore.<br/>È ciò che è grazie al supporto straordinario della fantastica comunità di utenti.",
+      "p3": "Controlla il nostro Discord per le ultime notizie, chat, suggerimenti e altro!",
+      "teams": {
+        "title": {
+          "start": "I team più",
+          "middle": "strategici",
+          "end": "<br/>utilizzano l'EBP"
+        },
+        "button": "Scopri queste squadre",
+        "noTeamInfo": "La squadra non ha fornito alcuna informazione a riguardo.",
+        "logosAlt": "Logo della squadra \"{{ teamName }}\""
+      },
+      "install": {
+        "title": {
+          "start": "I tuoi strumenti",
+          "end": "<br/>ovunque con te"
+        },
+        "others": "Altri",
+        "iosTitle": "Installa su iPhone/iPad",
+        "alts": {
+          "android": "Scarica l'app EBP dal Play Store",
+          "windows": "Scarica l'app EBP per Windows",
+          "mac": "Scarica l'app EBP per Mac",
+          "pwa": "Scarica l'app PWA di EBP"
+        }
+      }
+    },
+    "bank": {
+      "title": "Banca",
+      "h1": {
+        "start": "I tuoi piani sono",
+        "end": "al sicuro"
+      },
+      "h2": "I tuoi piani appartengono solo a te, non allo sviluppatore, non agli hacker.",
+      "h3": {
+        "start": "EBP cripta i tuoi piani",
+        "end": "più volte"
+      },
+      "p1": "La crittografia garantisce che nessuno possa accedere ai tuoi file, nemmeno io.<br/>Piani, nomi dei piani, nomi delle cartelle e altro sono completamente criptati, sia durante l'archiviazione che il trasferimento nel cloud sicuro.",
+      "encrypt": "Cripta",
+      "decrypt": "Decripta",
+      "step1": "Il tuo dispositivo",
+      "step2": "Il server di EBP",
+      "step3": "Il database di EBP",
+      "h4": {
+        "start": "I tuoi piani vengono salvati",
+        "end": "ogni giorno"
+      },
+      "p2": "È del tutto normale incontrare problemi, anche all'interno delle infrastrutture più affidabili.<br/>Ecco perché faccio backup giornalieri di tutti i tuoi piani. Questo significa che posso ripristinare tutti i tuoi dati quando necessario, garantendo che i tuoi piani non vengano mai persi.",
+      "dialog": {
+        "p": "Hai domande?",
+        "a": "Non esitare a chiedere"
+      }
+    },
+    "legalNoticesRelatingToThirdParties": {
+      "h1": "Note legali relative a terzi",
+      "ul": {
+        "li1": "\"EVA\" e \"EVA Esports Virtual Arenas\" sono marchi registrati di \"SmartVR Studio\"."
+      }
+    },
+    "legalNotice": {
+      "h1": "Nota legale",
+      "p1": "Il sito evabattleplan.com è prodotto e redatto da Duval Antoine.",
+      "p2": "Email",
+      "p3": "Il sito è ospitato da"
+    },
+    "weapons": {
+      "title": "Armi",
+      "3dModel": "Modelli 3D",
+      "damage": "Danno",
+      "head": "Testa",
+      "body": "Corpo",
+      "extremities": "Estremità",
+      "average": "Media",
+      "bulletDispersion": "Dispersione dei proiettili (gradi)",
+      "firstBullet": "Primo proiettile",
+      "secondBullet": "Secondo proiettile",
+      "thirdBullet": "Terzo proiettile",
+      "static": "Statico",
+      "mobile": "Mobile",
+      "burst": "Raffica",
+      "timeBetweenTwoBursts": "Tempo tra due raffiche (s)",
+      "bulletsPerBurst": "Proiettili per raffica",
+      "burstSpeed": "Velocità della raffica",
+      "cadence": "Cadenza (rpm)",
+      "magazineCapacity": "Capacità del caricatore",
+      "reloadingTime": "Tempo di ricarica (s)",
+      "bulletSpeed": "Velocità del proiettile (m/s)",
+      "timeToEquip": "Tempo per equipaggiare (s)",
+      "showHideCharts": "Mostra / nascondi grafici",
+      "lifePoints": "Punti vita",
+      "duration": "Durata (s)",
+      "activationTime": "Tempo di attivazione (s)",
+      "timeBeforeExplosion": "Tempo prima dell'esplosione (s)",
+      "radius": "Raggio (m)",
+      "damageLimit": "Limite di danno",
+      "TTKDependingOnDistance": "TTK in base alla distanza",
+      "averageTTKDependingOnDistance": "TTK media in base alla distanza",
+      "chooseWeapons": "Scegli le armi",
+      "thanksEVA": "Grazie a EVA per aver consentito l'uso delle illustrazioni delle loro armi.",
+      "tags": {
+        "all": "Tutte",
+        "assault_rifle": "Fucili d'assalto",
+        "long_range": "Lunga gittata",
+        "special": "Speciali",
+        "close_range": "Corta gittata",
+        "accessory": "Accessori"
+      },
+      "maximumDamage": "Danno massimo",
+      "skins": {
+        "title": "Skins",
+        "label": "Scegli una skin"
+      },
+      "season": "Stagione",
+      "battlePassRequired": "Pass battaglia richiesto"
+    },
+    "arenas": {
+      "title": "Arene",
+      "commingSoon": "Prossimamente",
+      "book_now": "Prenota ora",
+      "filter_placeholder": "Clicca qui per filtrare le squadre...",
+      "arena_placeholder": "Inserisci il tuo indirizzo qui...",
+      "addYourTeamHere": "Aggiungi la tua squadra qui",
+      "filter": {
+        "title": "Filtri",
+        "name": "Nome della squadra",
+        "namePlaceholder": "Inserisci il nome della squadra...",
+        "arena": "Arena",
+        "arenaPlaceholder": "Inserisci il nome di una città...",
+        "inter_arenas": "Inter-arena",
+        "submit": "Invia"
+      },
+      "details": {
+        "description": "Descrizione",
+        "arenas": "Arene",
+        "ia_allowed": "Questa squadra è autorizzata a giocare inter-arene.",
+        "ia_not_allowed": "Questa squadra non è autorizzata a giocare inter-arene.",
+        "networks": "Reti",
+        "discord": "Contatto su Discord",
+        "website": "Sito web"
+      },
+      "toast": {
+        "geolocation_not_supported": "La geolocalizzazione non è supportata da questo browser.",
+        "geolocation_error": "Si è verificato un errore durante il recupero della posizione.",
+        "team_not_found": "La squadra non è stata trovata. Se il problema persiste, non esitate a segnalarmelo.",
+        "arena_not_found": "L'arena non è stata trovata. Se il problema persiste, non esitate a segnalarmelo."
+      }
+    },
+    "account": {
+      "myTeam": "La mia squadra",
+      "manageMyTeam": "Gestisci la mia squadra",
+      "linkToMyTV": "Collega alla mia TV",
+      "navBar": {
+        "myAccount": "Il mio account",
+        "myTeam": "La mia squadra",
+        "logOut": "Disconnettersi",
+        "subscription": "Abbonamento",
+        "accessibility": "Accessibilità"
+      }
+    },
+    "link": {
+      "title": "Legamento",
+      "h1": {
+        "start": "Collega",
+        "end": "il tuo account"
+      },
+      "description": "Per collegare il tuo account, inserisci il codice di 4 caratteri visualizzato sulla tua TV.",
+      "button": "Collega",
+      "signedAs": "Sei connesso come ",
+      "signIn": "Accedi come un utente diverso",
+      "dialog": {
+        "p": "Hai domande?",
+        "a": "Non esitare a chiedere"
+      }
+    },
+    "myTeam": {
+      "toast": {
+        "teamSaved": "Le informazioni della tua squadra sono state salvate.",
+        "membersSaved": "I membri della tua squadra sono stati salvati."
+      },
+      "title": {
+        "start": "Gestisci il mio",
+        "end": "team"
+      },
+      "name": {
+        "label": "Nome della squadra",
+        "placeholder": "Inserisci qui il nome della tua squadra..."
+      },
+      "description": {
+        "label": "Descrizione",
+        "preview": "Anteprima della descrizione"
+      },
+      "markdown": {
+        "question": "Cos'è il markdown?",
+        "modal": {
+          "description": "Markdown è un linguaggio di markup leggero con una sintassi di formattazione del testo in chiaro progettata per essere convertita in HTML.",
+          "h1": "Formato",
+          "h2": "Sintassi",
+          "italics": "Corsivo",
+          "bold": "Grassetto",
+          "image": "Immagine",
+          "unorderedList": "Elenco non ordinato",
+          "orderedList": "Elenco ordinato",
+          "text": "Testo",
+          "legend": "Legenda",
+          "imageURL": "url dell'immagine",
+          "item": "Elemento"
+        }
+      },
+      "arenas": {
+        "label": "Arene",
+        "placeholder": "Seleziona una o più arene..."
+      },
+      "level": {
+        "label": "Livello",
+        "placeholder": "Seleziona il livello della tua squadra"
+      },
+      "publicArena": "Sì, voglio che la mia squadra appaia nella pagina 'Arene' (altri giocatori potranno contattarti tramite Discord).",
+      "publicThanks": "Sì, voglio che la mia squadra appaia nella pagina 'Grazie'.",
+      "websitePlaceholder": "(esempio : https://evabattleplan.com)",
+      "instagramPlaceholder": "(esempio : https://www.instagram.com/evabattleplan)",
+      "share": {
+        "title": "Condividi EBP con i tuoi compagni di squadra",
+        "description": "Quando aggiungi membri alla tua squadra, condividi le tue funzionalità da \"sostenitore\" e tutti i tuoi piani salvati con loro.",
+        "reserved": {
+          "description": "Questa sezione è riservata ai leader delle squadre che supportano EBP.",
+          "a": "Supporta EBP"
+        },
+        "dialog": {
+          "p1": "Non so dove trovare il nome Discord del mio amico!",
+          "p2": "Il nome Discord del tuo amico può essere trovato nel suo modulo di contatto (qui in rosso in",
+          "a": "questo esempio",
+          "p3": ").",
+          "f1": {
+            "label": "Primo amico",
+            "placeholder": "Nome « Discord » o « email Discord » del primo amico..."
+          },
+          "f2": {
+            "label": "Secondo amico",
+            "placeholder": "Nome « Discord » o « email Discord » del secondo amico..."
+          },
+          "f3": {
+            "label": "Terzo amico",
+            "placeholder": "Nome « Discord » o « email Discord » del terzo amico..."
+          },
+          "f4": {
+            "label": "Quarto amico",
+            "placeholder": "Nome « Discord » o « email Discord » del quarto amico..."
+          },
+          "f5": {
+            "label": "Quinto amico",
+            "placeholder": "Nome « Discord » o « email Discord » del quinto amico..."
+          },
+          "f6": {
+            "label": "Sesto amico",
+            "placeholder": "Nome « Discord » o « email Discord » del sesto amico..."
+          },
+          "f7": {
+            "label": "Settimo amico",
+            "placeholder": "Nome « Discord » o « email Discord » del settimo amico..."
+          },
+          "f8": {
+            "label": "Ottavo amico",
+            "placeholder": "Nome « Discord » o « email Discord » del ottavo amico..."
+          },
+          "f9": {
+            "label": "Nono amico",
+            "placeholder": "Nome « Discord » o « email Discord » del nono amico..."
+          },
+          "checkbox": "Riconosco che questi utenti fanno parte della mia squadra.",
+          "error": {
+            "error": "Errore",
+            "p1": "Perché ho degli errori?",
+            "p2": "Diverse ragioni possono causare questi errori:",
+            "li1": "L'amico non è registrato su EBP.",
+            "li2": "L'amico è già un sostenitore di EBP.",
+            "li3": "L'amico è già parte di una squadra."
+          }
+        }
+      }
+    },
+    "membershipLevels": {
+      "h1": "Facciamo vincere il tuo team!",
+      "h2": "Scegli un piano",
+      "getStarted": "Inizia",
+      "monthly": {
+        "title": "Mensile",
+        "month": "mese",
+        "steps": "Passi",
+        "video": "Video",
+        "database": "Database",
+        "collisions": "Collisioni",
+        "team": "Squadra",
+        "immersiveDrawer": "Cassetto immersivo",
+        "premiumSharing": "Condivisione premium fino a 3 utenti"
+      },
+      "yearly": {
+        "title": "Annuale",
+        "popular": "Popolare",
+        "year": "Anno",
+        "everything": "Tutto in \"Mensile\"",
+        "savings": "Risparmio del 77% rispetto al mensile",
+        "addUsers": "(Opzione) Goditi Premium per un massimo di 10 utenti",
+        "nbUsers": "Numero di giocatori nella squadra:"
+      }
+    },
+    "tv": {
+      "title": "TV",
+      "h1": {
+        "start": "Collega",
+        "end": "la tua TV"
+      },
+      "description": {
+        "start": "Per accedere, prendi il tuo telefono, visita",
+        "end": ", e inserisci il codice qui sotto"
+      },
+      "dialog": {
+        "p": "Hai domande?",
+        "a": "Non esitare a chiedere"
+      }
+    },
+    "login": {
+      "p1": "È la prima volta che accedi?",
+      "p2": "Il tuo account verrà creato automaticamente.",
+      "discordButton": "Accedi con Discord",
+      "problem": "Ho un problema di connessione",
+      "p3": "C'è un problema con il login Discord?",
+      "p4": "Se hai un account su EBP, possiamo inviarti un link di accesso unico via email.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "La tua email Discord...",
+      "emailButton": "Invia un link via email",
+      "toast": "È stata inviata un'email all'indirizzo."
+    },
+    "statistics": {
+      "home": {
+        "setTags": "Imposta i tag",
+        "title": "Statistiche",
+        "games": "giochi",
+        "videos": "video",
+        "createAGame": "Crea un gioco",
+        "importGames": "Importa giochi",
+        "bulkAction": "Azione di massa",
+        "teams": "Squadre",
+        "winner": "Vincitore",
+        "name": "Nome",
+        "score": "Punteggio",
+        "setOrangeTeamName": "Imposta il nome della squadra arancione",
+        "setBlueTeamName": "Imposta il nome della squadra blu",
+        "toast": {
+          "created": "Il gioco è stato creato.",
+          "deleted": "Il gioco è stato eliminato.",
+          "updated": "Il gioco è stato aggiornato.",
+          "renamed": "La squadra è stata rinominata.",
+          "excelImported": "Il file Excel è stato importato."
+        },
+        "dialog": {
+          "ad": {
+            "p1": "Ehi, psst...<br />Il tuo analizzatore video con <b>IA</b> sta arrivando!",
+            "p2": "Nel frattempo, non esitare a...",
+            "supportEBP": "Supporta EBP"
+          },
+          "create": {
+            "createAGame": "Crea un gioco",
+            "updateAGame": "Aggiorna un gioco",
+            "orangeTeam": "Squadra arancione",
+            "blueTeam": "Squadra blu",
+            "teamScore": "Punteggio della squadra",
+            "player": "Giocatore",
+            "playerName": "Nome del giocatore",
+            "playerScore": "Punteggio del giocatore",
+            "playerKills": "Uccisioni del giocatore",
+            "playerDeads": "Morti del giocatore",
+            "assistances": "Assistenze",
+            "create": "Crea"
+          },
+          "delete": {
+            "deleteAGame": "Elimina un gioco",
+            "confirmation": "Sei sicuro di voler eliminare questo gioco?",
+            "confirmations": "Vuoi davvero eliminare questi giochi?"
+          },
+          "importExcelDescription": "Clicca qui per inviare il tuo file Excel",
+          "rename": {
+            "title": "Imposta un nome per la squadra",
+            "question": "Che nome vorresti dare a questa squadra?<br/>Questo nome sarà applicato a tutti i giochi con questi giocatori."
+          },
+          "readGameVideo": {
+            "playPause": "Riproduci / Pausa",
+            "cut": "Tagliare"
+          }
+        }
+      },
+      "players": {
+        "pseudo": "Nome utente",
+        "favoriteSide": "Miglior tasso di vittoria",
+        "gamesPlayed": "Partite giocate",
+        "averageDuration": "Durata media",
+        "averageScore": "Punteggio medio"
+      },
+      "player": {
+        "dialog": {
+          "rename": {
+            "title": "Rinominare il giocatore",
+            "question": "Che nome vuoi dare a questo giocatore?<br/>Questo nome verrà applicato a tutte le sue partite."
+          }
+        }
+      },
+      "team": {
+        "opponents": "Avversari",
+        "gamesPlayed": "Giochi giocati",
+        "noPlayers": "Questa squadra non contiene ancora giocatori.<br />Aggiornala per aggiungerne!",
+        "dialog": {
+          "update": {
+            "title": "Modifica squadra",
+            "favorite": "Preferito",
+            "icons": "Questi loghi provengono dalla pagina \"Arene\". Se il tuo logo manca, sentiti libero di aggiungerlo."
+          },
+          "delete": {
+            "confirmation": "Sei sicuro di voler eliminare la squadra \"{{ team }}\"?"
+          }
+        }
+      },
+      "navBar": {
+        "dashboard": "Dashboard",
+        "players": "Giocatori",
+        "teams": "Squadre",
+        "replayer": "Riproduttore"
+      },
+      "dialog": {
+        "filter": {
+          "dates": {
+            "0": "Nessuno",
+            "30": "Ultimi 30 giorni",
+            "90": "Ultimi 90 giorni",
+            "365": "Ultimi 365 giorni",
+            "title": "Periodo"
+          }
+        }
+      },
+      "toast": {
+        "filter": {
+          "max2Teams": "Puoi selezionare al massimo due squadre."
+        }
+      },
+      "tooltip": {
+        "filter": {
+          "shared": "Questi filtri ti seguiranno durante la navigazione."
+        }
+      }
+    },
+    "cookies": {
+      "h1": "Politica sui cookie",
+      "p1": "Per offrirti un'esperienza migliore, utilizziamo i cookie per personalizzare i contenuti e analizzare il nostro traffico. I cookie includono cookie necessari, funzionali e prestazionali.",
+      "p2": "Non autorizziamo aziende terze a raccogliere informazioni sulla tua attività sui nostri siti web, ad esempio tramite cookie, pixel e web beacon.",
+      "h2": "La tua privacy",
+      "p3": "Quando visiti un sito web, questo può memorizzare o recuperare informazioni sul tuo browser, principalmente sotto forma di cookie. Queste informazioni possono riguardare te, le tue preferenze o il tuo dispositivo e vengono utilizzate principalmente per far funzionare il sito come ti aspetti. Normalmente queste informazioni non ti identificano direttamente, ma possono offrire un'esperienza web più personalizzata. Si prega di notare che il blocco di alcuni tipi di cookie potrebbe influenzare direttamente la tua esperienza sul nostro sito e i servizi che siamo in grado di offrire.",
+      "h3": "Condivisione o vendita di dati personali",
+      "p4": "EBP non vende né condivide le tue informazioni personali."
+    },
+    "event": {
+      "supporter": {
+        "title": "Benvenuto al tuo evento EBP",
+        "description1": "Questa pagina consente ai membri che non supportano EBP di usufruire dei vantaggi premium durante il loro evento.",
+        "description2": "Sostieni già EBP, e per questo ti ringrazio di cuore!",
+        "description3": "Conto su di te per accompagnare i tuoi amici 😊",
+        "back": "Torna alla home"
+      },
+      "step0": {
+        "description1": "Stai partecipando a un evento legato a EBP?",
+        "description2": "Per garantire che tu possa usufruire dei vantaggi del tuo evento, effettueremo alcuni controlli."
+      },
+      "step1": {
+        "title": "Verifica della tua posizione",
+        "description1": "Accetta il pop-up sul tuo dispositivo",
+        "description2": "I vantaggi sono riservati ai membri fisicamente presenti all'evento. Per garantire la sicurezza di questa offerta, verifica la posizione del tuo dispositivo."
+      },
+      "step2": {
+        "title": "Codice evento",
+        "description1": "Avvicinati all'organizzatore",
+        "description2": "Chiedi all'organizzatore che ospita l'evento il codice a 4 cifre.",
+        "placeholder": "Inserisci il codice dell'evento qui..."
+      },
+      "congratulations": {
+        "title": "Congratulazioni",
+        "description1": "I vantaggi premium di EBP sono stati sbloccati durante l'evento.",
+        "description2": "Grazie e non esitare, se hai bisogno di qualcosa, sono a tua disposizione!"
+      },
+      "title": "Evento"
+    },
+    "moonOfTheDead": {
+      "title": "Moon of the dead",
+      "toast": "Se questa pagina non è tradotta nella tua lingua,\nnon esitare a forzare la traduzione.",
+      "thanks": {
+        "description": "Grazie ai volontari che mantengono aggiornata questa pagina:"
+      }
+    },
+    "heroes": {
+      "title": "Eroi",
+      "chooseAHero": "Scegli un Eroe",
+      "chooseASkin": "Scegli una skin",
+      "aiGeneratedVideo": "Video generato dall'IA"
+    }
+  },
+  "toast": {
+    "loginError": "Si è verificato un errore durante l'accesso."
+  },
+  "meta": {
+    "description": "EBP è uno strumento che ti permette di modificare strategie sulle mappe del gioco EVA. Anticipa le squadre avversarie, prevedi tutte le loro azioni ed eludile. Predici i movimenti dei tuoi avversari, indica ai tuoi compagni di squadra dove posizionarsi e come reagire alle diverse situazioni."
+  }
+}

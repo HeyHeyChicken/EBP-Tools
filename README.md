@@ -10,6 +10,12 @@
 
 **EBP Replay-Cutter** ...
 
+TODO LIST :
+
+1. Passer le client en Angular.
+2. Permettre à l'utilisateur de définir le dossier de sortie des cuts.
+3. Permettre à l'utilisateur de cut sa vidéo sans les commentaires inner.
+
 <br>
 <br>
 

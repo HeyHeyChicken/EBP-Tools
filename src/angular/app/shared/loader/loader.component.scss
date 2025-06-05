@@ -1,0 +1,66 @@
+@use "../../../styles/imports/variables" as variables;
+
+$size: 150px;
+.loader {
+  height: $size;
+  width: $size;
+  border-radius: 50%;
+  background-color: variables.$dark_color;
+  position: relative;
+  font-family: sans-serif;
+  margin: 0 auto;
+
+  > span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    color: white;
+    transform: translate(-50%, -50%);
+    color: variables.$main_color;
+    font-size: calc(#{$size} * 0.4);
+  }
+
+  > div {
+    > div {
+      height: calc(#{$size} * 0.1);
+      width: calc(#{$size} * 0.02);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      background: rgba(255, 255, 255, 0.25);
+
+      @for $i from 1 through 50 {
+        &:nth-child(#{$i}) {
+          transform: translate(-50%, -50%)
+            rotate(#{180deg + 360deg / 50 * ($i - 1)})
+            translateY(calc(#{$size} * 0.5 - #{$size} * 0.08));
+        }
+      }
+
+      &:first-child {
+        background: variables.$main_color;
+      }
+    }
+  }
+
+  @for $i from 0 through 100 {
+    &.t#{$i} {
+      > span::after {
+        content: "#{$i}";
+      }
+    }
+  }
+
+  @for $i from 1 through 100 {
+    $active: floor($i / 2);
+    &.t#{$i} {
+      > div > div {
+        @for $j from 1 through $active {
+          &:nth-child(#{$j}) {
+            background: variables.$main_color;
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+// Custom Theming for Angular Material
+// For more information: https://material.angular.dev/guide/theming
+@use "@angular/material" as mat;
+@use "./styles/_index" as variables;
+
+html {
+  @include mat.theme(
+    (
+      color: (
+        theme-type: light,
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+} /* You can add global styles to this file, and also import other style files */
+
+html {
+  height: 100%;
+  overflow: hidden !important;
+
+  body {
+    touch-action: manipulation;
+    height: 100%;
+    margin: 0;
+    background-color: variables.$dark_color;
+    color: white;
+    overflow-x: hidden;
+    font-size: 16px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+      "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+    > app-root {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+
+      > main {
+        flex: 1;
+        overflow-x: hidden;
+        overflow-y: auto;
+
+        > *:not(router-outlet) {
+          padding: variables.$margin;
+          box-sizing: border-box;
+          display: block;
+          height: 100%;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+@use "../../../styles/imports/variables" as variables;
+
+:host {
+  display: block;
+  padding: 0 calc(#{variables.$margin} * 4 - #{variables.$form_height} / 4) 0 0;
+  height: calc(#{variables.$form_height} + #{variables.$margin} * 2);
+  border-bottom: 1px solid variables.$border_color;
+  position: relative;
+  z-index: 102;
+  background-color: variables.$dark_color;
+
+  > :not(.right) {
+    float: left;
+  }
+
+  > .logo {
+    width: fit-content;
+    display: flex;
+    cursor: pointer;
+
+    &.center {
+      margin: 0 auto;
+      float: none;
+    }
+
+    > img {
+      margin: calc(#{variables.$form_height} / 2) calc(#{variables.$margin} * 2)
+        calc(#{variables.$form_height} / 2) calc(#{variables.$margin} * 4);
+    }
+  }
+
+  > .right {
+    float: right;
+
+    > div {
+      float: left;
+      cursor: pointer;
+      padding: variables.$margin calc(#{variables.$margin} / 2);
+    }
+
+    > .language_selector {
+      position: relative;
+      height: variables.$form_height;
+
+      > img {
+        position: absolute;
+        top: 50%;
+        left: calc(#{variables.$margin} * 2);
+        transform: translateY(-50%);
+        width: calc(#{variables.$margin} * 2);
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      > select {
+        height: 100%;
+        background: transparent;
+        color: white;
+        position: relative;
+        cursor: pointer;
+        -webkit-appearance: none;
+        padding: 0 variables.$margin 0 calc(#{variables.$margin} * 4);
+        text-transform: uppercase;
+        text-align: center;
+
+        &:focus {
+          outline: none;
+        }
+
+        > option {
+          background-color: variables.$dark_color;
+        }
+      }
+    }
+  }
+}

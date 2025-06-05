@@ -1,0 +1,34 @@
+<ebp-container>
+  <ebp-row>
+    <ebp-column></ebp-column>
+    <ebp-column [xs]="7">
+      <div
+        class="dropper"
+        [class.disabled]="inputFileDisabled"
+        *ngIf="percent < 0"
+        (click)="onInputFileClick()"
+      >
+        <div class="icons">
+          <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
+          <i class="fa-sharp fa-solid fa-file"></i>
+          <i class="fa-sharp fa-solid fa-file-video"></i>
+        </div>
+        <p>Click here to send your video file</p>
+      </div>
+      <ebp-loader [value]="percent" *ngIf="percent >= 0"></ebp-loader>
+      <ebp-message>
+        Please wait, the video is being cut...<br />
+        Number of games found:<b id="nbGames">0</b>
+      </ebp-message>
+      <div id="result">
+        <button id="saveAll">
+          <i class="fa-sharp fa-solid fa-floppy-disk"></i> Save all
+        </button>
+        <button id="copyDatas">
+          <i class="fa-sharp fa-solid fa-copy"></i> Copy timecodes
+        </button>
+        <table></table>
+      </div>
+    </ebp-column>
+  </ebp-row>
+</ebp-container>

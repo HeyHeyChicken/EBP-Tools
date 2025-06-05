@@ -1,0 +1,128 @@
+@use "../imports/variables" as variables;
+
+//#region direction
+
+$directions: (
+	"row": "row",
+	"row-reverse": "row-reverse",
+	"column": "column",
+	"column-reverse": "column-reverse",
+);
+
+@each $size, $pixel in variables.$sizes {
+	@media (min-width: $pixel) {
+		@each $direction, $i in $directions {
+			html {
+				> body {
+					.flex#{$size}-#{$direction} {
+						flex-direction: #{$i};
+					}
+				}
+			}
+		}
+	}
+}
+
+//#endregion
+
+//#region justify
+
+$justifys: (
+	"start": "flex-start",
+	"end": "flex-end",
+	"center": "center",
+	"between": "space-between",
+	"around": "space-around",
+	"evenly": "space-evenly",
+);
+
+@each $size, $pixel in variables.$sizes {
+	@media (min-width: $pixel) {
+		@each $justify, $i in $justifys {
+			html {
+				> body {
+					.justify-content#{$size}-#{$justify} {
+						justify-content: #{$i};
+					}
+				}
+			}
+		}
+	}
+}
+
+//#endregion
+
+//#region align items
+
+$align_items: (
+	"start": "flex-start",
+	"end": "flex-end",
+	"center": "center",
+	"baseline": "baseline",
+	"stretch": "stretch",
+);
+
+@each $size, $pixel in variables.$sizes {
+	@media (min-width: $pixel) {
+		@each $align_item, $i in $align_items {
+			html {
+				> body {
+					.align-items#{$size}-#{$align_item} {
+						align-items: #{$i};
+					}
+				}
+			}
+		}
+	}
+}
+
+//#endregion
+
+//#region align self
+
+$align_selfs: (
+	"start": "flex-start",
+	"end": "flex-end",
+	"center": "center",
+	"baseline": "baseline",
+	"stretch": "stretch",
+);
+
+@each $size, $pixel in variables.$sizes {
+	@media (min-width: $pixel) {
+		@each $item, $i in $align_selfs {
+			html {
+				> body {
+					.align-self#{$size}-#{$item} {
+						align-self: #{$i};
+					}
+				}
+			}
+		}
+	}
+}
+
+//#endregion
+
+//#region fill
+
+$fills: (
+	"fill": "1 1 auto",
+);
+
+@each $size, $pixel in variables.$sizes {
+	@media (min-width: $pixel) {
+		@each $item, $i in $fills {
+			html {
+				> body {
+					.flex#{$size}-#{$item} {
+						flex: #{$i};
+					}
+				}
+			}
+		}
+	}
+}
+
+//#endregion
+

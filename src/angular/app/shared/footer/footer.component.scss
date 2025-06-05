@@ -1,0 +1,21 @@
+@use "../../../styles/imports/variables" as variables;
+@use "../../../styles/imports/material_colors" as material_colors;
+
+:host {
+  color: rgba(255, 255, 255, 0.5);
+  border-top: 1px solid variables.$border_color;
+
+  ebp-container {
+    display: flex;
+    flex-direction: column;
+  }
+
+  ::ng-deep a {
+    color: material_colors.$material_red_500;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

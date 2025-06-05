@@ -49,7 +49,8 @@ let projectLatestVersion /* string */ = "";
   APP.use(express.static(path.join(ROOT_PATH, "static")));
 
   APP.get("/", (request, response) => {
-    response.sendFile(path.join(ROOT_PATH, "views", "index.html"));
+    //response.sendFile(path.join(ROOT_PATH, "views", "index.html"));
+    response.redirect("http://localhost:4200");
   });
 
   // Allows the application's front-end to access local files on the user's device.
@@ -152,6 +153,7 @@ let projectLatestVersion /* string */ = "";
       width: 800 + (!IS_PROD ? 540 : 0),
       height: 800,
       resizable: false,
+      contextIsolation: true,
       webPreferences: {
         preload: IS_PROD
           ? MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY

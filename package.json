@@ -1,17 +1,23 @@
 {
   "name": "ebp-replay-cutter",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "",
   "main": ".webpack/main",
   "scripts": {
     "make": "electron-forge make",
-    "start": "concurrently \"sass --watch src/scss:src/static/style --style=compressed\" \"electron ./src/main.js\""
+    "start": "concurrently \"npx ng serve\" \"sass --watch src/scss:src/static/style --style=compressed\" \"electron ./src/main.js\""
   },
   "repository": "https://github.com/HeyHeyChicken/EBP-Replay-Cutter",
   "keywords": [],
   "author": "Antoine Duval",
   "license": "See LICENSE.txt",
   "devDependencies": {
+    "@angular/common": "^20.0.0",
+    "@angular/compiler": "^20.0.0",
+    "@angular/core": "^20.0.0",
+    "@angular/forms": "^20.0.0",
+    "@angular/platform-browser": "^20.0.0",
+    "@angular/router": "^20.0.0",
     "@electron-forge/cli": "^7.8.0",
     "@electron-forge/maker-deb": "^7.8.0",
     "@electron-forge/maker-dmg": "^7.8.0",
@@ -21,21 +27,43 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.0",
     "@electron-forge/plugin-fuses": "^7.8.0",
     "@electron-forge/plugin-webpack": "^7.8.0",
+    "@ngx-translate/core": "^15.0.0",
+    "@ngx-translate/http-loader": "^8.0.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
     "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^13.0.0",
     "electron": "^36.2.1",
     "electron-squirrel-startup": "^1.0.1",
+    "ngx-toastr": "^17.0.2",
     "node-addon-api": "^8.3.1",
     "nodemon": "^3.1.10",
-    "sass": "^1.89.1"
+    "rxjs": "~7.8.0",
+    "sass": "^1.89.1",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.0",
+    "@angular/animations": "^20.0.1"
   },
   "dependencies": {
+    "@angular/build": "^20.0.1",
+    "@angular/cdk": "^20.0.2",
+    "@angular/cli": "^20.0.1",
+    "@angular/compiler-cli": "^20.0.0",
+    "@angular/forms": "^20.0.0 || ^21.0.0",
+    "@angular/material": "^20.0.2",
+    "@types/jasmine": "~5.1.0",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",
     "get-port": "^7.1.0",
+    "jasmine-core": "~5.7.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
     "open": "^10.1.2",
     "pug": "^3.0.3",
-    "registry-js": "^1.16.1"
+    "registry-js": "^1.16.1",
+    "tesseract.js": "^6.0.1",
+    "typescript": "~5.8.2"
   }
 }

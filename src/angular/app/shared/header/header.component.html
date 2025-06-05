@@ -1,0 +1,40 @@
+<!-- #region LEFT -->
+<a
+  class="logo"
+  [attr.aria-label]="'view.home.title' | translate"
+  routerLink="/{{ translateService.currentLang }}"
+>
+  <img height="24px" alt="EBP's logo" src="/assets/img/logo.webp" />
+</a>
+<!-- #endregion -->
+<!-- #region RIGHT -->
+<div class="right">
+  <div class="language_selector">
+    <img
+      alt="Language flag"
+      src="/assets/img/flags/{{ translateService.currentLang }}.webp"
+    />
+    <select
+      aria-label="Language selector"
+      (change)="languageSelectChanged($event)"
+    >
+      <option
+        *ngFor="let lang of translateService.langs"
+        value="{{ lang }}"
+        [selected]="lang == translateService.currentLang"
+      >
+        {{ lang }}
+      </option>
+    </select>
+  </div>
+  <div>
+    <a
+      class="btn squared discord"
+      aria-label="Discord"
+      (click)="onDiscordButtonCLick()"
+    >
+      <i class="fa-brands fa-discord"></i>
+    </a>
+  </div>
+</div>
+<!-- #endregion -->
