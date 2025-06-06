@@ -4,12 +4,14 @@
   <router-outlet></router-outlet>
 </main>
 <ebp-footer>
-  <span>Version: {{ versions?.current }}</span>
+  <span
+    >{{ "shared.footer.version" | translate }}: {{ versions?.current }}</span
+  >
   <a
     class="ml-auto"
     *ngIf="versions && versions.last && versions.current != versions.last"
     (click)="onNewUpdateLinkClick()"
   >
-    A new update is available, download it by clicking here.
+    {{ "shared.footer.newUpdate" | translate }}
   </a>
 </ebp-footer>

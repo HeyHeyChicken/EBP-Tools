@@ -25,6 +25,7 @@ const { exec } = require("child_process");
 const { default: getPort } = require("get-port");
 const { version } = require("../package.json");
 const https = require("https");
+const http = require("http");
 
 //#endregion
 
@@ -41,6 +42,7 @@ let projectLatestVersion /* string */ = "";
 
   //#region Express
 
+  // A port is randomly generated from the ports available on the machine.
   const PORT = await getPort();
   const APP = express();
   if (!IS_PROD) {
@@ -49,8 +51,11 @@ let projectLatestVersion /* string */ = "";
   APP.use(express.static(path.join(ROOT_PATH, "static")));
 
   APP.get("/", (request, response) => {
-    //response.sendFile(path.join(ROOT_PATH, "views", "index.html"));
-    response.redirect("http://localhost:4200");
+    if (IS_PROD) {
+      response.sendFile(path.join(ROOT_PATH, "static", "index.html"));
+    } else {
+      response.redirect("http://localhost:4200");
+    }
   });
 
   // Allows the application's front-end to access local files on the user's device.
@@ -69,6 +74,47 @@ let projectLatestVersion /* string */ = "";
   });
 
   //#endregion
+
+  /**
+   * This function allows you to wait for an HTTP:PORT address to respond.
+   * @param {number} port Port of address to wait.
+   * @param {string} host Host of address to wait.
+   * @param {number} timeout Maximum time to wait before declaring a failure.
+   * @param {number} interval Address presence check interval.
+   * @returns
+   */
+  function waitForHttp(
+    port,
+    host = "localhost",
+    timeout = 60 * 1000,
+    interval = 500
+  ) {
+    return new Promise((resolve, reject) => {
+      const DEADLINE = Date.now() + timeout;
+
+      const CHECK = () => {
+        const req = http.get(
+          { hostname: host, port: port, path: "/", timeout: 2000 },
+          (res) => {
+            res.destroy();
+            resolve();
+          }
+        );
+
+        req.on("error", () => {
+          if (Date.now() > DEADLINE) {
+            reject(
+              new Error(`Timeout waiting for HTTP server on port ${port}`)
+            );
+          } else {
+            setTimeout(CHECK, interval);
+          }
+        });
+      };
+
+      CHECK();
+    });
+  }
 
   /**
    * This function cuts out a part of a video to get one file per game.
@@ -171,11 +217,26 @@ let projectLatestVersion /* string */ = "";
     }
   }
 
+  if (!IS_PROD) {
+    app.commandLine.appendSwitch("disable-web-security");
+    app.commandLine.appendSwitch(
+      "disable-features",
+      "IsolateOrigins,site-per-process"
+    );
+  }
   /**
    * This method will be called when Electron has finished initialization and is ready to create browser windows.
    */
   app.whenReady().then(() => {
-    createWindow();
+    if (IS_PROD) {
+      // If we are in production, we immediately create the window that will contain the HMI.
+      createWindow();
+    } else {
+      // If we are in dev, we wait until the Angular server is ready before creating the window that will contain the HMI.
+      waitForHttp(4200).then(() => {
+        createWindow();
+      });
+    }
 
     // The front-end asks the server to open an url in the default browser.
     ipcMain.handle("open-url", async (event, url) => {

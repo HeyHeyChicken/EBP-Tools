@@ -1,6 +1,7 @@
 //#region Imports
 
 import { Injectable } from "@angular/core";
+import { TranslateService } from "@ngx-translate/core";
 
 //#endregion
 
@@ -14,7 +15,15 @@ export class GlobalService {
     return "https://discord.gg/tAHAc9q3aX";
   }
 
+  public get webSiteURL(): string {
+    return `https://evabattleplan.com/${this.translateService.currentLang}`;
+  }
+
+  public serverPort: number = 0;
+
   //#endregion
+
+  constructor(private readonly translateService: TranslateService) {}
 
   //#region Functions
 

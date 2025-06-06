@@ -2,6 +2,17 @@
   <ebp-row>
     <ebp-column></ebp-column>
     <ebp-column [xs]="7">
+      <video
+        *ngIf="videoPath"
+        [src]="
+          'http://127.0.0.1:' +
+          globalService.serverPort +
+          '/file?path=' +
+          videoPath
+        "
+        (loadeddata)="videoLoadedData($event)"
+        (timeupdate)="videoTimeUpdate($event)"
+      ></video>
       <div
         class="dropper"
         [class.disabled]="inputFileDisabled"
@@ -13,22 +24,74 @@
           <i class="fa-sharp fa-solid fa-file"></i>
           <i class="fa-sharp fa-solid fa-file-video"></i>
         </div>
-        <p>Click here to send your video file</p>
+        <p>{{ "view.home.inputFile" | translate }}</p>
       </div>
-      <ebp-loader [value]="percent" *ngIf="percent >= 0"></ebp-loader>
-      <ebp-message>
-        Please wait, the video is being cut...<br />
-        Number of games found:<b id="nbGames">0</b>
-      </ebp-message>
-      <div id="result">
-        <button id="saveAll">
-          <i class="fa-sharp fa-solid fa-floppy-disk"></i> Save all
-        </button>
-        <button id="copyDatas">
-          <i class="fa-sharp fa-solid fa-copy"></i> Copy timecodes
-        </button>
-        <table></table>
+      <div *ngIf="percent >= 0">
+        <ebp-loader [value]="percent"></ebp-loader>
+        <ebp-message class="mt-2">
+          {{ "view.home.videoIsBeingAnalyzed" | translate }}<br />
+          {{ "view.home.nbGamesFound" | translate }}:<b> {{ games.length }}</b>
+        </ebp-message>
       </div>
+      <ng-container *ngIf="percent < 0 && games.length">
+        <table class="mt-2">
+          <thead>
+            <tr>
+              <th>{{ "view.home.map" | translate }}</th>
+              <th>{{ "view.home.infos" | translate }}</th>
+              <th>
+                <div>
+                  <button
+                    class="squared"
+                    (click)="saveAll()"
+                    matTooltip="{{ 'view.home.saveAll' | translate }}"
+                  >
+                    <i class="fa-sharp fa-solid fa-floppy-disk"></i>
+                  </button>
+                  <button
+                    class="squared"
+                    (click)="copyTimeCodes()"
+                    matTooltip="{{ 'view.home.copyTimecodes' | translate }}"
+                  >
+                    <i class="fa-sharp fa-solid fa-copy"></i>
+                  </button>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let game of games">
+              <th
+                [style.background-image]="
+                  'url(https://evabattleplan.com/back/wp-content/uploads/' +
+                  game.map.replaceAll(' ', '-').toLowerCase() +
+                  '-300x169.webp)'
+                "
+              >
+                {{ game.map }}
+              </th>
+              <td class="infos">
+                <p class="orange">
+                  {{ game.orangeTeam.name }} ({{ game.orangeTeam.score }})
+                </p>
+                <p class="blue">
+                  {{ game.blueTeam.name }} ({{ game.blueTeam.score }})
+                </p>
+              </td>
+              <td class="buttons">
+                <div>
+                  <button class="squared" (click)="save(game)">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                  </button>
+                  <button class="squared" disabled>
+                    <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
     </ebp-column>
   </ebp-row>
 </ebp-container>

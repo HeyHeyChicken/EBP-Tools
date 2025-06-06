@@ -1,6 +1,7 @@
 // Custom Theming for Angular Material
 // For more information: https://material.angular.dev/guide/theming
 @use "@angular/material" as mat;
+@use "ngx-toastr/toastr";
 @use "./styles/_index" as variables;
 
 html {
@@ -16,6 +17,11 @@ html {
     )
   );
 } /* You can add global styles to this file, and also import other style files */
+
+@font-face {
+  font-family: DukeFill;
+  src: url("/assets/font/dukeFill/Duke Fill.otf") format("opentype");
+}
 
 html {
   height: 100%;
@@ -40,14 +46,15 @@ html {
 
       > main {
         flex: 1;
-        overflow-x: hidden;
-        overflow-y: auto;
+        overflow: hidden;
 
         > *:not(router-outlet) {
           padding: variables.$margin;
           box-sizing: border-box;
           display: block;
           height: 100%;
+          overflow-x: hidden;
+          overflow-y: auto;
         }
       }
     }

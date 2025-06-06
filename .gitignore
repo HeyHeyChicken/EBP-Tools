@@ -16,6 +16,8 @@ ZERO_CHECK.vcxproj.filters
 x64
 windows.dir
 Debug
+src/static/*
+!src/static/README.md
 
 # See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 

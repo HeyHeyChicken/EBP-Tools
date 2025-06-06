@@ -72,6 +72,13 @@ jobs:
       # Installation des dépendances NPM
       - name: Install Node dependencies
         run: npm install
+      # Build Angular project
+      - name: Build Angular app
+        run: npm run build
+      - name: Move Angular build to static folder
+        run: |
+          Remove-Item -Recurse -Force src\static\*
+          Move-Item -Path dist\ebp\browser\* -Destination src\static\
       # Build de l'application Electron
       - name: Build Electron app
         run: npm run make

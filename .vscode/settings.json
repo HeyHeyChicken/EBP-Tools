@@ -1,0 +1,7 @@
+{
+  "i18n-ally.localesPaths": [
+    "out/EBP - Replay Cutter-win32-x64/locales",
+    "src/angular/assets/i18n"
+  ],
+  "i18n-ally.keystyle": "nested"
+}

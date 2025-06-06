@@ -4,7 +4,7 @@ const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: ["./src/views/", "./src/static/", "./src/ffmpeg/"],
+    extraResource: ["./src/static/", "./src/ffmpeg/"],
     icon: "assets/icon",
     name: "EBP - Replay Cutter",
   },

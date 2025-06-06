@@ -6,6 +6,14 @@
   background-position: center center;
 }
 
+video {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: -1000000vh;
+  left: -1000000vw;
+}
+
 .dropper {
   border: 1px dashed #d0dce7;
   padding: calc(#{variables.$margin} * 2);
@@ -85,5 +93,71 @@
   > p {
     margin: 0;
     color: variables.$main_color;
+  }
+}
+
+table {
+  background-color: variables.$dark_color;
+  color: white;
+  border-collapse: collapse;
+  width: 100%;
+
+  > thead,
+  > tbody {
+    > tr {
+      > * {
+        padding: calc(#{variables.$margin} / 2) variables.$margin;
+        border: 1px solid variables.$border_color;
+      }
+    }
+  }
+
+  > thead {
+    > tr {
+      > th {
+        padding: calc(#{variables.$margin} / 2);
+
+        > div {
+          display: flex;
+          gap: calc(#{variables.$margin} / 2);
+        }
+      }
+    }
+  }
+
+  > tbody > tr {
+    > th {
+      background-position: center center;
+      background-size: cover;
+      text-align: center;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    > td {
+      &.infos {
+        width: 100%;
+
+        .orange {
+          color: #b86d00;
+        }
+        .blue {
+          color: #0073bb;
+        }
+      }
+
+      &.buttons {
+        padding: calc(#{variables.$margin} / 2);
+
+        > div {
+          display: flex;
+          gap: calc(#{variables.$margin} / 2);
+        }
+      }
+
+      > p {
+        margin: 0;
+      }
+    }
   }
 }

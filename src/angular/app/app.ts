@@ -1,12 +1,19 @@
 //#region Imports
 
-import { Component, ElementRef, OnInit, ViewChild } from "@angular/core";
+import {
+  Component,
+  ElementRef,
+  NgZone,
+  OnInit,
+  ViewChild,
+} from "@angular/core";
 import { NavigationEnd, Router, RouterOutlet } from "@angular/router";
-import { IdentityService } from "./core/services/identity.service";
 import { HeaderComponent } from "./shared/header/header.component";
 import { WizzComponent } from "./shared/wizz/wizz.component";
 import { FooterComponent } from "./shared/footer/footer.component";
 import { CommonModule } from "@angular/common";
+import { GlobalService } from "./core/services/global.service";
+import { TranslateModule } from "@ngx-translate/core";
 
 //#endregion
 
@@ -23,6 +30,7 @@ interface Versions {
     WizzComponent,
     FooterComponent,
     CommonModule,
+    TranslateModule,
   ],
   templateUrl: "./app.html",
 })
@@ -37,8 +45,9 @@ export class App implements OnInit {
 
   //#endregion
   constructor(
-    private readonly identityService: IdentityService,
-    private readonly router: Router
+    private readonly globalService: GlobalService,
+    private readonly router: Router,
+    private readonly ngZone: NgZone
   ) {}
 
   //#region Functions
@@ -56,16 +65,17 @@ export class App implements OnInit {
     // Getting the project version.
     //@ts-ignore
     window.electronAPI.getVersion().then((versions: any) => {
-      this.versions = versions;
+      this.ngZone.run(() => {
+        this.versions = versions;
+      });
+    });
 
-      /*
-      if (versions.current != versions.last && versions.last) {
-        const ALERT = document.createElement("a");
- 
-        ALERT.classList.add("alert");
-        FOOTER.append(ALERT);
-      }
-        */
+    // Getting the web server port.
+    //@ts-ignore
+    window.electronAPI.getExpressPort().then((serverPort: number) => {
+      this.ngZone.run(() => {
+        this.globalService.serverPort = serverPort;
+      });
     });
   }
 

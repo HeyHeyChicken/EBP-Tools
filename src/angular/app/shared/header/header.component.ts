@@ -4,7 +4,7 @@ import { Component, OnInit } from "@angular/core";
 import { TranslateModule, TranslateService } from "@ngx-translate/core";
 import { CommonModule, Location as CommonLocation } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { Router, RouterModule } from "@angular/router";
+import { Router } from "@angular/router";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatSelectModule } from "@angular/material/select";
 import { IdentityService } from "../../core/services/identity.service";
@@ -21,7 +21,6 @@ import { GlobalService } from "../../core/services/global.service";
     CommonModule,
     FormsModule,
     TranslateModule,
-    RouterModule,
     MatFormFieldModule,
     MatSelectModule,
   ],
@@ -69,12 +68,9 @@ export class HeaderComponent implements OnInit {
     }
   }
 
-  /**
-   * Cette fonction permet à l'utilisateur d'accéder au Discord d'EBP.
-   */
-  protected onDiscordButtonCLick(): void {
+  protected openURLExternalBrowser(url: string): void {
     //@ts-ignore
-    window.electronAPI.openURL(this.globalService.discordServerURL);
+    window.electronAPI.openURL(url);
   }
 
   /**

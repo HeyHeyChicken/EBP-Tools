@@ -2,7 +2,7 @@
 <a
   class="logo"
   [attr.aria-label]="'view.home.title' | translate"
-  routerLink="/{{ translateService.currentLang }}"
+  (click)="openURLExternalBrowser(globalService.webSiteURL)"
 >
   <img height="24px" alt="EBP's logo" src="/assets/img/logo.webp" />
 </a>
@@ -31,7 +31,7 @@
     <a
       class="btn squared discord"
       aria-label="Discord"
-      (click)="onDiscordButtonCLick()"
+      (click)="openURLExternalBrowser(globalService.discordServerURL)"
     >
       <i class="fa-brands fa-discord"></i>
     </a>
