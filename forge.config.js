@@ -4,8 +4,8 @@ const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: ["./src/views/", "./src/static/", "./src/ffmpeg/"],
-    icon: "assets/icon",
+    extraResource: ["./angular/dist/angular/browser/", "./ffmpeg/"],
+    icon: "electron/assets/icon",
     name: "EBP - Replay Cutter",
   },
   rebuildConfig: {},
@@ -14,7 +14,7 @@ module.exports = {
       // Windows
       name: "@electron-forge/maker-squirrel",
       config: {
-        setupIcon: "./assets/icon.ico",
+        setupIcon: "./electron/assets/icon.ico",
         description: "EBP Replay Cutter Tool",
       },
     },
@@ -28,7 +28,7 @@ module.exports = {
       name: "@electron-forge/maker-deb",
       config: {
         options: {
-          icon: "./src/icon",
+          icon: "./electron/icon",
         },
       },
     },
@@ -42,8 +42,8 @@ module.exports = {
       name: "@electron-forge/maker-dmg",
       config: {
         format: "ULFO",
-        icon: "assets/icon.icns",
-        background: "assets/dmg-background.png",
+        icon: "electron/assets/icon.icns",
+        background: "electron/assets/dmg-background.png",
         overwrite: true,
         window: {
           size: {
@@ -67,11 +67,11 @@ module.exports = {
           config: "./webpack.renderer.config.js",
           entryPoints: [
             {
-              html: "./src/views/index.html",
-              js: "./src/static/script/client.js",
+              html: "./angular/dist/angular/browser/index.html",
+              js: "./angular/dist/angular/browser/main.js",
               name: "main_window",
               preload: {
-                js: "./src/preload.js",
+                js: "./electron/preload.js",
               },
             },
           ],

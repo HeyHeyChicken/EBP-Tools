@@ -4,8 +4,9 @@
   "description": "",
   "main": ".webpack/main",
   "scripts": {
-    "make": "electron-forge make",
-    "start": "concurrently \"sass --watch src/scss:src/static/style --style=compressed\" \"electron ./src/main.js\""
+    "install_npm": "npm install && cd angular && npm install",
+    "make": "cd ./angular && npx ng build && cd ../ && electron-forge make",
+    "start": "concurrently \"cd ./angular && npx ng serve\" \"electron ./electron/server.js\""
   },
   "repository": "https://github.com/HeyHeyChicken/EBP-Replay-Cutter",
   "keywords": [],
