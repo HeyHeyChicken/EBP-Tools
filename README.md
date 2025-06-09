@@ -1,8 +1,4 @@
 <div align="center">
-<br><br>
-
-**EBP - EVA Battle Plan - Tools**<br>
-
 <img width="410px" src="https://github.com/HeyHeyChicken/EBP-Replay-Cutter/blob/main/.github/screenshot.png">
 </div>
 
