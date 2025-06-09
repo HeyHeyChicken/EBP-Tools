@@ -153,5 +153,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./release/windows.exe
-          asset_name: Windows-EBP-ReplayCutter-Installer.exe
+          asset_name: Windows-EBP-Tools-Installer.exe
           asset_content_type: application/octet-stream

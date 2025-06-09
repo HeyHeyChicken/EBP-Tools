@@ -6,7 +6,7 @@ module.exports = {
     asar: true,
     extraResource: ["./angular/dist/angular/browser/", "./ffmpeg/"],
     icon: "electron/assets/icon",
-    name: "EBP - Replay Cutter",
+    name: "EBP - EVA Battle Plan - Tools",
   },
   rebuildConfig: {},
   makers: [
@@ -15,7 +15,7 @@ module.exports = {
       name: "@electron-forge/maker-squirrel",
       config: {
         setupIcon: "./electron/assets/icon.ico",
-        description: "EBP Replay Cutter Tool",
+        description: "EBP - EVA Battle Plan - Tools",
       },
     },
     {

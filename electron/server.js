@@ -71,7 +71,7 @@ let projectLatestVersion /* string */ = "";
 
   APP.listen(PORT, () => {
     console.log(
-      `EBP's Replay cutter's express server is listening on http://localhost:${PORT}`
+      `EBP - EVA Battle Plan - Tools's express server is listening on http://localhost:${PORT}`
     );
   });
 
