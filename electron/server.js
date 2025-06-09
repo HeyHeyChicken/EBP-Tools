@@ -13,7 +13,7 @@ const {
   shell,
 } = require("electron");
 
-// run this as early in the main process as possible
+// When in installation mode, close the application.
 if (require("electron-squirrel-startup")) {
   app.quit();
 }
@@ -95,7 +95,7 @@ let projectLatestVersion /* string */ = "";
       const DEADLINE = Date.now() + timeout;
 
       const CHECK = () => {
-        const req = http.get(
+        const REQUEST = http.get(
           { hostname: host, port: port, path: "/", timeout: 2000 },
           (res) => {
             res.destroy();
@@ -103,7 +103,7 @@ let projectLatestVersion /* string */ = "";
           }
         );
 
-        req.on("error", () => {
+        REQUEST.on("error", () => {
           if (Date.now() > DEADLINE) {
             reject(
               new Error(`Timeout waiting for HTTP server on port ${port}`)
@@ -142,7 +142,7 @@ let projectLatestVersion /* string */ = "";
   }
 
   /**
-   * Cette fonction récupère le numéro de la dernière version publiée du projet.
+   * This function retrieves the number of the latest published version of the project.
    * @param {Function} callback
    */
   function getProjectLatestVersion(callback) {
@@ -159,8 +159,8 @@ let projectLatestVersion /* string */ = "";
       res.on("data", (chunk) => (data += chunk));
       res.on("end", () => {
         try {
-          const json = JSON.parse(data);
-          callback(json.tag_name);
+          const DATA = JSON.parse(data);
+          callback(DATA.tag_name);
         } catch (err) {
           console.error(err);
         }

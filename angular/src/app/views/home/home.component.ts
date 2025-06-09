@@ -145,7 +145,7 @@ export class HomeComponent implements OnInit {
             const MODE = this.detectGameScoreFrame(VIDEO, this.games);
             if (MODE > 0) {
               found = true;
-              const GAME /* Game */ = new Game(MODE);
+              const GAME: Game = new Game(MODE);
               GAME.end = NOW;
 
               const PLAYER_NAME_X /* number */ = 475;
