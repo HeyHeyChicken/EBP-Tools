@@ -14,6 +14,13 @@
 
 Just download the software [here](/HeyHeyChicken/EBP-Replay-Cutter/releases/latest/).
 
+I provide support for all users through [Discord](//discord.gg/tAHAc9q3aX).
+
+### 💼 Features
+
+1. Auto cut your game replays.
+2. Get your game replays YouTube's timecodes, ready to paste into your video description.
+
 ## 🤓 You are a developper
 
 ### 🔧 Prerequisites
@@ -40,6 +47,12 @@ npm run install_npm
 ```
 npm run start
 ```
+
+If you would like to contribute to this project, don't hesitate ton contact me on Discord.
+
+## 💻 Compatibility
+
+EBP - EVA Battle Plan - Tools has only been officially tested on Mac and Windows.
 
 <br>
 <br>
