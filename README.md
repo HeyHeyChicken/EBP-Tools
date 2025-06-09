@@ -8,7 +8,7 @@
 
 ## 😀 You are an EVA player
 
-Just download the software [here](/HeyHeyChicken/EBP-Replay-Cutter/releases/latest/).
+Just download the software [here](//github.com/HeyHeyChicken/EBP-Replay-Cutter/releases/latest/).
 
 I provide support for all users through [Discord](//discord.gg/tAHAc9q3aX).
 
