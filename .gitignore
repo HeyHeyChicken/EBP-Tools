@@ -17,3 +17,46 @@ ZERO_CHECK.vcxproj.filters
 x64
 windows.dir
 Debug
+
+# ANGULAR
+
+# Compiled output
+/angular/dist
+/angular/tmp
+/angular/out-tsc
+/angular/bazel-out
+
+# Node
+/angular/node_modules
+/angular/npm-debug.log
+/angular/yarn-error.log
+
+# IDEs and editors
+/angular/.idea/
+/angular/.project
+/angular/.classpath
+/angular/.c9/
+/angular/*.launch
+/angular/.settings/
+/angular/*.sublime-workspace
+
+# Visual Studio Code
+/angular/.vscode/*
+/angular/!.vscode/settings.json
+/angular/!.vscode/tasks.json
+/angular/!.vscode/launch.json
+/angular/!.vscode/extensions.json
+/angular/.history/*
+
+# Miscellaneous
+/angular/.angular/cache
+/angular/.sass-cache/
+/angular/connect.lock
+/angular/coverage
+/angular/libpeerconnection.log
+/angular/testem.log
+/angular/typings
+
+# System files
+/angular/.DS_Store
+/angular/Thumbs.db
