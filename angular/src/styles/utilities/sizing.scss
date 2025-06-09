@@ -1,3 +1,7 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
 @for $i from 0 through 100 {
   .h-#{$i} {
     height: 1% * $i !important;

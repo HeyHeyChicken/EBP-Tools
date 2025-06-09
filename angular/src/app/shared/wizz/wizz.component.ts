@@ -1,6 +1,6 @@
-/**
- * WIZZ
- */
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
 
 //#region Imports
 
@@ -11,9 +11,6 @@ import { FormsModule, ReactiveFormsModule } from "@angular/forms";
 
 //#endregion
 
-/**
- * An input component respecting the SNA design.
- */
 @Component({
   selector: "wizz",
   template: "",

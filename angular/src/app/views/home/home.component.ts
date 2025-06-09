@@ -1,7 +1,11 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
 //#region Imports
 
 import { CommonModule } from "@angular/common";
-import { ChangeDetectorRef, Component, NgZone, OnInit } from "@angular/core";
+import { Component, NgZone, OnInit } from "@angular/core";
 import { TranslateModule } from "@ngx-translate/core";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { GridModule } from "../../shared/grid/grid.module";
