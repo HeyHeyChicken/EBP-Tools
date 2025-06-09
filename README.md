@@ -4,7 +4,7 @@
 
 ## 👋 Introduction
 
-**EBP - EVA Battle Plan - Tools** is a source-visible toolbox.
+**EBP - EVA Battle Plan - Tools** is a source-visible toolbox for [EVA](//www.eva.gg) players.
 
 ## 😀 You are an EVA player
 
