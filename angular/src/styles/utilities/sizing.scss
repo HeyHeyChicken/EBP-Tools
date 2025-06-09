@@ -1,0 +1,17 @@
+@for $i from 0 through 100 {
+  .h-#{$i} {
+    height: 1% * $i !important;
+  }
+
+  .mh-#{$i} {
+    max-height: 1% * $i !important;
+  }
+
+  .w-#{$i} {
+    width: 1% * $i !important;
+  }
+
+  .mw-#{$i} {
+    max-width: 1% * $i !important;
+  }
+}

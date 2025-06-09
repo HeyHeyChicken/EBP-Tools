@@ -1,0 +1,59 @@
+@use "sass:map";
+@use "../../../../styles/imports/variables" as variables;
+
+:host {
+	width: 100%;
+	padding: 0 variables.$margin;
+	margin: 0 auto;
+	display: block;
+	box-sizing: border-box;
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "sm")) {
+	:host {
+		max-width: 540px;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "md")) {
+	:host {
+		max-width: 720px;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "lg")) {
+	:host {
+		max-width: 960px;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl")) {
+	:host {
+		max-width: 1140px;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl2")) {
+	:host {
+		max-width: 1320px;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl3")) {
+	:host {
+		max-width: 1404px;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl4")) {
+	:host {
+		max-width: 1578px;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl5")) {
+	:host {
+		max-width: 1752px;
+	}
+}
+

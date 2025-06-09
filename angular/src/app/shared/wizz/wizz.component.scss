@@ -1,0 +1,28 @@
+@use "../../../styles//imports/variables" as variables;
+
+@keyframes wizz_animation {
+	0% {
+		transform: translate(calc(#{variables.$margin} * -1), 0);
+	}
+	25% {
+		transform: translate(0, calc(#{variables.$margin} * -1));
+	}
+	50% {
+		transform: translate(0, #{#{variables.$margin}});
+	}
+	75% {
+		transform: translate(#{#{variables.$margin}}, 0);
+	}
+	100% {
+		transform: translate(calc(#{variables.$margin} * -1), 0);
+	}
+}
+
+body {
+	&.wizz {
+		animation-name: wizz_animation;
+		animation-duration: 0.15s;
+		animation-iteration-count: infinite;
+		animation-timing-function: linear;
+	}
+}

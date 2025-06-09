@@ -1,0 +1,22 @@
+@use "../imports/variables" as variables;
+
+$textAlignments: (
+	"start": "left",
+	"center": "center",
+	"end": "right",
+);
+
+@each $size, $pixel in variables.$sizes {
+	@media (min-width: $pixel) {
+		html {
+			> body {
+				@each $alignment, $i in $textAlignments {
+					.text#{$size}-#{$alignment} {
+						text-align: #{$i};
+					}
+				}
+			}
+		}
+	}
+}
+

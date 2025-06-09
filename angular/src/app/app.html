@@ -1,0 +1,17 @@
+<wizz></wizz>
+<ebp-header role="banner"></ebp-header>
+<main #main>
+  <router-outlet></router-outlet>
+</main>
+<ebp-footer>
+  <span
+    >{{ "shared.footer.version" | translate }}: {{ versions?.current }}</span
+  >
+  <a
+    class="ml-auto"
+    *ngIf="versions && versions.last && versions.current != versions.last"
+    (click)="onNewUpdateLinkClick()"
+  >
+    {{ "shared.footer.newUpdate" | translate }}
+  </a>
+</ebp-footer>

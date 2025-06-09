@@ -1,0 +1,20 @@
+{
+  "view": {
+    "home": {
+      "inputFile": "Haz clic aquí para enviar tu archivo de vídeo",
+      "videoIsBeingAnalyzed": "Por favor espera, el video está siendo analizado...",
+      "nbGamesFound": "Número de juegos encontrados",
+      "saveAll": "Guardar todo",
+      "copyTimecodes": "Copiar códigos de tiempo",
+      "map": "Mapa",
+      "infos": "Información"
+    }
+  },
+  "common": {},
+  "shared": {
+    "footer": {
+      "version": "Versión",
+      "newUpdate": "Hay una nueva actualización disponible, descárgala haciendo clic aquí."
+    }
+  }
+}

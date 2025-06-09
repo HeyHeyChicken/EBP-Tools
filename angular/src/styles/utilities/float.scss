@@ -1,0 +1,79 @@
+@use "sass:map";
+@use "../imports/variables" as variables;
+
+$floats: (
+	"left": "left",
+	"right": "right",
+	"none": "none",
+);
+
+@each $float, $i in $floats {
+	.float-#{$float} {
+		float: #{$i} !important;
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "sm")) {
+	@each $float, $i in $floats {
+		.float-sm-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "md")) {
+	@each $float, $i in $floats {
+		.float-md-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "lg")) {
+	@each $float, $i in $floats {
+		.float-lg-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl")) {
+	@each $float, $i in $floats {
+		.float-xl-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl2")) {
+	@each $float, $i in $floats {
+		.float-xl2-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl3")) {
+	@each $float, $i in $floats {
+		.float-xl3-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl4")) {
+	@each $float, $i in $floats {
+		.float-xl4-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl5")) {
+	@each $float, $i in $floats {
+		.float-xl5-#{$float} {
+			float: #{$i};
+		}
+	}
+}
+

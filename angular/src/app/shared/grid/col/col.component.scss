@@ -1,0 +1,338 @@
+@use "sass:map";
+@use "../../../../styles/imports/material_colors.scss";
+@use "../../../../styles/imports/variables" as variables;
+
+:host {
+	flex: 1 0 0%;
+	position: relative;
+	max-width: 100%;
+
+	&:not(:empty) {
+		padding: variables.$margin;
+		max-height: 100%;
+		box-sizing: border-box;
+	}
+
+	&._xs-auto,
+	&._sm-auto,
+	&._md-auto,
+	&._lg-auto,
+	&._xl-auto,
+	&._xl2-auto,
+	&._xl3-auto,
+	&._xl4-auto,
+	&._xl5-auto {
+		flex: 0 0 auto;
+		width: auto;
+	}
+}
+
+$size: 24;
+$textAlignments: (
+	"start": "left",
+	"center": "center",
+	"end": "right",
+);
+$selfAlignments: (
+	"start": "flex-start",
+	"center": "center",
+	"end": "flex-end",
+	"baseline": "baseline",
+	"stretch": "stretch",
+);
+
+@each $alignment, $i in $textAlignments {
+	:host {
+		&.text-#{$alignment} {
+			text-align: #{$i};
+		}
+	}
+}
+
+@each $alignment, $i in $selfAlignments {
+	:host {
+		&.align-self-#{$alignment} {
+			align-self: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xs")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._xs-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-xs-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-xs-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "sm")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._sm-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-sm-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-sm-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "md")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._md-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-md-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-md-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "lg")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._lg-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-lg-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-lg-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._xl-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-xl-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-xl-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl2")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._xl2-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-xl2-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-xl2-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl3")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._xl3-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-xl3-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-xl3-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl4")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._xl4-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-xl4-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-xl4-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl5")) {
+	@for $row-size from 1 through $size {
+		@for $col-size from 1 through $size {
+			:host {
+				&.row-#{$row-size} {
+					&._xl5-#{$col-size} {
+						flex: 0 0 auto;
+						width: calc(1% * $col-size / $row-size * 100);
+					}
+				}
+			}
+		}
+	}
+
+	@each $alignment, $i in $textAlignments {
+		:host {
+			&.text-xl5-#{$alignment} {
+				text-align: #{$i};
+			}
+		}
+	}
+
+	@each $alignment, $i in $selfAlignments {
+		:host {
+			&.align-self-xl5-#{$alignment} {
+				align-self: #{$i};
+			}
+		}
+	}
+}
+

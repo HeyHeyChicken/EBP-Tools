@@ -1,0 +1,9 @@
+@use "../../../../styles/imports/variables" as variables;
+
+:host {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0 calc(#{variables.$margin} * -1);
+	width: calc(100% + #{variables.$margin} * 2);
+}
+

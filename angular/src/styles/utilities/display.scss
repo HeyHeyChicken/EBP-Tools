@@ -1,0 +1,94 @@
+@use "sass:map";
+@use "../imports/variables" as variables;
+
+$displays: (
+	"none": "none",
+	"inline": "inline",
+	"inline-block": "inline-block",
+	"block": "block",
+	"grid": "grid",
+	"table": "table",
+	"table-cell": "table-cell",
+	"table-row": "table-row",
+	"flex": "flex",
+	"inline-flex": "inline-flex",
+);
+
+@media print {
+	@each $display, $i in $displays {
+		.d-print-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@each $display, $i in $displays {
+	.d-#{$display} {
+		display: #{$i};
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "sm")) {
+	@each $display, $i in $displays {
+		.d-sm-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "md")) {
+	@each $display, $i in $displays {
+		.d-md-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "lg")) {
+	@each $display, $i in $displays {
+		.d-lg-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl")) {
+	@each $display, $i in $displays {
+		.d-xl-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl2")) {
+	@each $display, $i in $displays {
+		.d-xl2-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl3")) {
+	@each $display, $i in $displays {
+		.d-xl3-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl4")) {
+	@each $display, $i in $displays {
+		.d-xl4-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+
+@media (min-width: map.get(variables.$grid_breakpoints, "xl5")) {
+	@each $display, $i in $displays {
+		.d-xl5-#{$display} {
+			display: #{$i};
+		}
+	}
+}
+

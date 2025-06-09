@@ -1,0 +1,20 @@
+{
+  "view": {
+    "home": {
+      "inputFile": "Click here to send your video file",
+      "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
+      "nbGamesFound": "Number of games found",
+      "saveAll": "Save all",
+      "copyTimecodes": "Copy timecodes",
+      "map": "Map",
+      "infos": "Informations"
+    }
+  },
+  "common": {},
+  "shared": {
+    "footer": {
+      "version": "Version",
+      "newUpdate": "A new update is available, download it by clicking here."
+    }
+  }
+}

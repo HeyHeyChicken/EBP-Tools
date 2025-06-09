@@ -1,0 +1,86 @@
+@use "../../../styles/imports/variables" as variables;
+
+:host {
+  margin: 0 auto;
+  margin-bottom: variables.$margin;
+  color: variables.$dark_color;
+  display: block;
+  width: fit-content;
+  padding: variables.$margin;
+  position: relative;
+  text-align: left;
+  max-width: calc(100% - #{variables.$margin} * 8);
+
+  &:not(.friend) {
+    background: variables.$main_color;
+    transform: translateX(calc(#{variables.$margin} * -3));
+
+    &:before {
+      border-width: variables.$margin 0 0 variables.$margin;
+      border-color: transparent transparent transparent variables.$main_color;
+      left: 100%;
+    }
+
+    > div {
+      left: calc(100% + #{variables.$margin});
+      background-image: url("/assets/img/users/heyheychicken/picture.webp");
+
+      &::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        height: 120%;
+        width: 120%;
+        background-image: url("/assets/img/users/heyheychicken/hover.gif");
+        background-size: cover;
+        background-position: center center;
+      }
+    }
+  }
+
+  &.friend {
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateX(calc(#{variables.$margin} * 3));
+
+    &:before {
+      border-width: 0 0 variables.$margin variables.$margin;
+      border-color: transparent transparent rgba(255, 255, 255, 0.9) transparent;
+      right: 100%;
+    }
+
+    > div {
+      right: calc(100% + #{variables.$margin});
+      background-image: url("/assets/img/friend.webp");
+    }
+  }
+
+  &:before {
+    content: "";
+    position: absolute;
+    width: 0px;
+    height: 0px;
+    border-style: solid;
+    bottom: 0;
+  }
+
+  > div {
+    position: absolute;
+    width: calc(#{variables.$margin} * 4);
+    height: calc(#{variables.$margin} * 4);
+    border-radius: 50%;
+    display: block;
+    bottom: 0;
+    background: black;
+    background-size: cover;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-sizing: border-box;
+    background-repeat: no-repeat;
+  }
+
+  ::ng-deep > a {
+    text-decoration: underline;
+    color: variables.$dark_color;
+  }
+}
