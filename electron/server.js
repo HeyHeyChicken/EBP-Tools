@@ -31,7 +31,7 @@ const http = require("http");
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const ROOT_PATH = IS_PROD ? process.resourcesPath : __dirname;
-const FFMPEG_PATH = path.join(ROOT_PATH, "ffmpeg", os.platform());
+const FFMPEG_PATH = path.join(ROOT_PATH, IS_PROD ? "ffmpeg" : "../ffmpeg", os.platform());
 let mainWindow;
 let projectLatestVersion /* string */ = "";
 
