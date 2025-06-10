@@ -6,8 +6,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
 <!-- #region LEFT -->
 <a
   class="logo"
-  [attr.aria-label]="'view.home.title' | translate"
   (click)="openURLExternalBrowser(globalService.webSiteURL)"
+  matTooltip="{{ 'shared.header.accessWebsite' | translate }}"
 >
   <img height="24px" alt="EBP's logo" src="/assets/img/logo.webp" />
 </a>
@@ -37,6 +37,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
       class="btn squared discord"
       aria-label="Discord"
       (click)="openURLExternalBrowser(globalService.discordServerURL)"
+      matTooltip="{{ 'shared.header.accessDiscordServer' | translate }}"
     >
       <i class="fa-brands fa-discord"></i>
     </a>
@@ -46,6 +47,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
       class="btn squared red"
       (click)="logout()"
       [class.disabled]="disableLogoutButton"
+      matTooltip="{{ 'shared.header.logout' | translate }}"
     >
       <i class="fa-sharp fa-solid fa-user"></i>
     </a>

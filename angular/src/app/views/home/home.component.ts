@@ -6,7 +6,7 @@
 
 import { CommonModule } from "@angular/common";
 import { Component, NgZone, OnInit } from "@angular/core";
-import { TranslateModule } from "@ngx-translate/core";
+import { TranslateModule, TranslateService } from "@ngx-translate/core";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { GridModule } from "../../shared/grid/grid.module";
 import { LoaderComponent } from "../../shared/loader/loader.component";
@@ -55,7 +55,8 @@ export class HomeComponent implements OnInit {
   constructor(
     protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
-    private readonly ngZone: NgZone
+    private readonly ngZone: NgZone,
+    private readonly translateService: TranslateService
   ) {}
 
   //#region Functions
@@ -73,7 +74,9 @@ export class HomeComponent implements OnInit {
           this.videoPath = path;
           this.percent = 0;
         } else {
-          this.toastrService.error("No files selected");
+          this.translateService.get("view.home.noFilesSelected").subscribe((translated: string) => {
+						this.toastrService.error(translated);
+					});
         }
       });
     });
@@ -441,7 +444,6 @@ export class HomeComponent implements OnInit {
                             VIDEO,
                             NOW - DIFFERENCE,
                             this.games,
-                            this.videoPath,
                             this.globalService.discordServerURL
                           );
                           return;
@@ -460,13 +462,11 @@ export class HomeComponent implements OnInit {
             VIDEO,
             NOW - DEFAULT_STEP,
             this.games,
-            this.videoPath,
             this.globalService.discordServerURL
           );
         } else {
           this.onVideoEnded(
             this.games,
-            this.videoPath,
             this.globalService.discordServerURL
           );
 
@@ -624,14 +624,13 @@ export class HomeComponent implements OnInit {
     video: HTMLVideoElement,
     time: number,
     games: Game[],
-    videoPath: string,
     discordServerURL: string
   ): void {
     if (video) {
       if (time < video.duration) {
         video.currentTime = time;
       } else {
-        this.onVideoEnded(games, videoPath, discordServerURL);
+        this.onVideoEnded(games, discordServerURL);
       }
     }
   }
@@ -644,7 +643,6 @@ export class HomeComponent implements OnInit {
    */
   private onVideoEnded(
     games: Game[],
-    videoPath: string,
     discordServerURL: string
   ): void {
     this.percent = -1;
@@ -660,6 +658,10 @@ export class HomeComponent implements OnInit {
     }
   }
 
+  /**
+   * This function allows the user to mute one of his games.
+   * @param game Game to cut.
+   */
   protected async save(game: Game): Promise<void> {
     //@ts-ignore
     const FILE_PATH = await window.electronAPI.cutVideoFile(
@@ -674,6 +676,9 @@ export class HomeComponent implements OnInit {
       });
   }
 
+  /**
+   * This function allows the user to cut all games with a single click.
+   */
   protected async saveAll(): Promise<void> {
     //@ts-ignore
     const FILE_PATH = await window.electronAPI.cutVideoFiles(
@@ -689,6 +694,9 @@ export class HomeComponent implements OnInit {
       });
   }
 
+  /**
+   * This function adds game timecodes to the user's clipboard.
+   */
   protected copyTimeCodes(): void {
     let result = "";
     this.games.forEach((game) => {
@@ -696,7 +704,9 @@ export class HomeComponent implements OnInit {
     });
     navigator.clipboard.writeText(result);
 
-    this.toastrService.success("Data has been added to your clipboard.");
+    this.translateService.get("view.home.timeCodesCopiedClipboard").subscribe((translated: string) => {
+      this.toastrService.success(translated);
+    });
   }
 
   /**

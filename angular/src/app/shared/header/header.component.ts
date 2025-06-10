@@ -13,6 +13,7 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatSelectModule } from "@angular/material/select";
 import { IdentityService } from "../../core/services/identity.service";
 import { GlobalService } from "../../core/services/global.service";
+import { MatTooltipModule } from "@angular/material/tooltip";
 
 //#endregion
 
@@ -27,6 +28,7 @@ import { GlobalService } from "../../core/services/global.service";
     TranslateModule,
     MatFormFieldModule,
     MatSelectModule,
+    MatTooltipModule
   ],
 })
 export class HeaderComponent implements OnInit {

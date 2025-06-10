@@ -25,12 +25,15 @@ See LICENSE for terms. Unauthorized use is prohibited.
         *ngIf="percent < 0"
         (click)="onInputFileClick()"
       >
-        <div class="icons">
-          <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
-          <i class="fa-sharp fa-solid fa-file"></i>
-          <i class="fa-sharp fa-solid fa-file-video"></i>
-        </div>
-        <p>{{ "view.home.inputFile" | translate }}</p>
+        <ng-container *ngIf="!inputFileDisabled">
+          <div class="icons">
+            <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
+            <i class="fa-sharp fa-solid fa-file"></i>
+            <i class="fa-sharp fa-solid fa-file-video"></i>
+          </div>
+          <p>{{ "view.home.inputFile" | translate }}</p>
+        </ng-container>
+        <span class="loader" *ngIf="inputFileDisabled"></span>
       </div>
       <div *ngIf="percent >= 0">
         <ebp-loader [value]="percent"></ebp-loader>
@@ -51,6 +54,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                     class="squared"
                     (click)="saveAll()"
                     matTooltip="{{ 'view.home.saveAll' | translate }}"
+                    matTooltipPosition="above"
                   >
                     <i class="fa-sharp fa-solid fa-floppy-disk"></i>
                   </button>
@@ -58,6 +62,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                     class="squared"
                     (click)="copyTimeCodes()"
                     matTooltip="{{ 'view.home.copyTimecodes' | translate }}"
+                    matTooltipPosition="above"
                   >
                     <i class="fa-sharp fa-solid fa-copy"></i>
                   </button>
@@ -86,7 +91,12 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </td>
               <td class="buttons">
                 <div>
-                  <button class="squared" (click)="save(game)">
+                  <button
+                    class="squared"
+                    (click)="save(game)" 
+                    matTooltip="{{ 'view.home.save' | translate }}"
+                    matTooltipPosition="left"
+                  >
                     <i class="fa-solid fa-floppy-disk"></i>
                   </button>
                   <button class="squared" disabled>

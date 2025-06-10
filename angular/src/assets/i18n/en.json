@@ -4,14 +4,22 @@
       "inputFile": "Click here to send your video file",
       "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
       "nbGamesFound": "Number of games found",
+      "save": "Save",
       "saveAll": "Save all",
       "copyTimecodes": "Copy timecodes",
       "map": "Map",
-      "infos": "Informations"
+      "infos": "Informations",
+      "noFilesSelected": "No files selected",
+      "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard"
     }
   },
   "common": {},
   "shared": {
+    "header": {
+      "accessWebsite": "Access the EBP website",
+      "accessDiscordServer": "Access the EBP Discord server",
+      "logout": "Log out"
+    },
     "footer": {
       "version": "Version",
       "newUpdate": "A new update is available, download it by clicking here."
