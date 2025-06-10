@@ -213,7 +213,7 @@ let projectLatestVersion /* string */ = "";
     mainWindow.setMenuBarVisibility(false);
 
     // Loads the application's index.html.
-    mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
+    mainWindow.loadURL(IS_PROD ? `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent("http://localhost:" + PORT)}` : `http://localhost:${PORT}`);
     if (!IS_PROD) {
       mainWindow.webContents.openDevTools();
     }
