@@ -41,5 +41,14 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <i class="fa-brands fa-discord"></i>
     </a>
   </div>
+  <div>
+    <a
+      class="btn squared red"
+      (click)="logout()"
+      [class.disabled]="disableLogoutButton"
+    >
+      <i class="fa-sharp fa-solid fa-user"></i>
+    </a>
+  </div>
 </div>
 <!-- #endregion -->

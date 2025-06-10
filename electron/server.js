@@ -226,6 +226,7 @@ let projectLatestVersion /* string */ = "";
       "IsolateOrigins,site-per-process"
     );
   }
+
   /**
    * This method will be called when Electron has finished initialization and is ready to create browser windows.
    */
@@ -271,6 +272,18 @@ let projectLatestVersion /* string */ = "";
           }
           return !!WORDPRESS_COOKIE;
         });
+    });
+
+    // The front-end asks the server to logout.
+    ipcMain.handle("logout", async () => {
+      const SESSION = session.defaultSession;
+
+      Promise.all([
+        SESSION.clearStorageData({ storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers'] }),
+        SESSION.clearCache()
+      ]).then(() => {
+        mainWindow.loadURL(`https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent("http://localhost:" + PORT)}`);
+      });
     });
 
     // The front-end asks the server to ask the user to choose a video file.

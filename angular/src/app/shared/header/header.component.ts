@@ -32,6 +32,8 @@ import { GlobalService } from "../../core/services/global.service";
 export class HeaderComponent implements OnInit {
   //#region Attributes
 
+  protected disableLogoutButton: boolean = false;
+
   private static STORAGE_KEY_NAME: string = "language";
   private static DEFAULT_LANGUAGE: string = "en";
 
@@ -48,33 +50,44 @@ export class HeaderComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
+    // List of languages ​​supported by the application.
     this.translateService.langs = ["fr", "de", "en", "es", "it"].sort();
 
     this.translateService.setDefaultLang(HeaderComponent.DEFAULT_LANGUAGE);
 
-    const LANGUAGE = location.pathname.split("/").filter((x) => x != "")[0];
-    if (this.translateService.langs.includes(LANGUAGE)) {
-      this.setLanguage(LANGUAGE);
+    const STORED_LANGUAGE = localStorage.getItem(
+      HeaderComponent.STORAGE_KEY_NAME
+    );
+    if (STORED_LANGUAGE) {
+      this.setLanguage(STORED_LANGUAGE);
     } else {
-      const STORED_LANGUAGE = localStorage.getItem(
-        HeaderComponent.STORAGE_KEY_NAME
+      const BROWSER_LANGUAGE: string = navigator.language;
+      this.setLanguage(
+        this.translateService.langs.includes(BROWSER_LANGUAGE)
+          ? BROWSER_LANGUAGE
+          : HeaderComponent.DEFAULT_LANGUAGE
       );
-      if (STORED_LANGUAGE) {
-        this.setLanguage(STORED_LANGUAGE);
-      } else {
-        const BROWSER_LANGUAGE: string = navigator.language;
-        this.setLanguage(
-          this.translateService.langs.includes(BROWSER_LANGUAGE)
-            ? BROWSER_LANGUAGE
-            : HeaderComponent.DEFAULT_LANGUAGE
-        );
-      }
     }
   }
 
+  /**
+   * This function opens a URL in the user's default browser.
+   * @param url URL to open in the user's default browser.
+   */
   protected openURLExternalBrowser(url: string): void {
     //@ts-ignore
     window.electronAPI.openURL(url);
+  }
+
+  /**
+   * This function allows the user to log out.
+   */
+  protected logout(): void{
+    if(!this.disableLogoutButton){
+      this.disableLogoutButton = true;
+      //@ts-ignore
+      window.electronAPI.logout();
+    }
   }
 
   /**

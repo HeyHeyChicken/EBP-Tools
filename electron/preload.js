@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getVersion: () => ipcRenderer.invoke("get-version"),
   // The front-end asks the server to return the user's login status.
   getLoginState: () => ipcRenderer.invoke("get-login-state"),
+  // The front-end asks the server to logout.
+  logout: () => ipcRenderer.invoke("logout"),
   // The front-end asks the server to cut a video file.
   cutVideoFile: (game, videoPath) =>
     ipcRenderer.invoke("cut-video-file", game, videoPath),
