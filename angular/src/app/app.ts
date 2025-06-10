@@ -86,7 +86,7 @@ export class App implements OnInit {
   protected onNewUpdateLinkClick(): void {
     //@ts-ignore
     window.electronAPI.openURL(
-      "https://github.com/HeyHeyChicken/EBP-Replay-Cutter/releases/latest"
+      "https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/releases/latest"
     );
   }
 

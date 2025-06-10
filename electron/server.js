@@ -148,7 +148,7 @@ let projectLatestVersion /* string */ = "";
   function getProjectLatestVersion(callback) {
     const OPTIONS = {
       hostname: "api.github.com",
-      path: "/repos/heyheychicken/ebp-replay-cutter/releases/latest",
+      path: "/repos/heyheychicken/EBP-EVA-Battle-Plan-Tools/releases/latest",
       method: "GET",
       headers: { "User-Agent": "Node.js" },
     };
