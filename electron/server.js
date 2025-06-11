@@ -7,6 +7,7 @@
 const {
   app,
   BrowserWindow,
+  screen,
   ipcMain,
   session,
   dialog,
@@ -30,10 +31,13 @@ const fs = require("fs");
 
 //#endregion
 
-const IS_PROD = process.env.NODE_ENV === "production";
-const ROOT_PATH = IS_PROD ? process.resourcesPath : __dirname;
-const FFMPEG_PATH = path.join(ROOT_PATH, IS_PROD ? "ffmpeg" : "../ffmpeg", os.platform());
+let isProd = process.env.NODE_ENV === "production";
+const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
+const FFMPEG_PATH = path.join(ROOT_PATH, isProd ? "ffmpeg" : "../ffmpeg", os.platform());
 const SETTINGS_PATH = path.join(ROOT_PATH, "settings.json");
+const WINDOW_WIDTH = 800;
+const WINDOW_DEV_PANEL_WIDTH = 540;
+const WINDOW_HEIGHT = 800;
 let mainWindow;
 let projectLatestVersion /* string */ = "";
 
@@ -47,15 +51,15 @@ let projectLatestVersion /* string */ = "";
   // A port is randomly generated from the ports available on the machine.
   const PORT = await getPort();
   const APP = express();
-  if (!IS_PROD) {
+  if (!isProd) {
     APP.set("env", "development");
   }
-  if (IS_PROD) {
+  if (isProd) {
     APP.use(express.static(path.join(ROOT_PATH, "browser")));
   }
 
   APP.get("/", (request, response) => {
-    if (IS_PROD) {
+    if (isProd) {
       response.sendFile(path.join(ROOT_PATH, "browser", "index.html"));
     } else {
       response.redirect("http://localhost:4200");
@@ -204,13 +208,14 @@ let projectLatestVersion /* string */ = "";
    * This function initializes the front-end.
    */
   function createWindow() {
+    const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
     mainWindow = new BrowserWindow({
-      width: 800 + (!IS_PROD ? 540 : 0),
-      height: 800,
+      width: Math.min(PRIMARY_DISPLAY.workAreaSize.width, WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0)),
+      height: Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT),
       resizable: false,
       contextIsolation: true,
       webPreferences: {
-        preload: IS_PROD
+        preload: isProd
           ? MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY
           : path.join(__dirname, "preload.js"),
       },
@@ -220,13 +225,13 @@ let projectLatestVersion /* string */ = "";
     mainWindow.setMenuBarVisibility(false);
 
     // Loads the application's index.html.
-    mainWindow.loadURL(IS_PROD ? `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent("http://localhost:" + PORT)}` : `http://localhost:${PORT}`);
-    if (!IS_PROD) {
+    mainWindow.loadURL(isProd ? `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent("http://localhost:" + PORT)}` : `http://localhost:${PORT}`);
+    if (!isProd) {
       mainWindow.webContents.openDevTools();
     }
   }
 
-  if (!IS_PROD) {
+  if (!isProd) {
     app.commandLine.appendSwitch("disable-web-security");
     app.commandLine.appendSwitch(
       "disable-features",
@@ -238,7 +243,7 @@ let projectLatestVersion /* string */ = "";
    * This method will be called when Electron has finished initialization and is ready to create browser windows.
    */
   app.whenReady().then(() => {
-    if (IS_PROD) {
+    if (isProd) {
       // If we are in production, we immediately create the window that will contain the HMI.
       createWindow();
     } else {
@@ -247,6 +252,26 @@ let projectLatestVersion /* string */ = "";
         createWindow();
       });
     }
+
+    // The front-end asks the server to enables/disables debug mode.
+    ipcMain.handle("debug-mode", async () => {
+      isProd = !isProd;
+      if(isProd){
+        mainWindow.webContents.closeDevTools();
+      }
+      else{
+        mainWindow.webContents.openDevTools();
+      }
+      
+      const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
+      mainWindow.setResizable(true);
+      const DESIRED_WIDTH = WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0);
+      mainWindow.setSize(
+        Math.min(PRIMARY_DISPLAY.workAreaSize.width, DESIRED_WIDTH),
+        Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT)
+      );
+      mainWindow.setResizable(false);
+    });
 
     // The front-end asks the server to open an url in the default browser.
     ipcMain.handle("open-url", async (event, url) => {
@@ -270,11 +295,23 @@ let projectLatestVersion /* string */ = "";
     ipcMain.handle("set-video-cutter-output-path", async () => {
       const PATH = getVideoCutterOutputPath();
 
+      const FROM = Date.now();
       const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ["openDirectory"],
         defaultPath: PATH
       });
       if (!canceled && filePaths.length == 1) {
+        const DIFFERENCE = Date.now() - this.start;
+          const MINUTES = Math.floor(DIFFERENCE / 60000);
+          const SECONDS = Math.floor((DIFFERENCE % 60000) / 1000);
+
+          console.log(
+            `${MINUTES.toString().padStart(
+              2,
+              "0"
+            )}m ${SECONDS.toString().padStart(2, "0")}s`
+          );
+          
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
         SETTINGS.videoCutterOutputPath = filePaths[0];
 
@@ -296,7 +333,7 @@ let projectLatestVersion /* string */ = "";
           const WORDPRESS_COOKIE = cookies.find((c) =>
             c.name.startsWith("wordpress_logged_in")
           );
-          if (!IS_PROD) {
+          if (!isProd) {
             return true;
           }
           return !!WORDPRESS_COOKIE;

@@ -7,6 +7,7 @@
 import {
   Component,
   ElementRef,
+  HostListener,
   NgZone,
   OnInit,
   ViewChild,
@@ -81,6 +82,21 @@ export class App implements OnInit {
         this.globalService.serverPort = serverPort;
       });
     });
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  handleKeyboardEvent(event: KeyboardEvent) {
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'd') {
+      this.debugMode();
+    }
+  }
+
+  /**
+   * This function enables/disables debug mode.
+   */
+  debugMode(): void {
+    //@ts-ignore
+    window.electronAPI.debugMode();
   }
 
   protected onNewUpdateLinkClick(): void {

@@ -7,6 +7,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   //#region Client -> Server
 
+  // The front-end asks the server to enables/disables debug mode.
+  debugMode: (url) => ipcRenderer.invoke("debug-mode"),
   // The front-end asks the server to open an url in the default browser.
   openURL: (url) => ipcRenderer.invoke("open-url", url),
   // The front-end asks the server to return the web server port.

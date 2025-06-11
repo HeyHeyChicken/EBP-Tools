@@ -11,7 +11,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <video
         *ngIf="videoPath"
         [src]="
-          'http://127.0.0.1:' +
+          'http://localhost:' +
           globalService.serverPort +
           '/file?path=' +
           videoPath
@@ -45,7 +45,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <ng-container *ngIf="percent < 0 && games.length">
         <mat-form-field class="mt-2" (click)="setVideoCutterOutputPath()">
           <mat-label>Clearable input</mat-label>
-          <input matInput type="text" [value]="outputPath">
+          <input matInput readonly type="text" [value]="outputPath">
           <button class="btn squared">
             <i class="fa-sharp fa-solid fa-gear"></i>
           </button>
