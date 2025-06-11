@@ -17,6 +17,7 @@ import { Map } from "./models/map";
 import { Game } from "./models/game";
 import { RGB } from "./models/rgb";
 import { GlobalService } from "../../core/services/global.service";
+import { MatInputModule } from '@angular/material/input';
 
 //#endregion
 
@@ -33,6 +34,7 @@ import { GlobalService } from "../../core/services/global.service";
     TranslateModule,
     LoaderComponent,
     MessageComponent,
+    MatInputModule
   ],
 })
 export class HomeComponent implements OnInit {
@@ -42,6 +44,7 @@ export class HomeComponent implements OnInit {
   protected games: Game[] = [];
   protected inputFileDisabled: boolean = true;
   protected videoPath: string | undefined;
+  protected outputPath: string | undefined;
 
   private start: number = 0;
 
@@ -64,6 +67,14 @@ export class HomeComponent implements OnInit {
   ngOnInit(): void {
     this.initTesseract();
 
+    // Getting the project version.
+    //@ts-ignore
+    window.electronAPI.getVideoCutterOutputPath().then((path: sring) => {
+      this.ngZone.run(() => {
+        this.outputPath = path;
+      });
+    });
+
     // The server gives the path of the video file selected by the user.
     //@ts-ignore
     window.electronAPI.setVideoFile((path: string) => {
@@ -79,6 +90,17 @@ export class HomeComponent implements OnInit {
 					});
         }
       });
+    });
+  }
+
+  protected setVideoCutterOutputPath(): void{
+    //@ts-ignore
+    window.electronAPI.setVideoCutterOutputPath().then((path: string) => {
+      if(path){
+        this.ngZone.run(() => {
+          this.outputPath = path;
+        });
+      }
     });
   }
 

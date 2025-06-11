@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getVersion: () => ipcRenderer.invoke("get-version"),
   // The front-end asks the server to return the user's login status.
   getLoginState: () => ipcRenderer.invoke("get-login-state"),
+  // The front-end asks the server to return the cutter output path.
+  getVideoCutterOutputPath: () => ipcRenderer.invoke("get-video-cutter-output-path"),
+  // The front-end asks the server to edit the cutter output path.
+  setVideoCutterOutputPath: () => ipcRenderer.invoke("set-video-cutter-output-path"),
   // The front-end asks the server to logout.
   logout: () => ipcRenderer.invoke("logout"),
   // The front-end asks the server to cut a video file.

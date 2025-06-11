@@ -4,7 +4,7 @@ const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: ["./angular/dist/angular/browser/", "./ffmpeg/"],
+    extraResource: ["./angular/dist/angular/browser/", "./ffmpeg/", "./electron/settings.json"],
     icon: "electron/assets/icon",
     name: "EBP - EVA Battle Plan - Tools",
   },

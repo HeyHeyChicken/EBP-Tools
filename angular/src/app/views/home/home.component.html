@@ -43,7 +43,14 @@ See LICENSE for terms. Unauthorized use is prohibited.
         </ebp-message>
       </div>
       <ng-container *ngIf="percent < 0 && games.length">
-        <table class="mt-2">
+        <mat-form-field class="mt-2" (click)="setVideoCutterOutputPath()">
+          <mat-label>Clearable input</mat-label>
+          <input matInput type="text" [value]="outputPath">
+          <button class="btn squared">
+            <i class="fa-sharp fa-solid fa-gear"></i>
+          </button>
+        </mat-form-field>
+        <table class="mt-1">
           <thead>
             <tr>
               <th>{{ "view.home.map" | translate }}</th>

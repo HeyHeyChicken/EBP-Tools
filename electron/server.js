@@ -26,12 +26,14 @@ const { default: getPort } = require("get-port");
 const { version } = require("../package.json");
 const https = require("https");
 const http = require("http");
+const fs = require("fs");
 
 //#endregion
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const ROOT_PATH = IS_PROD ? process.resourcesPath : __dirname;
 const FFMPEG_PATH = path.join(ROOT_PATH, IS_PROD ? "ffmpeg" : "../ffmpeg", os.platform());
+const SETTINGS_PATH = path.join(ROOT_PATH, "settings.json");
 let mainWindow;
 let projectLatestVersion /* string */ = "";
 
@@ -76,6 +78,11 @@ let projectLatestVersion /* string */ = "";
   });
 
   //#endregion
+
+  function getVideoCutterOutputPath(){
+    const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+    return SETTINGS.videoCutterOutputPath ?? path.join(os.homedir(), "Downloads");
+  }
 
   /**
    * This function allows you to wait for an HTTP:PORT address to respond.
@@ -128,7 +135,7 @@ let projectLatestVersion /* string */ = "";
     // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
     const NOW = new Date().getTime();
     const OUTPUT_FILE_PATH /* string */ = path.join(
-      path.join(os.homedir(), "Downloads"),
+      getVideoCutterOutputPath(),
       `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map} (${NOW}).mp4`
     );
     const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
@@ -259,6 +266,28 @@ let projectLatestVersion /* string */ = "";
       };
     });
 
+    // The front-end asks the server to edit the video cutter output path.
+    ipcMain.handle("set-video-cutter-output-path", async () => {
+      const PATH = getVideoCutterOutputPath();
+
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        properties: ["openDirectory"],
+        defaultPath: PATH
+      });
+      if (!canceled && filePaths.length == 1) {
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+        SETTINGS.videoCutterOutputPath = filePaths[0];
+
+        fs.writeFileSync(SETTINGS_PATH, JSON.stringify(SETTINGS, null, 2), 'utf-8');
+        return filePaths[0];
+      }
+    });
+
+    // The front-end asks the server to return the video cutter output path.
+    ipcMain.handle("get-video-cutter-output-path", async () => {
+      return getVideoCutterOutputPath();
+    });
+    
     // The front-end asks the server to return the user's login status.
     ipcMain.handle("get-login-state", async () => {
       return session.defaultSession.cookies
