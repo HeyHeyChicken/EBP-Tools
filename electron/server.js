@@ -295,23 +295,11 @@ let projectLatestVersion /* string */ = "";
     ipcMain.handle("set-video-cutter-output-path", async () => {
       const PATH = getVideoCutterOutputPath();
 
-      const FROM = Date.now();
       const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ["openDirectory"],
         defaultPath: PATH
       });
       if (!canceled && filePaths.length == 1) {
-        const DIFFERENCE = Date.now() - this.start;
-          const MINUTES = Math.floor(DIFFERENCE / 60000);
-          const SECONDS = Math.floor((DIFFERENCE % 60000) / 1000);
-
-          console.log(
-            `${MINUTES.toString().padStart(
-              2,
-              "0"
-            )}m ${SECONDS.toString().padStart(2, "0")}s`
-          );
-          
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
         SETTINGS.videoCutterOutputPath = filePaths[0];
 

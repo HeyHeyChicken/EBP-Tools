@@ -38,6 +38,7 @@ interface Versions {
     TranslateModule,
   ],
   templateUrl: "./app.html",
+  styleUrls: ["./app.scss"],
 })
 export class App implements OnInit {
   //#region Attributes
@@ -50,7 +51,7 @@ export class App implements OnInit {
 
   //#endregion
   constructor(
-    private readonly globalService: GlobalService,
+    protected readonly globalService: GlobalService,
     private readonly router: Router,
     private readonly ngZone: NgZone
   ) {}

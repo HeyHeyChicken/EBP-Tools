@@ -20,3 +20,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
     {{ "shared.footer.newUpdate" | translate }}
   </a>
 </ebp-footer>
+<div id="loader" *ngIf="globalService.loading">
+  <div>
+    <div></div>
+  </div>
+</div>

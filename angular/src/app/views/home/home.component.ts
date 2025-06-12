@@ -79,6 +79,7 @@ export class HomeComponent implements OnInit {
     //@ts-ignore
     window.electronAPI.setVideoFile((path: string) => {
       this.ngZone.run(() => {
+        this.globalService.loading = false;
         this.inputFileDisabled = false;
 
         if (path) {
@@ -94,10 +95,12 @@ export class HomeComponent implements OnInit {
   }
 
   protected setVideoCutterOutputPath(): void{
+    this.globalService.loading = true;
     //@ts-ignore
     window.electronAPI.setVideoCutterOutputPath().then((path: string) => {
       if(path){
         this.ngZone.run(() => {
+          this.globalService.loading = false;
           this.outputPath = path;
         });
       }
@@ -130,6 +133,7 @@ export class HomeComponent implements OnInit {
 
   protected onInputFileClick(): void {
     if (!this.inputFileDisabled) {
+      this.globalService.loading = true;
       this.videoPath = undefined;
       this.inputFileDisabled = true;
       this.games = [];

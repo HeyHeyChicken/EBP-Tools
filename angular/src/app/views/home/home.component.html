@@ -25,15 +25,12 @@ See LICENSE for terms. Unauthorized use is prohibited.
         *ngIf="percent < 0"
         (click)="onInputFileClick()"
       >
-        <ng-container *ngIf="!inputFileDisabled">
-          <div class="icons">
-            <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
-            <i class="fa-sharp fa-solid fa-file"></i>
-            <i class="fa-sharp fa-solid fa-file-video"></i>
-          </div>
-          <p>{{ "view.home.inputFile" | translate }}</p>
-        </ng-container>
-        <span class="loader" *ngIf="inputFileDisabled"></span>
+        <div class="icons">
+          <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
+          <i class="fa-sharp fa-solid fa-file"></i>
+          <i class="fa-sharp fa-solid fa-file-video"></i>
+        </div>
+        <p>{{ "view.home.inputFile" | translate }}</p>
       </div>
       <div *ngIf="percent >= 0">
         <ebp-loader [value]="percent"></ebp-loader>
