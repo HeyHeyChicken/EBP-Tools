@@ -28,6 +28,7 @@ const { version } = require("../package.json");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
+require('./discord-rpc');
 
 //#endregion
 
