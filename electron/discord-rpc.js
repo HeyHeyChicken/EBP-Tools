@@ -25,5 +25,5 @@ RPC.on('ready', () => {
 });
 
 RPC.login({ clientId: CLIENT_ID }).catch(err => {
-    console.error('[DISCORD RPC] Connection error:', err);
+    console.error('[DISCORD RPC] Connection error.');
 });
