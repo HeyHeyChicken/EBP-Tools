@@ -10,7 +10,7 @@
   background-position: center center;
 }
 
-video {
+video:not(.visible) {
   opacity: 0;
   pointer-events: none;
   position: absolute;

@@ -8,7 +8,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <ebp-row>
     <ebp-column></ebp-column>
     <ebp-column [xs]="7">
+      <!-- This video is used to analyze the timecodes of games in a replay -->
       <video
+        muted
         *ngIf="videoPath"
         [src]="
           'http://localhost:' +
@@ -18,6 +20,19 @@ See LICENSE for terms. Unauthorized use is prohibited.
         "
         (loadeddata)="videoLoadedData($event)"
         (timeupdate)="videoTimeUpdate($event)"
+      ></video>
+      <!-- This video is used to upload the game in a replay -->
+      <video
+        muted
+        *ngIf="uploadingVideoPath"
+        [src]="
+          'http://localhost:' +
+          globalService.serverPort +
+          '/file?path=' +
+          uploadingVideoPath
+        "
+        (loadeddata)="uploadingVideoLoadedData($event)"
+        (timeupdate)="uploadingVideoTimeUpdate($event)"
       ></video>
       <div
         class="dropper"
@@ -75,7 +90,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let game of games">
+            <tr *ngFor="let game of games; let i = index">
               <th
                 [style.background-image]="
                   'url(https://evabattleplan.com/back/wp-content/uploads/' +
@@ -103,7 +118,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   >
                     <i class="fa-solid fa-floppy-disk"></i>
                   </button>
-                  <button class="squared" disabled>
+                  <button
+                    class="squared"
+                    [disabled]="!isDevMode"
+                    (click)="upload(i)"
+                  >
                     <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
                   </button>
                 </div>

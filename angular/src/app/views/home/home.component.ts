@@ -5,7 +5,7 @@
 //#region Imports
 
 import { CommonModule } from "@angular/common";
-import { Component, NgZone, OnInit } from "@angular/core";
+import { Component, isDevMode, NgZone, OnInit } from "@angular/core";
 import { TranslateModule, TranslateService } from "@ngx-translate/core";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { GridModule } from "../../shared/grid/grid.module";
@@ -18,6 +18,7 @@ import { Game } from "./models/game";
 import { RGB } from "./models/rgb";
 import { GlobalService } from "../../core/services/global.service";
 import { MatInputModule } from '@angular/material/input';
+import cvReadyPromise from "@techstark/opencv-js";
 
 //#endregion
 
@@ -44,9 +45,16 @@ export class HomeComponent implements OnInit {
   protected games: Game[] = [];
   protected inputFileDisabled: boolean = true;
   protected videoPath: string | undefined;
+  protected uploadingVideoPath: string | undefined;
   protected outputPath: string | undefined;
 
+  protected get isDevMode(): boolean{
+    return isDevMode();
+  }
+
   private start: number = 0;
+  private uploadingGameIndex: number | undefined;
+  private cv: any | undefined;
 
   private tesseractWorker_basic: Tesseract.Worker | undefined;
   private tesseractWorker_number: Tesseract.Worker | undefined;
@@ -59,13 +67,14 @@ export class HomeComponent implements OnInit {
     protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
-    private readonly translateService: TranslateService
+    private readonly translateService: TranslateService,
   ) {}
 
   //#region Functions
 
   ngOnInit(): void {
     this.initTesseract();
+    this.initOpenCV();
 
     // Getting the project version.
     //@ts-ignore
@@ -94,20 +103,14 @@ export class HomeComponent implements OnInit {
     });
   }
 
-  protected setVideoCutterOutputPath(): void{
-    this.globalService.loading = true;
-    //@ts-ignore
-    window.electronAPI.setVideoCutterOutputPath().then((path: string) => {
-      if(path){
-        this.ngZone.run(() => {
-          this.globalService.loading = false;
-          this.outputPath = path;
-        });
-      }
-    });
+  private async initOpenCV(): Promise<void> {
+    this.cv = await cvReadyPromise;
   }
 
-  private async initTesseract() {
+  /**
+   * This function initializes the different instances of the OCR.
+   */
+  private async initTesseract(): Promise<void> {
     this.tesseractWorker_basic = await createWorker("eng");
     this.tesseractWorker_number = await createWorker("eng");
     this.tesseractWorker_letter = await createWorker("eng");
@@ -131,6 +134,37 @@ export class HomeComponent implements OnInit {
     this.inputFileDisabled = false;
   }
 
+  /**
+   * This function allows user to change the folder where the cut games are stored.
+   */
+  protected setVideoCutterOutputPath(): void{
+    this.globalService.loading = true;
+    //@ts-ignore
+    window.electronAPI.setVideoCutterOutputPath().then((path: string) => {
+      if(path){
+        this.ngZone.run(() => {
+          this.globalService.loading = false;
+          this.outputPath = path;
+        });
+      }
+    });
+  }
+
+  /**
+   * This feature allows the user to upload their cut game.
+   * @param gameIndex Index of the game to upload.
+   */
+  protected upload(gameIndex: number): void{
+    this.uploadingVideoPath = undefined;
+    setTimeout(() => {
+      this.uploadingGameIndex = gameIndex;
+      this.uploadingVideoPath = `${this.videoPath}&v=${new Date().getTime()}`;
+    });
+  }
+
+  /**
+   * This function is triggered when the user clicks on the "input" to select a replay.
+   */
   protected onInputFileClick(): void {
     if (!this.inputFileDisabled) {
       this.globalService.loading = true;
@@ -147,24 +181,32 @@ export class HomeComponent implements OnInit {
    * This function initializes the position of a video's playhead when it is loaded.
    * @param event
    */
-  protected videoLoadedData(event: Event) {
+  protected videoLoadedData(event: Event): void {
     if (event.target) {
       const VIDEO = event.target as HTMLVideoElement;
       VIDEO.currentTime = VIDEO.duration;
     }
   }
 
-  protected async videoTimeUpdate(event: Event) {
+  protected uploadingVideoLoadedData(event: Event): void {
+    if (event.target && this.uploadingGameIndex) {
+      const VIDEO = event.target as HTMLVideoElement;
+      VIDEO.currentTime = this.games[this.uploadingGameIndex].start + 10;
+      console.log("uploadingVideoLoadedData");
+    }
+  }
+
+  protected async videoTimeUpdate(event: Event): Promise<void> {
     if (this.videoPath) {
       if (this.start == 0) {
         this.start = Date.now();
       }
       if (event.target) {
         const VIDEO = event.target as HTMLVideoElement;
-        let found /* boolean */ = false;
-        const DEFAULT_STEP /* number */ = 2;
+        let found: boolean = false;
+        const DEFAULT_STEP: number = 2;
         if (VIDEO.currentTime > 0) {
-          const NOW /* number */ = VIDEO.currentTime;
+          const NOW: number = VIDEO.currentTime;
 
           this.percent = Math.ceil(100 - (NOW / VIDEO.duration) * 100);
 
@@ -510,6 +552,76 @@ export class HomeComponent implements OnInit {
         }
       }
     }
+  }
+
+  private detecterImage(sourceMat: cvReadyPromise.Mat, templateMat: cvReadyPromise.Mat): any {
+    const result = new this.cv.Mat();
+    const mask = new this.cv.Mat();
+
+    // Match du template
+    this.cv.matchTemplate(sourceMat, templateMat, result, this.cv.TM_CCOEFF_NORMED, mask);
+
+    // Recherche de la meilleure correspondance
+    const minMax = this.cv.minMaxLoc(result, mask);
+    const maxPoint = minMax.maxLoc;
+    const maxVal = minMax.maxVal;
+
+    // Position (point haut gauche)
+    const position = { x: maxPoint.x, y: maxPoint.y };
+
+    // Taille = taille du template
+    const taille = { width: templateMat.cols, height: templateMat.rows };
+
+    // Nettoyage
+    result.delete();
+    mask.delete();
+
+    return { position, taille, confiance: maxVal };
+  }
+
+  protected async uploadingVideoTimeUpdate(event: Event): Promise<void> {
+    if (this.uploadingVideoPath && event.target && this.uploadingGameIndex) {
+      const VIDEO = event.target as HTMLVideoElement;
+      const DEFAULT_STEP: number = 2;
+      const NOW: number = VIDEO.currentTime;
+
+      if (this.detectGamePlaying(VIDEO, this.games, true)){
+        const VIDEO_MAT = this.cv.imread(this.videoToCanvas(VIDEO));
+        this.urlToCanvas(`/assets/img/maps/${this.games[this.uploadingGameIndex].map}.png`, (mapCanvas: HTMLCanvasElement) => {
+          const MAP_MAT = this.cv.imread(mapCanvas);
+          
+          const { position, taille, confiance } = this.detecterImage(VIDEO_MAT, MAP_MAT);
+          console.log('Position:', position, 'Taille:', taille, 'Confiance:', confiance);
+
+        });
+      }
+    }
+  }
+
+  private urlToCanvas(url: string, callback: Function): void{
+    const CANVAS = document.createElement('canvas');
+    const IMAGE = new Image();
+    IMAGE.src = url;
+    IMAGE.onload = () => {
+      CANVAS.width = IMAGE.width;
+      CANVAS.height = IMAGE.height;
+      const CTX = CANVAS.getContext('2d');
+      if(CTX){
+        CTX.drawImage(IMAGE, 0, 0);
+        callback(CANVAS);
+      }
+    };
+  }
+
+  private videoToCanvas(video: HTMLVideoElement): HTMLCanvasElement{
+    const CANVAS = document.createElement('canvas');
+    CANVAS.width = video.videoWidth;
+    CANVAS.height = video.videoHeight;
+    const CTX = CANVAS.getContext('2d');
+    if(CTX){
+      CTX.drawImage(video, 0, 0, CANVAS.width, CANVAS.height);
+    }
+    return CANVAS;
   }
 
   /**
@@ -999,10 +1111,11 @@ export class HomeComponent implements OnInit {
    * This function detects a playing game frame.
    * @param video HTML DOM of the video element to be analyzed.
    * @param games List of games already detected.
+   * @param force Disable the first if.
    * @returns Is the current frame a playing game frame?
    */
-  private detectGamePlaying(video: HTMLVideoElement, games: Game[]): boolean {
-    if (games.length > 0 && games[0].start == -1) {
+  private detectGamePlaying(video: HTMLVideoElement, games: Game[], force: boolean = false): boolean {
+    if (games.length > 0 && games[0].start == -1 || force) {
       // Trying to detect the color of all players' life bars.
       const J1_PIXEL = this.getPixelColor(
         video,
