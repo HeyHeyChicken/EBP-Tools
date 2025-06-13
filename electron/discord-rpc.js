@@ -19,6 +19,7 @@ RPC.on('ready', () => {
         startTimestamp: new Date(),
         largeImageKey: 'logo',
         largeImageText: 'EBP - Tools',
+        smallImageText: 'EBP - Tools',
         instance: false,
     });
 });
