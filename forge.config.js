@@ -1,10 +1,16 @@
 const { FusesPlugin } = require("@electron-forge/plugin-fuses");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
+const path = require("path");
+const { execSync } = require("child_process");
 
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: ["./angular/dist/angular/browser/", "./ffmpeg/", "./electron/settings.json"],
+    extraResource: [
+      "./angular/dist/angular/browser/",
+      "./ffmpeg/",
+      "./electron/settings.json",
+    ],
     icon: "electron/assets/icon",
     name: "EBP - EVA Battle Plan - Tools",
   },
@@ -42,6 +48,7 @@ module.exports = {
       name: "@electron-forge/maker-dmg",
       config: {
         format: "ULFO",
+        name: "EBP - Tools",
         icon: "electron/assets/icon.icns",
         background: "electron/assets/dmg-background.png",
         overwrite: true,
@@ -90,4 +97,28 @@ module.exports = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  hooks: {
+    async postPackage(config) {
+      if (process.platform == "darwin") {
+        console.log('Running "postPackage" hook on MacOS.');
+        try {
+          const FFMPEG_PATH = path.join(
+            __dirname,
+            "out",
+            config.packagerConfig.name + "-darwin-arm64",
+            config.packagerConfig.name + ".app",
+            "Contents",
+            "Resources",
+            "ffmpeg",
+            "darwin"
+          );
+
+          execSync(`chmod +x "${FFMPEG_PATH}"`);
+          console.log("ffmpeg rendu exécutable");
+        } catch (error) {
+          console.error("Erreur lors du chmod de ffmpeg :", error);
+        }
+      }
+    },
+  },
 };
