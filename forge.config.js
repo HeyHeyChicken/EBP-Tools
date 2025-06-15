@@ -25,11 +25,6 @@ module.exports = {
       },
     },
     {
-      // ZIP
-      name: "@electron-forge/maker-zip",
-      platforms: ["darwin"],
-    },
-    {
       // Linux (Debian/Ubuntu)
       name: "@electron-forge/maker-deb",
       config: {
