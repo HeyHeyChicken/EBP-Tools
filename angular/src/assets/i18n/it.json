@@ -1,6 +1,10 @@
 {
   "view": {
     "home": {
+      "welcomeTo": "Benvenuto su ",
+      "tuto": "Scegli lo strumento che desideri utilizzare dal menu a tendina sopra."
+    },
+    "replay_cutter": {
       "inputFile": "Clicca qui per inviare il tuo file video",
       "videoIsBeingAnalyzed": "Attendere prego, il video è in fase di analisi...",
       "nbGamesFound": "Numero di giochi trovati",
@@ -10,15 +14,22 @@
       "map": "Mappa",
       "infos": "Informazioni",
       "noFilesSelected": "Nessun file selezionato",
-      "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti"
+      "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti",
+      "outputPath": "Percorso di output"
     }
   },
   "common": {},
   "shared": {
     "header": {
       "accessWebsite": "Accedi al sito web di EBP",
+      "changeTool": "Cambiare strumento",
       "accessDiscordServer": "Accedi al server Discord di EBP",
-      "logout": "Disconnettersi"
+      "logout": "Disconnettersi",
+      "home": "Home",
+      "tools": {
+        "replay_cutter": "Taglierina replay",
+        "game_history": "Cronologia partite"
+      }
     },
     "footer": {
       "version": "Versione",

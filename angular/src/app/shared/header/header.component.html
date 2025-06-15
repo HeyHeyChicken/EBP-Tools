@@ -11,6 +11,21 @@ See LICENSE for terms. Unauthorized use is prohibited.
 >
   <img height="24px" alt="EBP's logo" src="/assets/img/logo.webp" />
 </a>
+<a
+  class="btn squared"
+  routerLink="/"
+  (click)="page = undefined"
+  matTooltip="{{ 'shared.header.home' | translate }}"
+>
+  <i class="fa-sharp fa-solid fa-house"></i>
+</a>
+<mat-form-field matTooltip="{{ 'shared.header.changeTool' | translate }}">
+  <mat-select [(ngModel)]="page" (selectionChange)="changeTool($event)">
+    <mat-option *ngFor="let page of pages" [value]="page">
+      {{ "shared.header.tools." + page | translate }}
+    </mat-option>
+  </mat-select>
+</mat-form-field>
 <!-- #endregion -->
 <!-- #region RIGHT -->
 <div class="right">

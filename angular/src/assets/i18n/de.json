@@ -1,6 +1,10 @@
 {
   "view": {
     "home": {
+      "welcomeTo": "Willkommen bei ",
+      "tuto": "Wählen Sie das gewünschte Tool aus der obigen Dropdown-Liste aus."
+    },
+    "replay_cutter": {
       "inputFile": "Klicken Sie hier, um Ihre Videodatei zu senden",
       "videoIsBeingAnalyzed": "Bitte warten, das Video wird gerade analysiert...",
       "nbGamesFound": "Anzahl gefundener Spiele",
@@ -10,15 +14,22 @@
       "map": "Karte",
       "infos": "Informationen",
       "noFilesSelected": "Keine Datei ausgewählt",
-      "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert"
+      "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
+      "outputPath": "Ausgabepfad"
     }
   },
   "common": {},
   "shared": {
     "header": {
       "accessWebsite": "Zur EBP-Website gehen",
+      "changeTool": "Werkzeug wechseln",
       "accessDiscordServer": "Dem EBP-Discord beitreten",
-      "logout": "Abmelden"
+      "logout": "Abmelden",
+      "home": "Startseite",
+      "tools": {
+        "replay_cutter": "Wiederholungs-Editor",
+        "game_history": "Spielverlauf"
+      }
     },
     "footer": {
       "version": "Version",

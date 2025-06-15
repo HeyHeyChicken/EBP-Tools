@@ -1,6 +1,10 @@
 {
   "view": {
     "home": {
+      "welcomeTo": "Welcome to ",
+      "tuto": "Choose the tool you want to use from the dropdown list above."
+    },
+    "replay_cutter": {
       "inputFile": "Click here to send your video file",
       "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
       "nbGamesFound": "Number of games found",
@@ -10,15 +14,22 @@
       "map": "Map",
       "infos": "Informations",
       "noFilesSelected": "No files selected",
-      "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard"
+      "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
+      "outputPath": "Output path"
     }
   },
   "common": {},
   "shared": {
     "header": {
       "accessWebsite": "Access the EBP website",
+      "changeTool": "Switch tool",
       "accessDiscordServer": "Access the EBP Discord server",
-      "logout": "Log out"
+      "logout": "Log out",
+      "home": "Home",
+      "tools": {
+        "replay_cutter": "Replay cutter",
+        "game_history": "Game history"
+      }
     },
     "footer": {
       "version": "Version",

@@ -1,0 +1,161 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use "../../../styles/imports/variables" as variables;
+
+video:not(.visible) {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: -1000000vh;
+  left: -1000000vw;
+}
+
+.dropper {
+  border: 1px dashed #d0dce7;
+  padding: calc(#{variables.$margin} * 2);
+  text-align: center;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  background-color: variables.$dark_color;
+
+  &:not(.disabled) {
+    cursor: pointer;
+  }
+
+  &.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  &:hover,
+  &.dropping {
+    background-color: #251e1b;
+    border-color: white;
+
+    > .icons {
+      > i {
+        &:nth-child(1),
+        &:nth-child(2) {
+          opacity: 0.5;
+        }
+
+        &:nth-child(1) {
+          transform: rotate(-15deg) translateY(-120%);
+        }
+
+        &:nth-child(2) {
+          transform: rotate(15deg) translate(+130%, -142%);
+        }
+      }
+    }
+  }
+
+  > .icons {
+    $size: 40px;
+    position: relative;
+    height: $size;
+    width: $size;
+    margin: 0 auto 12px auto;
+
+    > i {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: all 0.2s ease-in-out;
+      color: white;
+
+      &:nth-child(1),
+      &:nth-child(2) {
+        font-size: 30px;
+        opacity: 0;
+      }
+
+      &:nth-child(1) {
+        transform-origin: 100px 100px;
+      }
+
+      &:nth-child(2) {
+        transform-origin: -100px -100px;
+      }
+
+      &:nth-child(3) {
+        font-size: 40px;
+        background: black;
+      }
+    }
+  }
+
+  > p {
+    margin: 0;
+    color: variables.$main_color;
+  }
+}
+
+table {
+  background-color: variables.$dark_color;
+  color: white;
+  border-collapse: collapse;
+  width: 100%;
+
+  > thead,
+  > tbody {
+    > tr {
+      > * {
+        padding: calc(#{variables.$margin} / 2) variables.$margin;
+        border: 1px solid variables.$border_color;
+      }
+    }
+  }
+
+  > thead {
+    > tr {
+      > th {
+        padding: calc(#{variables.$margin} / 2);
+
+        > div {
+          display: flex;
+          gap: calc(#{variables.$margin} / 2);
+        }
+      }
+    }
+  }
+
+  > tbody > tr {
+    > th {
+      background-position: center center;
+      background-size: cover;
+      text-align: center;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    > td {
+      &.infos {
+        width: 100%;
+
+        .orange {
+          color: #b86d00;
+        }
+        .blue {
+          color: #0073bb;
+        }
+      }
+
+      &.buttons {
+        padding: calc(#{variables.$margin} / 2);
+
+        > div {
+          display: flex;
+          gap: calc(#{variables.$margin} / 2);
+        }
+      }
+
+      > p {
+        margin: 0;
+      }
+    }
+  }
+}

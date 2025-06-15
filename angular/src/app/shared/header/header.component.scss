@@ -5,7 +5,8 @@
 @use "../../../styles/imports/variables" as variables;
 
 :host {
-  display: block;
+  display: flex;
+  gap: variables.$margin;
   padding: 0 calc(#{variables.$margin} * 4 - #{variables.$form_height} / 4) 0 0;
   height: calc(#{variables.$form_height} + #{variables.$margin} * 2);
   border-bottom: 1px solid variables.$border_color;
@@ -15,6 +16,15 @@
 
   > :not(.right) {
     float: left;
+  }
+
+  > .btn {
+    margin: variables.$margin 0;
+  }
+
+  > mat-form-field {
+    margin: variables.$margin 0;
+    width: 230px;
   }
 
   > .logo {
@@ -28,18 +38,20 @@
     }
 
     > img {
-      margin: calc(#{variables.$form_height} / 2) calc(#{variables.$margin} * 2)
+      margin: calc(#{variables.$form_height} / 2) variables.$margin
         calc(#{variables.$form_height} / 2) calc(#{variables.$margin} * 4);
     }
   }
 
   > .right {
-    float: right;
+    margin-left: auto;
+    display: flex;
+    gap: variables.$margin;
 
     > div {
       float: left;
       cursor: pointer;
-      padding: variables.$margin calc(#{variables.$margin} / 2);
+      padding: variables.$margin 0;
     }
 
     > .language_selector {
@@ -49,7 +61,7 @@
       > img {
         position: absolute;
         top: 50%;
-        left: calc(#{variables.$margin} * 2);
+        left: variables.$margin;
         transform: translateY(-50%);
         width: calc(#{variables.$margin} * 2);
         z-index: 1;

@@ -1,0 +1,142 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<ebp-container>
+  <ebp-row>
+    <ebp-column></ebp-column>
+    <ebp-column [xs]="7">
+      <!-- This video is used to analyze the timecodes of games in a replay -->
+      <video
+        muted
+        *ngIf="videoPath"
+        [src]="
+          'http://localhost:' +
+          globalService.serverPort +
+          '/file?path=' +
+          videoPath
+        "
+        (loadeddata)="videoLoadedData($event)"
+        (timeupdate)="videoTimeUpdate($event)"
+      ></video>
+      <!-- This video is used to upload the game in a replay -->
+      <video
+        muted
+        *ngIf="uploadingVideoPath"
+        [src]="
+          'http://localhost:' +
+          globalService.serverPort +
+          '/file?path=' +
+          uploadingVideoPath
+        "
+        (loadeddata)="uploadingVideoLoadedData($event)"
+        (timeupdate)="uploadingVideoTimeUpdate($event)"
+      ></video>
+      <div
+        class="dropper"
+        [class.disabled]="inputFileDisabled"
+        *ngIf="percent < 0"
+        (click)="onInputFileClick()"
+      >
+        <div class="icons">
+          <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
+          <i class="fa-sharp fa-solid fa-file"></i>
+          <i class="fa-sharp fa-solid fa-file-video"></i>
+        </div>
+        <p>{{ "view.replay_cutter.inputFile" | translate }}</p>
+      </div>
+      <div *ngIf="percent >= 0">
+        <ebp-loader [value]="percent"></ebp-loader>
+        <ebp-message class="mt-2">
+          {{ "view.replay_cutter.videoIsBeingAnalyzed" | translate }}<br />
+          {{ "view.replay_cutter.nbGamesFound" | translate }}:<b>
+            {{ games.length }}</b
+          >
+        </ebp-message>
+      </div>
+      <ng-container *ngIf="percent < 0 && games.length">
+        <mat-form-field class="mt-2" (click)="setVideoCutterOutputPath()">
+          <mat-label>{{
+            "view.replay_cutter.outputPath" | translate
+          }}</mat-label>
+          <input matInput readonly type="text" [value]="outputPath" />
+          <button class="btn squared">
+            <i class="fa-sharp fa-solid fa-gear"></i>
+          </button>
+        </mat-form-field>
+        <table class="mt-1">
+          <thead>
+            <tr>
+              <th>{{ "view.replay_cutter.map" | translate }}</th>
+              <th>{{ "view.replay_cutter.infos" | translate }}</th>
+              <th>
+                <div>
+                  <button
+                    class="squared"
+                    (click)="saveAll()"
+                    matTooltip="{{ 'view.replay_cutter.saveAll' | translate }}"
+                    matTooltipPosition="above"
+                  >
+                    <i class="fa-sharp fa-solid fa-floppy-disk"></i>
+                  </button>
+                  <button
+                    class="squared"
+                    (click)="copyTimeCodes()"
+                    matTooltip="{{
+                      'view.replay_cutter.copyTimecodes' | translate
+                    }}"
+                    matTooltipPosition="above"
+                  >
+                    <i class="fa-sharp fa-solid fa-copy"></i>
+                  </button>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let game of games; let i = index">
+              <th
+                [style.background-image]="
+                  'url(https://evabattleplan.com/back/wp-content/uploads/' +
+                  game.map.replaceAll(' ', '-').toLowerCase() +
+                  '-300x169.webp)'
+                "
+              >
+                {{ game.map }}
+              </th>
+              <td class="infos">
+                <p class="orange">
+                  {{ game.orangeTeam.name }} ({{ game.orangeTeam.score }})
+                </p>
+                <p class="blue">
+                  {{ game.blueTeam.name }} ({{ game.blueTeam.score }})
+                </p>
+              </td>
+              <td class="buttons">
+                <div>
+                  <button
+                    class="squared"
+                    (click)="save(game)"
+                    matTooltip="{{ 'view.replay_cutter.save' | translate }}"
+                    matTooltipPosition="left"
+                  >
+                    <i class="fa-solid fa-floppy-disk"></i>
+                  </button>
+                  <button
+                    class="squared"
+                    [disabled]="!isDevMode"
+                    (click)="upload(i)"
+                  >
+                    <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+    </ebp-column>
+  </ebp-row>
+</ebp-container>

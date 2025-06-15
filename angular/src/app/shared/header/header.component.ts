@@ -4,23 +4,23 @@
 
 //#region Import
 
-import { Component, OnInit } from "@angular/core";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
-import { CommonModule, Location as CommonLocation } from "@angular/common";
-import { FormsModule } from "@angular/forms";
-import { Router } from "@angular/router";
-import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatSelectModule } from "@angular/material/select";
-import { IdentityService } from "../../core/services/identity.service";
-import { GlobalService } from "../../core/services/global.service";
-import { MatTooltipModule } from "@angular/material/tooltip";
+import { Component, OnInit } from '@angular/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { CommonModule, Location as CommonLocation } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterModule } from '@angular/router';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectChange, MatSelectModule } from '@angular/material/select';
+import { IdentityService } from '../../core/services/identity.service';
+import { GlobalService } from '../../core/services/global.service';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 //#endregion
 
 @Component({
-  selector: "ebp-header",
-  templateUrl: "./header.component.html",
-  styleUrls: ["./header.component.scss"],
+  selector: 'ebp-header',
+  templateUrl: './header.component.html',
+  styleUrls: ['./header.component.scss'],
   standalone: true,
   imports: [
     CommonModule,
@@ -28,7 +28,8 @@ import { MatTooltipModule } from "@angular/material/tooltip";
     TranslateModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatTooltipModule
+    MatTooltipModule,
+    RouterModule,
   ],
 })
 export class HeaderComponent implements OnInit {
@@ -36,8 +37,11 @@ export class HeaderComponent implements OnInit {
 
   protected disableLogoutButton: boolean = false;
 
-  private static STORAGE_KEY_NAME: string = "language";
-  private static DEFAULT_LANGUAGE: string = "en";
+  protected readonly pages: string[] = ['replay_cutter', 'game_history'];
+  protected page?: string;
+
+  private static STORAGE_KEY_NAME: string = 'language';
+  private static DEFAULT_LANGUAGE: string = 'en';
 
   //#endregion
 
@@ -53,7 +57,7 @@ export class HeaderComponent implements OnInit {
 
   ngOnInit(): void {
     // List of languages ​​supported by the application.
-    this.translateService.langs = ["fr", "de", "en", "es", "it"].sort();
+    this.translateService.langs = ['fr', 'de', 'en', 'es', 'it'].sort();
 
     this.translateService.setDefaultLang(HeaderComponent.DEFAULT_LANGUAGE);
 
@@ -84,8 +88,8 @@ export class HeaderComponent implements OnInit {
   /**
    * This function allows the user to log out.
    */
-  protected logout(): void{
-    if(!this.disableLogoutButton){
+  protected logout(): void {
+    if (!this.disableLogoutButton) {
       this.disableLogoutButton = true;
       //@ts-ignore
       window.electronAPI.logout();
@@ -101,6 +105,10 @@ export class HeaderComponent implements OnInit {
       const SELECT = event.target as HTMLSelectElement;
       this.setLanguage(SELECT.value);
     }
+  }
+
+  protected changeTool(event: MatSelectChange): void {
+    this.router.navigate([`/${event.value}`]);
   }
 
   /**

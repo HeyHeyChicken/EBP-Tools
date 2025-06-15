@@ -3,15 +3,14 @@
 // See LICENSE for terms. Unauthorized use is prohibited.
 
 $overflows: (
-	"auto": "auto",
-	"hidden": "hidden",
-	"visible": "visible",
-	"scroll": "scroll",
+  "auto": "auto",
+  "hidden": "hidden",
+  "visible": "visible",
+  "scroll": "scroll",
 );
 
 @each $item, $i in $overflows {
-	.overflow-#{$item} {
-		overflow: #{$i} !important;
-	}
+  .overflow-#{$item} {
+    overflow: #{$i} !important;
+  }
 }
-

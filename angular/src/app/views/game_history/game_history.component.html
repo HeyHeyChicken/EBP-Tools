@@ -1,0 +1,17 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<ebp-container>
+  <ebp-row>
+    <ebp-column></ebp-column>
+    <ebp-column [xs]="7">
+      <mat-form-field>
+        <mat-label>Clearable input</mat-label>
+        <input matInput type="text" (change)="onPublicPseudoChange()" />
+      </mat-form-field>
+    </ebp-column>
+  </ebp-row>
+</ebp-container>

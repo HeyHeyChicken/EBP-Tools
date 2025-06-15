@@ -1,0 +1,91 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use "../../../styles/imports/variables" as variables;
+@use "../../../styles/imports/material_colors" as material_colors;
+
+[role="listbox"] {
+  border-radius: 0 !important;
+  padding: 0 !important;
+
+  mat-option {
+    > mat-pseudo-checkbox {
+      &.mat-pseudo-checkbox-checked {
+        border-color: variables.$main_color !important;
+        background-color: variables.$main_color !important;
+        &:after {
+          color: variables.$dark_color !important;
+        }
+      }
+    }
+
+    &.mdc-list-item--selected {
+      > span {
+        color: variables.$main_color !important;
+      }
+    }
+  }
+}
+
+mat-form-field {
+  mat-select {
+    line-height: calc(#{variables.$form_height} - 2px) !important;
+
+    svg {
+      color: material_colors.$white;
+    }
+
+    .mat-mdc-select-value {
+      font-size: variables.$font_size;
+      color: material_colors.$white;
+      padding-right: calc(#{variables.$margin} * 2);
+    }
+
+    .mat-mdc-select-arrow-wrapper {
+      height: calc(#{variables.$form_height} - 2px) !important;
+      transform: translate(calc(#{variables.$margin} * -1), 0) !important;
+    }
+  }
+
+  &.mat-focused {
+    mat-select {
+      transform: translateY(-1px);
+
+      svg {
+        color: variables.$main_color;
+      }
+    }
+  }
+}
+
+.cdk-overlay-pane {
+  > div[role="listbox"] {
+    background-color: #0b0b0f;
+
+    > mat-option,
+    > mat-optgroup > mat-option {
+      border-style: solid;
+      border-width: 0 1px 1px 1px;
+      border-color: variables.$border-color;
+
+      &.mdc-list-item--selected {
+        background-color: transparent !important;
+      }
+
+      > span {
+        color: material_colors.$white;
+      }
+    }
+
+    > mat-optgroup {
+      > span {
+        border-style: solid;
+        border-width: 0 1px 1px 1px;
+        border-color: variables.$border-color;
+        color: material_colors.$white;
+        font-weight: bold;
+      }
+    }
+  }
+}
