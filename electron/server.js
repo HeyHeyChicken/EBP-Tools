@@ -28,13 +28,17 @@ const { version } = require("../package.json");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
-require('./discord-rpc');
+require("./discord-rpc");
 
 //#endregion
 
 let isProd = process.env.NODE_ENV === "production";
 const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
-const FFMPEG_PATH = path.join(ROOT_PATH, isProd ? "ffmpeg" : "../ffmpeg", os.platform());
+const FFMPEG_PATH = path.join(
+  ROOT_PATH,
+  isProd ? "ffmpeg" : "../ffmpeg",
+  os.platform()
+);
 const SETTINGS_PATH = path.join(ROOT_PATH, "settings.json");
 const WINDOW_WIDTH = 800;
 const WINDOW_DEV_PANEL_WIDTH = 540;
@@ -84,9 +88,11 @@ let projectLatestVersion /* string */ = "";
 
   //#endregion
 
-  function getVideoCutterOutputPath(){
-    const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
-    return SETTINGS.videoCutterOutputPath ?? path.join(os.homedir(), "Downloads");
+  function getVideoCutterOutputPath() {
+    const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8"));
+    return (
+      SETTINGS.videoCutterOutputPath ?? path.join(os.homedir(), "Downloads")
+    );
   }
 
   /**
@@ -211,7 +217,10 @@ let projectLatestVersion /* string */ = "";
   function createWindow() {
     const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
     mainWindow = new BrowserWindow({
-      width: Math.min(PRIMARY_DISPLAY.workAreaSize.width, WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0)),
+      width: Math.min(
+        PRIMARY_DISPLAY.workAreaSize.width,
+        WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0)
+      ),
       height: Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT),
       resizable: false,
       contextIsolation: true,
@@ -226,7 +235,13 @@ let projectLatestVersion /* string */ = "";
     mainWindow.setMenuBarVisibility(false);
 
     // Loads the application's index.html.
-    mainWindow.loadURL(isProd ? `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent("http://localhost:" + PORT)}` : `http://localhost:${PORT}`);
+    mainWindow.loadURL(
+      isProd
+        ? `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent(
+            "http://localhost:" + PORT
+          )}`
+        : `http://localhost:${PORT}`
+    );
     if (!isProd) {
       mainWindow.webContents.openDevTools();
     }
@@ -257,16 +272,16 @@ let projectLatestVersion /* string */ = "";
     // The front-end asks the server to enables/disables debug mode.
     ipcMain.handle("debug-mode", async () => {
       isProd = !isProd;
-      if(isProd){
+      if (isProd) {
         mainWindow.webContents.closeDevTools();
-      }
-      else{
+      } else {
         mainWindow.webContents.openDevTools();
       }
-      
+
       const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
       mainWindow.setResizable(true);
-      const DESIRED_WIDTH = WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0);
+      const DESIRED_WIDTH =
+        WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0);
       mainWindow.setSize(
         Math.min(PRIMARY_DISPLAY.workAreaSize.width, DESIRED_WIDTH),
         Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT)
@@ -298,13 +313,17 @@ let projectLatestVersion /* string */ = "";
 
       const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ["openDirectory"],
-        defaultPath: PATH
+        defaultPath: PATH,
       });
       if (!canceled && filePaths.length == 1) {
-        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8"));
         SETTINGS.videoCutterOutputPath = filePaths[0];
 
-        fs.writeFileSync(SETTINGS_PATH, JSON.stringify(SETTINGS, null, 2), 'utf-8');
+        fs.writeFileSync(
+          SETTINGS_PATH,
+          JSON.stringify(SETTINGS, null, 2),
+          "utf-8"
+        );
         return filePaths[0];
       }
     });
@@ -313,7 +332,7 @@ let projectLatestVersion /* string */ = "";
     ipcMain.handle("get-video-cutter-output-path", async () => {
       return getVideoCutterOutputPath();
     });
-    
+
     // The front-end asks the server to return the user's login status.
     ipcMain.handle("get-login-state", async () => {
       return session.defaultSession.cookies
@@ -334,10 +353,22 @@ let projectLatestVersion /* string */ = "";
       const SESSION = session.defaultSession;
 
       Promise.all([
-        SESSION.clearStorageData({ storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers'] }),
-        SESSION.clearCache()
+        SESSION.clearStorageData({
+          storages: [
+            "cookies",
+            "localstorage",
+            "indexdb",
+            "websql",
+            "serviceworkers",
+          ],
+        }),
+        SESSION.clearCache(),
       ]).then(() => {
-        mainWindow.loadURL(`https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent("http://localhost:" + PORT)}`);
+        mainWindow.loadURL(
+          `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent(
+            "http://localhost:" + PORT
+          )}`
+        );
       });
     });
 

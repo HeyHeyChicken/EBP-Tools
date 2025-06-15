@@ -32,7 +32,6 @@
     "sass": "^1.89.1"
   },
   "dependencies": {
-    "@techstark/opencv-js": "^4.11.0-release.1",
     "discord-rpc": "^4.0.1",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",

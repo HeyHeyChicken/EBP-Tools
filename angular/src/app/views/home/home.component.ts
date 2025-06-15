@@ -4,28 +4,29 @@
 
 //#region Imports
 
-import { CommonModule } from "@angular/common";
-import { Component, isDevMode, NgZone, OnInit } from "@angular/core";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
-import { MatTooltipModule } from "@angular/material/tooltip";
-import { GridModule } from "../../shared/grid/grid.module";
-import { LoaderComponent } from "../../shared/loader/loader.component";
-import { MessageComponent } from "../../shared/message/message.component";
-import Tesseract, { createWorker, PSM } from "tesseract.js";
-import { ToastrService } from "ngx-toastr";
-import { Map } from "./models/map";
-import { Game } from "./models/game";
-import { RGB } from "./models/rgb";
-import { GlobalService } from "../../core/services/global.service";
+import { CommonModule } from '@angular/common';
+import { Component, isDevMode, NgZone, OnInit } from '@angular/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { GridModule } from '../../shared/grid/grid.module';
+import { LoaderComponent } from '../../shared/loader/loader.component';
+import { MessageComponent } from '../../shared/message/message.component';
+import Tesseract, { createWorker, PSM } from 'tesseract.js';
+import { ToastrService } from 'ngx-toastr';
+import { Map } from './models/map';
+import { Game } from './models/game';
+import { RGB } from './models/rgb';
+import { GlobalService } from '../../core/services/global.service';
 import { MatInputModule } from '@angular/material/input';
-import cvReadyPromise from "@techstark/opencv-js";
 
 //#endregion
 
+declare let cv: any;
+
 @Component({
-  selector: "view-home",
-  templateUrl: "./home.component.html",
-  styleUrls: ["./home.component.scss"],
+  selector: 'view-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.scss'],
   standalone: true,
   imports: [
     GridModule,
@@ -35,7 +36,7 @@ import cvReadyPromise from "@techstark/opencv-js";
     TranslateModule,
     LoaderComponent,
     MessageComponent,
-    MatInputModule
+    MatInputModule,
   ],
 })
 export class HomeComponent implements OnInit {
@@ -48,13 +49,12 @@ export class HomeComponent implements OnInit {
   protected uploadingVideoPath: string | undefined;
   protected outputPath: string | undefined;
 
-  protected get isDevMode(): boolean{
+  protected get isDevMode(): boolean {
     return isDevMode();
   }
 
   private start: number = 0;
   private uploadingGameIndex: number | undefined;
-  private cv: any | undefined;
 
   private tesseractWorker_basic: Tesseract.Worker | undefined;
   private tesseractWorker_number: Tesseract.Worker | undefined;
@@ -67,14 +67,13 @@ export class HomeComponent implements OnInit {
     protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
-    private readonly translateService: TranslateService,
+    private readonly translateService: TranslateService
   ) {}
 
   //#region Functions
 
   ngOnInit(): void {
     this.initTesseract();
-    this.initOpenCV();
 
     // Getting the project version.
     //@ts-ignore
@@ -95,40 +94,38 @@ export class HomeComponent implements OnInit {
           this.videoPath = path;
           this.percent = 0;
         } else {
-          this.translateService.get("view.home.noFilesSelected").subscribe((translated: string) => {
-						this.toastrService.error(translated);
-					});
+          this.translateService
+            .get('view.home.noFilesSelected')
+            .subscribe((translated: string) => {
+              this.toastrService.error(translated);
+            });
         }
       });
     });
-  }
-
-  private async initOpenCV(): Promise<void> {
-    this.cv = await cvReadyPromise;
   }
 
   /**
    * This function initializes the different instances of the OCR.
    */
   private async initTesseract(): Promise<void> {
-    this.tesseractWorker_basic = await createWorker("eng");
-    this.tesseractWorker_number = await createWorker("eng");
-    this.tesseractWorker_letter = await createWorker("eng");
-    this.tesseractWorker_time = await createWorker("eng");
+    this.tesseractWorker_basic = await createWorker('eng');
+    this.tesseractWorker_number = await createWorker('eng');
+    this.tesseractWorker_letter = await createWorker('eng');
+    this.tesseractWorker_time = await createWorker('eng');
 
     this.tesseractWorker_basic.setParameters({
       tessedit_char_whitelist:
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
     });
     this.tesseractWorker_number.setParameters({
-      tessedit_char_whitelist: "0123456789",
+      tessedit_char_whitelist: '0123456789',
     });
     this.tesseractWorker_letter.setParameters({
       tessedit_char_whitelist:
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ",
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
     });
     this.tesseractWorker_time.setParameters({
-      tessedit_char_whitelist: "0123456789:",
+      tessedit_char_whitelist: '0123456789:',
     });
 
     this.inputFileDisabled = false;
@@ -137,11 +134,11 @@ export class HomeComponent implements OnInit {
   /**
    * This function allows user to change the folder where the cut games are stored.
    */
-  protected setVideoCutterOutputPath(): void{
+  protected setVideoCutterOutputPath(): void {
     this.globalService.loading = true;
     //@ts-ignore
     window.electronAPI.setVideoCutterOutputPath().then((path: string) => {
-      if(path){
+      if (path) {
         this.ngZone.run(() => {
           this.globalService.loading = false;
           this.outputPath = path;
@@ -154,7 +151,7 @@ export class HomeComponent implements OnInit {
    * This feature allows the user to upload their cut game.
    * @param gameIndex Index of the game to upload.
    */
-  protected upload(gameIndex: number): void{
+  protected upload(gameIndex: number): void {
     this.uploadingVideoPath = undefined;
     setTimeout(() => {
       this.uploadingGameIndex = gameIndex;
@@ -192,7 +189,7 @@ export class HomeComponent implements OnInit {
     if (event.target && this.uploadingGameIndex) {
       const VIDEO = event.target as HTMLVideoElement;
       VIDEO.currentTime = this.games[this.uploadingGameIndex].start + 10;
-      console.log("uploadingVideoLoadedData");
+      console.log('uploadingVideoLoadedData');
     }
   }
 
@@ -424,7 +421,7 @@ export class HomeComponent implements OnInit {
           if (!found) {
             if (this.detectGamePlaying(VIDEO, this.games)) {
               // On cherche le nom de la carte.
-              if (this.games[0].map == "") {
+              if (this.games[0].map == '') {
                 const TEXT /* string */ = await this.getTextFromImage(
                   VIDEO,
                   this.tesseractWorker_letter!,
@@ -436,7 +433,7 @@ export class HomeComponent implements OnInit {
                 );
                 if (TEXT) {
                   found = true;
-                  if (this.games[0].map == "") {
+                  if (this.games[0].map == '') {
                     const MAP_NAME /* string */ = this.getMapByName(TEXT);
                     this.games[0].map = MAP_NAME;
                     this.games[0].name = MAP_NAME;
@@ -445,7 +442,7 @@ export class HomeComponent implements OnInit {
               }
 
               // We are looking for the name of the orange team.
-              if (this.games[0].orangeTeam.name == "") {
+              if (this.games[0].orangeTeam.name == '') {
                 const TEXT /* string */ = await this.getTextFromImage(
                   VIDEO,
                   this.tesseractWorker_basic!,
@@ -457,14 +454,14 @@ export class HomeComponent implements OnInit {
                 );
                 if (TEXT && TEXT.length >= 2) {
                   found = true;
-                  if (this.games[0].orangeTeam.name == "") {
+                  if (this.games[0].orangeTeam.name == '') {
                     this.games[0].orangeTeam.name = TEXT.toUpperCase();
                   }
                 }
               }
 
               // We are looking for the name of the blue team.
-              if (this.games[0].blueTeam.name == "") {
+              if (this.games[0].blueTeam.name == '') {
                 const TEXT /* string */ = await this.getTextFromImage(
                   VIDEO,
                   this.tesseractWorker_basic!,
@@ -476,7 +473,7 @@ export class HomeComponent implements OnInit {
                 );
                 if (TEXT && TEXT.length >= 2) {
                   found = true;
-                  if (this.games[0].blueTeam.name == "") {
+                  if (this.games[0].blueTeam.name == '') {
                     this.games[0].blueTeam.name = TEXT.toUpperCase();
                   }
                 }
@@ -499,7 +496,7 @@ export class HomeComponent implements OnInit {
                   );
                   if (TEXT) {
                     found = true;
-                    const SPLITTED /* string[] */ = TEXT.split(":");
+                    const SPLITTED /* string[] */ = TEXT.split(':');
                     if (SPLITTED.length == 2) {
                       const MINUTES = parseInt(SPLITTED[0]);
                       const SECONDES = parseInt(SPLITTED[1]);
@@ -533,10 +530,7 @@ export class HomeComponent implements OnInit {
             this.globalService.discordServerURL
           );
         } else {
-          this.onVideoEnded(
-            this.games,
-            this.globalService.discordServerURL
-          );
+          this.onVideoEnded(this.games, this.globalService.discordServerURL);
 
           const DIFFERENCE = Date.now() - this.start;
           const MINUTES = Math.floor(DIFFERENCE / 60000);
@@ -545,8 +539,8 @@ export class HomeComponent implements OnInit {
           console.log(
             `${MINUTES.toString().padStart(
               2,
-              "0"
-            )}m ${SECONDS.toString().padStart(2, "0")}s`
+              '0'
+            )}m ${SECONDS.toString().padStart(2, '0')}s`
           );
           this.start = 0;
         }
@@ -554,15 +548,18 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  private detecterImage(sourceMat: cvReadyPromise.Mat, templateMat: cvReadyPromise.Mat): any {
-    const result = new this.cv.Mat();
-    const mask = new this.cv.Mat();
+  private detecterImage(
+    sourceMat: any /* cvReadyPromise.Mat */,
+    templateMat: any /* cvReadyPromise.Mat */
+  ): any {
+    const result = new cv.Mat();
+    const mask = new cv.Mat();
 
     // Match du template
-    this.cv.matchTemplate(sourceMat, templateMat, result, this.cv.TM_CCOEFF_NORMED, mask);
+    cv.matchTemplate(sourceMat, templateMat, result, cv.TM_CCOEFF_NORMED, mask);
 
     // Recherche de la meilleure correspondance
-    const minMax = this.cv.minMaxLoc(result, mask);
+    const minMax = cv.minMaxLoc(result, mask);
     const maxPoint = minMax.maxLoc;
     const maxVal = minMax.maxVal;
 
@@ -585,20 +582,32 @@ export class HomeComponent implements OnInit {
       const DEFAULT_STEP: number = 2;
       const NOW: number = VIDEO.currentTime;
 
-      if (this.detectGamePlaying(VIDEO, this.games, true)){
-        const VIDEO_MAT = this.cv.imread(this.videoToCanvas(VIDEO));
-        this.urlToCanvas(`/assets/img/maps/${this.games[this.uploadingGameIndex].map}.png`, (mapCanvas: HTMLCanvasElement) => {
-          const MAP_MAT = this.cv.imread(mapCanvas);
-          
-          const { position, taille, confiance } = this.detecterImage(VIDEO_MAT, MAP_MAT);
-          console.log('Position:', position, 'Taille:', taille, 'Confiance:', confiance);
+      if (this.detectGamePlaying(VIDEO, this.games, true)) {
+        const VIDEO_MAT = cv.imread(this.videoToCanvas(VIDEO));
+        this.urlToCanvas(
+          `/assets/img/maps/${this.games[this.uploadingGameIndex].map}.png`,
+          (mapCanvas: HTMLCanvasElement) => {
+            const MAP_MAT = cv.imread(mapCanvas);
 
-        });
+            const { position, taille, confiance } = this.detecterImage(
+              VIDEO_MAT,
+              MAP_MAT
+            );
+            console.log(
+              'Position:',
+              position,
+              'Taille:',
+              taille,
+              'Confiance:',
+              confiance
+            );
+          }
+        );
       }
     }
   }
 
-  private urlToCanvas(url: string, callback: Function): void{
+  private urlToCanvas(url: string, callback: Function): void {
     const CANVAS = document.createElement('canvas');
     const IMAGE = new Image();
     IMAGE.src = url;
@@ -606,19 +615,19 @@ export class HomeComponent implements OnInit {
       CANVAS.width = IMAGE.width;
       CANVAS.height = IMAGE.height;
       const CTX = CANVAS.getContext('2d');
-      if(CTX){
+      if (CTX) {
         CTX.drawImage(IMAGE, 0, 0);
         callback(CANVAS);
       }
     };
   }
 
-  private videoToCanvas(video: HTMLVideoElement): HTMLCanvasElement{
+  private videoToCanvas(video: HTMLVideoElement): HTMLCanvasElement {
     const CANVAS = document.createElement('canvas');
     CANVAS.width = video.videoWidth;
     CANVAS.height = video.videoHeight;
     const CTX = CANVAS.getContext('2d');
-    if(CTX){
+    if (CTX) {
       CTX.drawImage(video, 0, 0, CANVAS.width, CANVAS.height);
     }
     return CANVAS;
@@ -633,10 +642,10 @@ export class HomeComponent implements OnInit {
    */
   private getPixelColor(video: HTMLVideoElement, x: number, y: number): RGB {
     if (video) {
-      const CANVAS = document.createElement("canvas");
+      const CANVAS = document.createElement('canvas');
       CANVAS.width = 1;
       CANVAS.height = 1;
-      const CTX = CANVAS.getContext("2d");
+      const CTX = CANVAS.getContext('2d');
       if (CTX) {
         CTX.drawImage(
           video /* Image */,
@@ -683,29 +692,29 @@ export class HomeComponent implements OnInit {
    */
   private getMapByName(search: string): string {
     const MAPS: Map[] = [
-      new Map("Artefact", ["artefact"]),
-      new Map("Atlantis", ["atlantis"]),
-      new Map("Ceres", ["ceres"]),
-      new Map("Engine", ["engine"]),
-      new Map("Helios Station", ["helios", "station"]),
-      new Map("Lunar Outpost", ["lunar", "outpost"]),
-      new Map("Outlaw", ["outlaw"]),
-      new Map("Polaris", ["polaris"]),
-      new Map("Silva", ["silva"]),
-      new Map("The Cliff", ["cliff"]),
-      new Map("The Rock", ["rock"]),
+      new Map('Artefact', ['artefact']),
+      new Map('Atlantis', ['atlantis']),
+      new Map('Ceres', ['ceres']),
+      new Map('Engine', ['engine']),
+      new Map('Helios Station', ['helios', 'station']),
+      new Map('Lunar Outpost', ['lunar', 'outpost']),
+      new Map('Outlaw', ['outlaw']),
+      new Map('Polaris', ['polaris']),
+      new Map('Silva', ['silva']),
+      new Map('The Cliff', ['cliff']),
+      new Map('The Rock', ['rock']),
     ];
     const SPLITTED = search
-      .replace(/(\r\n|\n|\r)/gm, "")
+      .replace(/(\r\n|\n|\r)/gm, '')
       .toLowerCase()
-      .split(" ");
+      .split(' ');
     const RESULT = MAPS.find((x) =>
       SPLITTED.some((s) => x.dictionnary.includes(s))
     );
     if (RESULT) {
       return RESULT.name;
     }
-    return "";
+    return '';
   }
 
   /**
@@ -728,7 +737,7 @@ export class HomeComponent implements OnInit {
           new RGB(50, 138, 230)
         )
       ) {
-        console.log("Detect game score frame (mode 1)");
+        console.log('Detect game score frame (mode 1)');
         return 1;
       }
       if (
@@ -743,7 +752,7 @@ export class HomeComponent implements OnInit {
           new RGB(50, 138, 230)
         )
       ) {
-        console.log("Detect game score frame (mode 2)");
+        console.log('Detect game score frame (mode 2)');
         return 2;
       }
     }
@@ -779,15 +788,12 @@ export class HomeComponent implements OnInit {
    * @param videoPath Path of the analyzed video file.
    * @param discordServerURL EBP Discord server URL.
    */
-  private onVideoEnded(
-    games: Game[],
-    discordServerURL: string
-  ): void {
+  private onVideoEnded(games: Game[], discordServerURL: string): void {
     this.percent = -1;
     if (games.length == 0) {
       this.toastrService
         .error(
-          "No games were found in your video. If you think this is a mistake, please let me know."
+          'No games were found in your video. If you think this is a mistake, please let me know.'
         )
         .onTap.subscribe(() => {
           //@ts-ignore
@@ -807,7 +813,7 @@ export class HomeComponent implements OnInit {
       this.videoPath
     );
     this.toastrService
-      .success("Your video has been cut here: " + FILE_PATH)
+      .success('Your video has been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {
         //@ts-ignore
         window.electronAPI.readVideoFile(FILE_PATH);
@@ -825,7 +831,7 @@ export class HomeComponent implements OnInit {
     );
 
     this.toastrService
-      .success("Your videos have been cut here: " + FILE_PATH)
+      .success('Your videos have been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {
         //@ts-ignore
         window.electronAPI.readVideoFile(FILE_PATH);
@@ -836,15 +842,17 @@ export class HomeComponent implements OnInit {
    * This function adds game timecodes to the user's clipboard.
    */
   protected copyTimeCodes(): void {
-    let result = "";
+    let result = '';
     this.games.forEach((game) => {
       result += `${game.readableStart} ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map}\n`;
     });
     navigator.clipboard.writeText(result);
 
-    this.translateService.get("view.home.timeCodesCopiedClipboard").subscribe((translated: string) => {
-      this.toastrService.success(translated);
-    });
+    this.translateService
+      .get('view.home.timeCodesCopiedClipboard')
+      .subscribe((translated: string) => {
+        this.toastrService.success(translated);
+      });
   }
 
   /**
@@ -895,7 +903,7 @@ export class HomeComponent implements OnInit {
               new RGB(0, 0, 0)
             )
           ) {
-            console.log("Detect game loading frame");
+            console.log('Detect game loading frame');
             return true;
           }
           break;
@@ -1100,7 +1108,7 @@ export class HomeComponent implements OnInit {
           ))
         //#endregion
       ) {
-        console.log("Detect game intro frame");
+        console.log('Detect game intro frame');
         return true;
       }
     }
@@ -1114,8 +1122,12 @@ export class HomeComponent implements OnInit {
    * @param force Disable the first if.
    * @returns Is the current frame a playing game frame?
    */
-  private detectGamePlaying(video: HTMLVideoElement, games: Game[], force: boolean = false): boolean {
-    if (games.length > 0 && games[0].start == -1 || force) {
+  private detectGamePlaying(
+    video: HTMLVideoElement,
+    games: Game[],
+    force: boolean = false
+  ): boolean {
+    if ((games.length > 0 && games[0].start == -1) || force) {
       // Trying to detect the color of all players' life bars.
       const J1_PIXEL = this.getPixelColor(
         video,
@@ -1187,7 +1199,7 @@ export class HomeComponent implements OnInit {
           this.colorSimilarity(J8_PIXEL, new RGB(0, 0, 0), 50))
         //#endregion
       ) {
-        console.log("Detect game playing frame");
+        console.log('Detect game playing frame');
         return true;
       }
       return false;
@@ -1220,19 +1232,19 @@ export class HomeComponent implements OnInit {
     imageModeOrder: number[] = [0, 1, 2]
   ): Promise<string> {
     if (video) {
-      const CANVAS = document.createElement("canvas");
+      const CANVAS = document.createElement('canvas');
       const WIDTH /* number */ = x2 - x1;
       const HEIGHT /* number */ = y2 - y1;
       CANVAS.width = WIDTH;
       CANVAS.height = HEIGHT;
-      const CTX = CANVAS.getContext("2d");
+      const CTX = CANVAS.getContext('2d');
       if (CTX) {
         switch (imageModeOrder[imageModeIndex]) {
           case 1:
-            CTX.filter = "grayscale(1) contrast(100) brightness(1)";
+            CTX.filter = 'grayscale(1) contrast(100) brightness(1)';
             break;
           case 2:
-            CTX.filter = "grayscale(1) contrast(100) brightness(1) invert(1)";
+            CTX.filter = 'grayscale(1) contrast(100) brightness(1) invert(1)';
             break;
         }
         CTX.drawImage(
@@ -1246,7 +1258,7 @@ export class HomeComponent implements OnInit {
           WIDTH /* Canvas width */,
           HEIGHT /* Canvas height */
         );
-        const IMG = CANVAS.toDataURL("image/png");
+        const IMG = CANVAS.toDataURL('image/png');
         await tesseractWorker.setParameters({
           tessedit_pageseg_mode: tesseditPagesegMode.toString() as PSM,
         });
@@ -1264,10 +1276,10 @@ export class HomeComponent implements OnInit {
             imageModeOrder
           );
         }
-        return DATA.data.text.replace(/\r?\n|\r/, "");
+        return DATA.data.text.replace(/\r?\n|\r/, '');
       }
     }
-    return Promise.resolve("");
+    return Promise.resolve('');
   }
 
   //#endregion

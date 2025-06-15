@@ -11,16 +11,18 @@ import {
   NgZone,
   OnInit,
   ViewChild,
-} from "@angular/core";
-import { NavigationEnd, Router, RouterOutlet } from "@angular/router";
-import { HeaderComponent } from "./shared/header/header.component";
-import { WizzComponent } from "./shared/wizz/wizz.component";
-import { FooterComponent } from "./shared/footer/footer.component";
-import { CommonModule } from "@angular/common";
-import { GlobalService } from "./core/services/global.service";
-import { TranslateModule } from "@ngx-translate/core";
+} from '@angular/core';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { HeaderComponent } from './shared/header/header.component';
+import { WizzComponent } from './shared/wizz/wizz.component';
+import { FooterComponent } from './shared/footer/footer.component';
+import { CommonModule } from '@angular/common';
+import { GlobalService } from './core/services/global.service';
+import { TranslateModule } from '@ngx-translate/core';
 
 //#endregion
+
+declare let cv: any;
 
 interface Versions {
   current: string;
@@ -28,7 +30,7 @@ interface Versions {
 }
 
 @Component({
-  selector: "app-root",
+  selector: 'app-root',
   imports: [
     RouterOutlet,
     HeaderComponent,
@@ -37,14 +39,14 @@ interface Versions {
     CommonModule,
     TranslateModule,
   ],
-  templateUrl: "./app.html",
-  styleUrls: ["./app.scss"],
+  templateUrl: './app.html',
+  styleUrls: ['./app.scss'],
 })
 export class App implements OnInit {
   //#region Attributes
 
   /** Conteneur principal de la page. */
-  @ViewChild("main")
+  @ViewChild('main')
   private readonly main: ElementRef<HTMLElement> | undefined;
 
   protected versions: Versions | undefined;
@@ -59,6 +61,8 @@ export class App implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
+    this.loadOpenCV();
+
     // On scroll vers le haut à chaque fois que l'utilisateur change de page.
     this.router.events.subscribe((event) => {
       if (this.main) {
@@ -103,8 +107,50 @@ export class App implements OnInit {
   protected onNewUpdateLinkClick(): void {
     //@ts-ignore
     window.electronAPI.openURL(
-      "https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/releases/latest"
+      'https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/releases/latest'
     );
+  }
+
+  /**
+   * This function injects the OpenCV.js library.
+   */
+  private loadOpenCV(callback?: Function): void {
+    const OPENCV_URL: string = '/assets/js/opencv/opencv.js';
+
+    const SCRIPT: HTMLScriptElement = document.createElement('script');
+    SCRIPT.setAttribute('async', '');
+    SCRIPT.setAttribute('type', 'text/javascript');
+
+    SCRIPT.addEventListener('load', async () => {
+      if (cv.getBuildInformation) {
+        if (callback) {
+          callback();
+        }
+      } else {
+        // WASM
+        if (cv instanceof Promise) {
+          cv = await cv;
+          if (callback) {
+            callback();
+          }
+        } else {
+          cv['onRuntimeInitialized'] = () => {
+            if (callback) {
+              callback();
+            }
+          };
+        }
+      }
+    });
+
+    SCRIPT.addEventListener('error', () => {
+      console.error('Failed to load ' + OPENCV_URL);
+    });
+
+    SCRIPT.src = OPENCV_URL;
+
+    const NODE: HTMLScriptElement = document.getElementsByTagName('script')[0];
+    NODE.parentNode?.insertBefore(SCRIPT, NODE);
   }
 
   //#endregion
