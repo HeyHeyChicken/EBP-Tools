@@ -81,9 +81,7 @@ let projectLatestVersion /* string */ = "";
   });
 
   APP.listen(PORT, () => {
-    console.log(
-      `EBP - EVA Battle Plan - Tools's express server is listening on http://localhost:${PORT}`
-    );
+    console.log(`[EXPRESS] Listening on http://localhost:${PORT}.`);
   });
 
   //#endregion

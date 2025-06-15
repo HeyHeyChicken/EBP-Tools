@@ -3,6 +3,7 @@
 // See LICENSE for terms. Unauthorized use is prohibited.
 
 @use "../../../styles/imports/variables" as variables;
+@use "sass:math";
 
 $size: 150px;
 .loader {
@@ -36,7 +37,7 @@ $size: 150px;
       @for $i from 1 through 50 {
         &:nth-child(#{$i}) {
           transform: translate(-50%, -50%)
-            rotate(#{180deg + 360deg / 50 * ($i - 1)})
+            rotate(#{180deg + math.div(360deg, 50) * ($i - 1)})
             translateY(calc(#{$size} * 0.5 - #{$size} * 0.08));
         }
       }
@@ -56,7 +57,7 @@ $size: 150px;
   }
 
   @for $i from 1 through 100 {
-    $active: floor($i / 2);
+    $active: math.floor(math.div($i, 2));
     &.t#{$i} {
       > div > div {
         @for $j from 1 through $active {
