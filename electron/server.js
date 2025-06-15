@@ -237,7 +237,7 @@ let projectLatestVersion /* string */ = "";
     // Loads the application's index.html.
     mainWindow.loadURL(
       isProd
-        ? `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent(
+        ? `https://evabattleplan.com/${app.getLocale()}/login?app=cutter&redirect_uri=${encodeURIComponent(
             "http://localhost:" + PORT
           )}`
         : `http://localhost:${PORT}`
