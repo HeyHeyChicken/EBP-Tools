@@ -8,10 +8,86 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <ebp-row>
     <ebp-column></ebp-column>
     <ebp-column [xs]="7">
-      <mat-form-field>
-        <mat-label>Clearable input</mat-label>
-        <input matInput type="text" (change)="onPublicPseudoChange()" />
-      </mat-form-field>
+      <div class="box">
+        <h3 class="m-0">{{ "view.game_history.title" | translate }}</h3>
+
+        <div class="d-flex">
+          <p>{{ "view.game_history.step" | translate }} 1</p>
+          <div class="d-flex flex-row">
+            <mat-form-field
+              matTooltip="{{
+                'view.game_history.seasonExplanations' | translate
+              }}"
+            >
+              <mat-label>{{
+                "view.game_history.season" | translate
+              }}</mat-label>
+              <mat-select
+                [(ngModel)]="seasonIndex"
+                [ngModelOptions]="{ standalone: true }"
+              >
+                <mat-option
+                  *ngFor="let season of seasons; let i = index"
+                  [value]="i + 1"
+                  >{{ season }}</mat-option
+                >
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field
+              matTooltip="{{
+                'view.game_history.pagesExplanations' | translate
+              }}"
+              class="pages"
+            >
+              <mat-label>{{ "view.game_history.pages" | translate }}</mat-label>
+              <mat-select
+                [(ngModel)]="nbPages"
+                [ngModelOptions]="{ standalone: true }"
+              >
+                <mat-option *ngFor="let page of maxPages" [value]="page">{{
+                  page
+                }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+        <form class="d-flex" (submit)="onPublicPseudoExport()">
+          <p style="margin-bottom: -12px">
+            {{ "view.game_history.step" | translate }} 2
+          </p>
+          <span>{{ "view.game_history.firstOption" | translate }}</span>
+          <div class="d-flex">
+            <mat-form-field>
+              <mat-label>{{
+                "view.game_history.playerTag" | translate
+              }}</mat-label>
+              <input
+                matInput
+                type="text"
+                [ngModelOptions]="{ standalone: true }"
+                placeholder="HeyHeyChicken#37457"
+                [(ngModel)]="publicPseudo"
+                (paste)="onPublicPseudoPaste($event)"
+              />
+            </mat-form-field>
+          </div>
+          <button
+            type="submit"
+            class="w-100 excel"
+            [disabled]="disablePublicPseudoExportButton"
+          >
+            {{ "view.game_history.export" | translate }}
+          </button>
+          <span>{{ "view.game_history.secondOption" | translate }}</span>
+          <button
+            type="button"
+            class="w-100 eva"
+            (click)="onPrivatePseudoExport()"
+          >
+            login & export
+          </button>
+        </form>
+      </div>
     </ebp-column>
   </ebp-row>
 </ebp-container>

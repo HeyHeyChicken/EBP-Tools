@@ -40,7 +40,7 @@ html {
     overflow-x: hidden;
     font-size: 16px;
 
-    *:not(i) {
+    *:not(i):not(button):not(.btn) {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto,
         "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",

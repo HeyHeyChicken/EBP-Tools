@@ -28,7 +28,12 @@ const { version } = require("../package.json");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
+const puppeteer = require("puppeteer-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const ExcelJS = require("exceljs");
 require("./discord-rpc");
+
+puppeteer.use(StealthPlugin());
 
 //#endregion
 
@@ -177,9 +182,7 @@ let projectLatestVersion /* string */ = "";
         try {
           const DATA = JSON.parse(data);
           callback(DATA.tag_name);
-        } catch (err) {
-          console.error(err);
-        }
+        } catch (err) {}
       });
     });
 
@@ -243,6 +246,207 @@ let projectLatestVersion /* string */ = "";
     if (!isProd) {
       mainWindow.webContents.openDevTools();
     }
+  }
+
+  /**
+   * This function adds an EVA game to a game list.
+   * @param {*} games List of games to complete.
+   * @param {*} game Game to add.
+   */
+  function addGame(games, game) {
+    const DATE = new Date(game.createdAt);
+    const NEW_GAME = {
+      mode: game.mode.identifier,
+      map: game.map.name,
+      date: DATE.toLocaleDateString("fr-FR"),
+      hour: DATE.toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      duration: game.data.duration,
+      orangeTeam: {
+        name: game.data.teamOne.name,
+        score: game.data.teamOne.score,
+        players: [],
+      },
+      blueTeam: {
+        name: game.data.teamTwo.name,
+        score: game.data.teamTwo.score,
+        players: [],
+      },
+    };
+    game.players.forEach((player) => {
+      const NEW_PLAYER = {
+        name: player.data.niceName,
+        kills: player.data.kills,
+        deaths: player.data.deaths,
+        assists: player.data.assists,
+        score: player.data.score,
+      };
+      if (player.data.team == NEW_GAME.orangeTeam.name) {
+        NEW_GAME.orangeTeam.players.push(NEW_PLAYER);
+      } else if (player.data.team == NEW_GAME.blueTeam.name) {
+        NEW_GAME.blueTeam.players.push(NEW_PLAYER);
+      }
+    });
+
+    games.push(NEW_GAME);
+  }
+
+  async function exportGamesToExcel(games, playerName) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(path.join(ROOT_PATH, "template.xlsx"));
+
+    const worksheet = workbook.getWorksheet(1);
+
+    // Exemple : remplir A1, B2, C3
+    worksheet.getCell("A1").value = app.getLocale();
+
+    let rowIndew = 3;
+    games.forEach((game) => {
+      rowIndew++;
+
+      worksheet.getCell(`A${rowIndew}`).value = game.mode; // Mode
+      worksheet.getCell(`B${rowIndew}`).value =
+        game.orangeTeam.players.length + game.blueTeam.players.length; // Nb players
+      worksheet.getCell(`C${rowIndew}`).value = game.map; // Map
+      worksheet.getCell(`H${rowIndew}`).value = game.date; // Date
+      worksheet.getCell(`I${rowIndew}`).value = game.hour; // Hour
+      worksheet.getCell(`K${rowIndew}`).value = game.duration; // Duration
+      worksheet.getCell(`J${rowIndew}`).value = `${Math.floor(
+        game.duration / 60
+      )}m${game.duration % 60}s`; // Readable duration
+      worksheet.getCell(`L${rowIndew}`).value = game.orangeTeam.score; // Orange team score
+      worksheet.getCell(`AL${rowIndew}`).value = game.blueTeam.score; // Blue team score
+
+      let letters = [
+        ["M", "N", "O", "P", "Q"],
+        ["R", "S", "T", "U", "V"],
+        ["W", "X", "Y", "Z", "AA"],
+        ["AB", "AC", "AD", "AE", "AF"],
+        ["AG", "AH", "AI", "AJ", "AK"],
+      ];
+      for (let i = 0; i < game.orangeTeam.players.length; i++) {
+        worksheet.getCell(`${letters[i][0]}${rowIndew}`).value =
+          game.orangeTeam.players[i].name; // Name
+        worksheet.getCell(`${letters[i][1]}${rowIndew}`).value =
+          game.orangeTeam.players[i].kills; // Kills
+        worksheet.getCell(`${letters[i][2]}${rowIndew}`).value =
+          game.orangeTeam.players[i].deaths; // Deaths
+        worksheet.getCell(`${letters[i][3]}${rowIndew}`).value =
+          game.orangeTeam.players[i].assists; // Assists
+        worksheet.getCell(`${letters[i][4]}${rowIndew}`).value =
+          game.orangeTeam.players[i].score; // Score
+      }
+
+      letters = [
+        ["AM", "AN", "AO", "AP", "AQ"],
+        ["AR", "AS", "AT", "AU", "AV"],
+        ["AW", "AX", "AY", "AZ", "BA"],
+        ["BB", "BC", "BD", "BE", "BF"],
+        ["BG", "BH", "BI", "BJ", "BK"],
+      ];
+      for (let i = 0; i < game.blueTeam.players.length; i++) {
+        worksheet.getCell(`${letters[i][0]}${rowIndew}`).value =
+          game.blueTeam.players[i].name; // Name
+        worksheet.getCell(`${letters[i][1]}${rowIndew}`).value =
+          game.blueTeam.players[i].kills; // Kills
+        worksheet.getCell(`${letters[i][2]}${rowIndew}`).value =
+          game.blueTeam.players[i].deaths; // Deaths
+        worksheet.getCell(`${letters[i][3]}${rowIndew}`).value =
+          game.blueTeam.players[i].assists; // Assists
+        worksheet.getCell(`${letters[i][4]}${rowIndew}`).value =
+          game.blueTeam.players[i].score; // Score
+      }
+    });
+
+    const NOW = new Date().getTime();
+    const FILE_PATH = path.join(
+      os.homedir(),
+      "Downloads",
+      `EBP - ${playerName} (${NOW}).xlsx`
+    );
+    // Sauvegarder dans un nouveau fichier
+    await workbook.xlsx.writeFile(FILE_PATH);
+
+    return FILE_PATH;
+  }
+
+  async function extractGames(browser, page, nbPages, tag, seasonIndex) {
+    let index = 0;
+    const GAMES = [];
+
+    page.on("request", async (request) => {
+      const URL = request.url();
+      if (URL.includes("graphql")) {
+        try {
+          const DATA = request.postData();
+          if (DATA) {
+            const JSON_DATA = JSON.parse(DATA);
+            if (JSON_DATA.operationName === "listGameHistories") {
+              JSON_DATA.variables.seasonId = seasonIndex;
+              request.continue({
+                headers: request.headers(),
+                method: "POST",
+                postData: JSON.stringify(JSON_DATA),
+              });
+            } else {
+              request.continue();
+            }
+          } else {
+            request.continue();
+          }
+        } catch (err) {}
+      } else {
+        request.continue();
+      }
+    });
+
+    await page.setRequestInterception(true);
+    page.on("response", async (response) => {
+      if (response.status() === 403) {
+        console.log("❌ Accès refusé à l’API :", response.url());
+      }
+      if (response.url().includes("graphql")) {
+        try {
+          const JSON = await response.json();
+          if (
+            JSON?.data?.gameHistories?.nodes &&
+            Array.isArray(JSON.data.gameHistories.nodes)
+          ) {
+            index++;
+            const OLD_INDEX = index;
+            JSON.data.gameHistories.nodes.forEach((game) => {
+              addGame(GAMES, game);
+            });
+
+            if (index < nbPages) {
+              const MIN = 800;
+              const MAX = 1200;
+              setTimeout(async () => {
+                const QUERY = ".btn-group > button:last-child";
+                await page.waitForSelector(QUERY);
+                await page.click(QUERY);
+
+                setTimeout(async () => {
+                  if (OLD_INDEX == index) {
+                    await page.waitForSelector(QUERY);
+                    await page.click(QUERY);
+                  }
+                }, MAX + 1000);
+              }, Math.floor(Math.random() * (MAX - MIN + 1)) + MIN);
+            } else {
+              const FILE_PATH = await exportGamesToExcel(
+                GAMES,
+                tag.split("#")[0]
+              );
+              browser.close();
+              mainWindow.webContents.send("games-are-exported", FILE_PATH);
+            }
+          }
+        } catch (err) {}
+      }
+    });
   }
 
   if (!isProd) {
@@ -370,6 +574,66 @@ let projectLatestVersion /* string */ = "";
       });
     });
 
+    // The front-end asks the server to extract the public player games.
+    ipcMain.handle(
+      "extract-private-pseudo-games",
+      async (event, nbPages, seasonIndex) => {
+        const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
+        const BROWSER_WIDTH = Math.min(
+          PRIMARY_DISPLAY.workAreaSize.width,
+          1920
+        );
+        const BROWSER_HEIGHT = Math.min(
+          PRIMARY_DISPLAY.workAreaSize.height,
+          1080
+        );
+        const BROWSER = await puppeteer.launch({
+          headless: false,
+          args: [`--window-size=${BROWSER_WIDTH},${BROWSER_HEIGHT}`],
+        });
+        const PAGE = await BROWSER.newPage();
+        const LANGUAGE = await PAGE.evaluate(() => navigator.language);
+
+        PAGE.on("framenavigated", async (frame) => {
+          // When the user is logged in, he is redirected to the games page.
+          if (frame.url().endsWith("/profile/dashboard")) {
+            await PAGE.goto(`https://app.eva.gg/${LANGUAGE}/profile/history/`);
+          }
+        });
+
+        await extractGames(BROWSER, PAGE, nbPages, "private", seasonIndex);
+
+        await PAGE.goto(`https://app.eva.gg/${LANGUAGE}/login`, {
+          waitUntil: "networkidle2",
+        });
+      }
+    );
+
+    // The front-end asks the server to extract the public player games.
+    ipcMain.handle(
+      "extract-public-pseudo-games",
+      async (event, tag, nbPages, seasonIndex) => {
+        if (tag) {
+          const BROWSER = await puppeteer.launch({
+            headless: false,
+            defaultViewport: {
+              width: 1920,
+              height: 1080,
+            },
+            args: ["--window-size=0,0"],
+          });
+          const PAGE = await BROWSER.newPage();
+
+          // Interception des requêtes GraphQL
+          await extractGames(BROWSER, PAGE, nbPages, tag, seasonIndex);
+
+          await PAGE.goto(`https://app.eva.gg/profile/public/${tag}/history/`, {
+            waitUntil: "networkidle2",
+          });
+        }
+      }
+    );
+
     // The front-end asks the server to ask the user to choose a video file.
     ipcMain.handle("open-video-file", async () => {
       const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -414,7 +678,7 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to open a video file.
-    ipcMain.handle("read-video-file", async (event, path) => {
+    ipcMain.handle("open-file", async (event, path) => {
       const COMMAND =
         process.platform === "win32"
           ? `start "" "${path}"`

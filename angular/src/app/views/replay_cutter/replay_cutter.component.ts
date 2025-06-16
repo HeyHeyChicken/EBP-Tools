@@ -815,7 +815,7 @@ export class ReplayCutterComponent implements OnInit {
       .success('Your video has been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {
         //@ts-ignore
-        window.electronAPI.readVideoFile(FILE_PATH);
+        window.electronAPI.openFile(FILE_PATH);
       });
   }
 
@@ -833,7 +833,7 @@ export class ReplayCutterComponent implements OnInit {
       .success('Your videos have been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {
         //@ts-ignore
-        window.electronAPI.readVideoFile(FILE_PATH);
+        window.electronAPI.openFile(FILE_PATH);
       });
   }
 

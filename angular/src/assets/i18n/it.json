@@ -16,6 +16,18 @@
       "noFilesSelected": "Nessun file selezionato",
       "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti",
       "outputPath": "Percorso di output"
+    },
+    "game_history": {
+      "title": "Esporta la cronologia delle tue partite",
+      "step": "Fase",
+      "pages": "Pagine",
+      "pagesExplanations": "Numero di pagine da esportare",
+      "season": "Stagione",
+      "seasonExplanations": "Stagione da esportare",
+      "firstOption": "Se il giocatore ha un tag pubblico, inseriscilo qui...",
+      "playerTag": "Tag del giocatore",
+      "export": "Esporta",
+      "secondOption": "Altrimenti, clicca qui per accedere al tuo account EVA."
     }
   },
   "common": {},

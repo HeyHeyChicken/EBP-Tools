@@ -16,6 +16,18 @@
       "noFilesSelected": "Ningún archivo seleccionado",
       "timeCodesCopiedClipboard": "Los códigos de tiempo se han añadido al portapapeles",
       "outputPath": "Ruta de salida"
+    },
+    "game_history": {
+      "title": "Exporta el historial de tus partidas",
+      "step": "Paso",
+      "pages": "Páginas",
+      "pagesExplanations": "Número de páginas a exportar",
+      "season": "Temporada",
+      "seasonExplanations": "Temporada para exportar",
+      "firstOption": "Si el jugador tiene una etiqueta pública, introdúcela aquí...",
+      "playerTag": "Etiqueta del jugador",
+      "export": "Exportar",
+      "secondOption": "De lo contrario, haz clic aquí para iniciar sesión en tu cuenta EVA."
     }
   },
   "common": {},

@@ -19,7 +19,7 @@ $directions: (
       html {
         > body {
           .flex#{$size}-#{$direction} {
-            flex-direction: #{$i};
+            flex-direction: #{$i} !important;
           }
         }
       }

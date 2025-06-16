@@ -16,6 +16,18 @@
       "noFilesSelected": "Aucun fichier sélectionné",
       "timeCodesCopiedClipboard": "Les timecodes ont été ajoutés à votre presse-papiers",
       "outputPath": "Dossier de sortie"
+    },
+    "game_history": {
+      "title": "Exportez l'historique de vos parties",
+      "step": "Étape",
+      "pages": "Pages",
+      "pagesExplanations": "Nombre de pages à exporter",
+      "season": "Saison",
+      "seasonExplanations": "Saison à exporter",
+      "firstOption": "Si le joueur a un tag public, renseignez-le ici...",
+      "playerTag": "Tag du joueur",
+      "export": "Exporter",
+      "secondOption": "Sinon, cliquez ici pour vous connecter à votre compte EVA."
     }
   },
   "common": {},

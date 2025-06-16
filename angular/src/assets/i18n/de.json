@@ -16,6 +16,18 @@
       "noFilesSelected": "Keine Datei ausgewählt",
       "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
       "outputPath": "Ausgabepfad"
+    },
+    "game_history": {
+      "title": "Exportieren Sie Ihren Spielverlauf",
+      "step": "Schritt",
+      "pages": "Seiten",
+      "pagesExplanations": "Anzahl der zu exportierenden Seiten",
+      "season": "Saison",
+      "seasonExplanations": "Saison exportieren",
+      "firstOption": "Wenn der Spieler ein öffentliches Tag hat, geben Sie es hier ein...",
+      "playerTag": "Spielermarke",
+      "export": "Exportieren",
+      "secondOption": "Klicken Sie andernfalls hier, um sich bei Ihrem EVA-Konto anzumelden."
     }
   },
   "common": {},

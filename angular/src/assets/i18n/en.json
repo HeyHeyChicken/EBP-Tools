@@ -16,6 +16,18 @@
       "noFilesSelected": "No files selected",
       "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
       "outputPath": "Output path"
+    },
+    "game_history": {
+      "title": "Export your game history",
+      "step": "Step",
+      "pages": "Pages",
+      "pagesExplanations": "Number of pages to export",
+      "season": "Season",
+      "seasonExplanations": "Season to export",
+      "firstOption": "If the player has a public tag, enter it here...",
+      "playerTag": "Player's tag",
+      "export": "Export",
+      "secondOption": "Otherwise, click here to log in to your EVA account."
     }
   },
   "common": {},
