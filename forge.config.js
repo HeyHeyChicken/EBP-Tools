@@ -10,6 +10,7 @@ module.exports = {
       "./angular/dist/angular/browser/",
       "./ffmpeg/",
       "./electron/settings.json",
+      "./electron/template.xlsx",
     ],
     icon: "electron/assets/icon",
     name: "EBP - EVA Battle Plan - Tools",
