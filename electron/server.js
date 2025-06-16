@@ -299,7 +299,6 @@ let projectLatestVersion /* string */ = "";
 
     const worksheet = workbook.getWorksheet(1);
 
-    // Exemple : remplir A1, B2, C3
     worksheet.getCell("A1").value = app.getLocale();
 
     let rowIndew = 3;
