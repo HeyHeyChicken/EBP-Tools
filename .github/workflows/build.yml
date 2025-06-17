@@ -71,7 +71,7 @@ jobs:
           node-version: "20"
       # Installation des dépendances NPM
       - name: Install Node dependencies
-        run: npm install
+        run: npm run install_npm
       # Build de l'application Electron
       - name: Build Electron app
         run: npm run make
