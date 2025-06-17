@@ -27,7 +27,11 @@
       "firstOption": "Si le joueur a un tag public, renseignez-le ici...",
       "playerTag": "Tag du joueur",
       "export": "Exporter",
-      "secondOption": "Sinon, cliquez ici pour vous connecter à votre compte EVA."
+      "secondOption": "Sinon, cliquez ici pour vous connecter à votre compte EVA.",
+      "timeBetweenPages": "Délai entre pages (s)",
+      "timeBetweenPagesExplanations": "Temps en secondes à attendre entre chaque page. Plus vous exportez de pages, plus vous risquez de devoir augmenter ce temps.",
+      "ignore": " Pages à ignorer",
+      "ignoreExplanations": "Nombre de pages à ignorer"
     }
   },
   "common": {},

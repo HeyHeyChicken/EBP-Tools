@@ -14,7 +14,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
         <div class="d-flex">
           <p>{{ "view.game_history.step" | translate }} 1</p>
           <div class="d-flex flex-row">
+            <!-- SEASON -->
             <mat-form-field
+              matTooltipPosition="above"
               matTooltip="{{
                 'view.game_history.seasonExplanations' | translate
               }}"
@@ -33,6 +35,27 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 >
               </mat-select>
             </mat-form-field>
+            <!-- TIME TO WAIT -->
+            <mat-form-field
+              matTooltipPosition="above"
+              matTooltip="{{
+                'view.game_history.timeBetweenPagesExplanations' | translate
+              }}"
+            >
+              <mat-label>{{
+                "view.game_history.timeBetweenPages" | translate
+              }}</mat-label>
+              <input
+                matInput
+                placeholder="1"
+                min="1"
+                type="number"
+                [(ngModel)]="timeToWait"
+              />
+            </mat-form-field>
+          </div>
+          <div class="d-flex flex-row mt-1">
+            <!-- NB PAGE TO EXPORT -->
             <mat-form-field
               matTooltip="{{
                 'view.game_history.pagesExplanations' | translate
@@ -48,6 +71,23 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   page
                 }}</mat-option>
               </mat-select>
+            </mat-form-field>
+            <!-- NB PAGE TO SKIP -->
+            <mat-form-field
+              matTooltip="{{
+                'view.game_history.ignoreExplanations' | translate
+              }}"
+            >
+              <mat-label>{{
+                "view.game_history.ignore" | translate
+              }}</mat-label>
+              <input
+                matInput
+                placeholder="0"
+                min="0"
+                type="number"
+                [(ngModel)]="skip"
+              />
             </mat-form-field>
           </div>
         </div>

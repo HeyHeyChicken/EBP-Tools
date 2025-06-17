@@ -29,8 +29,11 @@ const https = require("https");
 const http = require("http");
 const fs = require("fs");
 const ExcelJS = require("exceljs");
-const io = require("socket.io-client");
 require("./discord-rpc");
+const {
+  extractPublicPseudoGames,
+  extractPrivatePseudoGames,
+} = require("./puppeteer.js");
 
 //#endregion
 
@@ -86,16 +89,6 @@ let projectLatestVersion /* string */ = "";
   //#endregion
 
   //#region Puppeteer
-
-  const startPuppeteer = require(path.join(
-    ROOT_PATH,
-    isProd ? "puppeteer" : "../puppeteer",
-    "server"
-  ));
-  const SOCKET_PORT = await getPort();
-  startPuppeteer(SOCKET_PORT);
-
-  const SOCKET = io(`http://localhost:${SOCKET_PORT}`);
 
   getProjectLatestVersion((version) => {
     projectLatestVersion = version;
@@ -466,20 +459,24 @@ let projectLatestVersion /* string */ = "";
     // The front-end asks the server to extract the public player games.
     ipcMain.handle(
       "extract-private-pseudo-games",
-      async (event, nbPages, seasonIndex) => {
-        const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
-        SOCKET.emit(
-          "extract-private-pseudo-games",
+      async (event, nbPages, seasonIndex, skip, timeToWait) => {
+        extractPrivatePseudoGames(
           nbPages,
           seasonIndex,
-          PRIMARY_DISPLAY,
+          skip,
+          timeToWait,
+          dialog,
           async (games) => {
-            const FILE_PATH = await exportGamesToExcel(
-              games,
-              "private",
-              seasonIndex
-            );
-            mainWindow.webContents.send("games-are-exported", FILE_PATH);
+            if (games.length > 0) {
+              const FILE_PATH = await exportGamesToExcel(
+                games,
+                "private",
+                seasonIndex
+              );
+              mainWindow.webContents.send("games-are-exported", FILE_PATH);
+            } else {
+              mainWindow.webContents.send("games-are-exported", undefined);
+            }
           }
         );
       }
@@ -488,20 +485,26 @@ let projectLatestVersion /* string */ = "";
     // The front-end asks the server to extract the public player games.
     ipcMain.handle(
       "extract-public-pseudo-games",
-      async (event, tag, nbPages, seasonIndex) => {
+      async (event, tag, nbPages, seasonIndex, skip, timeToWait) => {
         if (tag) {
-          SOCKET.emit(
-            "extract-public-pseudo-games",
+          extractPublicPseudoGames(
             tag,
             nbPages,
             seasonIndex,
+            skip,
+            timeToWait,
+            dialog,
             async (games) => {
-              const FILE_PATH = await exportGamesToExcel(
-                games,
-                tag.split("#")[0],
-                seasonIndex
-              );
-              mainWindow.webContents.send("games-are-exported", FILE_PATH);
+              if (games.length > 0) {
+                const FILE_PATH = await exportGamesToExcel(
+                  games,
+                  tag.split("#")[0],
+                  seasonIndex
+                );
+                mainWindow.webContents.send("games-are-exported", FILE_PATH);
+              } else {
+                mainWindow.webContents.send("games-are-exported", undefined);
+              }
             }
           );
         }

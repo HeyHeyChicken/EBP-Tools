@@ -43,6 +43,10 @@ export class GameHistoryComponent implements OnInit {
     return Array.from({ length: 20 }, (_, i) => i + 1);
   }
 
+  protected skip: number = 0;
+
+  protected timeToWait: number = 1;
+
   protected get seasons(): string[] {
     return ['1', '2', '3', '1 reloaded', '4', '5'];
   }
@@ -71,12 +75,14 @@ export class GameHistoryComponent implements OnInit {
     window.electronAPI.gamesAreExported((filePath: string) => {
       this.ngZone.run(() => {
         this.globalService.loading = false;
-        this.toastrService
-          .success('Your games have been exported here: ' + filePath)
-          .onTap.subscribe(() => {
-            //@ts-ignore
-            window.electronAPI.openFile(filePath);
-          });
+        if (filePath) {
+          this.toastrService
+            .success('Your games have been exported here: ' + filePath)
+            .onTap.subscribe(() => {
+              //@ts-ignore
+              window.electronAPI.openFile(filePath);
+            });
+        }
       });
     });
   }
@@ -104,7 +110,9 @@ export class GameHistoryComponent implements OnInit {
       window.electronAPI.extractPublicPseudoGames(
         this.publicPseudo,
         this.nbPages,
-        this.seasonIndex
+        this.seasonIndex,
+        this.skip ?? 0,
+        this.timeToWait ?? 1
       );
     }
   }
@@ -114,7 +122,9 @@ export class GameHistoryComponent implements OnInit {
     //@ts-ignore
     window.electronAPI.extractPrivatePseudoGames(
       this.nbPages,
-      this.seasonIndex
+      this.seasonIndex,
+      this.skip ?? 0,
+      this.timeToWait ?? 1
     );
   }
 

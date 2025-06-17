@@ -27,7 +27,11 @@
       "firstOption": "Si el jugador tiene una etiqueta pública, introdúcela aquí...",
       "playerTag": "Etiqueta del jugador",
       "export": "Exportar",
-      "secondOption": "De lo contrario, haz clic aquí para iniciar sesión en tu cuenta EVA."
+      "secondOption": "De lo contrario, haz clic aquí para iniciar sesión en tu cuenta EVA.",
+      "timeBetweenPages": "Intervalo (s)",
+      "timeBetweenPagesExplanations": "Tiempo en segundos a esperar entre cada página. Cuantas más páginas exportes, más deberás aumentar este tiempo.",
+      "ignore": "Páginas a omitir",
+      "ignoreExplanations": "Número de páginas a ignorar"
     }
   },
   "common": {},

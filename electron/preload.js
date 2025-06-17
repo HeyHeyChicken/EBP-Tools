@@ -36,20 +36,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to ask the user to select a video file.
   openVideoFile: () => ipcRenderer.invoke("open-video-file"),
   // The front-end asks the server to extract the public player games.
-  extractPublicPseudoGames: (tag, nbPages, seasonIndex) =>
+  extractPublicPseudoGames: (tag, nbPages, seasonIndex, skip, timeToWait) =>
     ipcRenderer.invoke(
       "extract-public-pseudo-games",
       tag,
       nbPages,
-      seasonIndex
+      seasonIndex,
+      skip,
+      timeToWait
     ),
   // The front-end asks the server to extract the private player games.
-  extractPrivatePseudoGames: (tag, nbPages, seasonIndex) =>
+  extractPrivatePseudoGames: (tag, nbPages, seasonIndex, skip, timeToWait) =>
     ipcRenderer.invoke(
       "extract-private-pseudo-games",
       tag,
       nbPages,
-      seasonIndex
+      seasonIndex,
+      skip,
+      timeToWait
     ),
 
   //#endregion

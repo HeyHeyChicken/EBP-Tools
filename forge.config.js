@@ -11,7 +11,6 @@ module.exports = {
       "./ffmpeg/",
       "./electron/settings.json",
       "./electron/template.xlsx",
-      "./puppeteer/",
     ],
     icon: "electron/assets/icon",
     name: "EBP - EVA Battle Plan - Tools",

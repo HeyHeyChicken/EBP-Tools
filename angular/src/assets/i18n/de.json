@@ -27,7 +27,11 @@
       "firstOption": "Wenn der Spieler ein öffentliches Tag hat, geben Sie es hier ein...",
       "playerTag": "Spielermarke",
       "export": "Exportieren",
-      "secondOption": "Klicken Sie andernfalls hier, um sich bei Ihrem EVA-Konto anzumelden."
+      "secondOption": "Klicken Sie andernfalls hier, um sich bei Ihrem EVA-Konto anzumelden.",
+      "timeBetweenPages": "Seitenabstand (s)",
+      "timeBetweenPagesExplanations": "Wartezeit in Sekunden zwischen den Seiten. Je mehr Seiten Sie exportieren, desto länger sollte diese Zeit sein.",
+      "ignore": "Seiten ignorieren",
+      "ignoreExplanations": "Anzahl der zu überspringenden Seiten"
     }
   },
   "common": {},

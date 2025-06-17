@@ -27,7 +27,11 @@
       "firstOption": "If the player has a public tag, enter it here...",
       "playerTag": "Player's tag",
       "export": "Export",
-      "secondOption": "Otherwise, click here to log in to your EVA account."
+      "secondOption": "Otherwise, click here to log in to your EVA account.",
+      "timeBetweenPages": "Time between pages (s)",
+      "timeBetweenPagesExplanations": "Time in seconds to wait between each page. The more pages you export, the more you may need to increase this time.",
+      "ignore": "Pages to skip",
+      "ignoreExplanations": "Number of pages to skip"
     }
   },
   "common": {},
