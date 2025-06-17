@@ -4,7 +4,7 @@
   "description": "",
   "main": ".webpack/main",
   "scripts": {
-    "install_npm": "npm install && cd angular && npm install",
+    "install_npm": "npm install && cd angular && npm install && cd ../puppeteer && npm install",
     "make": "cd ./angular && npx ng build && cd ../ && electron-forge make",
     "start": "concurrently \"cd ./angular && npx ng serve\" \"electron ./electron/server.js\""
   },
@@ -39,9 +39,7 @@
     "get-port": "^7.1.0",
     "open": "^10.1.2",
     "pug": "^3.0.3",
-    "puppeteer": "^24.10.1",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "registry-js": "^1.16.1"
+    "registry-js": "^1.16.1",
+    "socket.io-client": "^4.8.1"
   }
 }

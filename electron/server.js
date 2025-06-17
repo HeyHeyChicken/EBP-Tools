@@ -28,17 +28,15 @@ const { version } = require("../package.json");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const ExcelJS = require("exceljs");
+const io = require("socket.io-client");
 require("./discord-rpc");
-
-puppeteer.use(StealthPlugin());
 
 //#endregion
 
 let isProd = process.env.NODE_ENV === "production";
 const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
+
 const FFMPEG_PATH = path.join(
   ROOT_PATH,
   isProd ? "ffmpeg" : "../ffmpeg",
@@ -52,10 +50,6 @@ let mainWindow;
 let projectLatestVersion /* string */ = "";
 
 (async () => {
-  getProjectLatestVersion((version) => {
-    projectLatestVersion = version;
-  });
-
   //#region Express
 
   // A port is randomly generated from the ports available on the machine.
@@ -87,6 +81,24 @@ let projectLatestVersion /* string */ = "";
 
   APP.listen(PORT, () => {
     console.log(`[EXPRESS] Listening on http://localhost:${PORT}.`);
+  });
+
+  //#endregion
+
+  //#region Puppeteer
+
+  const startPuppeteer = require(path.join(
+    ROOT_PATH,
+    isProd ? "puppeteer" : "../puppeteer",
+    "server"
+  ));
+  const SOCKET_PORT = await getPort();
+  startPuppeteer(SOCKET_PORT);
+
+  const SOCKET = io(`http://localhost:${SOCKET_PORT}`);
+
+  getProjectLatestVersion((version) => {
+    projectLatestVersion = version;
   });
 
   //#endregion
@@ -248,52 +260,7 @@ let projectLatestVersion /* string */ = "";
     }
   }
 
-  /**
-   * This function adds an EVA game to a game list.
-   * @param {*} games List of games to complete.
-   * @param {*} game Game to add.
-   */
-  function addGame(games, game) {
-    const DATE = new Date(game.createdAt);
-    const NEW_GAME = {
-      mode: game.mode.identifier,
-      map: game.map.name,
-      date: DATE.toLocaleDateString("fr-FR"),
-      hour: DATE.toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      duration: game.data.duration,
-      orangeTeam: {
-        name: game.data.teamOne.name,
-        score: game.data.teamOne.score,
-        players: [],
-      },
-      blueTeam: {
-        name: game.data.teamTwo.name,
-        score: game.data.teamTwo.score,
-        players: [],
-      },
-    };
-    game.players.forEach((player) => {
-      const NEW_PLAYER = {
-        name: player.data.niceName,
-        kills: player.data.kills,
-        deaths: player.data.deaths,
-        assists: player.data.assists,
-        score: player.data.score,
-      };
-      if (player.data.team == NEW_GAME.orangeTeam.name) {
-        NEW_GAME.orangeTeam.players.push(NEW_PLAYER);
-      } else if (player.data.team == NEW_GAME.blueTeam.name) {
-        NEW_GAME.blueTeam.players.push(NEW_PLAYER);
-      }
-    });
-
-    games.push(NEW_GAME);
-  }
-
-  async function exportGamesToExcel(games, playerName) {
+  async function exportGamesToExcel(games, playerName, seasonIndex) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(path.join(ROOT_PATH, "template.xlsx"));
 
@@ -363,89 +330,12 @@ let projectLatestVersion /* string */ = "";
     const FILE_PATH = path.join(
       os.homedir(),
       "Downloads",
-      `EBP - ${playerName} (${NOW}).xlsx`
+      `EBP - ${playerName} - Season ${seasonIndex - 1} (${NOW}).xlsx`
     );
     // Sauvegarder dans un nouveau fichier
     await workbook.xlsx.writeFile(FILE_PATH);
 
     return FILE_PATH;
-  }
-
-  async function extractGames(browser, page, nbPages, tag, seasonIndex) {
-    let index = 0;
-    const GAMES = [];
-
-    page.on("request", async (request) => {
-      const URL = request.url();
-      if (URL.includes("graphql")) {
-        try {
-          const DATA = request.postData();
-          if (DATA) {
-            const JSON_DATA = JSON.parse(DATA);
-            if (JSON_DATA.operationName === "listGameHistories") {
-              JSON_DATA.variables.seasonId = seasonIndex;
-              request.continue({
-                headers: request.headers(),
-                method: "POST",
-                postData: JSON.stringify(JSON_DATA),
-              });
-            } else {
-              request.continue();
-            }
-          } else {
-            request.continue();
-          }
-        } catch (err) {}
-      } else {
-        request.continue();
-      }
-    });
-
-    await page.setRequestInterception(true);
-    page.on("response", async (response) => {
-      if (response.status() === 403) {
-        console.log("❌ Accès refusé à l’API :", response.url());
-      }
-      if (response.url().includes("graphql")) {
-        try {
-          const JSON = await response.json();
-          if (
-            JSON?.data?.gameHistories?.nodes &&
-            Array.isArray(JSON.data.gameHistories.nodes)
-          ) {
-            index++;
-            const OLD_INDEX = index;
-            JSON.data.gameHistories.nodes.forEach((game) => {
-              addGame(GAMES, game);
-            });
-
-            if (index < nbPages) {
-              const MIN = 800;
-              const MAX = 1200;
-              setTimeout(async () => {
-                const QUERY = ".btn-group > button:last-child";
-                await page.waitForSelector(QUERY);
-                await page.click(QUERY);
-
-                setTimeout(async () => {
-                  if (OLD_INDEX == index) {
-                    await page.waitForSelector(QUERY);
-                    await page.click(QUERY);
-                  }
-                }, MAX + 1000);
-              }, Math.floor(Math.random() * (MAX - MIN + 1)) + MIN);
-            } else {
-              const FILE_PATH = await exportGamesToExcel(
-                GAMES,
-                tag.split("#")[0]
-              );
-              browser.close();
-              mainWindow.webContents.send("games-are-exported", FILE_PATH);
-            }
-          }
-        } catch (err) {}
-      }
-    });
   }
 
   if (!isProd) {
@@ -578,33 +468,20 @@ let projectLatestVersion /* string */ = "";
       "extract-private-pseudo-games",
       async (event, nbPages, seasonIndex) => {
         const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
-        const BROWSER_WIDTH = Math.min(
-          PRIMARY_DISPLAY.workAreaSize.width,
-          1920
-        );
-        const BROWSER_HEIGHT = Math.min(
-          PRIMARY_DISPLAY.workAreaSize.height,
-          1080
-        );
-        const BROWSER = await puppeteer.launch({
-          headless: false,
-          args: [`--window-size=${BROWSER_WIDTH},${BROWSER_HEIGHT}`],
-        });
-        const PAGE = await BROWSER.newPage();
-        const LANGUAGE = await PAGE.evaluate(() => navigator.language);
-
-        PAGE.on("framenavigated", async (frame) => {
-          // When the user is logged in, he is redirected to the games page.
-          if (frame.url().endsWith("/profile/dashboard")) {
-            await PAGE.goto(`https://app.eva.gg/${LANGUAGE}/profile/history/`);
+        SOCKET.emit(
+          "extract-private-pseudo-games",
+          nbPages,
+          seasonIndex,
+          PRIMARY_DISPLAY,
+          async (games) => {
+            const FILE_PATH = await exportGamesToExcel(
+              games,
+              "private",
+              seasonIndex
+            );
+            mainWindow.webContents.send("games-are-exported", FILE_PATH);
           }
-        });
-
-        await extractGames(BROWSER, PAGE, nbPages, "private", seasonIndex);
-
-        await PAGE.goto(`https://app.eva.gg/${LANGUAGE}/login`, {
-          waitUntil: "networkidle2",
-        });
+        );
       }
     );
 
@@ -613,22 +490,20 @@ let projectLatestVersion /* string */ = "";
       "extract-public-pseudo-games",
       async (event, tag, nbPages, seasonIndex) => {
         if (tag) {
-          const BROWSER = await puppeteer.launch({
-            headless: false,
-            defaultViewport: {
-              width: 1920,
-              height: 1080,
-            },
-            args: ["--window-size=0,0"],
-          });
-          const PAGE = await BROWSER.newPage();
-
-          // Interception des requêtes GraphQL
-          await extractGames(BROWSER, PAGE, nbPages, tag, seasonIndex);
-
-          await PAGE.goto(`https://app.eva.gg/profile/public/${tag}/history/`, {
-            waitUntil: "networkidle2",
-          });
+          SOCKET.emit(
+            "extract-public-pseudo-games",
+            tag,
+            nbPages,
+            seasonIndex,
+            async (games) => {
+              const FILE_PATH = await exportGamesToExcel(
+                games,
+                tag.split("#")[0],
+                seasonIndex
+              );
+              mainWindow.webContents.send("games-are-exported", FILE_PATH);
+            }
+          );
         }
       }
     );

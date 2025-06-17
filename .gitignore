@@ -18,6 +18,10 @@ x64
 windows.dir
 Debug
 
+# PUPPETEER
+
+/puppeteer/node_modules
+
 # ANGULAR
 
 # Compiled output
