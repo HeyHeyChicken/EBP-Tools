@@ -31,7 +31,8 @@
       "timeBetweenPages": "Time between pages (s)",
       "timeBetweenPagesExplanations": "Time in seconds to wait between each page. The more pages you export, the more you may need to increase this time.",
       "ignore": "Pages to skip",
-      "ignoreExplanations": "Number of pages to skip"
+      "ignoreExplanations": "Number of pages to skip",
+      "exporting": "Export in progress... If the page stays blank, please restart the application."
     }
   },
   "common": {},
@@ -49,7 +50,8 @@
     },
     "footer": {
       "version": "Version",
-      "newUpdate": "A new update is available, download it by clicking here."
+      "newUpdate": "A new update is available, download it by clicking here.",
+      "beta": "You are using a beta version of the app, please do not share it."
     }
   }
 }

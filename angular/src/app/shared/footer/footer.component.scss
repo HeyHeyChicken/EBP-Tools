@@ -15,11 +15,16 @@
   }
 
   ::ng-deep a {
-    color: material_colors.$material_red_500;
-    cursor: pointer;
+    &:not(.beta) {
+      color: material_colors.$material_red_500;
+      cursor: pointer;
+      &:hover {
+        text-decoration: underline;
+      }
+    }
 
-    &:hover {
-      text-decoration: underline;
+    &.beta {
+      color: material_colors.$material_orange_500;
     }
   }
 }

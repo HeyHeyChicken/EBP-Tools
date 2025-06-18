@@ -31,7 +31,8 @@
       "timeBetweenPages": "Seitenabstand (s)",
       "timeBetweenPagesExplanations": "Wartezeit in Sekunden zwischen den Seiten. Je mehr Seiten Sie exportieren, desto länger sollte diese Zeit sein.",
       "ignore": "Seiten ignorieren",
-      "ignoreExplanations": "Anzahl der zu überspringenden Seiten"
+      "ignoreExplanations": "Anzahl der zu überspringenden Seiten",
+      "exporting": "Export läuft... Wenn die Seite weiß bleibt, starten Sie bitte die Anwendung neu."
     }
   },
   "common": {},
@@ -49,7 +50,8 @@
     },
     "footer": {
       "version": "Version",
-      "newUpdate": "Ein neues Update ist verfügbar. Klicken Sie hier, um es herunterzuladen."
+      "newUpdate": "Ein neues Update ist verfügbar. Klicken Sie hier, um es herunterzuladen.",
+      "beta": "Sie verwenden eine Beta-Version der App, bitte teilen Sie sie nicht."
     }
   }
 }

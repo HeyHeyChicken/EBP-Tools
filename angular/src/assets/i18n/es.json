@@ -31,7 +31,8 @@
       "timeBetweenPages": "Intervalo (s)",
       "timeBetweenPagesExplanations": "Tiempo en segundos a esperar entre cada página. Cuantas más páginas exportes, más deberás aumentar este tiempo.",
       "ignore": "Páginas a omitir",
-      "ignoreExplanations": "Número de páginas a ignorar"
+      "ignoreExplanations": "Número de páginas a ignorar",
+      "exporting": "Exportación en curso... Si la página permanece en blanco, reinicie la aplicación."
     }
   },
   "common": {},
@@ -49,7 +50,8 @@
     },
     "footer": {
       "version": "Versión",
-      "newUpdate": "Hay una nueva actualización disponible, descárgala haciendo clic aquí."
+      "newUpdate": "Hay una nueva actualización disponible, descárgala haciendo clic aquí.",
+      "beta": "Estás usando una versión beta de la aplicación, por favor no la compartas."
     }
   }
 }

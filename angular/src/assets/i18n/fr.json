@@ -31,7 +31,8 @@
       "timeBetweenPages": "Délai entre pages (s)",
       "timeBetweenPagesExplanations": "Temps en secondes à attendre entre chaque page. Plus vous exportez de pages, plus vous risquez de devoir augmenter ce temps.",
       "ignore": " Pages à ignorer",
-      "ignoreExplanations": "Nombre de pages à ignorer"
+      "ignoreExplanations": "Nombre de pages à ignorer",
+      "exporting": "Export en cours ... Si la page reste blanche, veuillez redémarrer l'application."
     }
   },
   "common": {},
@@ -49,7 +50,8 @@
     },
     "footer": {
       "version": "Version",
-      "newUpdate": "Une nouvelle mise à jour est disponible, téléchargez-la en cliquant ici."
+      "newUpdate": "Une nouvelle mise à jour est disponible, téléchargez-la en cliquant ici.",
+      "beta": "Vous utilisez une version beta de l'application, merci de ne pas la partager."
     }
   }
 }
