@@ -1,6 +1,6 @@
 {
   "name": "ebp-tools",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "",
   "main": ".webpack/main",
   "scripts": {
@@ -26,18 +26,13 @@
     "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^13.0.0",
     "electron": "^36.2.1",
-    "electron-squirrel-startup": "^1.0.1",
-    "node-addon-api": "^8.3.1",
-    "nodemon": "^3.1.10",
-    "sass": "^1.89.1"
+    "electron-squirrel-startup": "^1.0.1"
   },
   "dependencies": {
     "discord-rpc": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
-    "fs-extra": "^11.3.0",
     "get-port": "^7.1.0",
-    "open": "^10.1.2",
     "puppeteer-core": "^24.10.1",
     "registry-js": "^1.16.1"
   }
