@@ -129,14 +129,21 @@ async function extractGames(
             setTimeout(async () => {
               const QUERY = ".btn-group > button:last-child";
               await page.waitForSelector(QUERY);
-              await page.click(QUERY);
 
-              setTimeout(async () => {
-                if (OLD_INDEX == index) {
-                  await page.waitForSelector(QUERY);
-                  await page.click(QUERY);
-                }
-              }, MAX + 1000);
+              const END = (await page.$(QUERY + ":disabled")) !== null;
+              if (END) {
+                callback(GAMES);
+                browser.close();
+              } else {
+                await page.click(QUERY);
+
+                setTimeout(async () => {
+                  if (OLD_INDEX == index) {
+                    await page.waitForSelector(QUERY);
+                    await page.click(QUERY);
+                  }
+                }, MAX + 1000);
+              }
             }, Math.floor(Math.random() * (MAX - MIN + 1)) + MIN);
           } else {
             callback(GAMES);

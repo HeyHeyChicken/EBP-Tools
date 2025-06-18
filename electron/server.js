@@ -323,7 +323,7 @@ let projectLatestVersion /* string */ = "";
     const FILE_PATH = path.join(
       os.homedir(),
       "Downloads",
-      `EBP - ${playerName} - Season ${seasonIndex - 1} (${NOW}).xlsx`
+      `EBP - ${playerName} (${NOW}).xlsx`
     );
     // Sauvegarder dans un nouveau fichier
     await workbook.xlsx.writeFile(FILE_PATH);
