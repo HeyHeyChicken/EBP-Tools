@@ -32,7 +32,7 @@ import { ToastrService } from 'ngx-toastr';
 export class ReplayDownloaderComponent implements OnInit {
   //#region Attributes
 
-  protected url?: string = 'http://www.youtube.com/watch?v=aqz-KE-bpKQ';
+  protected url?: string;
 
   protected percent?: number;
 

@@ -23,7 +23,7 @@ Feel free to take a look at the [developer wiki](//github.com/HeyHeyChicken/EBP-
 
 ## 💻 Compatibility
 
-EBP - EVA Battle Plan - Tools has only been officially tested on Mac and Windows.
+EBP - EVA Battle Plan - Tools has only been officially tested on Windows.
 
 <br>
 <br>
