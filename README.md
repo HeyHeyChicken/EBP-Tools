@@ -7,8 +7,10 @@
 **EBP - EVA Battle Plan - Tools** is a source-visible toolbox for [EVA](//www.eva.gg) players.<br/>
 
 💼 Features:
+
 1. Auto cut your game replays.
 2. Get your game replays YouTube's timecodes, ready to paste into your video description.
+3. Export your EVA game history to an Excel file.
 
 ## 😀 You are an EVA player
 
