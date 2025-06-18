@@ -397,13 +397,14 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to download a YouTube video.
-    ipcMain.handle("download-youtube-replay", async (event, url) => {
+    ipcMain.handle("download-replay", async (event, url, platform) => {
       let percent = 0;
       // On récupère le titre de la vidéo.
       exec(
         `${YTDL_PATH} --ffmpeg-location ${FFMPEG_PATH} --get-title ${url}`,
         (error, stdout, stderr) => {
           if (error) {
+            console.error(error.message);
             mainWindow.webContents.send(
               "replay-downloader-error",
               error.message.split("ERROR: ")[1]
@@ -419,17 +420,27 @@ let projectLatestVersion /* string */ = "";
             `EBP - YouTube - ${VIDEO_TITLE} (${new Date().getTime()}).mp4`
           );
 
-          const DL = spawn(YTDL_PATH, [
-            `--ffmpeg-location`,
-            FFMPEG_PATH,
-            `-f`,
-            `bv[height=1080]+ba`,
-            `--merge-output-format`,
-            `mp4`,
-            `-o`,
-            OUTPUT_PATH,
-            url,
-          ]);
+          let settings = [];
+          switch (platform) {
+            case "youtube":
+              settings = [
+                `--ffmpeg-location`,
+                FFMPEG_PATH,
+                `-f`,
+                `bv[height<=1080]+ba`,
+                `--merge-output-format`,
+                `mp4`,
+                `-o`,
+                OUTPUT_PATH,
+                url,
+              ];
+              break;
+            case "twitch":
+              settings = [`-f`, `best[height<=1080]`, `-o`, OUTPUT_PATH, url];
+              break;
+          }
+
+          const DL = spawn(YTDL_PATH, settings);
 
           DL.stdout.on("data", (data) => {
             const MATCH = data.toString().match(/(\d{1,3}\.\d)%/); // extrait le % (ex: 42.3%)
@@ -446,8 +457,11 @@ let projectLatestVersion /* string */ = "";
           });
 
           DL.stderr.on("data", (data) => {
-            console.log("ERROR HERE");
             console.error(data.toString());
+            mainWindow.webContents.send(
+              "replay-downloader-error",
+              data.toString().split("ERROR: ")[1]
+            );
           });
 
           DL.on("close", (code) => {
@@ -455,11 +469,6 @@ let projectLatestVersion /* string */ = "";
               mainWindow.webContents.send(
                 "replay-downloader-success",
                 OUTPUT_PATH
-              );
-            } else {
-              mainWindow.webContents.send(
-                "replay-downloader-error",
-                "An error occured."
               );
             }
           });

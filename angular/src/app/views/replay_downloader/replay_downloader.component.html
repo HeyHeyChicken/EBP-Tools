@@ -13,21 +13,38 @@ See LICENSE for terms. Unauthorized use is prohibited.
         [value]="percent"
       ></ebp-loader>
       <ng-template #form>
-        <form class="box" (submit)="onDownloadYouTube()">
-          <mat-form-field>
-            <mat-label>YouTube</mat-label>
-            <input
-              matInput
-              type="text"
-              placeholder="http://www.youtube.com/watch?v=aqz-KE-bpKQ"
-              [ngModelOptions]="{ standalone: true }"
-              [(ngModel)]="url"
-            />
-            <button type="submit" class="youtube">
-              <i class="fa-brands fa-youtube"></i>
-            </button>
-          </mat-form-field>
-        </form>
+        <div class="box">
+          <form (submit)="onDownloadYouTube()">
+            <mat-form-field>
+              <mat-label>YouTube</mat-label>
+              <input
+                matInput
+                type="text"
+                placeholder="http://www.youtube.com/watch?v=aqz-KE-bpKQ"
+                [ngModelOptions]="{ standalone: true }"
+                [(ngModel)]="youTubeURL"
+              />
+              <button type="submit" class="youtube">
+                <i class="fa-brands fa-youtube"></i>
+              </button>
+            </mat-form-field>
+          </form>
+          <form (submit)="onDownloadTwitch()">
+            <mat-form-field>
+              <mat-label>Twitch</mat-label>
+              <input
+                matInput
+                type="text"
+                placeholder="https://www.twitch.tv/videos/2481536428"
+                [ngModelOptions]="{ standalone: true }"
+                [(ngModel)]="twitchURL"
+              />
+              <button type="submit" class="youtube">
+                <i class="fa-brands fa-twitch"></i>
+              </button>
+            </mat-form-field>
+          </form>
+        </div>
       </ng-template>
     </ebp-column>
   </ebp-row>

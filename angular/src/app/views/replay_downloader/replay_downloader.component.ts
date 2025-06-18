@@ -32,7 +32,8 @@ import { ToastrService } from 'ngx-toastr';
 export class ReplayDownloaderComponent implements OnInit {
   //#region Attributes
 
-  protected url?: string;
+  protected youTubeURL?: string;
+  protected twitchURL?: string;
 
   protected percent?: number;
 
@@ -75,20 +76,38 @@ export class ReplayDownloaderComponent implements OnInit {
     });
   }
 
+  protected onDownloadYouTube(): void {
+    if (this.youTubeURL) {
+      if (this.isYouTubeUrl(this.youTubeURL)) {
+        this.percent = 0;
+        //@ts-ignore
+        window.electronAPI.downloadReplay(this.youTubeURL, 'youtube');
+        this.youTubeURL = undefined;
+      }
+    }
+  }
+
+  protected onDownloadTwitch(): void {
+    if (this.twitchURL) {
+      if (this.isTwitchUrl(this.twitchURL)) {
+        this.percent = 0;
+        //@ts-ignore
+        window.electronAPI.downloadReplay(this.twitchURL, 'twitch');
+        this.twitchURL = undefined;
+      }
+    }
+  }
+
   private isYouTubeUrl(url: string): boolean {
     const regex =
       /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w\-]{11}(&\S*)?$/;
     return regex.test(url);
   }
 
-  protected onDownloadYouTube(): void {
-    if (this.url) {
-      if (this.isYouTubeUrl(this.url)) {
-        this.percent = 0;
-        //@ts-ignore
-        window.electronAPI.downloadYoutubeReplay(this.url);
-      }
-    }
+  private isTwitchUrl(url: string): boolean {
+    const regex =
+      /^(https?:\/\/)?(www\.)?twitch\.tv\/(videos\/\d+|[a-zA-Z0-9_]+\/clip\/[a-zA-Z0-9_-]+)$/;
+    return regex.test(url);
   }
 
   //#endregion

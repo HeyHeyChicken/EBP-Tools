@@ -8,8 +8,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   //#region Client -> Server
 
   // The front-end asks the server to download a YouTube video.
-  downloadYoutubeReplay: (url) =>
-    ipcRenderer.invoke("download-youtube-replay", url),
+  downloadReplay: (url, platform) =>
+    ipcRenderer.invoke("download-replay", url, platform),
   // The front-end asks the server to enables/disables debug mode.
   debugMode: () => ipcRenderer.invoke("debug-mode"),
   // The front-end asks the server to open an url in the default browser.

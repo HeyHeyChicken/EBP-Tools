@@ -11,6 +11,7 @@
 1. Auto cut your game replays.
 2. Get your game replays YouTube's timecodes, ready to paste into your video description.
 3. Export your EVA game history to an Excel file.
+4. Download replays from YouTube and Twitch.
 
 ## 😀 You are an EVA player
 
