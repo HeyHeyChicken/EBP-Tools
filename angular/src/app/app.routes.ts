@@ -8,6 +8,7 @@ import { Routes } from '@angular/router';
 import { HomeComponent } from './views/home/home.component';
 import { ReplayCutterComponent } from './views/replay_cutter/replay_cutter.component';
 import { GameHistoryComponent } from './views/game_history/game_history.component';
+import { ReplayDownloaderComponent } from './views/replay_downloader/replay_downloader.component';
 
 //#endregion
 
@@ -23,5 +24,9 @@ export const routes: Routes = [
   {
     path: 'game_history',
     component: GameHistoryComponent,
+  },
+  {
+    path: 'replay_downloader',
+    component: ReplayDownloaderComponent,
   },
 ];

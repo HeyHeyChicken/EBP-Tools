@@ -22,7 +22,7 @@ if (require("electron-squirrel-startup")) {
 const path = require("node:path");
 const express = require("express");
 const os = require("os");
-const { exec } = require("child_process");
+const { exec, spawn } = require("child_process");
 const { default: getPort } = require("get-port");
 const { version } = require("../package.json");
 const https = require("https");
@@ -43,8 +43,14 @@ const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
 const FFMPEG_PATH = path.join(
   ROOT_PATH,
   isProd ? "ffmpeg" : "../ffmpeg",
-  os.platform()
+  os.platform() + (os.platform() == "win32" ? ".exe" : "")
 );
+const YTDL_PATH = path.join(
+  ROOT_PATH,
+  isProd ? "yt-dlp" : "../yt-dlp",
+  os.platform() + (os.platform() == "win32" ? ".exe" : "")
+);
+
 const SETTINGS_PATH = path.join(ROOT_PATH, "settings.json");
 const WINDOW_WIDTH = 800;
 const WINDOW_DEV_PANEL_WIDTH = 540;
@@ -152,10 +158,11 @@ let projectLatestVersion /* string */ = "";
    */
   function cutVideoFile(game, videoPath) {
     // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
-    const NOW = new Date().getTime();
     const OUTPUT_FILE_PATH /* string */ = path.join(
       getVideoCutterOutputPath(),
-      `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map} (${NOW}).mp4`
+      `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
+        game.map
+      } (${new Date().getTime()}).mp4`
     );
     const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
       game._start
@@ -319,16 +326,32 @@ let projectLatestVersion /* string */ = "";
       }
     });
 
-    const NOW = new Date().getTime();
     const FILE_PATH = path.join(
       os.homedir(),
       "Downloads",
-      `EBP - ${playerName} (${NOW}).xlsx`
+      `EBP - ${playerName} (${new Date().getTime()}).xlsx`
     );
     // Sauvegarder dans un nouveau fichier
     await workbook.xlsx.writeFile(FILE_PATH);
 
     return FILE_PATH;
+  }
+
+  function downloadFileFromURL(url, outputPath) {
+    const file = fs.createWriteStream(outputPath);
+
+    https
+      .get(url, (response) => {
+        response.pipe(file);
+        file.on("finish", () => {
+          file.close();
+          console.log("Téléchargement terminé");
+        });
+      })
+      .on("error", (err) => {
+        fs.unlinkSync(outputPath);
+        console.error("Erreur :", err.message);
+      });
   }
 
   if (!isProd) {
@@ -371,6 +394,77 @@ let projectLatestVersion /* string */ = "";
         Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT)
       );
       mainWindow.setResizable(false);
+    });
+
+    // The front-end asks the server to download a YouTube video.
+    ipcMain.handle("download-youtube-replay", async (event, url) => {
+      let percent = 0;
+      // On récupère le titre de la vidéo.
+      exec(
+        `${YTDL_PATH} --ffmpeg-location ${FFMPEG_PATH} --get-title ${url}`,
+        (error, stdout, stderr) => {
+          if (error) {
+            mainWindow.webContents.send(
+              "replay-downloader-error",
+              error.message.split("ERROR: ")[1]
+            );
+            return;
+          }
+          if (stderr) console.error("Stderr :", stderr);
+
+          const VIDEO_TITLE = stdout.trim();
+          const OUTPUT_PATH = path.join(
+            os.homedir(),
+            "Downloads",
+            `EBP - YouTube - ${VIDEO_TITLE} (${new Date().getTime()}).mp4`
+          );
+
+          const DL = spawn(YTDL_PATH, [
+            `--ffmpeg-location`,
+            FFMPEG_PATH,
+            `-f`,
+            `bv[height=1080]+ba`,
+            `--merge-output-format`,
+            `mp4`,
+            `-o`,
+            OUTPUT_PATH,
+            url,
+          ]);
+
+          DL.stdout.on("data", (data) => {
+            const MATCH = data.toString().match(/(\d{1,3}\.\d)%/); // extrait le % (ex: 42.3%)
+            if (MATCH) {
+              const PERCENT = parseInt(MATCH[1]);
+              if (PERCENT > percent) {
+                percent = PERCENT;
+                mainWindow.webContents.send(
+                  "replay-downloader-percent",
+                  PERCENT
+                );
+              }
+            }
+          });
+
+          DL.stderr.on("data", (data) => {
+            console.log("ERROR HERE");
+            console.error(data.toString());
+          });
+
+          DL.on("close", (code) => {
+            if (code == 0) {
+              mainWindow.webContents.send(
+                "replay-downloader-success",
+                OUTPUT_PATH
+              );
+            } else {
+              mainWindow.webContents.send(
+                "replay-downloader-error",
+                "An error occured."
+              );
+            }
+          });
+        }
+      );
     });
 
     // The front-end asks the server to open an url in the default browser.

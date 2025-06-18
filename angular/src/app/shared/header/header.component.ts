@@ -37,7 +37,11 @@ export class HeaderComponent implements OnInit {
 
   protected disableLogoutButton: boolean = false;
 
-  protected readonly pages: string[] = ['replay_cutter', 'game_history'];
+  protected readonly pages: string[] = [
+    'replay_downloader',
+    'replay_cutter',
+    'game_history',
+  ];
   protected page?: string;
 
   private static STORAGE_KEY_NAME: string = 'language';

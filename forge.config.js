@@ -11,6 +11,7 @@ module.exports = {
       "./ffmpeg/",
       "./electron/settings.json",
       "./electron/template.xlsx",
+      "./yt-dlp/",
     ],
     icon: "electron/assets/icon",
     name: "EBP - EVA Battle Plan - Tools",

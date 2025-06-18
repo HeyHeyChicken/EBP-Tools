@@ -1,0 +1,34 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<ebp-container>
+  <ebp-row>
+    <ebp-column></ebp-column>
+    <ebp-column [xs]="8">
+      <ebp-loader
+        *ngIf="percent != undefined; else form"
+        [value]="percent"
+      ></ebp-loader>
+      <ng-template #form>
+        <form class="box" (submit)="onDownloadYouTube()">
+          <mat-form-field>
+            <mat-label>YouTube</mat-label>
+            <input
+              matInput
+              type="text"
+              placeholder="http://www.youtube.com/watch?v=aqz-KE-bpKQ"
+              [ngModelOptions]="{ standalone: true }"
+              [(ngModel)]="url"
+            />
+            <button type="submit" class="youtube">
+              <i class="fa-brands fa-youtube"></i>
+            </button>
+          </mat-form-field>
+        </form>
+      </ng-template>
+    </ebp-column>
+  </ebp-row>
+</ebp-container>

@@ -44,6 +44,7 @@
       "logout": "Se déconnecter",
       "home": "Accueil",
       "tools": {
+        "replay_downloader": "Téléchargeur de replay",
         "replay_cutter": "Découpeur de replay",
         "game_history": "Historique des parties"
       }

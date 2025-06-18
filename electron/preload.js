@@ -7,8 +7,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   //#region Client -> Server
 
+  // The front-end asks the server to download a YouTube video.
+  downloadYoutubeReplay: (url) =>
+    ipcRenderer.invoke("download-youtube-replay", url),
   // The front-end asks the server to enables/disables debug mode.
-  debugMode: (url) => ipcRenderer.invoke("debug-mode"),
+  debugMode: () => ipcRenderer.invoke("debug-mode"),
   // The front-end asks the server to open an url in the default browser.
   openURL: (url) => ipcRenderer.invoke("open-url", url),
   // The front-end asks the server to return the web server port.
@@ -71,6 +74,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The server asks the font-end to display an error.
   error: (callback) =>
     ipcRenderer.on("error", (event, value) => callback(value)),
+  // The server asks the font-end to display a replay downloader error.
+  replayDownloaderError: (callback) =>
+    ipcRenderer.on("replay-downloader-error", (event, error) =>
+      callback(error)
+    ),
+  // The server asks the font-end that the video is well downloaded.
+  replayDownloaderSuccess: (callback) =>
+    ipcRenderer.on("replay-downloader-success", (event, path) =>
+      callback(path)
+    ),
+  // The server asks the font-end the downloading percent.
+  replayDownloaderPercent: (callback) =>
+    ipcRenderer.on("replay-downloader-percent", (event, percent) =>
+      callback(percent)
+    ),
 
   //#endregion
 });

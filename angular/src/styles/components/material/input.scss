@@ -65,6 +65,7 @@ mat-form-field {
         }
 
         > input {
+          padding: 0;
           color: material_colors.$white;
           font-size: variables.$font_size;
           min-height: calc(#{variables.$form_height} - #{$border-size} * 2);
@@ -138,6 +139,7 @@ mat-form-field {
         > .mat-mdc-form-field-infix {
           > button {
             height: calc(#{variables.$form_height} - 4px);
+            top: -1px;
           }
 
           > input {

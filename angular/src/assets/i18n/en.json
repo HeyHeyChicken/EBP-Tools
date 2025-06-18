@@ -44,6 +44,7 @@
       "logout": "Log out",
       "home": "Home",
       "tools": {
+        "replay_downloader": "Replay downloader",
         "replay_cutter": "Replay cutter",
         "game_history": "Game history"
       }
