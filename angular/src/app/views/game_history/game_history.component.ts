@@ -36,7 +36,7 @@ import { GlobalService } from '../../core/services/global.service';
 export class GameHistoryComponent implements OnInit {
   //#region Attributes
 
-  protected publicPseudo?: string = 'HeyHeyChicken#37457';
+  protected publicPseudo?: string = undefined;
 
   protected nbPages: number = 1;
   protected get maxPages(): number[] {
@@ -106,6 +106,7 @@ export class GameHistoryComponent implements OnInit {
   protected onPublicPseudoExport(): void {
     if (this.publicPseudo) {
       this.globalService.loading = true;
+
       //@ts-ignore
       window.electronAPI.extractPublicPseudoGames(
         this.publicPseudo,
@@ -119,6 +120,7 @@ export class GameHistoryComponent implements OnInit {
 
   protected onPrivatePseudoExport(): void {
     this.globalService.loading = true;
+
     //@ts-ignore
     window.electronAPI.extractPrivatePseudoGames(
       this.nbPages,

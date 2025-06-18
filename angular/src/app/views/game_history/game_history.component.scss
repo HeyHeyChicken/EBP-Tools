@@ -40,3 +40,14 @@
     }
   }
 }
+
+.exporting {
+  position: fixed;
+  top: calc(50% + #{variables.$margin} * 4);
+  padding: variables.$margin;
+  left: 50%;
+  background-color: white;
+  color: black;
+  transform: translateX(-50%);
+  z-index: 1000;
+}

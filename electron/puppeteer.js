@@ -57,10 +57,10 @@ function addGame(games, game) {
  * Cette fonction extrait les games à partir d'une session EVA.
  * @param {*} browser
  * @param {*} page
- * @param {*} nbPages
- * @param {*} tag
- * @param {*} seasonIndex
- * @param {*} callback
+ * @param {*} nbPages Number of game pages to extract.
+ * @param {*} tag Player Name.
+ * @param {*} seasonIndex Season ID to extract.
+ * @param {*} callback Callback function
  */
 async function extractGames(
   browser,
@@ -111,14 +111,14 @@ async function extractGames(
     }
     if (response.url().includes("graphql")) {
       try {
-        const JSON = await response.json();
+        const JSON_DATA = await response.json();
         if (
-          JSON?.data?.gameHistories?.nodes &&
-          Array.isArray(JSON.data.gameHistories.nodes)
+          JSON_DATA?.data?.gameHistories?.nodes &&
+          Array.isArray(JSON_DATA.data.gameHistories.nodes)
         ) {
           index++;
           const OLD_INDEX = index;
-          JSON.data.gameHistories.nodes.forEach((game) => {
+          JSON_DATA.data.gameHistories.nodes.forEach((game) => {
             addGame(GAMES, game);
           });
 
@@ -168,29 +168,24 @@ async function extractPublicPseudoGames(
         width: 1920,
         height: 1080,
       },
-      args: ["--window-size=0,0"],
+      args: ["--window-size=0,200"],
     });
-    setTimeout(async () => {
-      const PAGE = await BROWSER.newPage();
 
-      await extractGames(
-        BROWSER,
-        PAGE,
-        nbPages,
-        seasonIndex,
-        skip,
-        timeToWait,
-        dialog,
-        callback
-      );
+    const PAGE = (await BROWSER.pages())[0];
 
-      BROWSER.on("disconnected", () => {
-        callback([]);
-      });
+    await extractGames(
+      BROWSER,
+      PAGE,
+      nbPages,
+      seasonIndex,
+      skip,
+      timeToWait,
+      dialog,
+      callback
+    );
 
-      await PAGE.goto(`https://app.eva.gg/profile/public/${tag}/history/`, {
-        waitUntil: "networkidle2",
-      });
+    await PAGE.goto(`https://app.eva.gg/profile/public/${tag}/history/`, {
+      waitUntil: "networkidle2",
     });
   } catch (err) {
     dialog.showErrorBox("Error", err);
@@ -211,7 +206,25 @@ async function extractPrivatePseudoGames(
         "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
       headless: false,
     });
-    const PAGE = await BROWSER.newPage();
+
+    // Cet espion permet de relancer la fonction si elle ne s'est pas bien passée.
+    setTimeout(async () => {
+      const PAGE = (await BROWSER.pages())[0];
+      const URL = await PAGE.url();
+      if (URL == "about:blank") {
+        BROWSER.close();
+        extractPrivatePseudoGames(
+          nbPages,
+          seasonIndex,
+          skip,
+          timeToWait,
+          dialog,
+          callback
+        );
+      }
+    }, 2000);
+
+    const PAGE = (await BROWSER.pages())[0];
 
     PAGE.on("framenavigated", async (frame) => {
       // When the user is logged in, he is redirected to the games page.
@@ -230,10 +243,6 @@ async function extractPrivatePseudoGames(
       dialog,
       callback
     );
-
-    BROWSER.on("disconnected", () => {
-      callback([]);
-    });
 
     await PAGE.goto(`https://app.eva.gg/fr-FR/login`, {
       waitUntil: "networkidle2",

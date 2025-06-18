@@ -10,11 +10,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
     <ebp-column [xs]="7">
       <div class="box">
         <h3 class="m-0 mb-1">{{ "view.game_history.title" | translate }}</h3>
-
         <div class="d-flex">
-          <!--
           <p>{{ "view.game_history.step" | translate }} 1</p>
-          -->
           <div class="d-flex flex-row">
             <!-- SEASON -->
             <mat-form-field
@@ -94,7 +91,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
           </div>
         </div>
         <form class="d-flex" (submit)="onPublicPseudoExport()">
-          <!--
           <p style="margin-bottom: -12px">
             {{ "view.game_history.step" | translate }} 2
           </p>
@@ -122,7 +118,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
             {{ "view.game_history.export" | translate }}
           </button>
           <span>{{ "view.game_history.secondOption" | translate }}</span>
-          -->
           <button
             type="button"
             class="w-100 eva"
@@ -135,3 +130,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
     </ebp-column>
   </ebp-row>
 </ebp-container>
+<div class="exporting" *ngIf="globalService.loading">
+  {{ "view.game_history.exporting" | translate }}
+</div>
