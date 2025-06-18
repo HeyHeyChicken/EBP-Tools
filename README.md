@@ -1,5 +1,5 @@
 <div align="center">
-<img width="410px" src="https://github.com/HeyHeyChicken/EBP-Replay-Cutter/blob/main/.github/screenshot.png">
+<img width="410px" src="https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/blob/main/.github/screenshot.png">
 </div>
 
 ## 👋 Introduction
@@ -14,7 +14,7 @@
 
 ## 😀 You are an EVA player
 
-Just download the software [here](//github.com/HeyHeyChicken/EBP-Replay-Cutter/releases/latest/).<br/>
+Just download the software [here](//github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/releases/latest/).<br/>
 I provide support for all users through [Discord](//discord.gg/tAHAc9q3aX).
 
 ## 🤓 You are a developper
