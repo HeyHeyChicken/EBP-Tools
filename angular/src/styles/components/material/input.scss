@@ -41,26 +41,28 @@ mat-form-field {
           }
         }
 
-        > button {
-          position: absolute;
-          top: 0;
-          right: 0;
-          min-height: calc(#{variables.$form_height} - 2px);
-          min-width: calc(#{variables.$form_height} - 2px);
-          border: none;
-          padding: 0;
-          background-color: transparent;
-          transform: translateX(variables.$margin);
-          cursor: pointer;
-          color: material_colors.$white;
+        > .buttons {
+          > button {
+            position: absolute;
+            top: 0;
+            right: 0;
+            min-height: calc(#{variables.$form_height} - 2px);
+            min-width: calc(#{variables.$form_height} - 2px);
+            border-width: 0 0 0 1px;
+            padding: 0;
+            background-color: transparent;
+            transform: translateX(variables.$margin);
+            cursor: pointer;
+            color: material_colors.$white;
 
-          &:before,
-          &:after {
-            content: none;
-          }
+            &:before,
+            &:after {
+              content: none;
+            }
 
-          > i {
-            margin-right: 0;
+            > i {
+              margin-right: 0;
+            }
           }
         }
 
@@ -137,9 +139,14 @@ mat-form-field {
 
       > .mat-mdc-form-field-flex {
         > .mat-mdc-form-field-infix {
-          > button {
-            height: calc(#{variables.$form_height} - 4px);
-            top: -1px;
+          > .buttons {
+            > button {
+              height: calc(#{variables.$form_height} - 4px);
+              top: -1px;
+              border-width: 0 1px 0 2px;
+              border-color: transparent transparent transparent
+                variables.$main_color;
+            }
           }
 
           > input {

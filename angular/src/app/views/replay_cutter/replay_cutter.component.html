@@ -57,14 +57,20 @@ See LICENSE for terms. Unauthorized use is prohibited.
         </ebp-message>
       </div>
       <ng-container *ngIf="percent < 0 && games.length">
-        <mat-form-field class="mt-2" (click)="setOutputPath()">
+        <mat-form-field
+          class="mt-2"
+          (click)="setOutputPath()"
+          (keypress)="setOutputPath()"
+        >
           <mat-label>{{
             "view.replay_cutter.outputPath" | translate
           }}</mat-label>
           <input matInput readonly type="text" [value]="outputPath" />
-          <button class="btn squared">
-            <i class="fa-sharp fa-solid fa-gear"></i>
-          </button>
+          <div class="buttons">
+            <button class="btn squared" tabindex="-1">
+              <i class="fa-sharp fa-solid fa-gear"></i>
+            </button>
+          </div>
         </mat-form-field>
         <table class="mt-1">
           <thead>

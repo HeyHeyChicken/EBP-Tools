@@ -15,14 +15,19 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <ng-template #form>
         <div class="box">
           <p>{{ "view.game_history.step" | translate }} 1</p>
-          <mat-form-field (click)="setOutputPath()">
+          <mat-form-field
+            (click)="setOutputPath()"
+            (keypress)="setOutputPath()"
+          >
             <mat-label>{{
               "view.replay_cutter.outputPath" | translate
             }}</mat-label>
             <input matInput readonly type="text" [value]="outputPath" />
-            <button class="btn squared">
-              <i class="fa-sharp fa-solid fa-gear"></i>
-            </button>
+            <div class="buttons">
+              <button class="btn squared" tabindex="-1">
+                <i class="fa-sharp fa-solid fa-gear"></i>
+              </button>
+            </div>
           </mat-form-field>
 
           <p>{{ "view.game_history.step" | translate }} 2</p>
@@ -36,9 +41,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 [ngModelOptions]="{ standalone: true }"
                 [(ngModel)]="youTubeURL"
               />
-              <button type="submit" class="youtube">
-                <i class="fa-brands fa-youtube"></i>
-              </button>
+              <div class="buttons">
+                <button type="submit" tabindex="-1">
+                  <i class="fa-brands fa-youtube"></i>
+                </button>
+              </div>
             </mat-form-field>
           </form>
           <form (submit)="onDownloadTwitch()">
@@ -51,9 +58,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 [ngModelOptions]="{ standalone: true }"
                 [(ngModel)]="twitchURL"
               />
-              <button type="submit" class="youtube">
-                <i class="fa-brands fa-twitch"></i>
-              </button>
+              <div class="buttons">
+                <button type="submit" tabindex="-1">
+                  <i class="fa-brands fa-twitch"></i>
+                </button>
+              </div>
             </mat-form-field>
           </form>
         </div>
