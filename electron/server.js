@@ -393,6 +393,11 @@ let projectLatestVersion /* string */ = "";
       mainWindow.setResizable(false);
     });
 
+    // The front-end asks the server to return the developer mode state.
+    ipcMain.handle("is-dev-mode", () => {
+      return !isProd;
+    });
+
     // The front-end asks the server to return the user's operating system.
     ipcMain.handle("get-os", () => {
       return os.platform();

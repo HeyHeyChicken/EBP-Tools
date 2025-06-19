@@ -159,3 +159,33 @@ table {
     }
   }
 }
+
+#debug {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: variables.$dark_color;
+  height: 100vh;
+  width: 100vw;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+
+  &.invisible {
+    display: none;
+  }
+
+  > button {
+    position: fixed;
+    top: variables.$margin;
+    right: variables.$margin;
+  }
+}
+
+#debugButton {
+  position: absolute;
+  left: variables.$margin;
+  bottom: 50%;
+  transform: translateY(+50%);
+}

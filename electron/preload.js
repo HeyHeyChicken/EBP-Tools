@@ -8,6 +8,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   //#region Client -> Server
 
+  // The front-end asks the server to return the developer mode state.
+  isDevMode: () => ipcRenderer.invoke("is-dev-mode"),
   // The front-end asks the server to return the user's operating system.
   getOS: () => ipcRenderer.invoke("get-os"),
   // The front-end asks the server to download a YouTube video.

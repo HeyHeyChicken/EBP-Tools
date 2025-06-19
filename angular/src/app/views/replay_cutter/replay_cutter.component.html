@@ -146,3 +146,16 @@ See LICENSE for terms. Unauthorized use is prohibited.
     </ebp-column>
   </ebp-row>
 </ebp-container>
+<div id="debug" #debug [class.invisible]="!debugMode">
+  <button class="squared" (click)="debugMode = !debugMode">
+    <i class="fa-sharp fa-solid fa-xmark"></i>
+  </button>
+</div>
+<button
+  id="debugButton"
+  class="squared"
+  (click)="debugMode = !debugMode"
+  *ngIf="globalService.devMode"
+>
+  <i class="fa-sharp fa-solid fa-bug"></i>
+</button>
