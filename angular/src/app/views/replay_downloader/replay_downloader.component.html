@@ -65,6 +65,27 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </div>
             </mat-form-field>
           </form>
+
+          <form (submit)="onDownloadTwitchLive()" class="mt-10">
+            <mat-form-field>
+              <mat-label>Twitch live</mat-label>
+              <input
+                matInput
+                type="text"
+                [disabled]="globalService.os != 'win32'"
+                placeholder="https://www.twitch.tv/videos/2481536428"
+                [ngModelOptions]="{ standalone: true }"
+                [(ngModel)]="twitchLiveURL"
+                (keydown)="onTwitchLiveURLChange()"
+                (paste)="onTwitchLiveURLChange()"
+              />
+              <div class="buttons">
+                <button type="submit" tabindex="-1">
+                  <i class="fa-brands fa-twitch"></i>
+                </button>
+              </div>
+            </mat-form-field>
+          </form>
         </div>
       </ng-template>
     </ebp-column>

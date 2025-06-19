@@ -72,6 +72,14 @@ export class App implements OnInit {
       }
     });
 
+    // Getting the user's operating system.
+    //@ts-ignore
+    window.electronAPI.getOS().then((os: any) => {
+      this.ngZone.run(() => {
+        this.globalService.os = os;
+      });
+    });
+
     // Getting the project version.
     //@ts-ignore
     window.electronAPI.getVersion().then((versions: any) => {

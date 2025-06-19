@@ -40,6 +40,8 @@ const {
 let isProd = process.env.NODE_ENV === "production";
 const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
 
+//#region Binaries paths
+
 const FFMPEG_PATH = path.join(
   ROOT_PATH,
   isProd ? "ffmpeg" : "../binaries/ffmpeg",
@@ -50,6 +52,13 @@ const YTDL_PATH = path.join(
   isProd ? "yt-dlp" : "../binaries/yt-dlp",
   os.platform() + (os.platform() == "win32" ? ".exe" : "")
 );
+const STREAMLINK_PATH = path.join(
+  ROOT_PATH,
+  isProd ? "streamlink" : "../binaries/streamlink",
+  os.platform() + (os.platform() == "win32" ? ".exe" : "")
+);
+
+//#endregion
 
 const SETTINGS_PATH = path.join(ROOT_PATH, "settings.json");
 const WINDOW_WIDTH = 800;
@@ -347,23 +356,6 @@ let projectLatestVersion /* string */ = "";
     return FILE_PATH;
   }
 
-  function downloadFileFromURL(url, outputPath) {
-    const file = fs.createWriteStream(outputPath);
-
-    https
-      .get(url, (response) => {
-        response.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          console.log("Téléchargement terminé");
-        });
-      })
-      .on("error", (err) => {
-        fs.unlinkSync(outputPath);
-        console.error("Erreur :", err.message);
-      });
-  }
-
   if (!isProd) {
     app.commandLine.appendSwitch("disable-web-security");
     app.commandLine.appendSwitch(
@@ -406,8 +398,38 @@ let projectLatestVersion /* string */ = "";
       mainWindow.setResizable(false);
     });
 
+    // The front-end asks the server to return the user's operating system.
+    ipcMain.handle("get-os", () => {
+      return os.platform();
+    });
+
+    // The front-end asks the server to check if a twitch channel is on live.
+    ipcMain.handle("check-live", (event, url) => {
+      exec(
+        `${STREAMLINK_PATH} --get-title --json ${url}`,
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Erreur : ${error.message}`);
+            return;
+          }
+          if (stderr) {
+            console.error(`stderr : ${stderr}`);
+            return;
+          }
+
+          try {
+            const data = JSON.parse(stdout);
+            console.log("Le streamer est EN LIVE 🎥");
+            console.log(data);
+          } catch (e) {
+            console.log("Le streamer est OFFLINE ❌ ou autre erreur.");
+          }
+        }
+      );
+    });
+
     // The front-end asks the server to download a YouTube video.
-    ipcMain.handle("download-replay", async (event, url, platform) => {
+    ipcMain.handle("download-replay", (event, url, platform) => {
       let percent = 0;
       // On récupère le titre de la vidéo.
       exec(
@@ -489,17 +511,17 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to open an url in the default browser.
-    ipcMain.handle("open-url", async (event, url) => {
+    ipcMain.handle("open-url", (event, url) => {
       shell.openExternal(url);
     });
 
     // The front-end asks the server to return the web server port.
-    ipcMain.handle("get-express-port", async () => {
+    ipcMain.handle("get-express-port", () => {
       return PORT;
     });
 
     // The front-end asks the server to return the project version.
-    ipcMain.handle("get-version", async () => {
+    ipcMain.handle("get-version", () => {
       return {
         current: version,
         last: projectLatestVersion,
@@ -533,7 +555,7 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to return the game-history output path.
-    ipcMain.handle("get-game-history-output-path", async () => {
+    ipcMain.handle("get-game-history-output-path", () => {
       return getOutputPath(
         "gameHistoryOutputPath",
         path.join(os.homedir(), "Downloads")
@@ -541,7 +563,7 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to return the video cutter output path.
-    ipcMain.handle("get-replay-downloader-output-path", async () => {
+    ipcMain.handle("get-replay-downloader-output-path", () => {
       return getOutputPath(
         "replayDownloaderOutputPath",
         path.join(os.homedir(), "Downloads")
@@ -549,7 +571,7 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to return the video cutter output path.
-    ipcMain.handle("get-video-cutter-output-path", async () => {
+    ipcMain.handle("get-video-cutter-output-path", () => {
       return getOutputPath(
         "videoCutterOutputPath",
         path.join(os.homedir(), "Downloads")
@@ -557,7 +579,7 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to return the user's login status.
-    ipcMain.handle("get-login-state", async () => {
+    ipcMain.handle("get-login-state", () => {
       return session.defaultSession.cookies
         .get({ domain: "evabattleplan.com" })
         .then((cookies) => {
@@ -572,7 +594,7 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to logout.
-    ipcMain.handle("logout", async () => {
+    ipcMain.handle("logout", () => {
       const SESSION = session.defaultSession;
 
       Promise.all([
@@ -598,7 +620,7 @@ let projectLatestVersion /* string */ = "";
     // The front-end asks the server to extract the public player games.
     ipcMain.handle(
       "extract-private-pseudo-games",
-      async (event, nbPages, seasonIndex, skip, timeToWait) => {
+      (event, nbPages, seasonIndex, skip, timeToWait) => {
         extractPrivatePseudoGames(
           nbPages,
           seasonIndex,
@@ -624,7 +646,7 @@ let projectLatestVersion /* string */ = "";
     // The front-end asks the server to extract the public player games.
     ipcMain.handle(
       "extract-public-pseudo-games",
-      async (event, tag, nbPages, seasonIndex, skip, timeToWait) => {
+      (event, tag, nbPages, seasonIndex, skip, timeToWait) => {
         if (tag) {
           extractPublicPseudoGames(
             tag,
@@ -681,7 +703,7 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to cut a video file.
-    ipcMain.handle("cut-video-files", async (event, games, videoPath) => {
+    ipcMain.handle("cut-video-files", (event, games, videoPath) => {
       games.forEach((game) => {
         return cutVideoFile(game, videoPath);
       });
@@ -689,12 +711,12 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to cut a video file.
-    ipcMain.handle("cut-video-file", async (event, game, videoPath) => {
+    ipcMain.handle("cut-video-file", (event, game, videoPath) => {
       return cutVideoFile(game, videoPath);
     });
 
     // The front-end asks the server to open a video file.
-    ipcMain.handle("open-file", async (event, path) => {
+    ipcMain.handle("open-file", (event, path) => {
       const COMMAND =
         process.platform === "win32"
           ? `start "" "${path}"`

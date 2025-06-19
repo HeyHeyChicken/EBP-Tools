@@ -4,12 +4,12 @@
 
 //#region Imports
 
-import { Injectable } from "@angular/core";
+import { Injectable } from '@angular/core';
 
 //#endregion
 
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root',
 })
 export class IdentityService {
   //#region Attributes
