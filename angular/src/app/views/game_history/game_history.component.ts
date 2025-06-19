@@ -37,6 +37,8 @@ export class GameHistoryComponent implements OnInit {
   //#region Attributes
 
   protected publicPseudo?: string = undefined;
+  protected outputPath: string | undefined;
+  protected exporting: boolean = false;
 
   protected nbPages: number = 1;
   protected get maxPages(): number[] {
@@ -72,9 +74,17 @@ export class GameHistoryComponent implements OnInit {
 
   ngOnInit(): void {
     //@ts-ignore
+    window.electronAPI.getGameHistoryOutputPath().then((path: sring) => {
+      this.ngZone.run(() => {
+        this.outputPath = path;
+      });
+    });
+
+    //@ts-ignore
     window.electronAPI.gamesAreExported((filePath: string) => {
       this.ngZone.run(() => {
         this.globalService.loading = false;
+        this.exporting = false;
         if (filePath) {
           this.toastrService
             .success('Your games have been exported here: ' + filePath)
@@ -85,6 +95,24 @@ export class GameHistoryComponent implements OnInit {
         }
       });
     });
+  }
+
+  /**
+   * This function allows user to change the folder where game histories are stored.
+   */
+  protected setOutputPath(): void {
+    this.globalService.loading = true;
+    //@ts-ignore
+    window.electronAPI
+      .setSetting('gameHistoryOutputPath')
+      .then((path: string) => {
+        this.ngZone.run(() => {
+          this.globalService.loading = false;
+          if (path) {
+            this.outputPath = path;
+          }
+        });
+      });
   }
 
   protected onPublicPseudoPaste(event: ClipboardEvent): void {
@@ -106,6 +134,7 @@ export class GameHistoryComponent implements OnInit {
   protected onPublicPseudoExport(): void {
     if (this.publicPseudo) {
       this.globalService.loading = true;
+      this.exporting = true;
 
       //@ts-ignore
       window.electronAPI.extractPublicPseudoGames(
@@ -120,6 +149,7 @@ export class GameHistoryComponent implements OnInit {
 
   protected onPrivatePseudoExport(): void {
     this.globalService.loading = true;
+    this.exporting = true;
 
     //@ts-ignore
     window.electronAPI.extractPrivatePseudoGames(

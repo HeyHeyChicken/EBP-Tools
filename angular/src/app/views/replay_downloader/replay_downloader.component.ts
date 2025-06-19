@@ -12,11 +12,12 @@ import { FormsModule } from '@angular/forms';
 import { LoaderComponent } from '../../shared/loader/loader.component';
 import { CommonModule } from '@angular/common';
 import { ToastrService } from 'ngx-toastr';
+import { GlobalService } from '../../core/services/global.service';
 
 //#endregion
 
 @Component({
-  selector: 'view-replay_downloader',
+  selector: 'view-replay-downloader',
   templateUrl: './replay_downloader.component.html',
   styleUrls: ['./replay_downloader.component.scss'],
   standalone: true,
@@ -34,12 +35,13 @@ export class ReplayDownloaderComponent implements OnInit {
 
   protected youTubeURL?: string;
   protected twitchURL?: string;
-
+  protected outputPath: string | undefined;
   protected percent?: number;
 
   //#endregion
 
   constructor(
+    protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone
   ) {}
@@ -47,6 +49,13 @@ export class ReplayDownloaderComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
+    //@ts-ignore
+    window.electronAPI.getReplayDownloaderOutputPath().then((path: sring) => {
+      this.ngZone.run(() => {
+        this.outputPath = path;
+      });
+    });
+
     //@ts-ignore
     window.electronAPI.replayDownloaderError((error: string) => {
       this.ngZone.run(() => {
@@ -74,6 +83,24 @@ export class ReplayDownloaderComponent implements OnInit {
         this.percent = percent;
       });
     });
+  }
+
+  /**
+   * This function allows user to change the folder where the replay downloader are stored.
+   */
+  protected setOutputPath(): void {
+    this.globalService.loading = true;
+    //@ts-ignore
+    window.electronAPI
+      .setSetting('replayDownloaderOutputPath')
+      .then((path: string) => {
+        this.ngZone.run(() => {
+          this.globalService.loading = false;
+          if (path) {
+            this.outputPath = path;
+          }
+        });
+      });
   }
 
   protected onDownloadYouTube(): void {

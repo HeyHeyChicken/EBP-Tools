@@ -14,7 +14,19 @@ See LICENSE for terms. Unauthorized use is prohibited.
       ></ebp-loader>
       <ng-template #form>
         <div class="box">
-          <form (submit)="onDownloadYouTube()">
+          <p>{{ "view.game_history.step" | translate }} 1</p>
+          <mat-form-field (click)="setOutputPath()">
+            <mat-label>{{
+              "view.replay_cutter.outputPath" | translate
+            }}</mat-label>
+            <input matInput readonly type="text" [value]="outputPath" />
+            <button class="btn squared">
+              <i class="fa-sharp fa-solid fa-gear"></i>
+            </button>
+          </mat-form-field>
+
+          <p>{{ "view.game_history.step" | translate }} 2</p>
+          <form style="margin-top: -12px" (submit)="onDownloadYouTube()">
             <mat-form-field>
               <mat-label>YouTube</mat-label>
               <input

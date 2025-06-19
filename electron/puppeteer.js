@@ -5,6 +5,7 @@
 //#region Imports
 
 const puppeteer = require("puppeteer-core");
+const os = require("os");
 
 //#endregion
 
@@ -51,6 +52,15 @@ function addGame(games, game) {
   });
 
   games.push(NEW_GAME);
+}
+
+function getBrowserPath() {
+  switch (os.platform()) {
+    case "win32":
+      return "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+    case "darwin":
+      return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  }
 }
 
 /**
@@ -168,8 +178,7 @@ async function extractPublicPseudoGames(
 ) {
   try {
     const BROWSER = await puppeteer.launch({
-      executablePath:
-        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      executablePath: getBrowserPath(),
       headless: false,
       defaultViewport: {
         width: 1920,
@@ -209,8 +218,7 @@ async function extractPrivatePseudoGames(
 ) {
   try {
     const BROWSER = await puppeteer.launch({
-      executablePath:
-        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      executablePath: getBrowserPath(),
       headless: false,
     });
 

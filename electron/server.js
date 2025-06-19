@@ -102,11 +102,15 @@ let projectLatestVersion /* string */ = "";
 
   //#endregion
 
-  function getVideoCutterOutputPath() {
+  /**
+   * This function returns the value of a path in the settings.
+   * @param {*} name Settings key.
+   * @param {*} defaultPath Default value.
+   * @returns
+   */
+  function getOutputPath(name, defaultPath) {
     const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8"));
-    return (
-      SETTINGS.videoCutterOutputPath ?? path.join(os.homedir(), "Downloads")
-    );
+    return SETTINGS[name] ?? defaultPath;
   }
 
   /**
@@ -159,7 +163,10 @@ let projectLatestVersion /* string */ = "";
   function cutVideoFile(game, videoPath) {
     // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
     const OUTPUT_FILE_PATH /* string */ = path.join(
-      getVideoCutterOutputPath(),
+      getOutputPath(
+        "videoCutterOutputPath",
+        path.join(os.homedir(), "Downloads")
+      ),
       `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
         game.map
       } (${new Date().getTime()}).mp4`
@@ -327,8 +334,10 @@ let projectLatestVersion /* string */ = "";
     });
 
     const FILE_PATH = path.join(
-      os.homedir(),
-      "Downloads",
+      getOutputPath(
+        "gameHistoryOutputPath",
+        path.join(os.homedir(), "Downloads")
+      ),
       `EBP - ${playerName} (${new Date().getTime()}).xlsx`
     );
     // Sauvegarder dans un nouveau fichier
@@ -415,8 +424,10 @@ let projectLatestVersion /* string */ = "";
 
           const VIDEO_TITLE = stdout.trim();
           const OUTPUT_PATH = path.join(
-            os.homedir(),
-            "Downloads",
+            getOutputPath(
+              "replayDownloaderOutputPath",
+              path.join(os.homedir(), "Downloads")
+            ),
             `EBP - YouTube - ${VIDEO_TITLE} (${new Date().getTime()}).mp4`
           );
 
@@ -495,8 +506,11 @@ let projectLatestVersion /* string */ = "";
     });
 
     // The front-end asks the server to edit the video cutter output path.
-    ipcMain.handle("set-video-cutter-output-path", async () => {
-      const PATH = getVideoCutterOutputPath();
+    ipcMain.handle("set-setting", async (event, setting) => {
+      const PATH = getOutputPath(
+        "videoCutterOutputPath",
+        path.join(os.homedir(), "Downloads")
+      );
 
       const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ["openDirectory"],
@@ -504,7 +518,7 @@ let projectLatestVersion /* string */ = "";
       });
       if (!canceled && filePaths.length == 1) {
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8"));
-        SETTINGS.videoCutterOutputPath = filePaths[0];
+        SETTINGS[setting] = filePaths[0];
 
         fs.writeFileSync(
           SETTINGS_PATH,
@@ -512,12 +526,33 @@ let projectLatestVersion /* string */ = "";
           "utf-8"
         );
         return filePaths[0];
+      } else {
+        return undefined;
       }
+    });
+
+    // The front-end asks the server to return the game-history output path.
+    ipcMain.handle("get-game-history-output-path", async () => {
+      return getOutputPath(
+        "gameHistoryOutputPath",
+        path.join(os.homedir(), "Downloads")
+      );
+    });
+
+    // The front-end asks the server to return the video cutter output path.
+    ipcMain.handle("get-replay-downloader-output-path", async () => {
+      return getOutputPath(
+        "replayDownloaderOutputPath",
+        path.join(os.homedir(), "Downloads")
+      );
     });
 
     // The front-end asks the server to return the video cutter output path.
     ipcMain.handle("get-video-cutter-output-path", async () => {
-      return getVideoCutterOutputPath();
+      return getOutputPath(
+        "videoCutterOutputPath",
+        path.join(os.homedir(), "Downloads")
+      );
     });
 
     // The front-end asks the server to return the user's login status.

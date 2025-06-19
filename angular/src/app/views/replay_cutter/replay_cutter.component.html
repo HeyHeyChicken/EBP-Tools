@@ -57,7 +57,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
         </ebp-message>
       </div>
       <ng-container *ngIf="percent < 0 && games.length">
-        <mat-form-field class="mt-2" (click)="setVideoCutterOutputPath()">
+        <mat-form-field class="mt-2" (click)="setOutputPath()">
           <mat-label>{{
             "view.replay_cutter.outputPath" | translate
           }}</mat-label>

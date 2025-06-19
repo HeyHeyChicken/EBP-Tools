@@ -74,7 +74,6 @@ export class ReplayCutterComponent implements OnInit {
   ngOnInit(): void {
     this.initTesseract();
 
-    // Getting the project version.
     //@ts-ignore
     window.electronAPI.getVideoCutterOutputPath().then((path: sring) => {
       this.ngZone.run(() => {
@@ -133,17 +132,19 @@ export class ReplayCutterComponent implements OnInit {
   /**
    * This function allows user to change the folder where the cut games are stored.
    */
-  protected setVideoCutterOutputPath(): void {
+  protected setOutputPath(): void {
     this.globalService.loading = true;
     //@ts-ignore
-    window.electronAPI.setVideoCutterOutputPath().then((path: string) => {
-      if (path) {
+    window.electronAPI
+      .setSetting('videoCutterOutputPath')
+      .then((path: string) => {
         this.ngZone.run(() => {
           this.globalService.loading = false;
-          this.outputPath = path;
+          if (path) {
+            this.outputPath = path;
+          }
         });
-      }
-    });
+      });
   }
 
   /**

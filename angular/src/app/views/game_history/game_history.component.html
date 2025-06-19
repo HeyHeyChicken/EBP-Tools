@@ -12,6 +12,18 @@ See LICENSE for terms. Unauthorized use is prohibited.
         <h3 class="m-0 mb-1">{{ "view.game_history.title" | translate }}</h3>
         <div class="d-flex">
           <p>{{ "view.game_history.step" | translate }} 1</p>
+          <!-- SETTINGS -->
+          <mat-form-field (click)="setOutputPath()">
+            <mat-label>{{
+              "view.replay_cutter.outputPath" | translate
+            }}</mat-label>
+            <input matInput readonly type="text" [value]="outputPath" />
+            <button class="btn squared">
+              <i class="fa-sharp fa-solid fa-gear"></i>
+            </button>
+          </mat-form-field>
+
+          <p>{{ "view.game_history.step" | translate }} 2</p>
           <div class="d-flex flex-row">
             <!-- SEASON -->
             <mat-form-field
@@ -92,7 +104,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
         </div>
         <form class="d-flex" (submit)="onPublicPseudoExport()">
           <p style="margin-bottom: -12px">
-            {{ "view.game_history.step" | translate }} 2
+            {{ "view.game_history.step" | translate }} 3
           </p>
           <span>{{ "view.game_history.firstOption" | translate }}</span>
           <div class="d-flex">
@@ -130,6 +142,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
     </ebp-column>
   </ebp-row>
 </ebp-container>
-<div class="exporting" *ngIf="globalService.loading">
+<div class="exporting" *ngIf="exporting">
   {{ "view.game_history.exporting" | translate }}
 </div>
