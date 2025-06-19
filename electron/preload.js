@@ -10,8 +10,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // The front-end asks the server to return the user's operating system.
   getOS: () => ipcRenderer.invoke("get-os"),
-  // The front-end asks the server to check if a twitch channel is on live.
-  checkLive: (url) => ipcRenderer.invoke("check-live", url),
   // The front-end asks the server to download a YouTube video.
   downloadReplay: (url, platform) => ipcRenderer.invoke("download-replay", url, platform),
   // The front-end asks the server to enables/disables debug mode.

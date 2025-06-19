@@ -38,9 +38,6 @@ export class ReplayDownloaderComponent implements OnInit {
   protected outputPath: string | undefined;
   protected percent?: number;
 
-  protected twitchLiveURL?: string;
-  protected twitchLiveURLIsOnLive: boolean = false;
-
   //#endregion
 
   constructor(
@@ -128,29 +125,6 @@ export class ReplayDownloaderComponent implements OnInit {
     }
   }
 
-  protected onTwitchLiveURLChange(): void {
-    setTimeout(() => {
-      if (this.twitchLiveURL) {
-        if (this.isTwitchLiveUrl(this.twitchLiveURL)) {
-          //@ts-ignore
-          this.twitchLiveURLIsOnLive = window.electronAPI.checkLive(
-            this.twitchLiveURL
-          );
-        }
-      }
-    });
-  }
-
-  protected onDownloadTwitchLive(): void {
-    if (this.twitchLiveURL) {
-      if (this.isTwitchLiveUrl(this.twitchLiveURL)) {
-        //@ts-ignore
-        //window.electronAPI.downloadLive(this.twitchLiveURL);
-        this.twitchLiveURL = undefined;
-      }
-    }
-  }
-
   private isYouTubeUrl(url: string): boolean {
     const regex =
       /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w\-]{11}(&\S*)?$/;
@@ -160,11 +134,6 @@ export class ReplayDownloaderComponent implements OnInit {
   private isTwitchUrl(url: string): boolean {
     const regex =
       /^(https?:\/\/)?(www\.)?twitch\.tv\/(videos\/\d+|[a-zA-Z0-9_]+\/clip\/[a-zA-Z0-9_-]+)$/;
-    return regex.test(url);
-  }
-
-  private isTwitchLiveUrl(url: string): boolean {
-    const regex = /^(https?:\/\/)?(www\.)?twitch\.tv\/[a-zA-Z0-9_]+\/?$/;
     return regex.test(url);
   }
 

@@ -47,7 +47,7 @@ const FFMPEG_PATH = path.join(
   isProd ? "ffmpeg" : "../binaries/ffmpeg",
   os.platform() + (os.platform() == "win32" ? ".exe" : "")
 );
-const YTDL_PATH = path.join(
+const YTDLP_PATH = path.join(
   ROOT_PATH,
   isProd ? "yt-dlp" : "../binaries/yt-dlp",
   os.platform() + (os.platform() == "win32" ? ".exe" : "")
@@ -398,32 +398,12 @@ let projectLatestVersion /* string */ = "";
       return os.platform();
     });
 
-    // The front-end asks the server to check if a twitch channel is on live.
-    ipcMain.handle("check-live", (event, url) => {
-      new Promise((resolve, reject) => {
-        https
-          .get(url, (res) => {
-            let data = "";
-
-            res.on("data", (chunk) => (data += chunk));
-            res.on("end", () => {
-              resolve(data.includes('"isLiveBroadcast":true'));
-            });
-          })
-          .on("error", reject);
-      })
-        .then((result) => {
-          return result;
-        })
-        .catch(console.error);
-    });
-
     // The front-end asks the server to download a YouTube video.
     ipcMain.handle("download-replay", (event, url, platform) => {
       let percent = 0;
       // On récupère le titre de la vidéo.
       exec(
-        `${YTDL_PATH} --ffmpeg-location ${FFMPEG_PATH} --get-title ${url}`,
+        `${YTDLP_PATH} --ffmpeg-location ${FFMPEG_PATH} --get-title ${url}`,
         (error, stdout, stderr) => {
           if (error) {
             console.error(error.message);
@@ -441,7 +421,7 @@ let projectLatestVersion /* string */ = "";
               "replayDownloaderOutputPath",
               path.join(os.homedir(), "Downloads")
             ),
-            `EBP - YouTube - ${VIDEO_TITLE} (${new Date().getTime()}).mp4`
+            `EBP - ${platform} - ${VIDEO_TITLE} (${new Date().getTime()}).mp4`
           );
 
           let settings = [];
@@ -464,7 +444,7 @@ let projectLatestVersion /* string */ = "";
               break;
           }
 
-          const DL = spawn(YTDL_PATH, settings);
+          const DL = spawn(YTDLP_PATH, settings);
 
           DL.stdout.on("data", (data) => {
             const MATCH = data.toString().match(/(\d{1,3}\.\d)%/); // extrait le % (ex: 42.3%)
