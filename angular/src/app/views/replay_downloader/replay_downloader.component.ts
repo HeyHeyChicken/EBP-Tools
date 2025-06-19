@@ -35,9 +35,11 @@ export class ReplayDownloaderComponent implements OnInit {
 
   protected youTubeURL?: string;
   protected twitchURL?: string;
-  protected twitchLiveURL?: string;
   protected outputPath: string | undefined;
   protected percent?: number;
+
+  protected twitchLiveURL?: string;
+  protected twitchLiveURLIsOnLive: boolean = false;
 
   //#endregion
 
@@ -131,7 +133,9 @@ export class ReplayDownloaderComponent implements OnInit {
       if (this.twitchLiveURL) {
         if (this.isTwitchLiveUrl(this.twitchLiveURL)) {
           //@ts-ignore
-          window.electronAPI.checkLive(this.twitchLiveURL);
+          this.twitchLiveURLIsOnLive = window.electronAPI.checkLive(
+            this.twitchLiveURL
+          );
         }
       }
     });
