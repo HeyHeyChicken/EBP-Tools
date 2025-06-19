@@ -8,10 +8,10 @@ module.exports = {
     asar: true,
     extraResource: [
       "./angular/dist/angular/browser/",
-      "./ffmpeg/",
       "./electron/settings.json",
       "./electron/template.xlsx",
-      "./yt-dlp/",
+      "./binaries/ffmpeg/",
+      "./binaries/yt-dlp/",
     ],
     icon: "electron/assets/icon",
     name: "EBP - EVA Battle Plan - Tools",

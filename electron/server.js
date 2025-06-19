@@ -42,12 +42,12 @@ const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
 
 const FFMPEG_PATH = path.join(
   ROOT_PATH,
-  isProd ? "ffmpeg" : "../ffmpeg",
+  isProd ? "ffmpeg" : "../binaries/ffmpeg",
   os.platform() + (os.platform() == "win32" ? ".exe" : "")
 );
 const YTDL_PATH = path.join(
   ROOT_PATH,
-  isProd ? "yt-dlp" : "../yt-dlp",
+  isProd ? "yt-dlp" : "../binaries/yt-dlp",
   os.platform() + (os.platform() == "win32" ? ".exe" : "")
 );
 
