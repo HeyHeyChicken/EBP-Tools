@@ -161,6 +161,7 @@ let projectLatestVersion /* string */ = "";
    * @returns {string} Cutted video path.
    */
   function cutVideoFile(game, videoPath) {
+    const EXTENSION = videoPath.split(".").pop().toLowerCase();
     // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
     const OUTPUT_FILE_PATH /* string */ = path.join(
       getOutputPath(
@@ -169,7 +170,7 @@ let projectLatestVersion /* string */ = "";
       ),
       `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
         game.map
-      } (${new Date().getTime()}).mp4`
+      } (${new Date().getTime()}).${EXTENSION}`
     );
     const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
       game._start
@@ -653,7 +654,7 @@ let projectLatestVersion /* string */ = "";
     ipcMain.handle("open-video-file", async () => {
       const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ["openFile"],
-        filters: [{ name: "EVA MP4 video", extensions: ["mp4"] }],
+        filters: [{ name: "EVA video", extensions: ["mp4", "mkv"] }],
       });
       if (canceled) {
         mainWindow.webContents.send("set-video-file", "");
