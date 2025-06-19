@@ -52,11 +52,6 @@ const YTDL_PATH = path.join(
   isProd ? "yt-dlp" : "../binaries/yt-dlp",
   os.platform() + (os.platform() == "win32" ? ".exe" : "")
 );
-const STREAMLINK_PATH = path.join(
-  ROOT_PATH,
-  isProd ? "streamlink" : "../binaries/streamlink",
-  os.platform() + (os.platform() == "win32" ? ".exe" : "")
-);
 
 //#endregion
 
@@ -405,27 +400,22 @@ let projectLatestVersion /* string */ = "";
 
     // The front-end asks the server to check if a twitch channel is on live.
     ipcMain.handle("check-live", (event, url) => {
-      exec(
-        `${STREAMLINK_PATH} --get-title --json ${url}`,
-        (error, stdout, stderr) => {
-          if (error) {
-            console.error(`Erreur : ${error.message}`);
-            return;
-          }
-          if (stderr) {
-            console.error(`stderr : ${stderr}`);
-            return;
-          }
+      new Promise((resolve, reject) => {
+        https
+          .get(url, (res) => {
+            let data = "";
 
-          try {
-            const data = JSON.parse(stdout);
-            console.log("Le streamer est EN LIVE 🎥");
-            console.log(data);
-          } catch (e) {
-            console.log("Le streamer est OFFLINE ❌ ou autre erreur.");
-          }
-        }
-      );
+            res.on("data", (chunk) => (data += chunk));
+            res.on("end", () => {
+              resolve(data.includes('"isLiveBroadcast":true'));
+            });
+          })
+          .on("error", reject);
+      })
+        .then((result) => {
+          return result;
+        })
+        .catch(console.error);
     });
 
     // The front-end asks the server to download a YouTube video.
