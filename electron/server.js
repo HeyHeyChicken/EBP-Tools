@@ -655,6 +655,10 @@ let projectLatestVersion /* string */ = "";
       });
       if (canceled) {
         mainWindow.webContents.send("set-video-file", "");
+        mainWindow.webContents.send(
+          "error",
+          "view.replay_cutter.noFilesSelected"
+        );
       } else {
         // Check that the video file resolution is correct.
         getVideoResolution(
@@ -668,7 +672,13 @@ let projectLatestVersion /* string */ = "";
             } else {
               mainWindow.webContents.send(
                 "error",
-                `Resolution must be ${EXPECTED_WIDTH}x${EXPECTED_HEIGHT}`
+                "view.replay_cutter.wrongResolution",
+                {
+                  expectedWidth: EXPECTED_WIDTH,
+                  expectedHeight: EXPECTED_HEIGHT,
+                  currentWidth: width,
+                  currentHeight: height,
+                }
               );
               mainWindow.webContents.send("set-video-file", "");
             }

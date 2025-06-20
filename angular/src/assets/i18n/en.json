@@ -5,6 +5,7 @@
       "tuto": "Choose the tool you want to use from the dropdown list above."
     },
     "replay_cutter": {
+      "wrongResolution": "Your video must be {{ expectedWidth }}x{{ expectedHeight }} in resolution, yours is {{ currentWidth }}x{{ currentHeight }}.",
       "inputFile": "Click here to send your video file",
       "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
       "nbGamesFound": "Number of games found",
