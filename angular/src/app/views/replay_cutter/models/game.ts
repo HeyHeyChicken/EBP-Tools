@@ -4,7 +4,7 @@
 
 //#region Imports
 
-import { Team } from "./team";
+import { Team } from './team';
 
 //#endregion
 
@@ -19,7 +19,7 @@ export class Game {
 
   //#region Start
 
-  private _readableStart: string = "";
+  private _readableStart: string = '';
   public get readableStart(): string {
     return this._readableStart;
   }
@@ -36,7 +36,7 @@ export class Game {
 
   //#region End
 
-  private _readableEnd: string = "";
+  private _readableEnd: string = '';
   public get readableEnd(): string {
     return this._readableEnd;
   }
@@ -51,8 +51,7 @@ export class Game {
 
   //#endregion
 
-  public name: string = "";
-  public map: string = "";
+  public map: string = '';
   public splitted: boolean = false;
 
   public orangeTeam: Team = new Team();
@@ -76,16 +75,16 @@ export class Game {
     );
 
     return (
-      (HOURS == 0 ? "" : HOURS + ":") +
+      (HOURS == 0 ? '' : HOURS + ':') +
       this.twoDigits(MINUTES) +
-      ":" +
+      ':' +
       this.twoDigits(SECONDES)
     );
   }
 
   private twoDigits(input: number): string {
     if (input < 10) {
-      return "0" + input;
+      return '0' + input;
     }
     return input.toString();
   }

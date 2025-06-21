@@ -8,32 +8,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <ebp-row>
     <ebp-column></ebp-column>
     <ebp-column [xs]="7">
-      <!-- This video is used to analyze the timecodes of games in a replay -->
-      <video
-        muted
-        *ngIf="videoPath"
-        [src]="
-          'http://localhost:' +
-          globalService.serverPort +
-          '/file?path=' +
-          videoPath
-        "
-        (loadeddata)="videoLoadedData($event)"
-        (timeupdate)="videoTimeUpdate($event)"
-      ></video>
-      <!-- This video is used to upload the game in a replay -->
-      <video
-        muted
-        *ngIf="uploadingVideoPath"
-        [src]="
-          'http://localhost:' +
-          globalService.serverPort +
-          '/file?path=' +
-          uploadingVideoPath
-        "
-        (loadeddata)="uploadingVideoLoadedData($event)"
-        (timeupdate)="uploadingVideoTimeUpdate($event)"
-      ></video>
       <div
         class="dropper"
         [class.disabled]="inputFileDisabled"
@@ -146,3 +120,53 @@ See LICENSE for terms. Unauthorized use is prohibited.
     </ebp-column>
   </ebp-row>
 </ebp-container>
+<div id="debug" #debug [class.invisible]="!debugMode">
+  <div class="buttons">
+    <button class="squared" (click)="playPauseDebug()">
+      <i
+        class="fa-sharp fa-solid fa-pause"
+        [class.fa-pause]="!debugPause"
+        [class.fa-play]="debugPause"
+      ></i>
+    </button>
+    <button class="squared" (click)="debugMode = !debugMode">
+      <i class="fa-sharp fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  <div class="video" *ngIf="videoPath">
+    <!-- This video is used to analyze the timecodes of games in a replay -->
+    <video
+      muted
+      [src]="
+        'http://localhost:' +
+        globalService.serverPort +
+        '/file?path=' +
+        videoPath
+      "
+      (loadeddata)="videoLoadedData($event)"
+      (timeupdate)="videoTimeUpdate($event)"
+    ></video>
+  </div>
+  <div class="video" *ngIf="uploadingVideoPath">
+    <!-- This video is used to upload the game in a replay -->
+    <video
+      muted
+      [src]="
+        'http://localhost:' +
+        globalService.serverPort +
+        '/file?path=' +
+        uploadingVideoPath
+      "
+      (loadeddata)="uploadingVideoLoadedData($event)"
+      (timeupdate)="uploadingVideoTimeUpdate($event)"
+    ></video>
+  </div>
+</div>
+<button
+  id="debugButton"
+  class="squared"
+  (click)="debugMode = !debugMode"
+  *ngIf="globalService.devMode"
+>
+  <i class="fa-sharp fa-solid fa-bug"></i>
+</button>

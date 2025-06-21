@@ -80,6 +80,13 @@ export class App implements OnInit {
       });
     });
 
+    //@ts-ignore
+    window.electronAPI.isDevMode().then((devMode: boolean) => {
+      this.ngZone.run(() => {
+        this.globalService.devMode = devMode;
+      });
+    });
+
     // Getting the project version.
     //@ts-ignore
     window.electronAPI.getVersion().then((versions: any) => {

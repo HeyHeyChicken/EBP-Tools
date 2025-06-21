@@ -31,6 +31,9 @@ export class GlobalService {
   // User's operating system.
   public os?: string;
 
+  // User's operating system.
+  public devMode: boolean = false;
+
   // Block the entire interface under a loading display.
   public loading: boolean = false;
 
