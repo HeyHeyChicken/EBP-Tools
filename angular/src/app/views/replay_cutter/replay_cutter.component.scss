@@ -5,11 +5,8 @@
 @use "../../../styles/imports/variables" as variables;
 
 video:not(.visible) {
-  opacity: 0;
   pointer-events: none;
-  position: absolute;
-  top: -1000000vh;
-  left: -1000000vw;
+  width: 1920px;
 }
 
 .dropper {
@@ -158,4 +155,60 @@ table {
       }
     }
   }
+}
+
+#debug {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: variables.$dark_color;
+  height: 100vh;
+  width: 100vw;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: auto;
+
+  &.invisible {
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    top: -1000000vh;
+    left: -1000000vw;
+  }
+
+  > .buttons {
+    position: fixed;
+    top: variables.$margin;
+    right: calc(#{variables.$margin} * 2);
+    z-index: 1;
+    gap: variables.$margin;
+    display: flex;
+  }
+
+  > .video {
+    position: relative;
+    overflow: hidden;
+    padding-top: 56.25%;
+    width: 100%;
+
+    video {
+      transform: translate(-50%, -50%) scale(0.41);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+    }
+  }
+
+  ::ng-deep canvas {
+    max-width: 100%;
+  }
+}
+
+#debugButton {
+  position: absolute;
+  left: variables.$margin;
+  bottom: 50%;
+  transform: translateY(+50%);
 }

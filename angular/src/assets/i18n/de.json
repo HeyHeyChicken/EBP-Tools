@@ -5,6 +5,7 @@
       "tuto": "Wählen Sie das gewünschte Tool aus der obigen Dropdown-Liste aus."
     },
     "replay_cutter": {
+      "wrongResolution": "Ihr Video muss eine Auflösung von {{ expectedWidth }}x{{ expectedHeight }} haben, Ihres ist in {{ currentWidth }}x{{ currentHeight }}.",
       "inputFile": "Klicken Sie hier, um Ihre Videodatei zu senden",
       "videoIsBeingAnalyzed": "Bitte warten, das Video wird gerade analysiert...",
       "nbGamesFound": "Anzahl gefundener Spiele",

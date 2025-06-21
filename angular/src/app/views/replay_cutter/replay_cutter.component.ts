@@ -5,7 +5,14 @@
 //#region Imports
 
 import { CommonModule } from '@angular/common';
-import { Component, isDevMode, NgZone, OnInit } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  isDevMode,
+  NgZone,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { GridModule } from '../../shared/grid/grid.module';
@@ -41,12 +48,17 @@ declare let cv: any;
 export class ReplayCutterComponent implements OnInit {
   //#region Attributes
 
+  @ViewChild('debug') debug?: ElementRef<HTMLDivElement>;
+  protected debugMode: boolean = false;
+  protected debugPause: boolean = false;
+
   protected percent: number = -1;
   protected games: Game[] = [];
   protected inputFileDisabled: boolean = true;
   protected videoPath: string | undefined;
   protected uploadingVideoPath: string | undefined;
   protected outputPath: string | undefined;
+  private lastDetectedGamePlayingFrame?: number;
 
   protected get isDevMode(): boolean {
     return isDevMode();
@@ -75,6 +87,19 @@ export class ReplayCutterComponent implements OnInit {
     this.initTesseract();
 
     //@ts-ignore
+    window.electronAPI.error((i18nPath: string, i18nVariables: Object) => {
+      this.ngZone.run(() => {
+        this.globalService.loading = false;
+
+        this.translateService
+          .get(i18nPath, i18nVariables)
+          .subscribe((translated: string) => {
+            this.toastrService.error(translated);
+          });
+      });
+    });
+
+    //@ts-ignore
     window.electronAPI.getVideoCutterOutputPath().then((path: sring) => {
       this.ngZone.run(() => {
         this.outputPath = path;
@@ -85,21 +110,18 @@ export class ReplayCutterComponent implements OnInit {
     //@ts-ignore
     window.electronAPI.setVideoFile((path: string) => {
       this.ngZone.run(() => {
-        this.globalService.loading = false;
-        this.inputFileDisabled = false;
-
         if (path) {
           this.videoPath = path;
           this.percent = 0;
-        } else {
-          this.translateService
-            .get('view.replay_cutter.noFilesSelected')
-            .subscribe((translated: string) => {
-              this.toastrService.error(translated);
-            });
         }
+        this.globalService.loading = false;
+        this.inputFileDisabled = false;
       });
     });
+  }
+
+  protected playPauseDebug(): void {
+    this.debugPause = !this.debugPause;
   }
 
   /**
@@ -194,324 +216,418 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   protected async videoTimeUpdate(event: Event): Promise<void> {
-    if (this.videoPath) {
-      if (this.start == 0) {
-        this.start = Date.now();
-      }
-      if (event.target) {
-        const VIDEO = event.target as HTMLVideoElement;
-        let found: boolean = false;
-        const DEFAULT_STEP: number = 2;
-        if (VIDEO.currentTime > 0) {
-          const NOW: number = VIDEO.currentTime;
+    if (this.debugPause) {
+      setTimeout(() => {
+        this.videoTimeUpdate(event);
+      }, 1000);
+    } else {
+      if (this.videoPath) {
+        if (this.start == 0) {
+          this.start = Date.now();
+        }
+        if (event.target) {
+          const VIDEO = event.target as HTMLVideoElement;
+          let found: boolean = false;
+          const DEFAULT_STEP: number = 2;
+          if (VIDEO.currentTime > 0) {
+            const NOW: number = VIDEO.currentTime;
 
-          this.percent = Math.ceil(100 - (NOW / VIDEO.duration) * 100);
+            this.percent = Math.ceil(100 - (NOW / VIDEO.duration) * 100);
 
-          //#region Détéction de la fin d'une game
+            //#region Détéction d'une frame de score d'une game
 
-          if (!found) {
-            const MODE = this.detectGameScoreFrame(VIDEO, this.games);
-            if (MODE > 0) {
-              found = true;
-              const GAME: Game = new Game(MODE);
-              GAME.end = NOW;
+            if (!found) {
+              const MODE = this.detectGameScoreFrame(VIDEO, this.games);
+              if (MODE > 0) {
+                found = true;
 
-              const PLAYER_NAME_X /* number */ = 475;
-              const PLAYER_NAME_MAX_WIDTH /* number */ = 154;
+                if (this.games.length == 0 || this.games[0].start != -1) {
+                  if (MODE > 0) {
+                    const GAME: Game = new Game(MODE);
+                    GAME.end = NOW;
 
-              //#region Orange team
+                    const PLAYER_NAME_X /* number */ = 475;
+                    const PLAYER_NAME_MAX_WIDTH /* number */ = 154;
 
-              const ORANGE_TEAM_NAME /* string */ = await this.getTextFromImage(
-                VIDEO,
-                this.tesseractWorker_basic!,
-                GAME.mode == 1 ? 390 : 388,
-                GAME.mode == 1 ? 187 : 159,
-                GAME.mode == 1 ? 620 : 618,
-                GAME.mode == 1 ? 217 : 189,
-                7
-              );
-              if (ORANGE_TEAM_NAME && ORANGE_TEAM_NAME.length >= 2) {
-                GAME.orangeTeam.name = ORANGE_TEAM_NAME.toUpperCase();
-              }
+                    //#region Orange team
 
-              const ORANGE_TEAM_SCORE /* string */ =
-                await this.getTextFromImage(
-                  VIDEO,
-                  this.tesseractWorker_number!,
-                  530,
-                  GAME.mode == 1 ? 89 : 54,
-                  620,
-                  GAME.mode == 1 ? 127 : 92,
-                  7
-                );
-              if (ORANGE_TEAM_SCORE) {
-                const INT_VALUE = parseInt(ORANGE_TEAM_SCORE);
-                if (INT_VALUE <= 100) {
-                  GAME.orangeTeam.score = INT_VALUE;
-                }
-              }
+                    const ORANGE_TEAM_NAME /* string */ =
+                      await this.getTextFromImage(
+                        VIDEO,
+                        this.tesseractWorker_basic!,
+                        GAME.mode == 1 ? 390 : 388,
+                        GAME.mode == 1 ? 187 : 159,
+                        GAME.mode == 1 ? 620 : 618,
+                        GAME.mode == 1 ? 217 : 189,
+                        7
+                      );
+                    if (ORANGE_TEAM_NAME && ORANGE_TEAM_NAME.length >= 2) {
+                      GAME.orangeTeam.name = ORANGE_TEAM_NAME.toUpperCase();
+                    }
 
-              // const ORANGE_PLAYER_1 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   259,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   282,
-              //   7
-              // );
-              // if (ORANGE_PLAYER_1) {
-              //   GAME.orangeTeam.players.push(new Player(1, ORANGE_PLAYER_1));
-              // }
+                    const ORANGE_TEAM_SCORE /* string */ =
+                      await this.getTextFromImage(
+                        VIDEO,
+                        this.tesseractWorker_number!,
+                        530,
+                        GAME.mode == 1 ? 89 : 54,
+                        620,
+                        GAME.mode == 1 ? 127 : 92,
+                        7
+                      );
+                    if (ORANGE_TEAM_SCORE) {
+                      const INT_VALUE = parseInt(ORANGE_TEAM_SCORE);
+                      if (INT_VALUE <= 100) {
+                        GAME.orangeTeam.score = INT_VALUE;
+                      }
+                    }
 
-              // const ORANGE_PLAYER_2 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   312,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   335,
-              //   7
-              // );
-              // if (ORANGE_PLAYER_2) {
-              //   GAME.orangeTeam.players.push(new Player(2, ORANGE_PLAYER_2));
-              // }
+                    // const ORANGE_PLAYER_1 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   259,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   282,
+                    //   7
+                    // );
+                    // if (ORANGE_PLAYER_1) {
+                    //   GAME.orangeTeam.players.push(new Player(1, ORANGE_PLAYER_1));
+                    // }
 
-              // const ORANGE_PLAYER_3 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   365,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   388,
-              //   7
-              // );
-              // if (ORANGE_PLAYER_3) {
-              //   GAME.orangeTeam.players.push(new Player(3, ORANGE_PLAYER_3));
-              // }
+                    // const ORANGE_PLAYER_2 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   312,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   335,
+                    //   7
+                    // );
+                    // if (ORANGE_PLAYER_2) {
+                    //   GAME.orangeTeam.players.push(new Player(2, ORANGE_PLAYER_2));
+                    // }
 
-              // const ORANGE_PLAYER_4 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   418,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   441,
-              //   7
-              // );
-              // if (ORANGE_PLAYER_4) {
-              //   GAME.orangeTeam.players.push(new Player(4, ORANGE_PLAYER_4));
-              // }
+                    // const ORANGE_PLAYER_3 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   365,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   388,
+                    //   7
+                    // );
+                    // if (ORANGE_PLAYER_3) {
+                    //   GAME.orangeTeam.players.push(new Player(3, ORANGE_PLAYER_3));
+                    // }
 
-              //#endregion
+                    // const ORANGE_PLAYER_4 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   418,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   441,
+                    //   7
+                    // );
+                    // if (ORANGE_PLAYER_4) {
+                    //   GAME.orangeTeam.players.push(new Player(4, ORANGE_PLAYER_4));
+                    // }
 
-              //#region Blue team
+                    //#endregion
 
-              const BLUE_TEAM_NAME /* string */ = await this.getTextFromImage(
-                VIDEO,
-                this.tesseractWorker_basic!,
-                390,
-                GAME.mode == 1 ? 637 : 629,
-                620,
-                GAME.mode == 1 ? 667 : 679,
-                7
-              );
-              if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
-                GAME.blueTeam.name = BLUE_TEAM_NAME.toUpperCase();
-              }
+                    //#region Blue team
 
-              const BLUE_TEAM_SCORE /* string */ = await this.getTextFromImage(
-                VIDEO,
-                this.tesseractWorker_number!,
-                GAME.mode == 1 ? 1294 : 1286,
-                GAME.mode == 1 ? 89 : 54,
-                GAME.mode == 1 ? 1384 : 1376,
-                GAME.mode == 1 ? 127 : 93,
-                7
-              );
-              if (BLUE_TEAM_SCORE) {
-                const INT_VALUE = parseInt(BLUE_TEAM_SCORE);
-                if (INT_VALUE <= 100) {
-                  GAME.blueTeam.score = INT_VALUE;
-                }
-              }
+                    const BLUE_TEAM_NAME /* string */ =
+                      await this.getTextFromImage(
+                        VIDEO,
+                        this.tesseractWorker_basic!,
+                        390,
+                        GAME.mode == 1 ? 637 : 629,
+                        620,
+                        GAME.mode == 1 ? 667 : 679,
+                        7
+                      );
+                    if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
+                      GAME.blueTeam.name = BLUE_TEAM_NAME.toUpperCase();
+                    }
 
-              // const BLUE_PLAYER_1 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   712,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   735,
-              //   7
-              // );
-              // if (BLUE_PLAYER_1) {
-              //   GAME.blueTeam.players.push(new Player(6, BLUE_PLAYER_1));
-              // }
+                    const BLUE_TEAM_SCORE /* string */ =
+                      await this.getTextFromImage(
+                        VIDEO,
+                        this.tesseractWorker_number!,
+                        GAME.mode == 1 ? 1294 : 1286,
+                        GAME.mode == 1 ? 89 : 54,
+                        GAME.mode == 1 ? 1384 : 1376,
+                        GAME.mode == 1 ? 127 : 93,
+                        7
+                      );
+                    if (BLUE_TEAM_SCORE) {
+                      const INT_VALUE = parseInt(BLUE_TEAM_SCORE);
+                      if (INT_VALUE <= 100) {
+                        GAME.blueTeam.score = INT_VALUE;
+                      }
+                    }
 
-              // const BLUE_PLAYER_2 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   765,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   788,
-              //   7
-              // );
-              // if (BLUE_PLAYER_2) {
-              //   GAME.blueTeam.players.push(new Player(7, BLUE_PLAYER_2));
-              // }
+                    // const BLUE_PLAYER_1 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   712,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   735,
+                    //   7
+                    // );
+                    // if (BLUE_PLAYER_1) {
+                    //   GAME.blueTeam.players.push(new Player(6, BLUE_PLAYER_1));
+                    // }
 
-              // const BLUE_PLAYER_3 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   818,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   841,
-              //   7
-              // );
-              // if (BLUE_PLAYER_3) {
-              //   GAME.blueTeam.players.push(new Player(8, BLUE_PLAYER_3));
-              // }
+                    // const BLUE_PLAYER_2 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   765,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   788,
+                    //   7
+                    // );
+                    // if (BLUE_PLAYER_2) {
+                    //   GAME.blueTeam.players.push(new Player(7, BLUE_PLAYER_2));
+                    // }
 
-              // const BLUE_PLAYER_4 /* string */ = await getTextFromImage(
-              //   VIDEO,
-              //   document.tesseractWorker,
-              //   PLAYER_NAME_X,
-              //   871,
-              //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-              //   894,
-              //   7
-              // );
-              // if (BLUE_PLAYER_4) {
-              //   GAME.blueTeam.players.push(new Player(9, BLUE_PLAYER_4));
-              // }
+                    // const BLUE_PLAYER_3 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   818,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   841,
+                    //   7
+                    // );
+                    // if (BLUE_PLAYER_3) {
+                    //   GAME.blueTeam.players.push(new Player(8, BLUE_PLAYER_3));
+                    // }
 
-              //#endregion
+                    // const BLUE_PLAYER_4 /* string */ = await getTextFromImage(
+                    //   VIDEO,
+                    //   document.tesseractWorker,
+                    //   PLAYER_NAME_X,
+                    //   871,
+                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
+                    //   894,
+                    //   7
+                    // );
+                    // if (BLUE_PLAYER_4) {
+                    //   GAME.blueTeam.players.push(new Player(9, BLUE_PLAYER_4));
+                    // }
 
-              this.games.unshift(GAME);
-            }
-          }
+                    //#endregion
 
-          //#endregion
-
-          //#region Détéction du début d'une game
-
-          if (!found) {
-            if (this.detectGameLoadingFrame(VIDEO, this.games)) {
-              found = true;
-              this.games[0].start =
-                NOW + 2 /* On vire le bout de loader de map. */;
-            }
-          }
-
-          if (!found) {
-            if (this.detectGameIntro(VIDEO, this.games)) {
-              found = true;
-              this.games[0].start =
-                NOW + 2 /* On vire le bout d'animation de map. */;
-            }
-          }
-
-          //#endregion
-
-          //#region Detecting card name during game.
-
-          if (!found) {
-            if (this.detectGamePlaying(VIDEO, this.games)) {
-              // On cherche le nom de la carte.
-              if (this.games[0].map == '') {
-                const TEXT /* string */ = await this.getTextFromImage(
-                  VIDEO,
-                  this.tesseractWorker_letter!,
-                  825,
-                  this.games[0].mode == 1 ? 81 : 89,
-                  1093,
-                  this.games[0].mode == 1 ? 102 : 110,
-                  7
-                );
-                if (TEXT) {
-                  found = true;
-                  if (this.games[0].map == '') {
-                    const MAP_NAME /* string */ = this.getMapByName(TEXT);
-                    this.games[0].map = MAP_NAME;
-                    this.games[0].name = MAP_NAME;
+                    this.games.unshift(GAME);
                   }
+                } else if (
+                  this.lastDetectedGamePlayingFrame &&
+                  this.games[0].start == -1
+                ) {
+                  /*
+                  console.log('SUPER SOLVE');
+                  this.games[0].start = this.lastDetectedGamePlayingFrame;
+                  this.lastDetectedGamePlayingFrame = undefined;
+                  console.log(this.games[0].map);
+                  */
                 }
               }
+            }
 
-              // We are looking for the name of the orange team.
-              if (this.games[0].orangeTeam.name == '') {
-                const TEXT /* string */ = await this.getTextFromImage(
-                  VIDEO,
-                  this.tesseractWorker_basic!,
-                  686,
-                  22,
-                  833,
-                  68,
-                  6
-                );
-                if (TEXT && TEXT.length >= 2) {
-                  found = true;
-                  if (this.games[0].orangeTeam.name == '') {
-                    this.games[0].orangeTeam.name = TEXT.toUpperCase();
+            //#endregion
+
+            //#region Détéction de la fin d'une game
+
+            if (!found) {
+              if (this.detectGameEndFrame(VIDEO, this.games)) {
+                found = true;
+
+                if (this.games.length == 0 || this.games[0].start != -1) {
+                  const GAME: Game = new Game(1);
+                  GAME.end = NOW;
+
+                  const ORANGE_TEAM_SCORE /* string */ =
+                    await this.getTextFromImage(
+                      VIDEO,
+                      this.tesseractWorker_number!,
+                      636,
+                      545,
+                      903,
+                      648,
+                      7
+                    );
+                  if (ORANGE_TEAM_SCORE) {
+                    const INT_VALUE = parseInt(ORANGE_TEAM_SCORE);
+                    if (INT_VALUE <= 100) {
+                      GAME.orangeTeam.score = INT_VALUE;
+                    }
                   }
-                }
-              }
 
-              // We are looking for the name of the blue team.
-              if (this.games[0].blueTeam.name == '') {
-                const TEXT /* string */ = await this.getTextFromImage(
-                  VIDEO,
-                  this.tesseractWorker_basic!,
-                  1087,
-                  22,
-                  1226,
-                  68,
-                  6
-                );
-                if (TEXT && TEXT.length >= 2) {
-                  found = true;
-                  if (this.games[0].blueTeam.name == '') {
-                    this.games[0].blueTeam.name = TEXT.toUpperCase();
+                  const BLUE_TEAM_SCORE /* string */ =
+                    await this.getTextFromImage(
+                      VIDEO,
+                      this.tesseractWorker_number!,
+                      996,
+                      545,
+                      1257,
+                      648,
+                      7
+                    );
+                  if (BLUE_TEAM_SCORE) {
+                    const INT_VALUE = parseInt(BLUE_TEAM_SCORE);
+                    if (INT_VALUE <= 100) {
+                      GAME.blueTeam.score = INT_VALUE;
+                    }
                   }
+
+                  this.games.unshift(GAME);
+                } else if (
+                  this.lastDetectedGamePlayingFrame &&
+                  this.games[0].start == -1
+                ) {
+                  /*
+                  console.log('SUPER SOLVE 2222222222222');
+                  this.games[0].start = this.lastDetectedGamePlayingFrame;
+                  this.lastDetectedGamePlayingFrame = undefined;
+                  console.log(this.games[0].map);
+                  */
                 }
               }
+            }
 
-              if (
-                this.games[0].orangeTeam.name &&
-                this.games[0].blueTeam.name &&
-                this.games[0].map
-              ) {
-                if (!this.games[0].__debug__jumped) {
+            //#endregion
+
+            //#region Détéction du début d'une game
+
+            if (!found) {
+              if (this.detectGameLoadingFrame(VIDEO, this.games)) {
+                found = true;
+                this.lastDetectedGamePlayingFrame = undefined;
+                this.games[0].start =
+                  NOW + 2 /* On vire le bout de loader de map. */;
+              }
+            }
+
+            if (!found) {
+              if (this.detectGameIntro(VIDEO, this.games)) {
+                found = true;
+                this.lastDetectedGamePlayingFrame = undefined;
+                this.games[0].start =
+                  NOW + 2 /* On vire le bout d'animation de map. */;
+                console.log(this.games[0].map);
+              }
+            }
+
+            //#endregion
+
+            //#region Detecting card name during game.
+
+            if (!found) {
+              if (this.detectGamePlaying(VIDEO, this.games)) {
+                this.lastDetectedGamePlayingFrame = NOW;
+                // On cherche le nom de la carte.
+                if (this.games[0].map == '') {
                   const TEXT /* string */ = await this.getTextFromImage(
                     VIDEO,
-                    this.tesseractWorker_time!,
-                    935,
-                    0,
-                    985,
-                    28,
+                    this.tesseractWorker_letter!,
+                    825,
+                    this.games[0].mode == 1 ? 81 : 89,
+                    1093,
+                    this.games[0].mode == 1 ? 102 : 110,
                     7
                   );
+                  // DEBUG
+                  this.debug?.nativeElement.append(this.getVideoFrame(VIDEO)!);
+
                   if (TEXT) {
                     found = true;
-                    const SPLITTED /* string[] */ = TEXT.split(':');
-                    if (SPLITTED.length == 2) {
-                      const MINUTES = parseInt(SPLITTED[0]);
-                      const SECONDES = parseInt(SPLITTED[1]);
-                      const DIFFERENCE = (10 - MINUTES) * 60 - SECONDES;
-                      if (MINUTES <= 9) {
-                        if (!this.games[0].__debug__jumped) {
-                          this.games[0].__debug__jumped = true;
-                          console.log("Jumping to the game's start !");
-                          this.setVideoCurrentTime(
-                            VIDEO,
-                            NOW - DIFFERENCE,
-                            this.games,
-                            this.globalService.discordServerURL
-                          );
-                          return;
+                    if (this.games[0].map == '') {
+                      const MAP_NAME /* string */ = this.getMapByName(TEXT);
+                      this.games[0].map = MAP_NAME;
+                      console.log('----- ', this.games[0].map);
+                    }
+                  }
+                }
+
+                // We are looking for the name of the orange team.
+                if (this.games[0].orangeTeam.name == '') {
+                  const TEXT /* string */ = await this.getTextFromImage(
+                    VIDEO,
+                    this.tesseractWorker_basic!,
+                    686,
+                    22,
+                    833,
+                    68,
+                    6
+                  );
+                  if (TEXT && TEXT.length >= 2) {
+                    found = true;
+                    if (this.games[0].orangeTeam.name == '') {
+                      this.games[0].orangeTeam.name = TEXT.toUpperCase();
+                    }
+                  }
+                }
+
+                // We are looking for the name of the blue team.
+                if (this.games[0].blueTeam.name == '') {
+                  const TEXT /* string */ = await this.getTextFromImage(
+                    VIDEO,
+                    this.tesseractWorker_basic!,
+                    1087,
+                    22,
+                    1226,
+                    68,
+                    6
+                  );
+                  if (TEXT && TEXT.length >= 2) {
+                    found = true;
+                    if (this.games[0].blueTeam.name == '') {
+                      this.games[0].blueTeam.name = TEXT.toUpperCase();
+                    }
+                  }
+                }
+
+                if (
+                  this.games[0].orangeTeam.name &&
+                  this.games[0].blueTeam.name &&
+                  this.games[0].map
+                ) {
+                  if (!this.games[0].__debug__jumped) {
+                    const TEXT /* string */ = await this.getTextFromImage(
+                      VIDEO,
+                      this.tesseractWorker_time!,
+                      935,
+                      0,
+                      985,
+                      28,
+                      7
+                    );
+                    if (TEXT) {
+                      found = true;
+                      const SPLITTED /* string[] */ = TEXT.split(':');
+                      if (SPLITTED.length == 2) {
+                        const MINUTES = parseInt(SPLITTED[0]);
+                        const SECONDES = parseInt(SPLITTED[1]);
+                        const DIFFERENCE = (10 - MINUTES) * 60 - SECONDES;
+                        if (MINUTES <= 9) {
+                          if (!this.games[0].__debug__jumped) {
+                            this.games[0].__debug__jumped = true;
+                            console.log("Jumping to the game's start !");
+                            this.lastDetectedGamePlayingFrame =
+                              NOW - DIFFERENCE;
+                            this.setVideoCurrentTime(
+                              VIDEO,
+                              NOW - DIFFERENCE,
+                              this.games,
+                              this.globalService.discordServerURL
+                            );
+                            return;
+                          }
                         }
                       }
                     }
@@ -519,30 +635,30 @@ export class ReplayCutterComponent implements OnInit {
                 }
               }
             }
+
+            //#endregion
+
+            this.setVideoCurrentTime(
+              VIDEO,
+              NOW - DEFAULT_STEP,
+              this.games,
+              this.globalService.discordServerURL
+            );
+          } else {
+            this.onVideoEnded(this.games, this.globalService.discordServerURL);
+
+            const DIFFERENCE = Date.now() - this.start;
+            const MINUTES = Math.floor(DIFFERENCE / 60000);
+            const SECONDS = Math.floor((DIFFERENCE % 60000) / 1000);
+
+            console.log(
+              `${MINUTES.toString().padStart(
+                2,
+                '0'
+              )}m ${SECONDS.toString().padStart(2, '0')}s`
+            );
+            this.start = 0;
           }
-
-          //#endregion
-
-          this.setVideoCurrentTime(
-            VIDEO,
-            NOW - DEFAULT_STEP,
-            this.games,
-            this.globalService.discordServerURL
-          );
-        } else {
-          this.onVideoEnded(this.games, this.globalService.discordServerURL);
-
-          const DIFFERENCE = Date.now() - this.start;
-          const MINUTES = Math.floor(DIFFERENCE / 60000);
-          const SECONDS = Math.floor((DIFFERENCE % 60000) / 1000);
-
-          console.log(
-            `${MINUTES.toString().padStart(
-              2,
-              '0'
-            )}m ${SECONDS.toString().padStart(2, '0')}s`
-          );
-          this.start = 0;
         }
       }
     }
@@ -717,6 +833,33 @@ export class ReplayCutterComponent implements OnInit {
     return '';
   }
 
+  private detectGameEndFrame(video: HTMLVideoElement, games: Game[]): boolean {
+    if (
+      /* Orange logo */
+      this.colorSimilarity(
+        this.getPixelColor(video, 387, 417),
+        new RGB(251, 209, 0)
+      ) &&
+      this.colorSimilarity(
+        this.getPixelColor(video, 481, 472),
+        new RGB(252, 205, 4)
+      ) &&
+      /* Blue logo */
+      this.colorSimilarity(
+        this.getPixelColor(video, 1498, 437),
+        new RGB(46, 144, 242)
+      ) &&
+      this.colorSimilarity(
+        this.getPixelColor(video, 1630, 486),
+        new RGB(46, 136, 226)
+      )
+    ) {
+      console.log('Detect game end frame');
+      return true;
+    }
+    return false;
+  }
+
   /**
    * This function detects the end of a game via the score display.
    * @param video HTML DOM of the video element to be analyzed.
@@ -724,37 +867,35 @@ export class ReplayCutterComponent implements OnInit {
    * @returns Is the current frame a game score frame?
    */
   private detectGameScoreFrame(video: HTMLVideoElement, games: Game[]): number {
-    if (games.length == 0 || games[0].start != -1) {
-      if (
-        /* Orange logo */
-        this.colorSimilarity(
-          this.getPixelColor(video, 325, 153),
-          new RGB(239, 203, 14)
-        ) &&
-        /* Blue logo */
-        this.colorSimilarity(
-          this.getPixelColor(video, 313, 613),
-          new RGB(50, 138, 230)
-        )
-      ) {
-        console.log('Detect game score frame (mode 1)');
-        return 1;
-      }
-      if (
-        /* Orange logo */
-        this.colorSimilarity(
-          this.getPixelColor(video, 325, 123),
-          new RGB(239, 203, 14)
-        ) &&
-        /* Blue logo */
-        this.colorSimilarity(
-          this.getPixelColor(video, 313, 618),
-          new RGB(50, 138, 230)
-        )
-      ) {
-        console.log('Detect game score frame (mode 2)');
-        return 2;
-      }
+    if (
+      /* Orange logo */
+      this.colorSimilarity(
+        this.getPixelColor(video, 325, 153),
+        new RGB(239, 203, 14)
+      ) &&
+      /* Blue logo */
+      this.colorSimilarity(
+        this.getPixelColor(video, 313, 613),
+        new RGB(50, 138, 230)
+      )
+    ) {
+      console.log('Detect game score frame (mode 1)');
+      return 1;
+    }
+    if (
+      /* Orange logo */
+      this.colorSimilarity(
+        this.getPixelColor(video, 325, 123),
+        new RGB(239, 203, 14)
+      ) &&
+      /* Blue logo */
+      this.colorSimilarity(
+        this.getPixelColor(video, 313, 618),
+        new RGB(50, 138, 230)
+      )
+    ) {
+      console.log('Detect game score frame (mode 2)');
+      return 2;
     }
     return 0;
   }
@@ -1115,6 +1256,31 @@ export class ReplayCutterComponent implements OnInit {
     return false;
   }
 
+  private getVideoFrame(
+    video: HTMLVideoElement
+  ): HTMLCanvasElement | undefined {
+    const CANVAS = document.createElement('canvas');
+    CANVAS.width = video.clientWidth;
+    CANVAS.height = video.clientHeight;
+    const CTX = CANVAS.getContext('2d');
+    if (CTX) {
+      CTX.drawImage(
+        video /* Image */,
+        0 /* Image X */,
+        0 /* Image Y */,
+        video.clientWidth /* Image width */,
+        video.clientHeight /* Image height */,
+        0 /* Canvas X */,
+        0 /* Canvas Y */,
+        video.clientWidth /* Canvas width */,
+        video.clientHeight /* Canvas height */
+      );
+
+      return CANVAS;
+    }
+    return undefined;
+  }
+
   /**
    * This function detects a playing game frame.
    * @param video HTML DOM of the video element to be analyzed.
@@ -1169,38 +1335,55 @@ export class ReplayCutterComponent implements OnInit {
         1801,
         games[0].mode == 1 ? 991 : 985
       );
+
+      const ORANGE = new RGB(231, 123, 9);
+      const BLUE = new RGB(30, 126, 242);
+      const BLACK = new RGB(0, 0, 0);
+
+      // S'il y a au moins un joueur en vie
       if (
-        //#region Orange team
-        // Player 1
-        (this.colorSimilarity(J1_PIXEL, new RGB(231, 123, 9)) ||
-          this.colorSimilarity(J1_PIXEL, new RGB(0, 0, 0), 50)) &&
-        // Player 2
-        (this.colorSimilarity(J2_PIXEL, new RGB(231, 123, 9)) ||
-          this.colorSimilarity(J2_PIXEL, new RGB(0, 0, 0), 50)) &&
-        // Player 3
-        (this.colorSimilarity(J3_PIXEL, new RGB(231, 123, 9)) ||
-          this.colorSimilarity(J3_PIXEL, new RGB(0, 0, 0), 50)) &&
-        //Joueur 4
-        (this.colorSimilarity(J4_PIXEL, new RGB(231, 123, 9)) ||
-          this.colorSimilarity(J4_PIXEL, new RGB(0, 0, 0), 50)) &&
-        //#endregion
-        //#region Blue team
-        //Joueur 1
-        (this.colorSimilarity(J5_PIXEL, new RGB(30, 126, 242)) ||
-          this.colorSimilarity(J5_PIXEL, new RGB(0, 0, 0), 50)) &&
-        // Player 2
-        (this.colorSimilarity(J6_PIXEL, new RGB(30, 126, 242)) ||
-          this.colorSimilarity(J6_PIXEL, new RGB(0, 0, 0), 50)) &&
-        // Player 3
-        (this.colorSimilarity(J7_PIXEL, new RGB(30, 126, 242)) ||
-          this.colorSimilarity(J7_PIXEL, new RGB(0, 0, 0), 50)) &&
-        // Player 4
-        (this.colorSimilarity(J8_PIXEL, new RGB(30, 126, 242)) ||
-          this.colorSimilarity(J8_PIXEL, new RGB(0, 0, 0), 50))
-        //#endregion
+        (this.colorSimilarity(J1_PIXEL, ORANGE) ||
+          this.colorSimilarity(J2_PIXEL, ORANGE) ||
+          this.colorSimilarity(J3_PIXEL, ORANGE) ||
+          this.colorSimilarity(J4_PIXEL, ORANGE)) &&
+        (this.colorSimilarity(J5_PIXEL, BLUE) ||
+          this.colorSimilarity(J6_PIXEL, BLUE) ||
+          this.colorSimilarity(J7_PIXEL, BLUE) ||
+          this.colorSimilarity(J8_PIXEL, BLUE))
       ) {
-        console.log('Detect game playing frame');
-        return true;
+        if (
+          //#region Orange team
+          // Player 1
+          (this.colorSimilarity(J1_PIXEL, ORANGE) ||
+            this.colorSimilarity(J1_PIXEL, BLACK, 50)) &&
+          // Player 2
+          (this.colorSimilarity(J2_PIXEL, ORANGE) ||
+            this.colorSimilarity(J2_PIXEL, BLACK, 50)) &&
+          // Player 3
+          (this.colorSimilarity(J3_PIXEL, ORANGE) ||
+            this.colorSimilarity(J3_PIXEL, BLACK, 50)) &&
+          //Joueur 4
+          (this.colorSimilarity(J4_PIXEL, ORANGE) ||
+            this.colorSimilarity(J4_PIXEL, BLACK, 50)) &&
+          //#endregion
+          //#region Blue team
+          //Joueur 1
+          (this.colorSimilarity(J5_PIXEL, BLUE) ||
+            this.colorSimilarity(J5_PIXEL, BLACK, 50)) &&
+          // Player 2
+          (this.colorSimilarity(J6_PIXEL, BLUE) ||
+            this.colorSimilarity(J6_PIXEL, BLACK, 50)) &&
+          // Player 3
+          (this.colorSimilarity(J7_PIXEL, BLUE) ||
+            this.colorSimilarity(J7_PIXEL, BLACK, 50)) &&
+          // Player 4
+          (this.colorSimilarity(J8_PIXEL, BLUE) ||
+            this.colorSimilarity(J8_PIXEL, BLACK, 50))
+          //#endregion
+        ) {
+          console.log('Detect game playing frame');
+          return true;
+        }
       }
       return false;
     }

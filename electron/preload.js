@@ -8,6 +8,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   //#region Client -> Server
 
+  // The front-end asks the server to return the developer mode state.
+  isDevMode: () => ipcRenderer.invoke("is-dev-mode"),
   // The front-end asks the server to return the user's operating system.
   getOS: () => ipcRenderer.invoke("get-os"),
   // The front-end asks the server to download a YouTube video.
@@ -54,7 +56,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The server informs the front-end that the games are exported.
   gamesAreExported: (callback) => ipcRenderer.on("games-are-exported", (event, filePath) => callback(filePath)),
   // The server asks the font-end to display an error.
-  error: (callback) => ipcRenderer.on("error", (event, value) => callback(value)),
+  error: (callback) => ipcRenderer.on("error", (event, i18nPath, i18nVariables) => callback(i18nPath, i18nVariables)),
   // The server asks the font-end to display a replay downloader error.
   replayDownloaderError: (callback) => ipcRenderer.on("replay-downloader-error", (event, error) => callback(error)),
   // The server asks the font-end that the video is well downloaded.
