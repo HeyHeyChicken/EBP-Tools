@@ -5,6 +5,7 @@
   "main": ".webpack/main",
   "scripts": {
     "install_npm": "npm install && cd angular && npm install",
+    "reinstall": "rm -rf node_modules && npm install && npm audit fix && cd angular && rm -rf node_modules && npm install && npm audit fix",
     "make": "cd ./angular && npx ng build && cd ../ && electron-forge make",
     "start": "concurrently \"cd ./angular && npx ng serve\" \"electron ./electron/server.js\""
   },

@@ -1,3 +1,7 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
 const { FusesPlugin } = require("@electron-forge/plugin-fuses");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 const path = require("path");
