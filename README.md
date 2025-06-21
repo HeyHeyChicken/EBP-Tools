@@ -20,7 +20,7 @@ I provide support for all users through [Discord](//discord.gg/tAHAc9q3aX).
 
 ## 🤓 You are a developper
 
-Feel free to take a look at the [developer wiki](//github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/wiki).
+Feel free to take a look at the [developer wiki](//github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/wiki/1-%E2%80%90-Home).
 
 ## 💻 Compatibility
 
