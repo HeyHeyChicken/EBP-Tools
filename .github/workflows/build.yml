@@ -103,7 +103,7 @@ jobs:
         run: |
           # Fonction de retry avec backoff
           staple_with_retry() {
-            local max_attempts=5
+            local max_attempts=10
             local attempt=1
             local delay=10
             
@@ -126,7 +126,7 @@ jobs:
               sleep $delay
               
               # Augmenter le délai pour le prochain essai
-              delay=$((delay + 5))
+              delay=$((delay + delay))
               attempt=$((attempt + 1))
             done
           }
