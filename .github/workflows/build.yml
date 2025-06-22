@@ -143,7 +143,7 @@ jobs:
   # Create the Windows version of the application.
   build-windows:
     runs-on: windows-latest
-    needs: [macos-latest]
+    needs: [build-macos]
     steps:
       # Clone the repository.
       - uses: actions/checkout@v3
