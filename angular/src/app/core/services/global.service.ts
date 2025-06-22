@@ -10,7 +10,7 @@ import { TranslateService } from '@ngx-translate/core';
 //#endregion
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: 'root'
 })
 export class GlobalService {
   //#region Attributes
@@ -29,7 +29,7 @@ export class GlobalService {
   public serverPort: number = 0;
 
   // User's operating system.
-  public os?: string;
+  public os?: NodeJS.Platform;
 
   // User's operating system.
   public devMode: boolean = false;

@@ -15,18 +15,18 @@ import { ReplayDownloaderComponent } from './views/replay_downloader/replay_down
 export const routes: Routes = [
   {
     path: '',
-    component: HomeComponent,
+    component: HomeComponent
   },
   {
     path: 'replay_cutter',
-    component: ReplayCutterComponent,
+    component: ReplayCutterComponent
   },
   {
     path: 'game_history',
-    component: GameHistoryComponent,
+    component: GameHistoryComponent
   },
   {
     path: 'replay_downloader',
-    component: ReplayDownloaderComponent,
-  },
+    component: ReplayDownloaderComponent
+  }
 ];

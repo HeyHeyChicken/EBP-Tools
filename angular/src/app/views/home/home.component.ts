@@ -25,7 +25,7 @@ import { GlobalService } from '../../core/services/global.service';
     MessageComponent,
     CommonModule,
     MatTooltipModule,
-  ],
+  ]
 })
 export class HomeComponent implements OnInit {
   //#region Attributes

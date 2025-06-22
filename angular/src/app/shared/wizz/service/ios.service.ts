@@ -4,12 +4,12 @@
 
 //#region Imports
 
-import { Injectable } from "@angular/core";
+import { Injectable } from '@angular/core';
 
 //#endregion
 
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root'
 })
 export class iOSService {
   //#region Attributes
@@ -17,15 +17,15 @@ export class iOSService {
   public static get isiOS(): boolean {
     return (
       [
-        "iPad Simulator",
-        "iPhone Simulator",
-        "iPod Simulator",
-        "iPad",
-        "iPhone",
-        "iPod",
+        'iPad Simulator',
+        'iPhone Simulator',
+        'iPod Simulator',
+        'iPad',
+        'iPhone',
+        'iPod'
       ].includes(navigator.platform) ||
       // iPad on iOS 13 detection
-      (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+      (navigator.userAgent.includes('Mac') && 'ontouchend' in document)
     );
   }
 
@@ -38,6 +38,9 @@ export class iOSService {
    * @param el Input
    * @param timeout
    */
+  // TODO: should be removed or used
+  /* eslint-disable */
+  // prettier-ignore
   public focus(el: any, timeout: number = 100): void {
     // Align temp input element approximately where the input element is so the cursor doesn't jump around
     var __tempEl__ = document.createElement("input");
@@ -58,6 +61,6 @@ export class iOSService {
       document.body.removeChild(__tempEl__);
     }, timeout);
   }
-
+  /* eslint-enable */
   //#endregion
 }

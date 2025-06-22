@@ -4,17 +4,17 @@
 
 //#region Import
 
-import { Component, Input } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
 
 //#endregion
 
 @Component({
-  selector: "ebp-loader",
-  templateUrl: "./loader.component.html",
-  styleUrls: ["./loader.component.scss"],
+  selector: 'ebp-loader',
+  templateUrl: './loader.component.html',
+  styleUrls: ['./loader.component.scss'],
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule]
 })
 export class LoaderComponent {
   //#region Attributes

@@ -3,5 +3,9 @@
 // See LICENSE for terms. Unauthorized use is prohibited.
 
 export class RGB {
-	constructor(public r: number, public g: number, public b: number) {}
+  constructor(
+    public r: number,
+    public g: number,
+    public b: number
+  ) {}
 }
