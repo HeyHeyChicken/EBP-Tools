@@ -101,7 +101,38 @@ jobs:
       # Staple notarization ticket
       - name: Staple notarization ticket
         run: |
-          xcrun stapler staple "out/make/macos.dmg"
+          # Fonction de retry avec backoff
+          staple_with_retry() {
+            local max_attempts=5
+            local attempt=1
+            local delay=10
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "🔄 Stapling attempt $attempt/$max_attempts..."
+              
+              if xcrun stapler staple "out/make/macos.dmg"; then
+                echo "✅ Successfully stapled out/make/macos.dmg"
+                xcrun stapler validate "out/make/macos.dmg"
+                return 0
+              fi
+              
+              if [ $attempt -eq $max_attempts ]; then
+                echo "❌ Failed to staple after $max_attempts attempts"
+                echo "⚠️ App will still work but will download ticket on first run"
+                return 1
+              fi
+              
+              echo "⏳ Attempt $attempt failed, waiting ${delay}s before retry..."
+              sleep $delay
+              
+              # Augmenter le délai pour le prochain essai
+              delay=$((delay + 5))
+              attempt=$((attempt + 1))
+            done
+          }
+
+          # Exécuter le stapling avec retry
+          staple_with_retry
       # Upload the created binary.
       - name: Upload artifact
         uses: actions/upload-artifact@v4
