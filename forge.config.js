@@ -49,7 +49,7 @@ module.exports = {
       name: "@electron-forge/maker-dmg",
       config: {
         format: "ULFO",
-        name: "EBP - Tools",
+        name: "EBP-Tools",
         icon: "electron/assets/icon.icns",
         background: "electron/assets/dmg-background.png",
         overwrite: true,
