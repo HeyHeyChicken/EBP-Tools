@@ -53,8 +53,8 @@ jobs:
       # Rename the created binary.
       - name: Rename .dmg
         run: |
-          $file = Get-ChildItem -Path "out/make/" -Filter *.dmg | Select-Object -First 1
-          Rename-Item -Path $file.FullName -NewName "macos.dmg"
+          file=$(find out/make -type f -name "*.dmg" | head -n 1)
+          mv "$file" out/macos.dmg
       # Prepare temporary keychain and import certificate
       - name: Prepare Keychain and import certificate
         env:
