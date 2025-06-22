@@ -54,7 +54,7 @@ jobs:
       - name: Rename .dmg
         run: |
           file=$(find out/make -type f -name "*.dmg" | head -n 1)
-          mv "$file" out/macos.dmg
+          mv "$file" out/make/macos.dmg
       # Prepare temporary keychain and import certificate
       - name: Prepare Keychain and import certificate
         env:
@@ -112,7 +112,7 @@ jobs:
   # Create the Windows version of the application.
   build-windows:
     runs-on: windows-latest
-    needs: [test]
+    needs: [macos-latest]
     steps:
       # Clone the repository.
       - uses: actions/checkout@v3
@@ -142,7 +142,7 @@ jobs:
   # Deploy the new version.
   deploy-builds:
     runs-on: ubuntu-latest
-    needs: [build-windows, build-macos]
+    needs: [build-windows]
     steps:
       # Retrieve the version number of the application.
       - name: Get version
