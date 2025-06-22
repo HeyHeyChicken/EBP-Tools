@@ -31,6 +31,84 @@ jobs:
       # Run Jest tests.
       - name: Run tests
         run: npm test
+
+  # Create the MacOS version of the application.
+  build-macos:
+    runs-on: macos-latest
+    needs: [test]
+    steps:
+      # Clone the repository.
+      - uses: actions/checkout@v3
+      # Install Node.js.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # Install NPM dependencies.
+      - name: Install Node dependencies
+        run: npm run install_npm
+      # Building Angular and making the Electron application.
+      - name: Build Electron app
+        run: npm run make
+      # Rename the created binary.
+      - name: Rename .dmg
+        run: |
+          $file = Get-ChildItem -Path "out/make/" -Filter *.dmg | Select-Object -First 1
+          Rename-Item -Path $file.FullName -NewName "macos.dmg"
+      # Prepare temporary keychain and import certificate
+      - name: Prepare Keychain and import certificate
+        env:
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          # Create a temporary keychain
+          security create-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          # Decode and import the certificate
+          echo "${{ secrets.CERTIFICATE_P12 }}" | base64 --decode > cert.p12
+          security import cert.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+
+          # Configure the default keychain
+          security list-keychains -s build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          # Allows codesign to use the key
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+      # Code sign the app and dmg
+      - name: Code sign the app and dmg
+        env:
+          CERTIFICATE_NAME: "Developer ID Application: Antoine Duval (5DQ59NSHNB)"
+        run: |
+          codesign --force --sign "$CERTIFICATE_NAME" "out/make/macos.dmg"
+      # Configure notarytool credentials
+      - name: Configure notarytool credentials
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          echo "$APPLE_API_PRIVATE_KEY" | base64 --decode > AuthKey.p8
+          xcrun notarytool store-credentials "notary-creds" \
+            --key AuthKey.p8 \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID"
+      # Submit app for notarization
+      - name: Submit app for notarization
+        run: |
+          xcrun notarytool submit "out/make/macos.dmg" --wait --keychain-profile "notary-creds"
+      # Staple notarization ticket
+      - name: Staple notarization ticket
+        run: |
+          xcrun stapler staple "out/make/macos.dmg"
+      # Upload the created binary.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/make/*.dmg
+
   # Create the Windows version of the application.
   build-windows:
     runs-on: windows-latest
@@ -64,14 +142,20 @@ jobs:
   # Deploy the new version.
   deploy-builds:
     runs-on: ubuntu-latest
-    needs: [build-windows]
+    needs: [build-windows, build-macos]
     steps:
       # Retrieve the version number of the application.
       - name: Get version
         id: get_version
         run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-      # Download the binary created from the latest job.
-      - name: Download windows artifact
+      # Download the MacOS binary created from the latest job.
+      - name: Download macos artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos
+          path: ./release
+      # Download the Windows binary created from the latest job.
+      - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: windows
@@ -87,7 +171,17 @@ jobs:
           release_name: Release ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
-      # Add the binary to the GitHub release.
+      # Add the MacOS binary to the GitHub release.
+      - name: Upload MacOS asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/macos.dmg
+          asset_name: MacOS-EBP-Tools-Installer.dmg
+          asset_content_type: application/octet-stream
+      # Add the Windows binary to the GitHub release.
       - name: Upload Windows asset
         uses: actions/upload-release-asset@v1
         env:
