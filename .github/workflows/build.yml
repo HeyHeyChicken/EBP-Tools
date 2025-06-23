@@ -34,7 +34,7 @@ jobs:
 
   # Create the MacOS version of the application.
   build-macos:
-    runs-on: [self-hosted, ebp-mac-runner]
+    runs-on: self-hosted
     needs: [test]
     steps:
       # Clone the repository.
