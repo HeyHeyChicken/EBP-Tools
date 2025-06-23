@@ -21,6 +21,9 @@ module.exports = {
     name: "EBP - EVA Battle Plan - Tools",
     osxSign: {
       identity: "Developer ID Application: Antoine Duval (5DQ59NSHNB)",
+      hardenedRuntime: true,
+      entitlements: "build/entitlements.plist",
+      "entitlements-inherit": "build/entitlements.plist",
     },
     osxNotarize: {
       appleId: process.env.APPLE_ID,
