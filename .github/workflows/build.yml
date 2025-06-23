@@ -37,10 +37,6 @@ jobs:
     runs-on: self-hosted
     needs: [test]
     steps:
-      - name: Show user info
-        run: |
-          whoami
-          id
       # Clone the repository.
       - uses: actions/checkout@v3
       # Install Node.js.
@@ -109,11 +105,10 @@ jobs:
           staple_with_retry() {
             local max_attempts=15
             local attempt=1
-            local initial_delay=60  # Délai initial plus long
-            local delay=$initial_delay
+            local delay=60
             
-            echo "⏳ Waiting ${initial_delay}s before first stapling attempt..."
-            sleep $initial_delay
+            echo "⏳ Waiting ${delay}s before first stapling attempt..."
+            sleep $delay
             
             while [ $attempt -le $max_attempts ]; do
               echo "🔄 Stapling attempt $attempt/$max_attempts..."
@@ -140,7 +135,6 @@ jobs:
               sleep $delay
               
               # Augmenter le délai progressivement mais plafonner à 5 minutes
-              delay=$((delay < 300 ? delay + 30 : 300))
               attempt=$((attempt + 1))
             done
           }

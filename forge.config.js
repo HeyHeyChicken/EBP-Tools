@@ -19,6 +19,9 @@ module.exports = {
     ],
     icon: "electron/assets/icon",
     name: "EBP - EVA Battle Plan - Tools",
+    osxSign: {
+      identity: "Developer ID Application: Antoine Duval (5DQ59NSHNB)",
+    },
   },
   rebuildConfig: {},
   makers: [
