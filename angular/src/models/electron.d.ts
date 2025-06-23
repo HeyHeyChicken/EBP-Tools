@@ -1,5 +1,13 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+//#region Imports
+
 import { VideoPlatform } from './video-platform.enum';
-import { Version } from './versions';
+import { Versions } from './versions';
+
+//#endregion
 
 export interface ElectronAPI {
   //#region Client to Server
@@ -27,7 +35,7 @@ export interface ElectronAPI {
   getPrivatePseudoGamesOutputPath: () => Promise<string>;
   getReplayCutterOutputPath: () => Promise<string>;
   getReplayDownloaderOutputPath: () => Promise<string>;
-  getVersion: () => Promise<Version>;
+  getVersion: () => Promise<Versions>;
   getVideoCutterOutputPath: () => Promise<string>;
   isDevMode: () => Promise<boolean>;
   logout: () => Promise<void>;

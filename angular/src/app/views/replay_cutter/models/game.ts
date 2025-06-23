@@ -20,13 +20,9 @@ export class Game {
   //#region Start
 
   private _readableStart: string = '';
-  public get readableStart(): string {
-    return this._readableStart;
-  }
+
   private _start: number = -1;
-  public get start(): number {
-    return this._start;
-  }
+
   public set start(value: number) {
     this._start = value;
     this._readableStart = this.readTime(value);
@@ -37,13 +33,9 @@ export class Game {
   //#region End
 
   private _readableEnd: string = '';
-  public get readableEnd(): string {
-    return this._readableEnd;
-  }
+
   private _end: number = -1;
-  public get end(): number {
-    return this._end;
-  }
+
   public set end(value: number) {
     this._end = value;
     this._readableEnd = this.readTime(value);
@@ -62,6 +54,21 @@ export class Game {
   constructor(public mode: number) {}
 
   //#region Functions
+
+  public get start(): number {
+    return this._start;
+  }
+
+  public get end(): number {
+    return this._end;
+  }
+  public get readableEnd(): string {
+    return this._readableEnd;
+  }
+
+  public get readableStart(): string {
+    return this._readableStart;
+  }
 
   private readTime(secondes: number): string {
     const HOURS: number = Math.floor(

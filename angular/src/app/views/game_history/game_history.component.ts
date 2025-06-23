@@ -41,26 +41,12 @@ export class GameHistoryComponent implements OnInit {
   protected exporting: boolean = false;
 
   protected nbPages: number = 1;
-  protected get maxPages(): number[] {
-    return Array.from({ length: 20 }, (_, i) => i + 1);
-  }
 
   protected skip: number = 0;
 
   protected timeToWait: number = 1;
 
-  protected get seasons(): string[] {
-    return ['1', '2', '3', '1 reloaded', '4', '5'];
-  }
   protected seasonIndex: number = this.seasons.length;
-
-  protected get disablePublicPseudoExportButton(): boolean {
-    if (!this.publicPseudo) {
-      return true;
-    }
-    const REGEX = /^[a-zA-Z0-9]+#[0-9]+$/;
-    return !REGEX.test(this.publicPseudo);
-  }
 
   //#endregion
 
@@ -92,6 +78,22 @@ export class GameHistoryComponent implements OnInit {
         }
       });
     });
+  }
+
+  protected get seasons(): string[] {
+    return ['1', '2', '3', '1 reloaded', '4', '5'];
+  }
+
+  protected get maxPages(): number[] {
+    return Array.from({ length: 20 }, (_, i) => i + 1);
+  }
+
+  protected get disablePublicPseudoExportButton(): boolean {
+    if (!this.publicPseudo) {
+      return true;
+    }
+    const REGEX = /^[a-zA-Z0-9]+#[0-9]+$/;
+    return !REGEX.test(this.publicPseudo);
   }
 
   /**

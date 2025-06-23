@@ -20,7 +20,7 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 
 //#endregion
 
-// Factory pour charger les fichiers i18n
+// Factory for loading i18n files.
 export function HttpLoaderFactory(http: HttpClient) {
   return new TranslateHttpLoader(http, '/assets/i18n/', '.json');
 }

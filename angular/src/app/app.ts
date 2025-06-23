@@ -19,7 +19,7 @@ import { FooterComponent } from './shared/footer/footer.component';
 import { CommonModule } from '@angular/common';
 import { GlobalService } from './core/services/global.service';
 import { TranslateModule } from '@ngx-translate/core';
-import { Versions } from '../types/versions';
+import { Versions } from '../models/versions';
 
 //#endregion
 @Component({

@@ -13,7 +13,7 @@ import { LoaderComponent } from '../../shared/loader/loader.component';
 import { CommonModule } from '@angular/common';
 import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
-import { VideoPlatform } from '../../../types/video-platform.enum';
+import { VideoPlatform } from '../../../models/video-platform.enum';
 
 //#endregion
 

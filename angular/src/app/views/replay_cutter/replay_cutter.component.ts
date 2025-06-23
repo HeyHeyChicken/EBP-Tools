@@ -27,7 +27,7 @@ import { GlobalService } from '../../core/services/global.service';
 import { MatInputModule } from '@angular/material/input';
 import { OpenCVService } from '../../core/services/open-cv.service';
 import cv from '@techstark/opencv-js';
-import { ImageDetectionResult } from '../../../types/image-detection-result';
+import { ImageDetectionResult } from '../../../models/image-detection-result';
 
 //#endregion
 @Component({
@@ -59,10 +59,6 @@ export class ReplayCutterComponent implements OnInit {
   protected uploadingVideoPath: string | undefined;
   protected outputPath: string | undefined;
   private lastDetectedGamePlayingFrame?: number;
-
-  protected get isDevMode(): boolean {
-    return isDevMode();
-  }
 
   private start: number = 0;
   private uploadingGameIndex: number | undefined;
@@ -116,6 +112,10 @@ export class ReplayCutterComponent implements OnInit {
         this.inputFileDisabled = false;
       });
     });
+  }
+
+  protected get isDevMode(): boolean {
+    return isDevMode();
   }
 
   protected playPauseDebug(): void {
