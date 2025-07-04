@@ -2,7 +2,8 @@
   "view": {
     "home": {
       "welcomeTo": "Bienvenue sur ",
-      "tuto": "Choisissez l'outil que vous souhaitez utiliser via la liste déroulante ci-dessus."
+      "tuto": "Choisissez l'outil que vous souhaitez utiliser via la liste déroulante ci-dessus.",
+      "thanksToTheContributors": "Merci aux contributeurs"
     },
     "replay_cutter": {
       "wrongResolution": "Votre vidéo doit avoir pour résolution {{ expectedWidth }}x{{ expectedHeight }}, la vôtre est en {{ currentWidth }}x{{ currentHeight }}.",

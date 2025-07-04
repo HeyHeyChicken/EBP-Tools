@@ -2,7 +2,8 @@
   "view": {
     "home": {
       "welcomeTo": "Benvenuto su ",
-      "tuto": "Scegli lo strumento che desideri utilizzare dal menu a tendina sopra."
+      "tuto": "Scegli lo strumento che desideri utilizzare dal menu a tendina sopra.",
+      "thanksToTheContributors": "Grazie ai collaboratori"
     },
     "replay_cutter": {
       "wrongResolution": "Il vostro video deve avere una risoluzione di {{ expectedWidth }}x{{ expectedHeight }}, il vostro è in {{ currentWidth }}x{{ currentHeight }}.",

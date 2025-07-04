@@ -10,9 +10,77 @@ img {
   pointer-events: none;
   position: absolute;
   top: 0;
-  left: calc(#{variables.$margin} * 4);
+  left: calc(#{variables.$margin} * 2);
 
   &::selection {
     background-color: transparent;
+  }
+}
+
+.box {
+  background-color: variables.$dark_color;
+  padding: calc(#{variables.$margin} * 2) 0 0 calc(#{variables.$margin} * 2);
+  border: 1px solid variables.$border_color;
+  box-sizing: border-box;
+  flex: 1;
+  margin-top: variables.$margin;
+  display: flex;
+  flex-direction: column;
+  gap: variables.$margin;
+
+  // To change in the futur...
+  max-height: 156px;
+  margin-top: auto;
+
+  > h2 {
+    margin: 0;
+  }
+
+  > .scroller {
+    flex: 1;
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    > .d-flex {
+      gap: variables.$margin;
+      flex-wrap: wrap;
+      position: absolute;
+      padding-right: variables.$margin;
+      width: 100%;
+
+      $nbElements: 5;
+      .developper {
+        width: calc(
+          100% / #{$nbElements} - #{variables.$margin} + #{variables.$margin} / #{$nbElements}
+        );
+
+        &:first-child {
+          > div {
+            border-style: dashed;
+          }
+        }
+
+        > div {
+          width: 100%;
+          padding-top: 100%;
+          border-radius: 50%;
+          border: 1px solid variables.$border_color;
+          box-sizing: border-box;
+          position: relative;
+          cursor: pointer;
+          background-size: cover;
+          background-repeat: no-repeat;
+          background-position: center center;
+
+          > i {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+          }
+        }
+      }
+    }
   }
 }
