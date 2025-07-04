@@ -33,43 +33,43 @@ jobs:
         run: npm test
 
   # Create the MacOS version of the application.
-  build-macos:
-    runs-on: self-hosted
-    needs: [test]
-    env:
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-    steps:
-      # Clone the repository.
-      - uses: actions/checkout@v3
-      # Install Node.js.
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      # Install NPM dependencies.
-      - name: Install Node dependencies
-        run: npm run install_npm
-      # Building Angular and making the Electron application.
-      - name: Build Electron app
-        run: npm run make
-      # Rename the created binary.
-      - name: Rename .dmg
-        run: |
-          file=$(find out/make -type f -name "*.dmg" | head -n 1)
-          mv "$file" out/make/macos.dmg
-      # Upload the created binary.
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos
-          path: out/make/*.dmg
+  #build-macos:
+  #  runs-on: self-hosted
+  #  needs: [test]
+  #  env:
+  #    APPLE_ID: ${{ secrets.APPLE_ID }}
+  #    APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+  #    APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+  #  steps:
+  #    # Clone the repository.
+  #    - uses: actions/checkout@v3
+  #    # Install Node.js.
+  #    - name: Setup Node.js
+  #      uses: actions/setup-node@v4
+  #      with:
+  #        node-version: "20"
+  #    # Install NPM dependencies.
+  #    - name: Install Node dependencies
+  #      run: npm run install_npm
+  #    # Building Angular and making the Electron application.
+  #    - name: Build Electron app
+  #      run: npm run make
+  #    # Rename the created binary.
+  #    - name: Rename .dmg
+  #      run: |
+  #        file=$(find out/make -type f -name "*.dmg" | head -n 1)
+  #        mv "$file" out/make/macos.dmg
+  #    # Upload the created binary.
+  #    - name: Upload artifact
+  #      uses: actions/upload-artifact@v4
+  #      with:
+  #        name: macos
+  #        path: out/make/*.dmg
 
   # Create the Windows version of the application.
   build-windows:
     runs-on: windows-latest
-    needs: [build-macos]
+    needs: [test]
     steps:
       # Clone the repository.
       - uses: actions/checkout@v3
@@ -106,11 +106,11 @@ jobs:
         id: get_version
         run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
       # Download the MacOS binary created from the latest job.
-      - name: Download macos artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: macos
-          path: ./release
+      #- name: Download macos artifact
+      #  uses: actions/download-artifact@v4
+      #  with:
+      #    name: macos
+      #    path: ./release
       # Download the Windows binary created from the latest job.
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
@@ -129,15 +129,15 @@ jobs:
           draft: false
           prerelease: false
       # Add the MacOS binary to the GitHub release.
-      - name: Upload MacOS asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/macos.dmg
-          asset_name: MacOS-EBP-Tools-Installer.dmg
-          asset_content_type: application/octet-stream
+      #- name: Upload MacOS asset
+      #  uses: actions/upload-release-asset@v1
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #  with:
+      #    upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #    asset_path: ./release/macos.dmg
+      #    asset_name: MacOS-EBP-Tools-Installer.dmg
+      #    asset_content_type: application/octet-stream
       # Add the Windows binary to the GitHub release.
       - name: Upload Windows asset
         uses: actions/upload-release-asset@v1
