@@ -43,6 +43,8 @@ function addGame(games, game) {
       deaths: player.data.deaths,
       assists: player.data.assists,
       score: player.data.score,
+      inflictedDamage: player.data.inflictedDamage,
+      bulletsFiredAccuracy: player.data.bulletsFiredAccuracy,
     };
     if (player.data.team == NEW_GAME.orangeTeam.name) {
       NEW_GAME.orangeTeam.players.push(NEW_PLAYER);
