@@ -4,21 +4,20 @@
 
 //#region Imports
 
-import { Component, Input } from "@angular/core";
+import { Component, Input } from '@angular/core';
 
 //#endregion
 
 @Component({
-	selector: "ebp-row",
-	templateUrl: "./row.component.html",
-	styleUrls: ["./row.component.scss"],
-	standalone: false,
+  selector: 'ebp-row',
+  templateUrl: './row.component.html',
+  styleUrls: ['./row.component.scss'],
+  standalone: false
 })
 export class RowComponent {
-	//#region Attributes
+  //#region Attributes
 
-	@Input() public size: number = 12;
+  @Input() public size: number = 12;
 
-	//#endregion
+  //#endregion
 }
-

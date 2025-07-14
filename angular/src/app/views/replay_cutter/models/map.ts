@@ -3,5 +3,8 @@
 // See LICENSE for terms. Unauthorized use is prohibited.
 
 export class Map {
-  constructor(public name: string, public dictionnary: string[]) {}
+  constructor(
+    public name: string,
+    public dictionnary: string[]
+  ) {}
 }

@@ -30,8 +30,8 @@ import { GlobalService } from '../../core/services/global.service';
     MatInputModule,
     FormsModule,
     MatTooltipModule,
-    MatSelectModule,
-  ],
+    MatSelectModule
+  ]
 })
 export class GameHistoryComponent implements OnInit {
   //#region Attributes
@@ -41,26 +41,12 @@ export class GameHistoryComponent implements OnInit {
   protected exporting: boolean = false;
 
   protected nbPages: number = 1;
-  protected get maxPages(): number[] {
-    return Array.from({ length: 20 }, (_, i) => i + 1);
-  }
 
   protected skip: number = 0;
 
   protected timeToWait: number = 1;
 
-  protected get seasons(): string[] {
-    return ['1', '2', '3', '1 reloaded', '4', '5'];
-  }
   protected seasonIndex: number = this.seasons.length;
-
-  protected get disablePublicPseudoExportButton(): boolean {
-    if (!this.publicPseudo) {
-      return true;
-    }
-    const REGEX = /^[a-zA-Z0-9]+#[0-9]+$/;
-    return !REGEX.test(this.publicPseudo);
-  }
 
   //#endregion
 
@@ -73,15 +59,13 @@ export class GameHistoryComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
-    //@ts-ignore
-    window.electronAPI.getGameHistoryOutputPath().then((path: sring) => {
+    window.electronAPI.getGameHistoryOutputPath().then((path: string) => {
       this.ngZone.run(() => {
         this.outputPath = path;
       });
     });
 
-    //@ts-ignore
-    window.electronAPI.gamesAreExported((filePath: string) => {
+    window.electronAPI.gamesAreExported((filePath?: string) => {
       this.ngZone.run(() => {
         this.globalService.loading = false;
         this.exporting = false;
@@ -89,7 +73,6 @@ export class GameHistoryComponent implements OnInit {
           this.toastrService
             .success('Your games have been exported here: ' + filePath)
             .onTap.subscribe(() => {
-              //@ts-ignore
               window.electronAPI.openFile(filePath);
             });
         }
@@ -97,12 +80,27 @@ export class GameHistoryComponent implements OnInit {
     });
   }
 
+  protected get seasons(): string[] {
+    return ['1', '2', '3', '1 reloaded', '4', '5'];
+  }
+
+  protected get maxPages(): number[] {
+    return Array.from({ length: 20 }, (_, i) => i + 1);
+  }
+
+  protected get disablePublicPseudoExportButton(): boolean {
+    if (!this.publicPseudo) {
+      return true;
+    }
+    const REGEX = /^[a-zA-Z0-9]+#[0-9]+$/;
+    return !REGEX.test(this.publicPseudo);
+  }
+
   /**
    * This function allows user to change the folder where game histories are stored.
    */
   protected setOutputPath(): void {
     this.globalService.loading = true;
-    //@ts-ignore
     window.electronAPI
       .setSetting('gameHistoryOutputPath')
       .then((path: string) => {
@@ -136,7 +134,6 @@ export class GameHistoryComponent implements OnInit {
       this.globalService.loading = true;
       this.exporting = true;
 
-      //@ts-ignore
       window.electronAPI.extractPublicPseudoGames(
         this.publicPseudo,
         this.nbPages,
@@ -151,7 +148,6 @@ export class GameHistoryComponent implements OnInit {
     this.globalService.loading = true;
     this.exporting = true;
 
-    //@ts-ignore
     window.electronAPI.extractPrivatePseudoGames(
       this.nbPages,
       this.seasonIndex,

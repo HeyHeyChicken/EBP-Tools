@@ -11,7 +11,7 @@ import {
   isDevMode,
   NgZone,
   OnInit,
-  ViewChild,
+  ViewChild
 } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -25,11 +25,11 @@ import { Game } from './models/game';
 import { RGB } from './models/rgb';
 import { GlobalService } from '../../core/services/global.service';
 import { MatInputModule } from '@angular/material/input';
+import { OpenCVService } from '../../core/services/open-cv.service';
+import cv from '@techstark/opencv-js';
+import { ImageDetectionResult } from '../../../models/image-detection-result';
 
 //#endregion
-
-declare let cv: any;
-
 @Component({
   selector: 'view-replay_cutter',
   templateUrl: './replay_cutter.component.html',
@@ -42,8 +42,8 @@ declare let cv: any;
     TranslateModule,
     LoaderComponent,
     MessageComponent,
-    MatInputModule,
-  ],
+    MatInputModule
+  ]
 })
 export class ReplayCutterComponent implements OnInit {
   //#region Attributes
@@ -60,10 +60,6 @@ export class ReplayCutterComponent implements OnInit {
   protected outputPath: string | undefined;
   private lastDetectedGamePlayingFrame?: number;
 
-  protected get isDevMode(): boolean {
-    return isDevMode();
-  }
-
   private start: number = 0;
   private uploadingGameIndex: number | undefined;
 
@@ -78,16 +74,16 @@ export class ReplayCutterComponent implements OnInit {
     protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
-    private readonly translateService: TranslateService
+    private readonly translateService: TranslateService,
+    private readonly openCVService: OpenCVService
   ) {}
 
   //#region Functions
 
   ngOnInit(): void {
-    this.initTesseract();
+    this.initServices();
 
-    //@ts-ignore
-    window.electronAPI.error((i18nPath: string, i18nVariables: Object) => {
+    window.electronAPI.error((i18nPath: string, i18nVariables: object) => {
       this.ngZone.run(() => {
         this.globalService.loading = false;
 
@@ -99,15 +95,13 @@ export class ReplayCutterComponent implements OnInit {
       });
     });
 
-    //@ts-ignore
-    window.electronAPI.getVideoCutterOutputPath().then((path: sring) => {
+    window.electronAPI.getVideoCutterOutputPath().then((path: string) => {
       this.ngZone.run(() => {
         this.outputPath = path;
       });
     });
 
     // The server gives the path of the video file selected by the user.
-    //@ts-ignore
     window.electronAPI.setVideoFile((path: string) => {
       this.ngZone.run(() => {
         if (path) {
@@ -120,8 +114,26 @@ export class ReplayCutterComponent implements OnInit {
     });
   }
 
+  protected get isDevMode(): boolean {
+    return isDevMode();
+  }
+
   protected playPauseDebug(): void {
     this.debugPause = !this.debugPause;
+  }
+
+  private async initServices(): Promise<void> {
+    await this.initTesseract();
+
+    this.openCVService.isLoaded$.subscribe((loaded: boolean) => {
+      if (loaded) {
+        console.log('OpenCV loaded');
+        this.inputFileDisabled = false;
+      } else {
+        console.error("OpenCV isn't loaded");
+        this.toastrService.error("Erreur lors du chargement d'OpenCV");
+      }
+    });
   }
 
   /**
@@ -135,17 +147,17 @@ export class ReplayCutterComponent implements OnInit {
 
     this.tesseractWorker_basic.setParameters({
       tessedit_char_whitelist:
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
     });
     this.tesseractWorker_number.setParameters({
-      tessedit_char_whitelist: '0123456789',
+      tessedit_char_whitelist: '0123456789'
     });
     this.tesseractWorker_letter.setParameters({
       tessedit_char_whitelist:
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz '
     });
     this.tesseractWorker_time.setParameters({
-      tessedit_char_whitelist: '0123456789:',
+      tessedit_char_whitelist: '0123456789:'
     });
 
     this.inputFileDisabled = false;
@@ -156,7 +168,6 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected setOutputPath(): void {
     this.globalService.loading = true;
-    //@ts-ignore
     window.electronAPI
       .setSetting('videoCutterOutputPath')
       .then((path: string) => {
@@ -191,7 +202,6 @@ export class ReplayCutterComponent implements OnInit {
       this.inputFileDisabled = true;
       this.games = [];
 
-      //@ts-ignore
       window.electronAPI.openVideoFile();
     }
   }
@@ -237,7 +247,7 @@ export class ReplayCutterComponent implements OnInit {
             //#region Détéction d'une frame de score d'une game
 
             if (!found) {
-              const MODE = this.detectGameScoreFrame(VIDEO, this.games);
+              const MODE = this.detectGameScoreFrame(VIDEO);
               if (MODE > 0) {
                 found = true;
 
@@ -245,10 +255,6 @@ export class ReplayCutterComponent implements OnInit {
                   if (MODE > 0) {
                     const GAME: Game = new Game(MODE);
                     GAME.end = NOW;
-
-                    const PLAYER_NAME_X /* number */ = 475;
-                    const PLAYER_NAME_MAX_WIDTH /* number */ = 154;
-
                     //#region Orange team
 
                     const ORANGE_TEAM_NAME /* string */ =
@@ -444,7 +450,7 @@ export class ReplayCutterComponent implements OnInit {
             //#region Détéction de la fin d'une game
 
             if (!found) {
-              if (this.detectGameEndFrame(VIDEO, this.games)) {
+              if (this.detectGameEndFrame(VIDEO)) {
                 found = true;
 
                 if (this.games.length == 0 || this.games[0].start != -1) {
@@ -664,18 +670,26 @@ export class ReplayCutterComponent implements OnInit {
     }
   }
 
-  private detecterImage(
-    sourceMat: any /* cvReadyPromise.Mat */,
-    templateMat: any /* cvReadyPromise.Mat */
-  ): any {
-    const result = new cv.Mat();
-    const mask = new cv.Mat();
+  private detectImage(
+    sourceMat: cv.Mat,
+    templateMat: cv.Mat
+  ): ImageDetectionResult {
+    const _cv: typeof cv = this.openCVService.cv!;
+
+    const result = new _cv.Mat();
+    const mask = new _cv.Mat();
 
     // Match du template
-    cv.matchTemplate(sourceMat, templateMat, result, cv.TM_CCOEFF_NORMED, mask);
+    _cv.matchTemplate(
+      sourceMat,
+      templateMat,
+      result,
+      cv.TM_CCOEFF_NORMED,
+      mask
+    );
 
     // Recherche de la meilleure correspondance
-    const minMax = cv.minMaxLoc(result, mask);
+    const minMax = _cv.minMaxLoc(result, mask);
     const maxPoint = minMax.maxLoc;
     const maxVal = minMax.maxVal;
 
@@ -683,29 +697,28 @@ export class ReplayCutterComponent implements OnInit {
     const position = { x: maxPoint.x, y: maxPoint.y };
 
     // Taille = taille du template
-    const taille = { width: templateMat.cols, height: templateMat.rows };
+    const size = { width: templateMat.cols, height: templateMat.rows };
 
     // Nettoyage
     result.delete();
     mask.delete();
 
-    return { position, taille, confiance: maxVal };
+    return { position, size, confidence: maxVal };
   }
 
   protected async uploadingVideoTimeUpdate(event: Event): Promise<void> {
     if (this.uploadingVideoPath && event.target && this.uploadingGameIndex) {
+      const _cv: typeof cv = this.openCVService.cv!;
       const VIDEO = event.target as HTMLVideoElement;
-      const DEFAULT_STEP: number = 2;
-      const NOW: number = VIDEO.currentTime;
 
       if (this.detectGamePlaying(VIDEO, this.games, true)) {
-        const VIDEO_MAT = cv.imread(this.videoToCanvas(VIDEO));
+        const VIDEO_MAT = _cv.imread(this.videoToCanvas(VIDEO));
         this.urlToCanvas(
           `/assets/img/maps/${this.games[this.uploadingGameIndex].map}.png`,
           (mapCanvas: HTMLCanvasElement) => {
-            const MAP_MAT = cv.imread(mapCanvas);
+            const MAP_MAT = _cv.imread(mapCanvas);
 
-            const { position, taille, confiance } = this.detecterImage(
+            const { position, size, confidence } = this.detectImage(
               VIDEO_MAT,
               MAP_MAT
             );
@@ -713,9 +726,9 @@ export class ReplayCutterComponent implements OnInit {
               'Position:',
               position,
               'Taille:',
-              taille,
+              size,
               'Confiance:',
-              confiance
+              confidence
             );
           }
         );
@@ -723,7 +736,10 @@ export class ReplayCutterComponent implements OnInit {
     }
   }
 
-  private urlToCanvas(url: string, callback: Function): void {
+  private urlToCanvas(
+    url: string,
+    callback: (canvas: HTMLCanvasElement) => void
+  ): void {
     const CANVAS = document.createElement('canvas');
     const IMAGE = new Image();
     IMAGE.src = url;
@@ -818,7 +834,7 @@ export class ReplayCutterComponent implements OnInit {
       new Map('Polaris', ['polaris']),
       new Map('Silva', ['silva']),
       new Map('The Cliff', ['cliff']),
-      new Map('The Rock', ['rock']),
+      new Map('The Rock', ['rock'])
     ];
     const SPLITTED = search
       .replace(/(\r\n|\n|\r)/gm, '')
@@ -833,7 +849,7 @@ export class ReplayCutterComponent implements OnInit {
     return '';
   }
 
-  private detectGameEndFrame(video: HTMLVideoElement, games: Game[]): boolean {
+  private detectGameEndFrame(video: HTMLVideoElement): boolean {
     if (
       /* Orange logo */
       this.colorSimilarity(
@@ -863,10 +879,9 @@ export class ReplayCutterComponent implements OnInit {
   /**
    * This function detects the end of a game via the score display.
    * @param video HTML DOM of the video element to be analyzed.
-   * @param games List of games already detected.
    * @returns Is the current frame a game score frame?
    */
-  private detectGameScoreFrame(video: HTMLVideoElement, games: Game[]): number {
+  private detectGameScoreFrame(video: HTMLVideoElement): number {
     if (
       /* Orange logo */
       this.colorSimilarity(
@@ -905,7 +920,6 @@ export class ReplayCutterComponent implements OnInit {
    * @param video HTML DOM of the video element to set the timecode to
    * @param time Timecode in seconds to apply.
    * @param games List of games already detected.
-   * @param videoPath Path of the video file to analyze.
    * @param discordServerURL EBP Discord server URL.
    */
   private setVideoCurrentTime(
@@ -937,7 +951,6 @@ export class ReplayCutterComponent implements OnInit {
           'No games were found in your video. If you think this is a mistake, please let me know.'
         )
         .onTap.subscribe(() => {
-          //@ts-ignore
           window.electronAPI.openURL(discordServerURL);
         });
     }
@@ -948,7 +961,10 @@ export class ReplayCutterComponent implements OnInit {
    * @param game Game to cut.
    */
   protected async save(game: Game): Promise<void> {
-    //@ts-ignore
+    if (this.videoPath === undefined) {
+      this.toastrService.error('Video file not found.');
+      return;
+    }
     const FILE_PATH = await window.electronAPI.cutVideoFile(
       game,
       this.videoPath
@@ -956,7 +972,6 @@ export class ReplayCutterComponent implements OnInit {
     this.toastrService
       .success('Your video has been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {
-        //@ts-ignore
         window.electronAPI.openFile(FILE_PATH);
       });
   }
@@ -965,7 +980,10 @@ export class ReplayCutterComponent implements OnInit {
    * This function allows the user to cut all games with a single click.
    */
   protected async saveAll(): Promise<void> {
-    //@ts-ignore
+    if (this.videoPath === undefined) {
+      this.toastrService.error('Video file not found.');
+      return;
+    }
     const FILE_PATH = await window.electronAPI.cutVideoFiles(
       this.games,
       this.videoPath
@@ -974,7 +992,6 @@ export class ReplayCutterComponent implements OnInit {
     this.toastrService
       .success('Your videos have been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {
-        //@ts-ignore
         window.electronAPI.openFile(FILE_PATH);
       });
   }
@@ -1443,7 +1460,7 @@ export class ReplayCutterComponent implements OnInit {
         );
         const IMG = CANVAS.toDataURL('image/png');
         await tesseractWorker.setParameters({
-          tessedit_pageseg_mode: tesseditPagesegMode.toString() as PSM,
+          tessedit_pageseg_mode: tesseditPagesegMode.toString() as PSM
         });
         const DATA = await tesseractWorker.recognize(IMG);
         if (!DATA.data.text && imageModeIndex < imageModeOrder.length - 1) {

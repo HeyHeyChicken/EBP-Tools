@@ -29,8 +29,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     MatFormFieldModule,
     MatSelectModule,
     MatTooltipModule,
-    RouterModule,
-  ],
+    RouterModule
+  ]
 })
 export class HeaderComponent implements OnInit {
   //#region Attributes
@@ -40,7 +40,7 @@ export class HeaderComponent implements OnInit {
   protected readonly pages: string[] = [
     'replay_downloader',
     'replay_cutter',
-    'game_history',
+    'game_history'
   ];
   protected page?: string;
 
@@ -60,7 +60,7 @@ export class HeaderComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
-    // List of languages ​​supported by the application.
+    // List of languages supported by the application.
     this.translateService.langs = ['fr', 'de', 'en', 'es', 'it'].sort();
 
     this.translateService.setDefaultLang(HeaderComponent.DEFAULT_LANGUAGE);
@@ -85,7 +85,6 @@ export class HeaderComponent implements OnInit {
    * @param url URL to open in the user's default browser.
    */
   protected openURLExternalBrowser(url: string): void {
-    //@ts-ignore
     window.electronAPI.openURL(url);
   }
 
@@ -95,7 +94,6 @@ export class HeaderComponent implements OnInit {
   protected logout(): void {
     if (!this.disableLogoutButton) {
       this.disableLogoutButton = true;
-      //@ts-ignore
       window.electronAPI.logout();
     }
   }

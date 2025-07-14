@@ -4,14 +4,14 @@
 
 //#region Imports
 
-import { Player } from "./player";
+import { Player } from './player';
 
 //#endregion
 
 export class Team {
   //#region Attributes
 
-  public name: string = "";
+  public name: string = '';
   public score: number = 0;
   public players: Player[] = [];
 

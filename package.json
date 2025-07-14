@@ -1,41 +1,47 @@
 {
-  "name": "ebp-tools",
-  "version": "1.4.1",
-  "description": "",
-  "main": ".webpack/main",
-  "scripts": {
-    "install_npm": "npm install && cd angular && npm install",
-    "reinstall": "rm -rf node_modules && npm install && npm audit fix && cd angular && rm -rf node_modules && npm install && npm audit fix",
-    "make": "cd ./angular && npx ng build && cd ../ && electron-forge make",
-    "start": "concurrently \"cd ./angular && npx ng serve\" \"electron ./electron/server.js\"",
-    "test": "cd angular && npx jest"
-  },
-  "repository": "https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools",
-  "keywords": [],
-  "author": "Antoine Duval",
-  "license": "See LICENSE.txt",
-  "devDependencies": {
-    "@electron-forge/cli": "^7.8.0",
-    "@electron-forge/maker-deb": "^7.8.1",
-    "@electron-forge/maker-dmg": "^7.8.0",
-    "@electron-forge/maker-rpm": "^7.8.1",
-    "@electron-forge/maker-squirrel": "^7.8.0",
-    "@electron-forge/maker-zip": "^7.8.0",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.8.0",
-    "@electron-forge/plugin-fuses": "^7.8.0",
-    "@electron-forge/plugin-webpack": "^7.8.0",
-    "@vercel/webpack-asset-relocator-loader": "^1.7.3",
-    "concurrently": "^9.1.2",
-    "copy-webpack-plugin": "^13.0.0",
-    "electron": "^36.5.0",
-    "electron-squirrel-startup": "^1.0.1"
-  },
-  "dependencies": {
-    "discord-rpc": "^4.0.1",
-    "exceljs": "^4.4.0",
-    "express": "^5.1.0",
-    "get-port": "^7.1.0",
-    "puppeteer-core": "^24.10.2",
-    "registry-js": "^1.16.1"
-  }
+    "name": "ebp-tools",
+    "version": "1.4.1",
+    "description": "",
+    "main": ".webpack/main",
+    "scripts": {
+        "install_npm": "npm install && cd angular && npm install",
+        "lint": "eslint \"angular/src/**/*.ts\"",
+        "lint:fix": "eslint \"angular/src/**/*.ts\" --fix && prettier --write \"angular/src/**/*.ts\"",
+        "make": "cd ./angular && npx ng build && cd ../ && electron-forge make",
+        "start": "concurrently \"cd ./angular && npx ng serve\" \"electron ./electron/server.js\"",
+        "test": "cd angular && npx jest"
+    },
+    "repository": "https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools",
+    "keywords": [],
+    "author": "Antoine Duval",
+    "license": "See LICENSE.txt",
+    "devDependencies": {
+        "@electron-forge/cli": "^7.8.0",
+        "@electron-forge/maker-deb": "^7.8.1",
+        "@electron-forge/maker-dmg": "^7.8.0",
+        "@electron-forge/maker-rpm": "^7.8.1",
+        "@electron-forge/maker-squirrel": "^7.8.0",
+        "@electron-forge/maker-zip": "^7.8.0",
+        "@electron-forge/plugin-auto-unpack-natives": "^7.8.0",
+        "@electron-forge/plugin-fuses": "^7.8.0",
+        "@electron-forge/plugin-webpack": "^7.8.0",
+        "@eslint/js": "^9.29.0",
+        "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+        "concurrently": "^9.1.2",
+        "copy-webpack-plugin": "^13.0.0",
+        "electron": "^36.5.0",
+        "electron-squirrel-startup": "^1.0.1",
+        "eslint": "^9.29.0",
+        "prettier": "^3.5.3",
+        "typescript": "^5.8.3",
+        "typescript-eslint": "^8.34.1"
+    },
+    "dependencies": {
+        "discord-rpc": "^4.0.1",
+        "exceljs": "^4.4.0",
+        "express": "^5.1.0",
+        "get-port": "^7.1.0",
+        "puppeteer-core": "^24.10.2",
+        "registry-js": "^1.16.1"
+    }
 }

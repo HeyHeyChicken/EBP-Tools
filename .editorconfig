@@ -1,0 +1,20 @@
+# Marks this .editorconfig as the root file;
+# EditorConfig will stop searching parent directories.
+root = true
+
+[*] # Applies the settings below to all files.
+end_of_line = lf # Uses LF (Line Feed) as the line ending (Unix style).
+charset = utf-8 # Sets file encoding to UTF-8.
+indent_style = space # Uses spaces (not tabs) for indentation.
+indent_size = 4 # Sets the indentation width to 4 spaces.
+insert_final_newline = true # Ensures files end with a newline.
+trim_trailing_whitespace = true # Removes any spaces or tabs at the end of lines.
+
+[*.md] # Overrides settings for Markdown files (.md).
+trim_trailing_whitespace = false # Removes any spaces or tabs at the end of lines.
+
+[*.{ts,js,tsx,jsx}] # Targets TypeScript, JavaScript, and their JSX/TSX variants.
+quote_type = double # Enforces single quotes for strings (if the editor supports this setting).
+
+[*.json] # Targets JSON files.
+insert_final_newline = false # Prevents adding a newline at the end of JSON files.

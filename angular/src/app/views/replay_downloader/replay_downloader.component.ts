@@ -13,6 +13,7 @@ import { LoaderComponent } from '../../shared/loader/loader.component';
 import { CommonModule } from '@angular/common';
 import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
+import { VideoPlatform } from '../../../models/video-platform.enum';
 
 //#endregion
 
@@ -27,8 +28,8 @@ import { GlobalService } from '../../core/services/global.service';
     MatInputModule,
     FormsModule,
     LoaderComponent,
-    CommonModule,
-  ],
+    CommonModule
+  ]
 })
 export class ReplayDownloaderComponent implements OnInit {
   //#region Attributes
@@ -49,14 +50,12 @@ export class ReplayDownloaderComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
-    //@ts-ignore
-    window.electronAPI.getReplayDownloaderOutputPath().then((path: sring) => {
+    window.electronAPI.getReplayDownloaderOutputPath().then((path: string) => {
       this.ngZone.run(() => {
         this.outputPath = path;
       });
     });
 
-    //@ts-ignore
     window.electronAPI.replayDownloaderError((error: string) => {
       this.ngZone.run(() => {
         this.percent = undefined;
@@ -65,19 +64,18 @@ export class ReplayDownloaderComponent implements OnInit {
         }
       });
     });
-    //@ts-ignore
+
     window.electronAPI.replayDownloaderSuccess((videoPath: string) => {
       this.ngZone.run(() => {
         this.percent = undefined;
         if (videoPath) {
           this.toastrService.success(videoPath).onTap.subscribe(() => {
-            //@ts-ignore
             window.electronAPI.openFile(videoPath);
           });
         }
       });
     });
-    //@ts-ignore
+
     window.electronAPI.replayDownloaderPercent((percent: number) => {
       this.ngZone.run(() => {
         this.percent = percent;
@@ -90,7 +88,6 @@ export class ReplayDownloaderComponent implements OnInit {
    */
   protected setOutputPath(): void {
     this.globalService.loading = true;
-    //@ts-ignore
     window.electronAPI
       .setSetting('replayDownloaderOutputPath')
       .then((path: string) => {
@@ -107,8 +104,10 @@ export class ReplayDownloaderComponent implements OnInit {
     if (this.youTubeURL) {
       if (this.isYouTubeUrl(this.youTubeURL)) {
         this.percent = 0;
-        //@ts-ignore
-        window.electronAPI.downloadReplay(this.youTubeURL, 'youtube');
+        window.electronAPI.downloadReplay(
+          this.youTubeURL,
+          VideoPlatform.YOUTUBE
+        );
         this.youTubeURL = undefined;
       }
     }
@@ -118,8 +117,7 @@ export class ReplayDownloaderComponent implements OnInit {
     if (this.twitchURL) {
       if (this.isTwitchUrl(this.twitchURL)) {
         this.percent = 0;
-        //@ts-ignore
-        window.electronAPI.downloadReplay(this.twitchURL, 'twitch');
+        window.electronAPI.downloadReplay(this.twitchURL, VideoPlatform.TWITCH);
         this.twitchURL = undefined;
       }
     }
@@ -127,7 +125,7 @@ export class ReplayDownloaderComponent implements OnInit {
 
   private isYouTubeUrl(url: string): boolean {
     const regex =
-      /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w\-]{11}(&\S*)?$/;
+      /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]{11}(&\S*)?$/;
     return regex.test(url);
   }
 
