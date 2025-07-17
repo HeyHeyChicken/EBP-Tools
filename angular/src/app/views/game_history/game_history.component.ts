@@ -16,7 +16,6 @@ import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
 import { MatDialog } from '@angular/material/dialog';
 import { ConfirmationDialog } from './dialog/confirmation/confirmation.dialog';
-import { bool } from '@techstark/opencv-js';
 
 //#endregion
 
@@ -141,7 +140,7 @@ export class GameHistoryComponent implements OnInit {
       this.dialogService
         .open(ConfirmationDialog)
         .afterClosed()
-        .subscribe((answer: bool | undefined) => {
+        .subscribe((answer: boolean | undefined) => {
           if (answer === true) {
             window.electronAPI.extractPublicPseudoGames(
               this.publicPseudo!,
@@ -159,7 +158,7 @@ export class GameHistoryComponent implements OnInit {
     this.dialogService
       .open(ConfirmationDialog)
       .afterClosed()
-      .subscribe((answer: bool | undefined) => {
+      .subscribe((answer: boolean | undefined) => {
         if (answer === true) {
           window.electronAPI.extractPrivatePseudoGames(
             this.nbPages,
