@@ -5,7 +5,7 @@
 //#region Imports
 
 import { CommonModule } from '@angular/common';
-import { Component, NgZone, OnInit } from '@angular/core';
+import { Component, isDevMode, NgZone, OnInit } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../shared/grid/grid.module';
 import { MatInputModule } from '@angular/material/input';
@@ -14,6 +14,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialog } from './dialog/confirmation/confirmation.dialog';
+import { bool } from '@techstark/opencv-js';
 
 //#endregion
 
@@ -38,7 +41,6 @@ export class GameHistoryComponent implements OnInit {
 
   protected publicPseudo?: string = undefined;
   protected outputPath: string | undefined;
-  protected exporting: boolean = false;
 
   protected nbPages: number = 1;
 
@@ -47,18 +49,24 @@ export class GameHistoryComponent implements OnInit {
   protected timeToWait: number = 1;
 
   protected seasonIndex: number = this.seasons.length;
+  protected readonly tagPlaceholder: string = 'HeyHeyChicken#37457';
 
   //#endregion
 
   constructor(
     private readonly ngZone: NgZone,
     private readonly toastrService: ToastrService,
-    protected readonly globalService: GlobalService
+    protected readonly globalService: GlobalService,
+    public readonly dialogService: MatDialog
   ) {}
 
   //#region Functions
 
   ngOnInit(): void {
+    if (isDevMode()) {
+      this.publicPseudo = this.tagPlaceholder;
+    }
+
     window.electronAPI.getGameHistoryOutputPath().then((path: string) => {
       this.ngZone.run(() => {
         this.outputPath = path;
@@ -68,7 +76,6 @@ export class GameHistoryComponent implements OnInit {
     window.electronAPI.gamesAreExported((filePath?: string) => {
       this.ngZone.run(() => {
         this.globalService.loading = false;
-        this.exporting = false;
         if (filePath) {
           this.toastrService
             .success('Your games have been exported here: ' + filePath)
@@ -131,29 +138,37 @@ export class GameHistoryComponent implements OnInit {
 
   protected onPublicPseudoExport(): void {
     if (this.publicPseudo) {
-      this.globalService.loading = true;
-      this.exporting = true;
-
-      window.electronAPI.extractPublicPseudoGames(
-        this.publicPseudo,
-        this.nbPages,
-        this.seasonIndex,
-        this.skip ?? 0,
-        this.timeToWait ?? 1
-      );
+      this.dialogService
+        .open(ConfirmationDialog)
+        .afterClosed()
+        .subscribe((answer: bool | undefined) => {
+          if (answer === true) {
+            window.electronAPI.extractPublicPseudoGames(
+              this.publicPseudo!,
+              this.nbPages,
+              this.seasonIndex,
+              this.skip ?? 0,
+              this.timeToWait ?? 1
+            );
+          }
+        });
     }
   }
 
   protected onPrivatePseudoExport(): void {
-    this.globalService.loading = true;
-    this.exporting = true;
-
-    window.electronAPI.extractPrivatePseudoGames(
-      this.nbPages,
-      this.seasonIndex,
-      this.skip ?? 0,
-      this.timeToWait ?? 1
-    );
+    this.dialogService
+      .open(ConfirmationDialog)
+      .afterClosed()
+      .subscribe((answer: bool | undefined) => {
+        if (answer === true) {
+          window.electronAPI.extractPrivatePseudoGames(
+            this.nbPages,
+            this.seasonIndex,
+            this.skip ?? 0,
+            this.timeToWait ?? 1
+          );
+        }
+      });
   }
 
   //#endregion

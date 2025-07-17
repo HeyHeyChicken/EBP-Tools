@@ -34,10 +34,22 @@
       "timeBetweenPagesExplanations": "Time in seconds to wait between each page. The more pages you export, the more you may need to increase this time.",
       "ignore": "Pages to skip",
       "ignoreExplanations": "Number of pages to skip",
-      "exporting": "Export in progress... If the page stays blank, please restart the application."
+      "dialog": {
+        "confirmation": {
+          "p1": "Please do not interact with anything during the export. If it completes successfully, a green notification will confirm it.",
+          "p2": "\"Tools\" may encounter issues when exporting your games. If you see a message saying the username was not found or if a blank table appears, please follow these steps:",
+          "li1": "Refresh the page several times.",
+          "li2": "Close and then reopen the browser.",
+          "li3": "Restart \"Tools\".",
+          "p3": "If you have exported a large number of games, please wait 15 minutes before starting another export."
+        }
+      }
     }
   },
-  "common": {},
+  "common": {
+    "ok": "Ok",
+    "cancel": "Cancel"
+  },
   "shared": {
     "header": {
       "accessWebsite": "Access the EBP website",

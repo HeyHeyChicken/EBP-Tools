@@ -1,0 +1,29 @@
+<mat-dialog-content>
+  <p>{{"view.game_history.dialog.confirmation.p1"|translate}}</p>
+  <p>{{"view.game_history.dialog.confirmation.p2"|translate}}</p>
+  <ul>
+    <li>1) {{"view.game_history.dialog.confirmation.li1"|translate}}</li>
+    <li>2) {{"view.game_history.dialog.confirmation.li2"|translate}}</li>
+    <li>3) {{"view.game_history.dialog.confirmation.li3"|translate}}</li>
+  </ul>
+  <p>{{"view.game_history.dialog.confirmation.p3"|translate}}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button
+    type="button"
+    mat-dialog-close
+    attr.aria-label="{{ 'common.cancel' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-xmark"></i>{{"common.cancel"|translate}}
+  </button>
+  <button
+    type="button"
+    [mat-dialog-close]="true"
+    class="ml-2 green"
+    [disabled]="timeToWait > 0"
+    attr.aria-label="{{ 'common.ok' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-check"></i>{{ "common.ok" | translate }}
+    <span *ngIf="timeToWait > 0">({{timeToWait}}s)</span>
+  </button>
+</mat-dialog-actions>

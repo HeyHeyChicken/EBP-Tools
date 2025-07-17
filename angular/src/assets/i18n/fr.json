@@ -34,10 +34,22 @@
       "timeBetweenPagesExplanations": "Temps en secondes à attendre entre chaque page. Plus vous exportez de pages, plus vous risquez de devoir augmenter ce temps.",
       "ignore": " Pages à ignorer",
       "ignoreExplanations": "Nombre de pages à ignorer",
-      "exporting": "Export en cours ... Si la page reste blanche, veuillez redémarrer l'application."
+      "dialog": {
+        "confirmation": {
+          "p1": "Merci de ne rien manipuler durant l’export. Si celui-ci se déroule correctement, une notification verte confirmera sa réussite.",
+          "p2": "Il se peut que \"Tools\" rencontre des difficultés lors de l’export de vos games. En cas de message indiquant que le pseudo est introuvable ou si un tableau vide s’affiche, veuillez suivre ces étapes :",
+          "li1": "Rafraîchissez la page plusieurs fois.",
+          "li2": "Fermez puis rouvrez le navigateur.",
+          "li3": "Redémarrez \"Tools\".",
+          "p3": "Si vous avez exporté un grand nombre de games, patientez 15 minutes avant de relancer un export."
+        }
+      }
     }
   },
-  "common": {},
+  "common": {
+    "ok": "Ok",
+    "cancel": "Annuler"
+  },
   "shared": {
     "header": {
       "accessWebsite": "Accéder au site web d'EBP",

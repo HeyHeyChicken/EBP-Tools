@@ -1,0 +1,25 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use '../../../../../styles/imports/variables' as variables;
+
+mat-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: variables.$margin;
+
+  ul,
+  p {
+    margin: 0;
+  }
+}
+
+mat-dialog-actions {
+  button {
+    > span {
+      text-transform: lowercase;
+      margin-left: 0;
+    }
+  }
+}

@@ -2,20 +2,21 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-@forward "./components/material/button.scss";
-@forward "./components/material/input.scss";
-@forward "./components/material/select.scss";
-@forward "./components/material/spinner.scss";
+@forward './components/material/button.scss';
+@forward './components/material/dialog.scss';
+@forward './components/material/input.scss';
+@forward './components/material/select.scss';
+@forward './components/material/spinner.scss';
 
-@forward "./imports/variables.scss";
-@forward "./imports/material_colors.scss";
+@forward './imports/variables.scss';
+@forward './imports/material_colors.scss';
 
-@forward "./utilities/display.scss";
-@forward "./utilities/flexboxOptions.scss";
-@forward "./utilities/float.scss";
-@forward "./utilities/overflow.scss";
-@forward "./utilities/sizing.scss";
-@forward "./utilities/spacing.scss";
-@forward "./utilities/textAlign.scss";
+@forward './utilities/display.scss';
+@forward './utilities/flexboxOptions.scss';
+@forward './utilities/float.scss';
+@forward './utilities/overflow.scss';
+@forward './utilities/sizing.scss';
+@forward './utilities/spacing.scss';
+@forward './utilities/textAlign.scss';
 
-@forward "./scrollbar.scss";
+@forward './scrollbar.scss';

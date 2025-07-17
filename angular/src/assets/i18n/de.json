@@ -34,10 +34,22 @@
       "timeBetweenPagesExplanations": "Wartezeit in Sekunden zwischen den Seiten. Je mehr Seiten Sie exportieren, desto länger sollte diese Zeit sein.",
       "ignore": "Seiten ignorieren",
       "ignoreExplanations": "Anzahl der zu überspringenden Seiten",
-      "exporting": "Export läuft... Wenn die Seite weiß bleibt, starten Sie bitte die Anwendung neu."
+      "dialog": {
+        "confirmation": {
+          "p1": "Bitte während des Exports nichts bedienen. Bei erfolgreichem Abschluss wird eine grüne Benachrichtigung angezeigt.",
+          "p2": "\"Tools\" kann beim Export Ihrer Spiele auf Probleme stoßen. Wenn eine Meldung erscheint, dass der Benutzername nicht gefunden wurde, oder eine leere Tabelle angezeigt wird, folgen Sie bitte diesen Schritten:",
+          "li1": "Aktualisieren Sie die Seite mehrmals.",
+          "li2": "Schließen Sie den Browser und öffnen Sie ihn erneut.",
+          "li3": "Starten Sie \"Tools\" neu.",
+          "p3": "Wenn Sie eine große Anzahl von Spielen exportiert haben, warten Sie bitte 15 Minuten, bevor Sie einen weiteren Export starten."
+        }
+      }
     }
   },
-  "common": {},
+  "common": {
+    "ok": "Ok",
+    "cancel": "Abbrechen"
+  },
   "shared": {
     "header": {
       "accessWebsite": "Zur EBP-Website gehen",

@@ -34,10 +34,22 @@
       "timeBetweenPagesExplanations": "Tiempo en segundos a esperar entre cada página. Cuantas más páginas exportes, más deberás aumentar este tiempo.",
       "ignore": "Páginas a omitir",
       "ignoreExplanations": "Número de páginas a ignorar",
-      "exporting": "Exportación en curso... Si la página permanece en blanco, reinicie la aplicación."
+      "dialog": {
+        "confirmation": {
+          "p1": "Por favor, no interactúe con nada durante la exportación. Si todo va bien, una notificación verde lo confirmará.",
+          "p2": "Es posible que \"Tools\" tenga problemas al exportar sus partidas. Si aparece un mensaje indicando que el nombre de usuario no existe o si se muestra una tabla vacía, siga estos pasos:",
+          "li1": "Actualice la página varias veces.",
+          "li2": "Cierre y vuelva a abrir el navegador.",
+          "li3": "Reinicie \"Tools\".",
+          "p3": "Si ha exportado una gran cantidad de partidas, espere 15 minutos antes de iniciar otra exportación."
+        }
+      }
     }
   },
-  "common": {},
+  "common": {
+    "ok": "Ok",
+    "cancel": "Cancelar"
+  },
   "shared": {
     "header": {
       "accessWebsite": "Acceder al sitio web de EBP",

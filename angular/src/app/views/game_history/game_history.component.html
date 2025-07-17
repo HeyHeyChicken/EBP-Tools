@@ -9,16 +9,16 @@ See LICENSE for terms. Unauthorized use is prohibited.
     <ebp-column></ebp-column>
     <ebp-column [xs]="7">
       <div class="box">
-        <h3 class="m-0 mb-1">{{ "view.game_history.title" | translate }}</h3>
+        <h3 class="m-0 mb-1">{{ 'view.game_history.title' | translate }}</h3>
         <div class="d-flex">
-          <p>{{ "view.game_history.step" | translate }} 1</p>
+          <p>{{ 'view.game_history.step' | translate }} 1</p>
           <!-- SETTINGS -->
           <mat-form-field
             (click)="setOutputPath()"
             (keypress)="setOutputPath()"
           >
             <mat-label>{{
-              "view.replay_cutter.outputPath" | translate
+              'view.replay_cutter.outputPath' | translate
             }}</mat-label>
             <input matInput readonly type="text" [value]="outputPath" />
             <div class="buttons">
@@ -28,7 +28,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
             </div>
           </mat-form-field>
 
-          <p>{{ "view.game_history.step" | translate }} 2</p>
+          <p>{{ 'view.game_history.step' | translate }} 2</p>
           <div class="d-flex flex-row">
             <!-- SEASON -->
             <mat-form-field
@@ -38,7 +38,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
               }}"
             >
               <mat-label>{{
-                "view.game_history.season" | translate
+                'view.game_history.season' | translate
               }}</mat-label>
               <mat-select
                 [(ngModel)]="seasonIndex"
@@ -59,7 +59,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
               }}"
             >
               <mat-label>{{
-                "view.game_history.timeBetweenPages" | translate
+                'view.game_history.timeBetweenPages' | translate
               }}</mat-label>
               <input
                 matInput
@@ -78,7 +78,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
               }}"
               class="pages"
             >
-              <mat-label>{{ "view.game_history.pages" | translate }}</mat-label>
+              <mat-label>{{ 'view.game_history.pages' | translate }}</mat-label>
               <mat-select
                 [(ngModel)]="nbPages"
                 [ngModelOptions]="{ standalone: true }"
@@ -95,7 +95,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
               }}"
             >
               <mat-label>{{
-                "view.game_history.ignore" | translate
+                'view.game_history.ignore' | translate
               }}</mat-label>
               <input
                 matInput
@@ -109,19 +109,19 @@ See LICENSE for terms. Unauthorized use is prohibited.
         </div>
         <form class="d-flex" (submit)="onPublicPseudoExport()">
           <p style="margin-bottom: -12px">
-            {{ "view.game_history.step" | translate }} 3
+            {{ 'view.game_history.step' | translate }} 3
           </p>
-          <span>{{ "view.game_history.firstOption" | translate }}</span>
+          <span>{{ 'view.game_history.firstOption' | translate }}</span>
           <div class="d-flex">
             <mat-form-field>
               <mat-label>{{
-                "view.game_history.playerTag" | translate
+                'view.game_history.playerTag' | translate
               }}</mat-label>
               <input
                 matInput
                 type="text"
                 [ngModelOptions]="{ standalone: true }"
-                placeholder="HeyHeyChicken#37457"
+                [placeholder]="tagPlaceholder"
                 [(ngModel)]="publicPseudo"
                 (paste)="onPublicPseudoPaste($event)"
               />
@@ -132,9 +132,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
             class="w-100 excel"
             [disabled]="disablePublicPseudoExportButton"
           >
-            {{ "view.game_history.export" | translate }}
+            {{ 'view.game_history.export' | translate }}
           </button>
-          <span>{{ "view.game_history.secondOption" | translate }}</span>
+          <span>{{ 'view.game_history.secondOption' | translate }}</span>
           <button
             type="button"
             class="w-100 eva"
@@ -147,6 +147,3 @@ See LICENSE for terms. Unauthorized use is prohibited.
     </ebp-column>
   </ebp-row>
 </ebp-container>
-<div class="exporting" *ngIf="exporting">
-  {{ "view.game_history.exporting" | translate }}
-</div>

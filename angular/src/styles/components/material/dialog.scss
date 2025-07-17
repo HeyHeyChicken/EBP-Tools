@@ -1,0 +1,101 @@
+@use '../../imports/variables' as variables;
+
+.mat-mdc-dialog-surface {
+  border-radius: 0 !important;
+  border: 1px solid variables.$border_color;
+
+  .mat-mdc-checkbox .mdc-form-field {
+    color: white;
+  }
+}
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  background-color: variables.$dark_color !important;
+
+  .mat-mdc-dialog-title {
+    color: white;
+    text-transform: uppercase;
+    font-size: 20px;
+    font-weight: bold;
+
+    > button {
+      position: absolute;
+      top: calc(#{variables.$margin} / 2);
+      right: calc(#{variables.$margin} / 2);
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
+  mat-dialog-content {
+    color: white;
+    max-height: 100vh;
+    flex: 1;
+  }
+
+  mat-dialog-actions {
+    padding: 12px 24px 24px 24px;
+  }
+}
+
+* {
+  &:has(> .mat-mdc-dialog-title):has(> mat-dialog-content):has(
+      > mat-dialog-actions
+    ) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  $header_height: 53px;
+
+  // Header + Body + Footer
+  &:has(> .mat-mdc-dialog-title):has(> mat-dialog-content):has(
+      > mat-dialog-actions
+    ) {
+    > mat-dialog-content {
+      max-height: calc(
+        100vh - #{variables.$margin} * 7 - #{variables.$form_height} -
+          #{$header_height}
+      ) !important;
+    }
+  }
+
+  // Header + Body
+  &:has(> .mat-mdc-dialog-title):has(> mat-dialog-content):not(
+      :has(> mat-dialog-actions)
+    ) {
+    > mat-dialog-content {
+      max-height: calc(
+        100vh - #{variables.$margin} * 4 - #{$header_height}
+      ) !important;
+    }
+  }
+
+  // Body
+  &:not(:has(> .mat-mdc-dialog-title)):has(> mat-dialog-content):not(
+      :has(> mat-dialog-actions)
+    ) {
+    > mat-dialog-content {
+      max-height: calc(100vh - #{variables.$margin} * 4) !important;
+    }
+  }
+
+  // Body + Footer
+  &:not(:has(> .mat-mdc-dialog-title)):has(> mat-dialog-content):has(
+      > mat-dialog-actions
+    ) {
+    > mat-dialog-content {
+      max-height: calc(
+        100vh - #{variables.$margin} * 7 - #{variables.$form_height}
+      ) !important;
+    }
+  }
+
+  // Body + Footer
+  &:has(> mat-dialog-content):has(> mat-dialog-actions) {
+    > mat-dialog-content {
+      padding-bottom: 0 !important;
+    }
+  }
+}
