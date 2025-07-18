@@ -24,7 +24,7 @@ import { GlobalService } from '../../core/services/global.service';
     TranslateModule,
     MessageComponent,
     CommonModule,
-    MatTooltipModule,
+    MatTooltipModule
   ]
 })
 export class HomeComponent implements OnInit {
@@ -53,13 +53,15 @@ export class HomeComponent implements OnInit {
 
     while (currentIndex != 0) {
       const RANDOM_INDEX: number = Math.floor(
-        GlobalService.random(0, 1) * currentIndex
+        (GlobalService.random(1000000000000000, 9999999999999999) /
+          10000000000000000) *
+          currentIndex
       );
       currentIndex--;
 
       [array[currentIndex], array[RANDOM_INDEX]] = [
         array[RANDOM_INDEX],
-        array[currentIndex],
+        array[currentIndex]
       ];
     }
   }
