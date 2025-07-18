@@ -41,7 +41,6 @@ export class HomeComponent implements OnInit {
   }
 
   protected openURL(url: string): void {
-    //@ts-ignore
     window.electronAPI.openURL(url);
   }
 
@@ -54,9 +53,7 @@ export class HomeComponent implements OnInit {
 
     while (currentIndex != 0) {
       const RANDOM_INDEX: number = Math.floor(
-        (GlobalService.random(1000000000000000, 9999999999999999) /
-          10000000000000000) *
-          currentIndex
+        GlobalService.random(0, 1) * currentIndex
       );
       currentIndex--;
 

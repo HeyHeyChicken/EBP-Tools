@@ -26,7 +26,6 @@ import { RGB } from './models/rgb';
 import { GlobalService } from '../../core/services/global.service';
 import { MatInputModule } from '@angular/material/input';
 import { OpenCVService } from '../../core/services/open-cv.service';
-import cv from '@techstark/opencv-js';
 import { ImageDetectionResult } from '../../../models/image-detection-result';
 
 //#endregion

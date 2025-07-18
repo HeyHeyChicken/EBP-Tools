@@ -6,7 +6,7 @@
 
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import cv from '@techstark/opencv-js';
+
 
 //#endregion
 
@@ -39,14 +39,25 @@ export class OpenCVService {
     return this._cv !== null;
   }
 
-  private async init(): Promise<void> {
-    try {
-      this._cv = await cv;
+  private init(): void {
+    const win = window as typeof window & { cv?: typeof cv };
+    if (win.cv) {
+      this._cv = win.cv;
       this.isLoadedSubject.next(true);
-    } catch (error) {
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'assets/js/opencv.js';
+    script.async = true;
+    script.onload = () => {
+      this._cv = win.cv!;
+      this.isLoadedSubject.next(true);
+    };
+    script.onerror = (error) => {
       console.error('Loading error OpenCV: ', error);
       this.isLoadedSubject.next(false);
-    }
+    };
+    document.body.appendChild(script);
   }
 
   //#endregion
