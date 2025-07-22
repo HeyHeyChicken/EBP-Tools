@@ -61,7 +61,7 @@ export class HeaderComponent implements OnInit {
 
   ngOnInit(): void {
     // List of languages supported by the application.
-    this.translateService.langs = ['fr', 'de', 'en', 'es', 'it'].sort();
+    this.translateService.langs = ['fr', 'de', 'en', 'es', 'it', 'ro'].sort();
 
     this.translateService.setDefaultLang(HeaderComponent.DEFAULT_LANGUAGE);
 
