@@ -53,10 +53,10 @@ export class GameHistoryComponent implements OnInit {
   //#endregion
 
   constructor(
+    protected readonly globalService: GlobalService,
     private readonly ngZone: NgZone,
     private readonly toastrService: ToastrService,
-    protected readonly globalService: GlobalService,
-    public readonly dialogService: MatDialog
+    private readonly dialogService: MatDialog
   ) {}
 
   //#region Functions
@@ -87,7 +87,7 @@ export class GameHistoryComponent implements OnInit {
   }
 
   protected get seasons(): string[] {
-    return ['1', '2', '3', '1 reloaded', '4', '5'];
+    return ['1', '2', '3', '1 reloaded', '4', '5', '6'];
   }
 
   protected get maxPages(): number[] {

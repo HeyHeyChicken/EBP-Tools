@@ -26,6 +26,9 @@ export class ConfirmationDialog implements OnInit {
   //#endregion
 
   constructor() {}
+
+  //#region Functions
+
   ngOnInit(): void {
     const INTERVAL = setInterval(() => {
       this.timeToWait--;
@@ -35,8 +38,6 @@ export class ConfirmationDialog implements OnInit {
       }
     }, 1000);
   }
-
-  //#region Functions
 
   //#endregion
 }
