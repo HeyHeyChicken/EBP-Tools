@@ -2,12 +2,14 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer } = require('electron');
 
 // prettier-ignore
 contextBridge.exposeInMainWorld("electronAPI", {
   //#region Client -> Server
 
+  // The front-end asks the server to resize the main frame;
+  setWindowSize: (width, height) => ipcRenderer.invoke("set-window-size", width, height),
   // The front-end asks the server to return the developer mode state.
   isDevMode: () => ipcRenderer.invoke("is-dev-mode"),
   // The front-end asks the server to return the user's operating system.

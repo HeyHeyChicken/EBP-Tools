@@ -19,13 +19,13 @@ See LICENSE for terms. Unauthorized use is prohibited.
           <i class="fa-sharp fa-solid fa-file"></i>
           <i class="fa-sharp fa-solid fa-file-video"></i>
         </div>
-        <p>{{ "view.replay_cutter.inputFile" | translate }}</p>
+        <p>{{ 'view.replay_cutter.inputFile' | translate }}</p>
       </div>
       <div *ngIf="percent >= 0">
         <ebp-loader [value]="percent"></ebp-loader>
         <ebp-message class="mt-2">
-          {{ "view.replay_cutter.videoIsBeingAnalyzed" | translate }}<br />
-          {{ "view.replay_cutter.nbGamesFound" | translate }}:<b>
+          {{ 'view.replay_cutter.videoIsBeingAnalyzed' | translate }}<br />
+          {{ 'view.replay_cutter.nbGamesFound' | translate }}:<b>
             {{ games.length }}</b
           >
         </ebp-message>
@@ -37,7 +37,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
           (keypress)="setOutputPath()"
         >
           <mat-label>{{
-            "view.replay_cutter.outputPath" | translate
+            'view.replay_cutter.outputPath' | translate
           }}</mat-label>
           <input matInput readonly type="text" [value]="outputPath" />
           <div class="buttons">
@@ -49,8 +49,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
         <table class="mt-1">
           <thead>
             <tr>
-              <th>{{ "view.replay_cutter.map" | translate }}</th>
-              <th>{{ "view.replay_cutter.infos" | translate }}</th>
+              <th>{{ 'view.replay_cutter.map' | translate }}</th>
+              <th>{{ 'view.replay_cutter.infos' | translate }}</th>
               <th>
                 <div>
                   <button
@@ -107,7 +107,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   <button
                     class="squared"
                     [disabled]="!isDevMode"
-                    (click)="upload(i)"
+                    (click)="cropGameMinimap(i)"
                   >
                     <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
                   </button>

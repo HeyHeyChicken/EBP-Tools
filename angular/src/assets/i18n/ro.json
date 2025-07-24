@@ -48,7 +48,8 @@
   },
   "common": {
     "ok": "Ok",
-    "cancel": "Anulează"
+    "cancel": "Anulează",
+    "reset": "Resetare"
   },
   "shared": {
     "header": {

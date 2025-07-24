@@ -27,6 +27,9 @@ import { GlobalService } from '../../core/services/global.service';
 import { MatInputModule } from '@angular/material/input';
 import { OpenCVService } from '../../core/services/open-cv.service';
 import { ImageDetectionResult } from '../../../models/image-detection-result';
+import { MatDialog } from '@angular/material/dialog';
+import { ReplayCutterCropDialog } from './dialog/crop/crop.dialog';
+import { CropperPosition } from 'ngx-image-cropper';
 
 //#endregion
 @Component({
@@ -74,7 +77,8 @@ export class ReplayCutterComponent implements OnInit {
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
     private readonly translateService: TranslateService,
-    private readonly openCVService: OpenCVService
+    private readonly openCVService: OpenCVService,
+    private readonly dialogService: MatDialog
   ) {}
 
   //#region Functions
@@ -180,16 +184,49 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
-   * This feature allows the user to upload their cut game.
+   * This function allows the user to set the game mini map position.
    * @param gameIndex Index of the game to upload.
    */
-  protected upload(gameIndex: number): void {
-    this.uploadingVideoPath = undefined;
-    setTimeout(() => {
-      this.uploadingGameIndex = gameIndex;
-      this.uploadingVideoPath = `${this.videoPath}&v=${new Date().getTime()}`;
-    });
+  protected cropGameMinimap(gameIndex: number): void {
+    if (this.videoPath) {
+      this.videoURLToCanvas(
+        `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
+        Math.round((this.games[gameIndex].start + 10) * 1000),
+        (videoFrame?: HTMLCanvasElement) => {
+          if (videoFrame) {
+            this.uploadingVideoPath = undefined;
+            this.uploadingGameIndex = gameIndex;
+            //this.uploadingVideoPath = `${this.videoPath}&v=${new Date().getTime()}`;
+            const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
+            this.dialogService
+              .open(ReplayCutterCropDialog, {
+                data: {
+                  imgBase64: videoFrame?.toDataURL('image/png')
+                },
+                maxWidth: DIALOG_WIDTH,
+                width: DIALOG_WIDTH,
+                autoFocus: false
+              })
+              .afterClosed()
+              .subscribe((miniMapPositions: CropperPosition) => {
+                window.electronAPI.setWindowSize();
+                this.uploadGameMiniMap(gameIndex, miniMapPositions);
+              });
+          }
+        }
+      );
+    }
   }
+
+  /**
+   * This function allows the user to upload their cut game.
+   * @param gameIndex Index of the game to upload.
+   * @param miniMapPositions Position of the minimap.
+   */
+  private uploadGameMiniMap(
+    gameIndex: number,
+    miniMapPositions: CropperPosition
+  ): void {}
 
   /**
    * This function is triggered when the user clicks on the "input" to select a replay.
@@ -547,7 +584,7 @@ export class ReplayCutterComponent implements OnInit {
                     7
                   );
                   // DEBUG
-                  this.debug?.nativeElement.append(this.getVideoFrame(VIDEO)!);
+                  this.debug?.nativeElement.append(this.videoToCanvas(VIDEO)!);
 
                   if (TEXT) {
                     found = true;
@@ -751,17 +788,6 @@ export class ReplayCutterComponent implements OnInit {
         callback(CANVAS);
       }
     };
-  }
-
-  private videoToCanvas(video: HTMLVideoElement): HTMLCanvasElement {
-    const CANVAS = document.createElement('canvas');
-    CANVAS.width = video.videoWidth;
-    CANVAS.height = video.videoHeight;
-    const CTX = CANVAS.getContext('2d');
-    if (CTX) {
-      CTX.drawImage(video, 0, 0, CANVAS.width, CANVAS.height);
-    }
-    return CANVAS;
   }
 
   /**
@@ -1272,29 +1298,45 @@ export class ReplayCutterComponent implements OnInit {
     return false;
   }
 
-  private getVideoFrame(
-    video: HTMLVideoElement
-  ): HTMLCanvasElement | undefined {
+  private videoToCanvas(video: HTMLVideoElement): HTMLCanvasElement {
     const CANVAS = document.createElement('canvas');
-    CANVAS.width = video.clientWidth;
-    CANVAS.height = video.clientHeight;
+    CANVAS.width = video.videoWidth;
+    CANVAS.height = video.videoHeight;
     const CTX = CANVAS.getContext('2d');
     if (CTX) {
-      CTX.drawImage(
-        video /* Image */,
-        0 /* Image X */,
-        0 /* Image Y */,
-        video.clientWidth /* Image width */,
-        video.clientHeight /* Image height */,
-        0 /* Canvas X */,
-        0 /* Canvas Y */,
-        video.clientWidth /* Canvas width */,
-        video.clientHeight /* Canvas height */
-      );
-
-      return CANVAS;
+      CTX.drawImage(video, 0, 0, CANVAS.width, CANVAS.height);
     }
-    return undefined;
+    return CANVAS;
+  }
+
+  private videoURLToCanvas(
+    url: string,
+    timeMs: number,
+    callback: (video?: HTMLCanvasElement) => void,
+    onError?: (err: Error) => void
+  ): void {
+    const VIDEO = document.createElement('video');
+    VIDEO.src = url;
+    VIDEO.crossOrigin = 'anonymous';
+    VIDEO.muted = true;
+    VIDEO.preload = 'auto';
+
+    VIDEO.addEventListener('loadedmetadata', () => {
+      const TIME_SECONDS = timeMs / 1000;
+      if (TIME_SECONDS > VIDEO.duration) {
+        callback(undefined);
+        return;
+      }
+      VIDEO.currentTime = TIME_SECONDS;
+    });
+
+    VIDEO.addEventListener('seeked', () => {
+      callback(this.videoToCanvas(VIDEO));
+    });
+
+    VIDEO.addEventListener('error', () => {
+      callback(undefined);
+    });
   }
 
   /**

@@ -48,7 +48,8 @@
   },
   "common": {
     "ok": "Ok",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "reset": "Reimposta"
   },
   "shared": {
     "header": {

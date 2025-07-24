@@ -48,7 +48,8 @@
   },
   "common": {
     "ok": "Ok",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "reset": "Zurücksetzen"
   },
   "shared": {
     "header": {

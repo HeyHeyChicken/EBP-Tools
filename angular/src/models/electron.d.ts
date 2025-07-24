@@ -11,6 +11,7 @@ import { Versions } from './versions';
 
 export interface ElectronAPI {
   //#region Client to Server
+  setWindowSize: (width?: number, height?: number) => Promise<void>;
   cutVideoFile: (game: Game, videoPath: string) => Promise<string>;
   cutVideoFiles: (games: Game[], videoPath: string) => Promise<string>;
   debugMode: () => Promise<void>;

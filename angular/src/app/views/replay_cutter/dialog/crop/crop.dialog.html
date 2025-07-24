@@ -1,0 +1,48 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<mat-dialog-content>
+  <div #imageCropperContainer>
+    <image-cropper
+      *ngIf="currentImgBase64"
+      [imageBase64]="currentImgBase64"
+      [cropper]="cropper"
+      [maintainAspectRatio]="false"
+      (cropperReady)="onCropperReady($event)"
+      (cropperChange)="onCropperChange($event)"
+    ></image-cropper>
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <!-- RESET BUTTON -->
+  <button
+    type="button"
+    class="mr-auto"
+    (click)="reset()"
+    attr.aria-label="{{ 'common.reset' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-arrow-rotate-left"></i
+    >{{"common.reset"|translate}}
+  </button>
+  <!-- CANCEL BUTTON -->
+  <button
+    type="button"
+    mat-dialog-close
+    attr.aria-label="{{ 'common.cancel' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-xmark"></i>{{"common.cancel"|translate}}
+  </button>
+  <!-- SUBMIT BUTTON -->
+  <button
+    type="button"
+    class="ml-2 green"
+    [disabled]="disableSubmitButton"
+    (click)="submit()"
+    attr.aria-label="{{ 'common.ok' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-check"></i>{{ "common.ok" | translate }}
+  </button>
+</mat-dialog-actions>
