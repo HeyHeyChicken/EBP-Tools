@@ -652,6 +652,15 @@ let projectLatestVersion /* string */ = '';
 
                     DL.on('close', (code) => {
                         if (code == 0) {
+                            const NORMALIZED_OUTPUT_PATH =
+                                OUTPUT_PATH.normalize('NFC');
+                            if (fs.existsSync(NORMALIZED_OUTPUT_PATH)) {
+                                fs.utimesSync(
+                                    NORMALIZED_OUTPUT_PATH,
+                                    new Date(),
+                                    new Date()
+                                );
+                            }
                             mainWindow.webContents.send(
                                 'replay-downloader-success',
                                 OUTPUT_PATH
