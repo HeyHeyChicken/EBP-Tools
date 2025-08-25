@@ -938,6 +938,14 @@ let projectLatestVersion /* string */ = '';
             exec(COMMAND);
         });
 
+        // The front-end asks the server to open a video file.
+        ipcMain.handle(
+            'upload-game-mini-map',
+            (event, game, cropPosition, videoPath) => {
+                console.log(game, cropPosition, videoPath);
+            }
+        );
+
         app.on('activate', function () {
             // On macOS it's common to re-create a window in the app when the dock icon is clicked and there are no other windows open.
             if (BrowserWindow.getAllWindows().length === 0) createWindow();

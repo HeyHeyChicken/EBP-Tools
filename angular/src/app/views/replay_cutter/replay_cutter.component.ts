@@ -226,7 +226,15 @@ export class ReplayCutterComponent implements OnInit {
   private uploadGameMiniMap(
     gameIndex: number,
     miniMapPositions: CropperPosition
-  ): void {}
+  ): void {
+    if (this.videoPath) {
+      window.electronAPI.uploadGameMiniMap(
+        this.games[gameIndex],
+        miniMapPositions,
+        decodeURIComponent(this.videoPath)
+      );
+    }
+  }
 
   /**
    * This function is triggered when the user clicks on the "input" to select a replay.
@@ -992,7 +1000,7 @@ export class ReplayCutterComponent implements OnInit {
     }
     const FILE_PATH = await window.electronAPI.cutVideoFile(
       game,
-      this.videoPath
+      decodeURIComponent(this.videoPath)
     );
     this.toastrService
       .success('Your video has been cut here: ' + FILE_PATH)
@@ -1011,7 +1019,7 @@ export class ReplayCutterComponent implements OnInit {
     }
     const FILE_PATH = await window.electronAPI.cutVideoFiles(
       this.games,
-      this.videoPath
+      decodeURIComponent(this.videoPath)
     );
 
     this.toastrService

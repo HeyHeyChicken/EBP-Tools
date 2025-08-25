@@ -7,11 +7,14 @@
 import { VideoPlatform } from './video-platform.enum';
 import { Versions } from './versions';
 import { JWT } from './jwt';
+import { CropperPosition } from 'ngx-image-cropper';
+import { Game } from '../app/views/replay_cutter/models/game';
 
 //#endregion
 
 export interface ElectronAPI {
   //#region Client to Server
+
   setWindowSize: (width?: number, height?: number) => Promise<void>;
   cutVideoFile: (game: Game, videoPath: string) => Promise<string>;
   cutVideoFiles: (games: Game[], videoPath: string) => Promise<string>;
@@ -47,14 +50,22 @@ export interface ElectronAPI {
   openURL: (url: string) => void;
   setSetting: (setting: string) => Promise<string>;
   setVideoFile: (callback: (path: string) => void) => Promise<void>;
+  uploadGameMiniMap: (
+    game: Game,
+    c: CropperPosition,
+    videoPath: string
+  ) => void;
+
   //#endregion
 
   //#region Server to Client
+
   gamesAreExported: (callback: (filePath: string | undefined) => void) => void;
   replayDownloaderError: (callback: (error: string) => void) => void;
   replayDownloaderSuccess: (callback: (path: string) => void) => void;
   replayDownloaderPercent: (callback: (percent: number) => void) => void;
   error: (callback: (i18nPath: string, i18nVariables: object) => void) => void;
+
   //#endregion
 }
 

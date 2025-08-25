@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   extractPublicPseudoGames: (tag, nbPages, seasonIndex, skip, timeToWait) => ipcRenderer.invoke("extract-public-pseudo-games", tag, nbPages, seasonIndex, skip, timeToWait),
   // The front-end asks the server to extract the private player games.
   extractPrivatePseudoGames: (tag, nbPages, seasonIndex, skip, timeToWait) => ipcRenderer.invoke("extract-private-pseudo-games", tag, nbPages, seasonIndex, skip, timeToWait),
+  // The front-end asks the server to crop, cut and upload a video to the EBP's S3 server.
+  uploadGameMiniMap: (game, cropPosition, videoPath) => ipcRenderer.invoke("upload-game-mini-map", game, cropPosition, videoPath),
 
   //#endregion
 
