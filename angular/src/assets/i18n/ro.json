@@ -15,7 +15,7 @@
       "copyTimecodes": "Copiază codurile de timp",
       "map": "Hartă",
       "infos": "Informații",
-      "noFilesSelectedOrinvalidCharactersInFileName": "Nu a fost selectat niciun fișier sau fișierul ales conține caractere nevalide în nume. Vă rugăm să selectați un fișier valid și să încercați din nou.",
+      "noFilesSelected": "Niciun fișier selectat",
       "timeCodesCopiedClipboard": "Codurile de timp au fost copiate în clipboard",
       "outputPath": "Cale fișier ieșire"
     },

@@ -15,7 +15,7 @@
       "copyTimecodes": "Copiar códigos de tiempo",
       "map": "Mapa",
       "infos": "Información",
-      "noFilesSelectedOrinvalidCharactersInFileName": "No se ha seleccionado ningún archivo o el archivo elegido contiene caracteres no válidos en su nombre. Por favor, seleccione un archivo válido e inténtelo de nuevo.",
+      "noFilesSelected": "Ningún archivo seleccionado",
       "timeCodesCopiedClipboard": "Los códigos de tiempo se han añadido al portapapeles",
       "outputPath": "Ruta de salida"
     },

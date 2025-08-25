@@ -15,7 +15,7 @@
       "copyTimecodes": "Copy timecodes",
       "map": "Map",
       "infos": "Informations",
-      "noFilesSelectedOrinvalidCharactersInFileName": "No file was selected or the chosen file contains invalid characters in its name. Please select a valid file and try again.",
+      "noFilesSelected": "No files selected",
       "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
       "outputPath": "Output path"
     },

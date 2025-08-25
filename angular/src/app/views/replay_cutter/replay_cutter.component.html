@@ -79,9 +79,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
             <tr *ngFor="let game of games; let i = index">
               <th
                 [style.background-image]="
-                  'url(https://evabattleplan.com/back/wp-content/uploads/' +
-                  game.map.replaceAll(' ', '-').toLowerCase() +
-                  '-300x169.webp)'
+                  'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
+                  game.map.replaceAll(' ', '_') +
+                  '_EBP-300x169.webp)'
                 "
               >
                 {{ game.map }}

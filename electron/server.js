@@ -705,22 +705,22 @@ let projectLatestVersion /* string */ = '';
                 path.join(os.homedir(), 'Downloads')
             );
 
-            const { CANCELED, FILE_PATHS } = await dialog.showOpenDialog({
+            const { canceled, filePaths } = await dialog.showOpenDialog({
                 properties: ['openDirectory'],
                 defaultPath: PATH
             });
-            if (!CANCELED && FILE_PATHS.length == 1) {
+            if (!canceled && filePaths.length == 1) {
                 const SETTINGS = JSON.parse(
                     fs.readFileSync(SETTINGS_PATH, 'utf-8')
                 );
-                SETTINGS[setting] = FILE_PATHS[0];
+                SETTINGS[setting] = filePaths[0];
 
                 fs.writeFileSync(
                     SETTINGS_PATH,
                     JSON.stringify(SETTINGS, null, 2),
                     'utf-8'
                 );
-                return FILE_PATHS[0];
+                return filePaths[0];
             } else {
                 return undefined;
             }
@@ -860,58 +860,47 @@ let projectLatestVersion /* string */ = '';
 
         // The front-end asks the server to ask the user to choose a video file.
         ipcMain.handle('open-video-file', async () => {
-            const { CANCELED, FILE_PATHS } = await dialog.showOpenDialog({
+            const { canceled, filePaths } = await dialog.showOpenDialog({
                 properties: ['openFile'],
                 filters: [{ name: 'EVA video', extensions: ['mp4', 'mkv'] }]
             });
-            if (CANCELED) {
+            if (canceled) {
                 mainWindow.webContents.send('set-video-file', '');
                 mainWindow.webContents.send(
                     'error',
-                    'view.replay_cutter.noFilesSelectedOrinvalidCharactersInFileName'
+                    'view.replay_cutter.noFilesSelected'
                 );
             } else {
-                if (FILE_PATHS) {
-                    // Check that the video file resolution is correct.
-                    getVideoResolution(
-                        FFMPEG_PATH,
-                        FILE_PATHS[0],
-                        (width, height, duration) => {
-                            const EXPECTED_WIDTH /* number */ = 1920;
-                            const EXPECTED_HEIGHT /* number */ = 1080;
-                            if (
-                                width == EXPECTED_WIDTH &&
-                                height == EXPECTED_HEIGHT
-                            ) {
-                                mainWindow.webContents.send(
-                                    'set-video-file',
-                                    FILE_PATHS[0]
-                                );
-                            } else {
-                                mainWindow.webContents.send(
-                                    'error',
-                                    'view.replay_cutter.wrongResolution',
-                                    {
-                                        expectedWidth: EXPECTED_WIDTH,
-                                        expectedHeight: EXPECTED_HEIGHT,
-                                        currentWidth: width,
-                                        currentHeight: height
-                                    }
-                                );
-                                mainWindow.webContents.send(
-                                    'set-video-file',
-                                    ''
-                                );
-                            }
+                // Check that the video file resolution is correct.
+                getVideoResolution(
+                    FFMPEG_PATH,
+                    filePaths[0],
+                    (width, height, duration) => {
+                        const EXPECTED_WIDTH /* number */ = 1920;
+                        const EXPECTED_HEIGHT /* number */ = 1080;
+                        if (
+                            width == EXPECTED_WIDTH &&
+                            height == EXPECTED_HEIGHT
+                        ) {
+                            mainWindow.webContents.send(
+                                'set-video-file',
+                                filePaths[0]
+                            );
+                        } else {
+                            mainWindow.webContents.send(
+                                'error',
+                                'view.replay_cutter.wrongResolution',
+                                {
+                                    expectedWidth: EXPECTED_WIDTH,
+                                    expectedHeight: EXPECTED_HEIGHT,
+                                    currentWidth: width,
+                                    currentHeight: height
+                                }
+                            );
+                            mainWindow.webContents.send('set-video-file', '');
                         }
-                    );
-                } else {
-                    mainWindow.webContents.send('set-video-file', '');
-                    mainWindow.webContents.send(
-                        'error',
-                        'view.replay_cutter.noFilesSelectedOrinvalidCharactersInFileName'
-                    );
-                }
+                    }
+                );
             }
         });
 

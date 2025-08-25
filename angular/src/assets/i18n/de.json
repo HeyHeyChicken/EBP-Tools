@@ -15,7 +15,7 @@
       "copyTimecodes": "Zeitstempel kopieren",
       "map": "Karte",
       "infos": "Informationen",
-      "noFilesSelectedOrinvalidCharactersInFileName": "Es wurde keine Datei ausgewählt oder die ausgewählte Datei enthält ungültige Zeichen im Namen. Bitte wählen Sie eine gültige Datei aus und versuchen Sie es erneut.",
+      "noFilesSelected": "Keine Datei ausgewählt",
       "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
       "outputPath": "Ausgabepfad"
     },

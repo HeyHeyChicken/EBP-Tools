@@ -108,7 +108,7 @@ export class ReplayCutterComponent implements OnInit {
     window.electronAPI.setVideoFile((path: string) => {
       this.ngZone.run(() => {
         if (path) {
-          this.videoPath = path;
+          this.videoPath = encodeURIComponent(path);
           this.percent = 0;
         }
         this.globalService.loading = false;
