@@ -179,14 +179,49 @@ let projectLatestVersion /* string */ = '';
                 game.map
             } (${new Date().getTime()}).${EXTENSION}`
         );
+
         const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
             game._start
         } -i "${videoPath}" -t ${
             game._end - game._start
         } -c copy "${OUTPUT_FILE_PATH}"`;
 
-        exec(COMMAND);
-        return OUTPUT_FILE_PATH;
+        return new Promise((resolve, reject) => {
+            exec(COMMAND, (error, stdout, stderr) => {
+                if (error) return reject(error);
+                resolve(OUTPUT_FILE_PATH);
+            });
+        });
+    }
+
+    /**
+     * This function crop a video file.
+     * @param {Game} game Game's data.
+     * @param {string} videoPath Full video path.
+     * @param {*} cropPosition Cropp positions and dimentions.
+     * @returns {string} Cutted video path.
+     */
+    function cropVideoFile(game, videoPath, cropPosition) {
+        const EXTENSION = videoPath.split('.').pop().toLowerCase();
+        // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
+        const OUTPUT_FILE_PATH /* string */ = path.join(
+            getOutputPath(
+                'videoCutterOutputPath',
+                path.join(os.homedir(), 'Downloads')
+            ),
+            `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
+                game.map
+            } (${new Date().getTime()}).${EXTENSION}`
+        );
+
+        const COMMAND /* string */ = `"${FFMPEG_PATH}" -i "${videoPath}" -filter:v "crop=${cropPosition.x2 - cropPosition.x1}:${cropPosition.y2 - cropPosition.y1}:${cropPosition.x1}:${cropPosition.y1}" -an "${OUTPUT_FILE_PATH}"`;
+
+        return new Promise((resolve, reject) => {
+            exec(COMMAND, (error, stdout, stderr) => {
+                if (error) return reject(error);
+                resolve(OUTPUT_FILE_PATH);
+            });
+        });
     }
 
     /**
@@ -914,16 +949,19 @@ let projectLatestVersion /* string */ = '';
         });
 
         // The front-end asks the server to cut a video file.
-        ipcMain.handle('cut-video-files', (event, games, videoPath) => {
-            games.forEach((game) => {
-                return cutVideoFile(game, videoPath);
-            });
-            return path.join(os.homedir(), 'Downloads');
+        ipcMain.handle('cut-video-files', async (event, games, videoPath) => {
+            for (const game of games) {
+                await cutVideoFile(game, videoPath);
+            }
+            return getOutputPath(
+                'videoCutterOutputPath',
+                path.join(os.homedir(), 'Downloads')
+            );
         });
 
         // The front-end asks the server to cut a video file.
-        ipcMain.handle('cut-video-file', (event, game, videoPath) => {
-            return cutVideoFile(game, videoPath);
+        ipcMain.handle('cut-video-file', async (event, game, videoPath) => {
+            return await cutVideoFile(game, videoPath);
         });
 
         // The front-end asks the server to open a video file.
@@ -942,7 +980,20 @@ let projectLatestVersion /* string */ = '';
         ipcMain.handle(
             'upload-game-mini-map',
             (event, game, cropPosition, videoPath) => {
-                console.log(game, cropPosition, videoPath);
+                cutVideoFile(game, videoPath).then((cuttedPath) => {
+                    cropVideoFile(game, cuttedPath, cropPosition).then(
+                        (croppedPath) => {
+                            const NORMALIZED_CUTTED_PATH =
+                                cuttedPath.normalize('NFC');
+                            if (fs.existsSync(NORMALIZED_CUTTED_PATH)) {
+                                fs.unlinkSync(NORMALIZED_CUTTED_PATH);
+                            }
+
+                            console.log(croppedPath);
+                            console.log(game, cropPosition, videoPath);
+                        }
+                    );
+                });
             }
         );
 

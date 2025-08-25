@@ -210,7 +210,9 @@ export class ReplayCutterComponent implements OnInit {
               .afterClosed()
               .subscribe((miniMapPositions: CropperPosition) => {
                 window.electronAPI.setWindowSize();
-                this.uploadGameMiniMap(gameIndex, miniMapPositions);
+                if (miniMapPositions) {
+                  this.uploadGameMiniMap(gameIndex, miniMapPositions);
+                }
               });
           }
         }
