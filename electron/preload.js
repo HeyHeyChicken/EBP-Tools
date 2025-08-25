@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openURL: (url) => ipcRenderer.invoke("open-url", url),
   // The front-end asks the server to return the web server port.
   getExpressPort: () => ipcRenderer.invoke("get-express-port"),
+  // The front-end asks the server to return the JWT token content.
+  getJWT: () => ipcRenderer.invoke("get-jwt"),
   // The front-end asks the server to return the project version.
   getVersion: () => ipcRenderer.invoke("get-version"),
   // The front-end asks the server to return the user's login status.

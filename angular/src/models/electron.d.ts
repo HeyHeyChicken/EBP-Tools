@@ -6,6 +6,7 @@
 
 import { VideoPlatform } from './video-platform.enum';
 import { Versions } from './versions';
+import { JWT } from './jwt';
 
 //#endregion
 
@@ -30,6 +31,7 @@ export interface ElectronAPI {
     timeToWait: number
   ) => Promise<void>;
   getExpressPort: () => Promise<number>;
+  getJWT: () => Promise<JWT>;
   getGameHistoryOutputPath: () => Promise<string>;
   getOS: () => Promise<NodeJS.Platform>;
   getPublicPseudoGamesOutputPath: () => Promise<string>;

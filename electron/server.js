@@ -55,6 +55,7 @@ const YTDLP_PATH = path.join(
 
 //#endregion
 
+const EBP_DOMAIN = 'evabattleplan.com';
 const SETTINGS_PATH = path.join(ROOT_PATH, 'settings.json');
 const WINDOW_WIDTH = 800;
 const WINDOW_DEV_PANEL_WIDTH = 540;
@@ -197,7 +198,7 @@ let projectLatestVersion /* string */ = '';
             hostname: 'api.github.com',
             path: '/repos/heyheychicken/EBP-EVA-Battle-Plan-Tools/releases/latest',
             method: 'GET',
-            headers: { 'User-Agent': 'Node.js' }
+            headers: { 'User-Agent': '' }
         };
 
         const REQUEST = https.request(OPTIONS, (res) => {
@@ -239,6 +240,127 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
+     * This function indicates whether the user's access token exists and is still valid.
+     * @returns {boolean}
+     */
+    function isJwtAccessTokenOk() {
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+        if (SETTINGS['jwt']) {
+            if (Date.now() < SETTINGS['jwt'].access_expires_in) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * This function indicates whether the user's refresh token exists and is still valid.
+     * @returns {boolean}
+     */
+    function isJwtRefreshTokenOk() {
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+        if (SETTINGS['jwt']) {
+            if (Date.now() < SETTINGS['jwt'].refresh_expires_in) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * This function checks that the user is logged in with a valid token.
+     * @param {Function} callback Callback function with loggin in information.
+     * @param {boolean} justLoggedFromWordpress
+     */
+    async function checkJwtToken(callback, justLoggedFromWordpress = false) {
+        if (isJwtAccessTokenOk()) {
+            if (callback) {
+                callback(true);
+            }
+        } else {
+            const IS_JWT_REFRESH_TOKEN_OK = isJwtRefreshTokenOk();
+            if (IS_JWT_REFRESH_TOKEN_OK || justLoggedFromWordpress) {
+                const SETTINGS = JSON.parse(
+                    fs.readFileSync(SETTINGS_PATH, 'utf-8')
+                );
+
+                // On récupèrer les cookies de la fenêtre principale.
+                const COOKIES =
+                    await mainWindow.webContents.session.cookies.get({
+                        url: `https://${EBP_DOMAIN}`
+                    });
+
+                // On transforme les cookies en header.
+                const COOKIES_HEADER = COOKIES.map(
+                    (c) => `${c.name}=${c.value}`
+                ).join('; ');
+
+                let path = '/back/api/?c=user&r=token';
+                if (IS_JWT_REFRESH_TOKEN_OK) {
+                    path += '&refresh=' + SETTINGS['jwt'].refresh_token;
+                }
+                const REQUEST_OPTIONS = {
+                    hostname: EBP_DOMAIN,
+                    port: 443,
+                    path: path,
+                    method: 'GET',
+                    headers: {
+                        Cookie: COOKIES_HEADER,
+                        Accept: 'application/json'
+                    }
+                };
+
+                const REQUEST = https.request(REQUEST_OPTIONS, (res) => {
+                    let data = '';
+
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+
+                    res.on('end', () => {
+                        try {
+                            const DATA = JSON.parse(data);
+                            DATA.access_expires_in =
+                                DATA.access_expires_in * 1000 + Date.now();
+                            DATA.refresh_expires_in =
+                                DATA.refresh_expires_in * 1000 + Date.now();
+
+                            SETTINGS['jwt'] = DATA;
+                            fs.writeFileSync(
+                                SETTINGS_PATH,
+                                JSON.stringify(SETTINGS, null, 2),
+                                'utf-8'
+                            );
+
+                            if (callback) {
+                                callback(true);
+                            }
+                        } catch (e) {
+                            console.error(`Erreur: ${e.message}`);
+                            if (callback) {
+                                callback(false);
+                            }
+                        }
+                    });
+                });
+
+                REQUEST.on('error', (e) => {
+                    console.error(`Erreur: ${e.message}`);
+                    if (callback) {
+                        callback(false);
+                    }
+                });
+
+                REQUEST.end();
+            } else {
+                if (callback) {
+                    callback(false);
+                }
+            }
+        }
+    }
+
+    /**
      * This function initializes the front-end.
      */
     function createWindow() {
@@ -261,27 +383,38 @@ let projectLatestVersion /* string */ = '';
             }
         });
 
+        const HOME_URL = `http://localhost:${isProd ? PORT : '4200'}/`;
+
+        mainWindow.webContents.on('did-navigate', async (event, url) => {
+            if (url === HOME_URL) {
+                checkJwtToken(undefined, true);
+            }
+        });
+
         // Hides the menu bar displayed in the top left corner on Windows.
         mainWindow.setMenuBarVisibility(false);
 
-        // Loads the application's index.html.
-        mainWindow.loadURL(
-            isProd
-                ? `https://evabattleplan.com/${app.getLocale()}/login?app=cutter&redirect_uri=${encodeURIComponent(
-                      'http://localhost:' + PORT
-                  )}`
-                : `http://localhost:${PORT}`
-        );
         if (!isProd) {
             mainWindow.webContents.openDevTools();
         }
+
+        checkJwtToken((isLoggedIn) => {
+            // Loads the application's index.html.
+            mainWindow.loadURL(
+                isLoggedIn
+                    ? HOME_URL
+                    : `https://${EBP_DOMAIN}/${app.getLocale()}/login?app=cutter&redirect_uri=${encodeURIComponent(
+                          HOME_URL
+                      )}`
+            );
+        });
     }
 
     async function exportGamesToExcel(games, playerName, seasonIndex) {
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.readFile(path.join(ROOT_PATH, 'template.xlsx'));
+        const WORKBOOK = new ExcelJS.Workbook();
+        await WORKBOOK.xlsx.readFile(path.join(ROOT_PATH, 'template.xlsx'));
 
-        const worksheet = workbook.getWorksheet(1);
+        const worksheet = WORKBOOK.getWorksheet(1);
 
         worksheet.getCell('A1').value = app.getLocale();
 
@@ -359,7 +492,7 @@ let projectLatestVersion /* string */ = '';
             `EBP - ${playerName} (${new Date().getTime()}).xlsx`
         );
         // Sauvegarder dans un nouveau fichier
-        await workbook.xlsx.writeFile(FILE_PATH);
+        await WORKBOOK.xlsx.writeFile(FILE_PATH);
 
         return FILE_PATH;
     }
@@ -539,6 +672,24 @@ let projectLatestVersion /* string */ = '';
             return PORT;
         });
 
+        // The front-end asks the server to return the JWT token content.
+        ipcMain.handle('get-jwt', () => {
+            const SETTINGS = JSON.parse(
+                fs.readFileSync(SETTINGS_PATH, 'utf-8')
+            );
+
+            if (SETTINGS['jwt']) {
+                const PAYLOAD = SETTINGS['jwt'].access_token.split('.')[1];
+                const DATA = JSON.parse(atob(PAYLOAD));
+                return {
+                    userID: DATA.sub,
+                    supporterLevel: parseInt(DATA.supporterLevel)
+                };
+            }
+
+            return undefined;
+        });
+
         // The front-end asks the server to return the project version.
         ipcMain.handle('get-version', () => {
             return {
@@ -554,22 +705,22 @@ let projectLatestVersion /* string */ = '';
                 path.join(os.homedir(), 'Downloads')
             );
 
-            const { canceled, filePaths } = await dialog.showOpenDialog({
+            const { CANCELED, FILE_PATHS } = await dialog.showOpenDialog({
                 properties: ['openDirectory'],
                 defaultPath: PATH
             });
-            if (!canceled && filePaths.length == 1) {
+            if (!CANCELED && FILE_PATHS.length == 1) {
                 const SETTINGS = JSON.parse(
                     fs.readFileSync(SETTINGS_PATH, 'utf-8')
                 );
-                SETTINGS[setting] = filePaths[0];
+                SETTINGS[setting] = FILE_PATHS[0];
 
                 fs.writeFileSync(
                     SETTINGS_PATH,
                     JSON.stringify(SETTINGS, null, 2),
                     'utf-8'
                 );
-                return filePaths[0];
+                return FILE_PATHS[0];
             } else {
                 return undefined;
             }
@@ -602,7 +753,7 @@ let projectLatestVersion /* string */ = '';
         // The front-end asks the server to return the user's login status.
         ipcMain.handle('get-login-state', () => {
             return session.defaultSession.cookies
-                .get({ domain: 'evabattleplan.com' })
+                .get({ domain: EBP_DOMAIN })
                 .then((cookies) => {
                     const WORDPRESS_COOKIE = cookies.find((c) =>
                         c.name.startsWith('wordpress_logged_in')
@@ -618,6 +769,8 @@ let projectLatestVersion /* string */ = '';
         ipcMain.handle('logout', () => {
             const SESSION = session.defaultSession;
 
+            fs.writeFileSync(SETTINGS_PATH, '{}', 'utf-8');
+
             Promise.all([
                 SESSION.clearStorageData({
                     storages: [
@@ -631,7 +784,7 @@ let projectLatestVersion /* string */ = '';
                 SESSION.clearCache()
             ]).then(() => {
                 mainWindow.loadURL(
-                    `https://evabattleplan.com/en/login?app=cutter&redirect_uri=${encodeURIComponent(
+                    `https://${EBP_DOMAIN}/${app.getLocale()}/login?app=cutter&redirect_uri=${encodeURIComponent(
                         'http://localhost:' + PORT
                     )}`
                 );
@@ -707,11 +860,11 @@ let projectLatestVersion /* string */ = '';
 
         // The front-end asks the server to ask the user to choose a video file.
         ipcMain.handle('open-video-file', async () => {
-            const { canceled, filePaths } = await dialog.showOpenDialog({
+            const { CANCELED, FILE_PATHS } = await dialog.showOpenDialog({
                 properties: ['openFile'],
                 filters: [{ name: 'EVA video', extensions: ['mp4', 'mkv'] }]
             });
-            if (canceled) {
+            if (CANCELED) {
                 mainWindow.webContents.send('set-video-file', '');
                 mainWindow.webContents.send(
                     'error',
@@ -721,7 +874,7 @@ let projectLatestVersion /* string */ = '';
                 // Check that the video file resolution is correct.
                 getVideoResolution(
                     FFMPEG_PATH,
-                    filePaths[0],
+                    FILE_PATHS[0],
                     (width, height, duration) => {
                         const EXPECTED_WIDTH /* number */ = 1920;
                         const EXPECTED_HEIGHT /* number */ = 1080;
@@ -731,7 +884,7 @@ let projectLatestVersion /* string */ = '';
                         ) {
                             mainWindow.webContents.send(
                                 'set-video-file',
-                                filePaths[0]
+                                FILE_PATHS[0]
                             );
                         } else {
                             mainWindow.webContents.send(
