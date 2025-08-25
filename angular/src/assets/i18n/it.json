@@ -15,7 +15,7 @@
       "copyTimecodes": "Copia i timecode",
       "map": "Mappa",
       "infos": "Informazioni",
-      "noFilesSelected": "Nessun file selezionato",
+      "noFilesSelectedOrinvalidCharactersInFileName": "Nessun file è stato selezionato o il file scelto contiene caratteri non validi nel nome. Seleziona un file valido e riprova.",
       "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti",
       "outputPath": "Percorso di output"
     },

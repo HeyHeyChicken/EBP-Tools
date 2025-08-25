@@ -868,39 +868,50 @@ let projectLatestVersion /* string */ = '';
                 mainWindow.webContents.send('set-video-file', '');
                 mainWindow.webContents.send(
                     'error',
-                    'view.replay_cutter.noFilesSelected'
+                    'view.replay_cutter.noFilesSelectedOrinvalidCharactersInFileName'
                 );
             } else {
-                // Check that the video file resolution is correct.
-                getVideoResolution(
-                    FFMPEG_PATH,
-                    FILE_PATHS[0],
-                    (width, height, duration) => {
-                        const EXPECTED_WIDTH /* number */ = 1920;
-                        const EXPECTED_HEIGHT /* number */ = 1080;
-                        if (
-                            width == EXPECTED_WIDTH &&
-                            height == EXPECTED_HEIGHT
-                        ) {
-                            mainWindow.webContents.send(
-                                'set-video-file',
-                                FILE_PATHS[0]
-                            );
-                        } else {
-                            mainWindow.webContents.send(
-                                'error',
-                                'view.replay_cutter.wrongResolution',
-                                {
-                                    expectedWidth: EXPECTED_WIDTH,
-                                    expectedHeight: EXPECTED_HEIGHT,
-                                    currentWidth: width,
-                                    currentHeight: height
-                                }
-                            );
-                            mainWindow.webContents.send('set-video-file', '');
+                if (FILE_PATHS) {
+                    // Check that the video file resolution is correct.
+                    getVideoResolution(
+                        FFMPEG_PATH,
+                        FILE_PATHS[0],
+                        (width, height, duration) => {
+                            const EXPECTED_WIDTH /* number */ = 1920;
+                            const EXPECTED_HEIGHT /* number */ = 1080;
+                            if (
+                                width == EXPECTED_WIDTH &&
+                                height == EXPECTED_HEIGHT
+                            ) {
+                                mainWindow.webContents.send(
+                                    'set-video-file',
+                                    FILE_PATHS[0]
+                                );
+                            } else {
+                                mainWindow.webContents.send(
+                                    'error',
+                                    'view.replay_cutter.wrongResolution',
+                                    {
+                                        expectedWidth: EXPECTED_WIDTH,
+                                        expectedHeight: EXPECTED_HEIGHT,
+                                        currentWidth: width,
+                                        currentHeight: height
+                                    }
+                                );
+                                mainWindow.webContents.send(
+                                    'set-video-file',
+                                    ''
+                                );
+                            }
                         }
-                    }
-                );
+                    );
+                } else {
+                    mainWindow.webContents.send('set-video-file', '');
+                    mainWindow.webContents.send(
+                        'error',
+                        'view.replay_cutter.noFilesSelectedOrinvalidCharactersInFileName'
+                    );
+                }
             }
         });
 
