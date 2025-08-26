@@ -371,7 +371,7 @@ let projectLatestVersion /* string */ = '';
                                 callback(true);
                             }
                         } catch (e) {
-                            console.error(`Erreur: ${e.message}`);
+                            console.error(`Error: ${e.message}`);
                             if (callback) {
                                 callback(false);
                             }
@@ -380,7 +380,7 @@ let projectLatestVersion /* string */ = '';
                 });
 
                 REQUEST.on('error', (e) => {
-                    console.error(`Erreur: ${e.message}`);
+                    console.error(`Error: ${e.message}`);
                     if (callback) {
                         callback(false);
                     }
@@ -980,19 +980,71 @@ let projectLatestVersion /* string */ = '';
         ipcMain.handle(
             'upload-game-mini-map',
             (event, game, cropPosition, videoPath) => {
-                cutVideoFile(game, videoPath).then((cuttedPath) => {
-                    cropVideoFile(game, cuttedPath, cropPosition).then(
-                        (croppedPath) => {
-                            const NORMALIZED_CUTTED_PATH =
-                                cuttedPath.normalize('NFC');
-                            if (fs.existsSync(NORMALIZED_CUTTED_PATH)) {
-                                fs.unlinkSync(NORMALIZED_CUTTED_PATH);
-                            }
+                // On verrifie que l'utilisateur est connecté.
+                checkJwtToken((isLoggedIn) => {
+                    if (isLoggedIn) {
+                        // On racourci la vidéo...
+                        cutVideoFile(game, videoPath).then((cuttedPath) => {
+                            // On crop la vidéo...
+                            cropVideoFile(game, cuttedPath, cropPosition).then(
+                                (croppedPath) => {
+                                    const NORMALIZED_CUTTED_PATH =
+                                        cuttedPath.normalize('NFC');
+                                    if (fs.existsSync(NORMALIZED_CUTTED_PATH)) {
+                                        fs.unlinkSync(NORMALIZED_CUTTED_PATH);
+                                    }
 
-                            console.log(croppedPath);
-                            console.log(game, cropPosition, videoPath);
-                        }
-                    );
+                                    // On récupère le lien permettant l'upload de la vidéo.
+                                    const SETTINGS = JSON.parse(
+                                        fs.readFileSync(SETTINGS_PATH, 'utf-8')
+                                    );
+
+                                    const REQUEST_OPTIONS = {
+                                        hostname: EBP_DOMAIN,
+                                        port: 443,
+                                        path: '/back/api/?c=statistic&r=s3_create_video_url',
+                                        method: 'GET',
+                                        headers: {
+                                            Authorization: `Bearer ${SETTINGS['jwt'].access_token}`,
+                                            'Content-Type': 'application/json'
+                                        }
+                                    };
+
+                                    const REQUEST = https.request(
+                                        REQUEST_OPTIONS,
+                                        (res) => {
+                                            let data = '';
+
+                                            res.on('data', (chunk) => {
+                                                data += chunk;
+                                            });
+
+                                            res.on('end', () => {
+                                                console.log(
+                                                    'Réponse du serveur:',
+                                                    data
+                                                );
+
+                                                // On upload la vidéo...
+                                                console.log(croppedPath);
+                                                console.log(
+                                                    game,
+                                                    cropPosition,
+                                                    videoPath
+                                                );
+                                            });
+                                        }
+                                    );
+
+                                    REQUEST.on('error', (err) => {
+                                        console.error('Error:', err);
+                                    });
+
+                                    REQUEST.end();
+                                }
+                            );
+                        });
+                    }
                 });
             }
         );
