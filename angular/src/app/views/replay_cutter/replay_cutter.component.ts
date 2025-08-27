@@ -280,6 +280,8 @@ export class ReplayCutterComponent implements OnInit {
     gameID: number
   ): void {
     if (this.videoPath) {
+      this.globalService.loading = true;
+
       window.electronAPI.uploadGameMiniMap(
         this.games[gameIndex],
         miniMapPositions,
