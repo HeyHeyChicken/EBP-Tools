@@ -222,7 +222,6 @@ let projectLatestVersion /* string */ = '';
                       game.map
                   } (${new Date().getTime()})`) + `.${EXTENSION}`
         );
-        console.log('AAA - ' + OUTPUT_FILE_PATH);
 
         const COMMAND /* string */ = `"${FFMPEG_PATH}" -i "${videoPath}" -filter:v "crop=${cropPosition.x2 - cropPosition.x1}:${cropPosition.y2 - cropPosition.y1}:${cropPosition.x1}:${cropPosition.y1}" -an "${OUTPUT_FILE_PATH}"`;
 
@@ -1037,11 +1036,7 @@ let projectLatestVersion /* string */ = '';
                                             });
 
                                             res.on('end', () => {
-                                                console.log(
-                                                    'Réponse du serveur:',
-                                                    data
-                                                );
-
+                                                // On upload la vidéo...
                                                 const UPLOAD_URL = new URL(
                                                     data
                                                 );
@@ -1063,33 +1058,9 @@ let projectLatestVersion /* string */ = '';
                                                     https.request(
                                                         UPLOAD_OPTIONS,
                                                         (res) => {
-                                                            console.log(
-                                                                'Status:',
-                                                                res.statusCode
-                                                            );
-                                                            res.on(
-                                                                'data',
-                                                                (chunk) => {
-                                                                    console.log(
-                                                                        'Body:',
-                                                                        chunk.toString()
-                                                                    );
-                                                                }
-                                                            );
                                                             res.on(
                                                                 'end',
                                                                 () => {
-                                                                    console.log(
-                                                                        'Upload terminé'
-                                                                    );
-                                                                    // On upload la vidéo...
-                                                                    console.log(
-                                                                        NORMALIZED_CROPPED_PATH
-                                                                    );
-                                                                    console.log(
-                                                                        game,
-                                                                        cropPosition
-                                                                    );
                                                                     if (
                                                                         fs.existsSync(
                                                                             NORMALIZED_CROPPED_PATH
