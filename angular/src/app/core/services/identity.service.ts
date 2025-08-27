@@ -14,8 +14,39 @@ import { Injectable } from '@angular/core';
 export class IdentityService {
   //#region Attributes
 
-  public id: number = 0;
-  public premium: boolean = false;
+  private _accessToken: string = '';
+  private _userID: number = 0;
+  private _supporterLevel: number = 0;
+
+  //#endregion
+
+  //#region Functions
+
+  public set(accessToken: string) {
+    this._accessToken = accessToken;
+
+    const PAYLOAD = accessToken.split('.')[1];
+    const DATA = JSON.parse(atob(PAYLOAD));
+
+    this._userID = DATA.sub;
+    this._supporterLevel = parseInt(DATA.supporterLevel);
+  }
+
+  //#region Getters
+
+  public get accessToken(): string {
+    return this._accessToken;
+  }
+
+  public get userID(): number {
+    return this._userID;
+  }
+
+  public get supporterLevel(): number {
+    return this._supporterLevel;
+  }
+
+  //#endregion
 
   //#endregion
 }

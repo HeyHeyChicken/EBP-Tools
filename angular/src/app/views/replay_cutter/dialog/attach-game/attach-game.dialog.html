@@ -1,0 +1,50 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<mat-dialog-content>
+  <ebp-row>
+    <ebp-column [xs]="12"> Veuillez séléctionner une game... </ebp-column>
+    <ebp-column [xs]="12">
+      <table>
+        <thead>
+          <tr>
+            <th>Tags</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (game of data.games; track game.ID) {
+          <tr>
+            <td>
+              <div class="tags">
+                @for (tag of game.tags; track $index) {
+                <div class="tag">{{tag}}</div>
+                }
+              </div>
+            </td>
+            <td>{{ game.date }}</td>
+            <td>
+              <button class="green squared" [mat-dialog-close]="game.ID">
+                <i class="fa-solid fa-check"></i>
+              </button>
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </ebp-column>
+  </ebp-row>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button
+    type="button"
+    mat-dialog-close
+    attr.aria-label="{{ 'common.cancel' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-xmark"></i>{{"common.cancel"|translate}}
+  </button>
+</mat-dialog-actions>

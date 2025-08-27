@@ -34,7 +34,7 @@ export interface ElectronAPI {
     timeToWait: number
   ) => Promise<void>;
   getExpressPort: () => Promise<number>;
-  getJWT: () => Promise<JWT>;
+  getJWTAccessToken: () => Promise<string>;
   getGameHistoryOutputPath: () => Promise<string>;
   getOS: () => Promise<NodeJS.Platform>;
   getPublicPseudoGamesOutputPath: () => Promise<string>;
@@ -53,7 +53,8 @@ export interface ElectronAPI {
   uploadGameMiniMap: (
     game: Game,
     c: CropperPosition,
-    videoPath: string
+    videoPath: string,
+    gameID: number
   ) => void;
 
   //#endregion

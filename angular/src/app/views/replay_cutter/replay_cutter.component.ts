@@ -30,6 +30,9 @@ import { ImageDetectionResult } from '../../../models/image-detection-result';
 import { MatDialog } from '@angular/material/dialog';
 import { ReplayCutterCropDialog } from './dialog/crop/crop.dialog';
 import { CropperPosition } from 'ngx-image-cropper';
+import { APIRestService } from '../../core/services/api-rest.service';
+import { RestGame } from './models/rest-game';
+import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
 
 //#endregion
 @Component({
@@ -78,7 +81,8 @@ export class ReplayCutterComponent implements OnInit {
     private readonly ngZone: NgZone,
     private readonly translateService: TranslateService,
     private readonly openCVService: OpenCVService,
-    private readonly dialogService: MatDialog
+    private readonly dialogService: MatDialog,
+    private readonly apiRestService: APIRestService
   ) {}
 
   //#region Functions
@@ -184,10 +188,54 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
+   * This function allows the user to select which game to attach the video to.
+   * @param gameIndex Index of the game to attach.
+   */
+  protected selectWhichGameToAttachMinimap(gameIndex: number): void {
+    if (this.videoPath) {
+      this.apiRestService.getGames(
+        this.games[gameIndex].map,
+        this.games[gameIndex].orangeTeam.score,
+        this.games[gameIndex].blueTeam.score,
+        (games: RestGame[]) => {
+          if (games.length > 0) {
+            if (games.length == 1) {
+              this.cropGameMinimap(gameIndex, games[0].ID);
+            } else {
+              this.dialogService
+                .open(ReplayCutterAttachGameDialog, {
+                  data: {
+                    games: games
+                  },
+                  autoFocus: false
+                })
+                .afterClosed()
+                .subscribe((gameID: number | undefined) => {
+                  if (gameID) {
+                    this.cropGameMinimap(gameIndex, gameID);
+                  }
+                });
+            }
+          } else {
+            this.toastrService
+              .error(
+                `No games were found on ${this.games[gameIndex].map} with these scores (${this.games[gameIndex].orangeTeam.score} vs ${this.games[gameIndex].blueTeam.score}). If you think this is an error, please let me know.`
+              )
+              .onTap.subscribe(() => {
+                window.electronAPI.openURL(this.globalService.discordServerURL);
+              });
+          }
+        }
+      );
+    }
+  }
+
+  /**
    * This function allows the user to set the game mini map position.
    * @param gameIndex Index of the game to upload.
+   * @param gameID ID of the game.
    */
-  protected cropGameMinimap(gameIndex: number): void {
+  protected cropGameMinimap(gameIndex: number, gameID: number): void {
     if (this.videoPath) {
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
@@ -211,7 +259,7 @@ export class ReplayCutterComponent implements OnInit {
               .subscribe((miniMapPositions: CropperPosition) => {
                 window.electronAPI.setWindowSize();
                 if (miniMapPositions) {
-                  this.uploadGameMiniMap(gameIndex, miniMapPositions);
+                  this.uploadGameMiniMap(gameIndex, miniMapPositions, gameID);
                 }
               });
           }
@@ -224,16 +272,19 @@ export class ReplayCutterComponent implements OnInit {
    * This function allows the user to upload their cut game.
    * @param gameIndex Index of the game to upload.
    * @param miniMapPositions Position of the minimap.
+   * @param gameID ID of the game.
    */
   private uploadGameMiniMap(
     gameIndex: number,
-    miniMapPositions: CropperPosition
+    miniMapPositions: CropperPosition,
+    gameID: number
   ): void {
     if (this.videoPath) {
       window.electronAPI.uploadGameMiniMap(
         this.games[gameIndex],
         miniMapPositions,
-        decodeURIComponent(this.videoPath)
+        decodeURIComponent(this.videoPath),
+        gameID
       );
     }
   }
@@ -675,8 +726,7 @@ export class ReplayCutterComponent implements OnInit {
                             this.setVideoCurrentTime(
                               VIDEO,
                               NOW - DIFFERENCE,
-                              this.games,
-                              this.globalService.discordServerURL
+                              this.games
                             );
                             return;
                           }
@@ -690,14 +740,9 @@ export class ReplayCutterComponent implements OnInit {
 
             //#endregion
 
-            this.setVideoCurrentTime(
-              VIDEO,
-              NOW - DEFAULT_STEP,
-              this.games,
-              this.globalService.discordServerURL
-            );
+            this.setVideoCurrentTime(VIDEO, NOW - DEFAULT_STEP, this.games);
           } else {
-            this.onVideoEnded(this.games, this.globalService.discordServerURL);
+            this.onVideoEnded(this.games);
 
             const DIFFERENCE = Date.now() - this.start;
             const MINUTES = Math.floor(DIFFERENCE / 60000);
@@ -960,14 +1005,13 @@ export class ReplayCutterComponent implements OnInit {
   private setVideoCurrentTime(
     video: HTMLVideoElement,
     time: number,
-    games: Game[],
-    discordServerURL: string
+    games: Game[]
   ): void {
     if (video) {
       if (time < video.duration) {
         video.currentTime = time;
       } else {
-        this.onVideoEnded(games, discordServerURL);
+        this.onVideoEnded(games);
       }
     }
   }
@@ -978,7 +1022,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param videoPath Path of the analyzed video file.
    * @param discordServerURL EBP Discord server URL.
    */
-  private onVideoEnded(games: Game[], discordServerURL: string): void {
+  private onVideoEnded(games: Game[]): void {
     this.percent = -1;
     if (games.length == 0) {
       this.toastrService
@@ -986,7 +1030,7 @@ export class ReplayCutterComponent implements OnInit {
           'No games were found in your video. If you think this is a mistake, please let me know.'
         )
         .onTap.subscribe(() => {
-          window.electronAPI.openURL(discordServerURL);
+          window.electronAPI.openURL(this.globalService.discordServerURL);
         });
     }
   }

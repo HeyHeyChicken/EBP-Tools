@@ -14,9 +14,14 @@ import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { provideToastr } from 'ngx-toastr';
-import { HttpClient, provideHttpClient } from '@angular/common/http';
+import {
+  HttpClient,
+  provideHttpClient,
+  withInterceptors
+} from '@angular/common/http';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { provideAnimations } from '@angular/platform-browser/animations';
+import { APIInterceptor } from './core/api.interceptor';
 
 //#endregion
 
@@ -27,6 +32,7 @@ export function HttpLoaderFactory(http: HttpClient) {
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideHttpClient(withInterceptors([APIInterceptor])),
     provideAnimations(),
     provideHttpClient(),
     provideBrowserGlobalErrorListeners(),

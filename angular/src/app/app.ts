@@ -20,7 +20,7 @@ import { CommonModule } from '@angular/common';
 import { GlobalService } from './core/services/global.service';
 import { TranslateModule } from '@ngx-translate/core';
 import { Versions } from '../models/versions';
-import { JWT } from '../models/jwt';
+import { IdentityService } from './core/services/identity.service';
 
 //#endregion
 @Component({
@@ -43,18 +43,14 @@ export class App implements OnInit {
   @ViewChild('main')
   private readonly main: ElementRef<HTMLElement> | undefined;
 
-  private _jwt: JWT | undefined;
-  public get jwt(): JWT | undefined {
-    return this._jwt;
-  }
-
   protected versions: Versions | undefined;
 
   //#endregion
   constructor(
     protected readonly globalService: GlobalService,
     private readonly router: Router,
-    private readonly ngZone: NgZone
+    private readonly ngZone: NgZone,
+    private readonly identityService: IdentityService
   ) {}
 
   //#region Functions
@@ -97,8 +93,8 @@ export class App implements OnInit {
     });
 
     // Getting logged user informations from his JWT.
-    window.electronAPI.getJWT().then((jwt: JWT) => {
-      this._jwt = jwt;
+    window.electronAPI.getJWTAccessToken().then((accessToken: string) => {
+      this.identityService.set(accessToken);
     });
   }
 

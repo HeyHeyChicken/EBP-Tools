@@ -1,0 +1,38 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use '../../../../../styles/imports/variables' as variables;
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+
+  th,
+  td {
+    border: 1px solid variables.$border_color;
+    padding: calc(#{variables.$margin} / 2) variables.$margin;
+  }
+
+  > tbody {
+    > tr {
+      > td {
+        > .tags {
+          display: flex;
+          gap: calc(#{variables.$margin} / 2);
+          flex-wrap: wrap;
+          max-height: 100%;
+          overflow-y: auto;
+
+          > .tag {
+            border: 1px solid variables.$border_color;
+            padding: 0 variables.$margin;
+            height: variables.$form_height;
+            line-height: calc(#{variables.$form_height} - 1px * 2);
+            box-sizing: border-box;
+          }
+        }
+      }
+    }
+  }
+}

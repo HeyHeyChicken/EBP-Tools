@@ -167,7 +167,7 @@ let projectLatestVersion /* string */ = '';
      * @param {string} videoPath Full video path.
      * @returns {string} Cutted video path.
      */
-    function cutVideoFile(game, videoPath) {
+    function cutVideoFile(game, videoPath, fileName = undefined) {
         const EXTENSION = videoPath.split('.').pop().toLowerCase();
         // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
         const OUTPUT_FILE_PATH /* string */ = path.join(
@@ -175,9 +175,11 @@ let projectLatestVersion /* string */ = '';
                 'videoCutterOutputPath',
                 path.join(os.homedir(), 'Downloads')
             ),
-            `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
-                game.map
-            } (${new Date().getTime()}).${EXTENSION}`
+            (fileName
+                ? fileName
+                : `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
+                      game.map
+                  } (${new Date().getTime()})`) + `.${EXTENSION}`
         );
 
         const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
@@ -201,7 +203,12 @@ let projectLatestVersion /* string */ = '';
      * @param {*} cropPosition Cropp positions and dimentions.
      * @returns {string} Cutted video path.
      */
-    function cropVideoFile(game, videoPath, cropPosition) {
+    function cropVideoFile(
+        game,
+        videoPath,
+        cropPosition,
+        fileName = undefined
+    ) {
         const EXTENSION = videoPath.split('.').pop().toLowerCase();
         // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
         const OUTPUT_FILE_PATH /* string */ = path.join(
@@ -209,10 +216,13 @@ let projectLatestVersion /* string */ = '';
                 'videoCutterOutputPath',
                 path.join(os.homedir(), 'Downloads')
             ),
-            `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
-                game.map
-            } (${new Date().getTime()}).${EXTENSION}`
+            (fileName
+                ? fileName
+                : `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
+                      game.map
+                  } (${new Date().getTime()})`) + `.${EXTENSION}`
         );
+        console.log('AAA - ' + OUTPUT_FILE_PATH);
 
         const COMMAND /* string */ = `"${FFMPEG_PATH}" -i "${videoPath}" -filter:v "crop=${cropPosition.x2 - cropPosition.x1}:${cropPosition.y2 - cropPosition.y1}:${cropPosition.x1}:${cropPosition.y1}" -an "${OUTPUT_FILE_PATH}"`;
 
@@ -717,18 +727,13 @@ let projectLatestVersion /* string */ = '';
         });
 
         // The front-end asks the server to return the JWT token content.
-        ipcMain.handle('get-jwt', () => {
+        ipcMain.handle('get-jwt-access-token', () => {
             const SETTINGS = JSON.parse(
                 fs.readFileSync(SETTINGS_PATH, 'utf-8')
             );
 
             if (SETTINGS['jwt']) {
-                const PAYLOAD = SETTINGS['jwt'].access_token.split('.')[1];
-                const DATA = JSON.parse(atob(PAYLOAD));
-                return {
-                    userID: DATA.sub,
-                    supporterLevel: parseInt(DATA.supporterLevel)
-                };
+                return SETTINGS['jwt'].access_token;
             }
 
             return undefined;
@@ -979,30 +984,42 @@ let projectLatestVersion /* string */ = '';
         // The front-end asks the server to open a video file.
         ipcMain.handle(
             'upload-game-mini-map',
-            (event, game, cropPosition, videoPath) => {
+            (event, game, cropPosition, videoPath, gameID) => {
                 // On verrifie que l'utilisateur est connecté.
                 checkJwtToken((isLoggedIn) => {
                     if (isLoggedIn) {
                         // On racourci la vidéo...
-                        cutVideoFile(game, videoPath).then((cuttedPath) => {
-                            // On crop la vidéo...
-                            cropVideoFile(game, cuttedPath, cropPosition).then(
-                                (croppedPath) => {
+                        cutVideoFile(game, videoPath, 'temp1').then(
+                            (cuttedPath) => {
+                                // On crop la vidéo...
+                                cropVideoFile(
+                                    game,
+                                    cuttedPath,
+                                    cropPosition,
+                                    'temp2'
+                                ).then((croppedPath) => {
                                     const NORMALIZED_CUTTED_PATH =
                                         cuttedPath.normalize('NFC');
                                     if (fs.existsSync(NORMALIZED_CUTTED_PATH)) {
                                         fs.unlinkSync(NORMALIZED_CUTTED_PATH);
                                     }
+                                    const NORMALIZED_CROPPED_PATH =
+                                        croppedPath.normalize('NFC');
 
                                     // On récupère le lien permettant l'upload de la vidéo.
                                     const SETTINGS = JSON.parse(
                                         fs.readFileSync(SETTINGS_PATH, 'utf-8')
                                     );
 
+                                    const PARAMS = new URLSearchParams({
+                                        r: 's3_create_video_url',
+                                        gameID: gameID
+                                    });
+
                                     const REQUEST_OPTIONS = {
                                         hostname: EBP_DOMAIN,
                                         port: 443,
-                                        path: '/back/api/?c=statistic&r=s3_create_video_url',
+                                        path: `/back/api-tools/?${PARAMS.toString()}`,
                                         method: 'GET',
                                         headers: {
                                             Authorization: `Bearer ${SETTINGS['jwt'].access_token}`,
@@ -1025,13 +1042,80 @@ let projectLatestVersion /* string */ = '';
                                                     data
                                                 );
 
-                                                // On upload la vidéo...
-                                                console.log(croppedPath);
-                                                console.log(
-                                                    game,
-                                                    cropPosition,
-                                                    videoPath
+                                                const UPLOAD_URL = new URL(
+                                                    data
                                                 );
+
+                                                const UPLOAD_OPTIONS = {
+                                                    method: 'PUT',
+                                                    hostname:
+                                                        UPLOAD_URL.hostname,
+                                                    path:
+                                                        UPLOAD_URL.pathname +
+                                                        UPLOAD_URL.search,
+                                                    headers: {
+                                                        'Content-Type':
+                                                            'video/mp4'
+                                                    }
+                                                };
+
+                                                const UPLOAD_REQUEST =
+                                                    https.request(
+                                                        UPLOAD_OPTIONS,
+                                                        (res) => {
+                                                            console.log(
+                                                                'Status:',
+                                                                res.statusCode
+                                                            );
+                                                            res.on(
+                                                                'data',
+                                                                (chunk) => {
+                                                                    console.log(
+                                                                        'Body:',
+                                                                        chunk.toString()
+                                                                    );
+                                                                }
+                                                            );
+                                                            res.on(
+                                                                'end',
+                                                                () => {
+                                                                    console.log(
+                                                                        'Upload terminé'
+                                                                    );
+                                                                    // On upload la vidéo...
+                                                                    console.log(
+                                                                        NORMALIZED_CROPPED_PATH
+                                                                    );
+                                                                    console.log(
+                                                                        game,
+                                                                        cropPosition
+                                                                    );
+                                                                    if (
+                                                                        fs.existsSync(
+                                                                            NORMALIZED_CROPPED_PATH
+                                                                        )
+                                                                    ) {
+                                                                        fs.unlinkSync(
+                                                                            NORMALIZED_CROPPED_PATH
+                                                                        );
+                                                                    }
+                                                                }
+                                                            );
+                                                        }
+                                                    );
+
+                                                UPLOAD_REQUEST.on(
+                                                    'error',
+                                                    (err) =>
+                                                        console.error(
+                                                            'Error:',
+                                                            err
+                                                        )
+                                                );
+
+                                                fs.createReadStream(
+                                                    NORMALIZED_CROPPED_PATH
+                                                ).pipe(UPLOAD_REQUEST);
                                             });
                                         }
                                     );
@@ -1041,9 +1125,9 @@ let projectLatestVersion /* string */ = '';
                                     });
 
                                     REQUEST.end();
-                                }
-                            );
-                        });
+                                });
+                            }
+                        );
                     }
                 });
             }
