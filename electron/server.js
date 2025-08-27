@@ -121,9 +121,9 @@ let projectLatestVersion /* string */ = '';
     /**
      * This function allows you to wait for an HTTP:PORT address to respond.
      * @param {number} port Port of address to wait.
-     * @param {string} host Host of address to wait.
-     * @param {number} timeout Maximum time to wait before declaring a failure.
-     * @param {number} interval Address presence check interval.
+     * @param {string} host (optional) Host of address to wait.
+     * @param {number} timeout (optional) Maximum time to wait before declaring a failure.
+     * @param {number} interval (optional) Address presence check interval.
      * @returns
      */
     function waitForHttp(
@@ -165,6 +165,7 @@ let projectLatestVersion /* string */ = '';
      * This function cuts out a part of a video to get one file per game.
      * @param {Game} game Game's data.
      * @param {string} videoPath Full video path.
+     * @param {string} fileName (optional) File name.
      * @returns {string} Cutted video path.
      */
     function cutVideoFile(game, videoPath, fileName = undefined) {
@@ -197,10 +198,128 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
+     * This function uploads the video of a game's minimap to EBP's S3 server.
+     * @param {*} url URL to upload the video to.
+     * @param {*} videoPath Local path to the video file to upload.
+     * @param {*} callback Callback function.
+     */
+    function uploadVideo(url, videoPath, callback) {
+        const UPLOAD_URL = new URL(url);
+
+        const UPLOAD_OPTIONS = {
+            method: 'PUT',
+            hostname: UPLOAD_URL.hostname,
+            path: UPLOAD_URL.pathname + UPLOAD_URL.search,
+            headers: {
+                'Content-Type': 'video/mp4'
+            }
+        };
+
+        const UPLOAD_REQUEST = https.request(UPLOAD_OPTIONS, (res) => {
+            // This line This line is essential.
+            // Without it, 'end' will never fire.
+            res.on('data', () => {});
+
+            res.on('end', () => {
+                callback();
+            });
+        });
+
+        UPLOAD_REQUEST.on('error', (err) => console.error('Error:', err));
+
+        fs.createReadStream(videoPath).pipe(UPLOAD_REQUEST);
+    }
+
+    /**
+     * This function tells the EBP GPU server that a new video is ready to be analyzed.
+     * @param {*} gameID ID of the game.
+     * @param {*} callback Callback function.
+     */
+    function setVideoAsUploaded(gameID, callback) {
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+
+        const URL_PARAMS = new URLSearchParams({
+            r: 's3_uploaded',
+            gameID: gameID
+        });
+
+        const OPTIONS = {
+            hostname: EBP_DOMAIN,
+            port: 443,
+            path: `/back/api-tools/?${URL_PARAMS.toString()}`,
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${SETTINGS['jwt'].access_token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const REQUEST = https.request(OPTIONS, (res) => {
+            // This line This line is essential.
+            // Without it, 'end' will never fire.
+            res.on('data', () => {});
+
+            res.on('end', () => {
+                callback();
+            });
+        });
+
+        REQUEST.on('error', (e) => {
+            console.error('Error:', e);
+        });
+
+        REQUEST.end();
+    }
+
+    /**
+     * This function allows you to retrieve an upload URL to the EBP S3 server.
+     * @param {*} gameID ID of the game to attach the video to.
+     * @param {*} callback Callback function.
+     */
+    function getVideoUploadURL(gameID, callback) {
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+
+        const PARAMS = new URLSearchParams({
+            r: 's3_create_video_url',
+            gameID: gameID
+        });
+
+        const REQUEST_OPTIONS = {
+            hostname: EBP_DOMAIN,
+            port: 443,
+            path: `/back/api-tools/?${PARAMS.toString()}`,
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${SETTINGS['jwt'].access_token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const REQUEST = https.request(REQUEST_OPTIONS, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            res.on('end', () => {
+                callback(data);
+            });
+        });
+
+        REQUEST.on('error', (err) => {
+            console.error('Error:', err);
+        });
+
+        REQUEST.end();
+    }
+
+    /**
      * This function crop a video file.
      * @param {Game} game Game's data.
      * @param {string} videoPath Full video path.
      * @param {*} cropPosition Cropp positions and dimentions.
+     * @param {string} fileName (optional) File name.
      * @returns {string} Cutted video path.
      */
     function cropVideoFile(
@@ -235,7 +354,7 @@ let projectLatestVersion /* string */ = '';
 
     /**
      * This function retrieves the number of the latest published version of the project.
-     * @param {Function} callback
+     * @param {Function} callback Callback function.
      */
     function getProjectLatestVersion(callback) {
         const OPTIONS = {
@@ -328,13 +447,13 @@ let projectLatestVersion /* string */ = '';
                     fs.readFileSync(SETTINGS_PATH, 'utf-8')
                 );
 
-                // On récupèrer les cookies de la fenêtre principale.
+                // We retrieve cookies from the main window.
                 const COOKIES =
                     await mainWindow.webContents.session.cookies.get({
                         url: `https://${EBP_DOMAIN}`
                     });
 
-                // On transforme les cookies en header.
+                // We transform cookies into headers.
                 const COOKIES_HEADER = COOKIES.map(
                     (c) => `${c.name}=${c.value}`
                 ).join('; ');
@@ -535,7 +654,7 @@ let projectLatestVersion /* string */ = '';
             ),
             `EBP - ${playerName} (${new Date().getTime()}).xlsx`
         );
-        // Sauvegarder dans un nouveau fichier
+        // Save to a new file
         await WORKBOOK.xlsx.writeFile(FILE_PATH);
 
         return FILE_PATH;
@@ -621,7 +740,7 @@ let projectLatestVersion /* string */ = '';
         // The front-end asks the server to download a YouTube video.
         ipcMain.handle('download-replay', (event, url, platform) => {
             let percent = 0;
-            // On récupère le titre de la vidéo.
+            // We get the title of the video.
             exec(
                 `${YTDLP_PATH} --ffmpeg-location ${FFMPEG_PATH} --get-title ${url}`,
                 (error, stdout, stderr) => {
@@ -673,7 +792,7 @@ let projectLatestVersion /* string */ = '';
                     const DL = spawn(YTDLP_PATH, settings);
 
                     DL.stdout.on('data', (data) => {
-                        const MATCH = data.toString().match(/(\d{1,3}\.\d)%/); // extrait le % (ex: 42.3%)
+                        const MATCH = data.toString().match(/(\d{1,3}\.\d)%/); // extract the % (eg: 42.3%)
                         if (MATCH) {
                             const PERCENT = parseInt(MATCH[1]);
                             if (PERCENT > percent) {
@@ -984,118 +1103,58 @@ let projectLatestVersion /* string */ = '';
         ipcMain.handle(
             'upload-game-mini-map',
             (event, game, cropPosition, videoPath, gameID) => {
-                // On verrifie que l'utilisateur est connecté.
+                // We check that the user is logged in.
                 checkJwtToken((isLoggedIn) => {
                     if (isLoggedIn) {
-                        // On racourci la vidéo...
+                        // We cut the video...
                         cutVideoFile(game, videoPath, 'temp1').then(
                             (cuttedPath) => {
-                                // On crop la vidéo...
+                                // We crop the video...
                                 cropVideoFile(
                                     game,
                                     cuttedPath,
                                     cropPosition,
                                     'temp2'
                                 ).then((croppedPath) => {
-                                    const NORMALIZED_CUTTED_PATH =
+                                    // We delete the cut video.
+                                    const NORMALIZED_CUT_PATH =
                                         cuttedPath.normalize('NFC');
-                                    if (fs.existsSync(NORMALIZED_CUTTED_PATH)) {
-                                        fs.unlinkSync(NORMALIZED_CUTTED_PATH);
+                                    if (fs.existsSync(NORMALIZED_CUT_PATH)) {
+                                        fs.unlinkSync(NORMALIZED_CUT_PATH);
                                     }
-                                    const NORMALIZED_CROPPED_PATH =
-                                        croppedPath.normalize('NFC');
 
-                                    // On récupère le lien permettant l'upload de la vidéo.
-                                    const SETTINGS = JSON.parse(
-                                        fs.readFileSync(SETTINGS_PATH, 'utf-8')
-                                    );
-
-                                    const PARAMS = new URLSearchParams({
-                                        r: 's3_create_video_url',
-                                        gameID: gameID
-                                    });
-
-                                    const REQUEST_OPTIONS = {
-                                        hostname: EBP_DOMAIN,
-                                        port: 443,
-                                        path: `/back/api-tools/?${PARAMS.toString()}`,
-                                        method: 'GET',
-                                        headers: {
-                                            Authorization: `Bearer ${SETTINGS['jwt'].access_token}`,
-                                            'Content-Type': 'application/json'
-                                        }
-                                    };
-
-                                    const REQUEST = https.request(
-                                        REQUEST_OPTIONS,
-                                        (res) => {
-                                            let data = '';
-
-                                            res.on('data', (chunk) => {
-                                                data += chunk;
-                                            });
-
-                                            res.on('end', () => {
-                                                // On upload la vidéo...
-                                                const UPLOAD_URL = new URL(
-                                                    data
-                                                );
-
-                                                const UPLOAD_OPTIONS = {
-                                                    method: 'PUT',
-                                                    hostname:
-                                                        UPLOAD_URL.hostname,
-                                                    path:
-                                                        UPLOAD_URL.pathname +
-                                                        UPLOAD_URL.search,
-                                                    headers: {
-                                                        'Content-Type':
-                                                            'video/mp4'
+                                    // We retrieve the link allowing the video to be uploaded.
+                                    getVideoUploadURL(
+                                        gameID,
+                                        (videoUploadURL) => {
+                                            // On upload la vidéo...
+                                            const NORMALIZED_CROPPED_PATH =
+                                                croppedPath.normalize('NFC');
+                                            uploadVideo(
+                                                videoUploadURL,
+                                                NORMALIZED_CROPPED_PATH,
+                                                () => {
+                                                    // We delete the cropped video.
+                                                    if (
+                                                        fs.existsSync(
+                                                            NORMALIZED_CROPPED_PATH
+                                                        )
+                                                    ) {
+                                                        fs.unlinkSync(
+                                                            NORMALIZED_CROPPED_PATH
+                                                        );
                                                     }
-                                                };
 
-                                                const UPLOAD_REQUEST =
-                                                    https.request(
-                                                        UPLOAD_OPTIONS,
-                                                        (res) => {
-                                                            res.on(
-                                                                'end',
-                                                                () => {
-                                                                    if (
-                                                                        fs.existsSync(
-                                                                            NORMALIZED_CROPPED_PATH
-                                                                        )
-                                                                    ) {
-                                                                        fs.unlinkSync(
-                                                                            NORMALIZED_CROPPED_PATH
-                                                                        );
-                                                                    }
-                                                                }
-                                                            );
+                                                    setVideoAsUploaded(
+                                                        gameID,
+                                                        () => {
+                                                            //@TODO : Remove spinner from client
                                                         }
                                                     );
-
-                                                UPLOAD_REQUEST.on(
-                                                    'error',
-                                                    (err) =>
-                                                        console.error(
-                                                            'Error:',
-                                                            err
-                                                        )
-                                                );
-
-                                                fs.createReadStream(
-                                                    NORMALIZED_CROPPED_PATH
-                                                ).pipe(UPLOAD_REQUEST);
-                                            });
+                                                }
+                                            );
                                         }
                                     );
-
-                                    REQUEST.on('error', (err) => {
-                                        console.error('Error:', err);
-                                    });
-
-                                    REQUEST.end();
                                 });
                             }
                         );
