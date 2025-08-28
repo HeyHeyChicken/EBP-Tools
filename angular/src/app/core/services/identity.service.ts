@@ -5,6 +5,7 @@
 //#region Imports
 
 import { Injectable } from '@angular/core';
+import { GlobalService } from './global.service';
 
 //#endregion
 
@@ -20,6 +21,8 @@ export class IdentityService {
 
   //#endregion
 
+  constructor(private readonly globalService: GlobalService) {}
+
   //#region Functions
 
   public set(accessToken: string) {
@@ -29,7 +32,11 @@ export class IdentityService {
     const DATA = JSON.parse(atob(PAYLOAD));
 
     this._userID = DATA.sub;
+
     this._supporterLevel = parseInt(DATA.supporterLevel);
+    if (isNaN(this._supporterLevel)) {
+      this._supporterLevel = 0;
+    }
   }
 
   //#region Getters
@@ -44,6 +51,10 @@ export class IdentityService {
 
   public get supporterLevel(): number {
     return this._supporterLevel;
+  }
+
+  public get isBetaUser(): boolean {
+    return this.globalService.betaUsers.includes(this._userID);
   }
 
   //#endregion

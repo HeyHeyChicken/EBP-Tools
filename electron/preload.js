@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   //#region Server -> Client
 
   // The server gives the path of the video file selected by the user.
+  gameIsUploaded: (callback) => ipcRenderer.on("game-is-uploaded", (event) => callback()),
+  // The server gives the path of the video file selected by the user.
   setVideoFile: (callback) => ipcRenderer.on("set-video-file", (event, value) => callback(value)),
   // The server informs the front-end that the games are exported.
   gamesAreExported: (callback) => ipcRenderer.on("games-are-exported", (event, filePath) => callback(filePath)),

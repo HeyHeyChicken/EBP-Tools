@@ -25,11 +25,11 @@ export class APIRestService {
   //#region Functions
 
   /**
-   * Cette fonction retourne les games EVA du joueur filtrées.
-   * @param mapName Nom de la carte.
-   * @param orangeScore Score de l'équipe orange.
-   * @param blueScore Score de l'équipe bleu.
-   * @param callback Fonction de retour.
+   * This function returns the player's filtered EVA games.
+   * @param mapName Name of the card.
+   * @param orangeScore Orange team score.
+   * @param blueScore Blue team score.
+   * @param callback Callback fonction.
    */
   public getGames(
     mapName: string,
@@ -42,6 +42,23 @@ export class APIRestService {
       .set('map', mapName)
       .set('orangeScore', orangeScore.toString())
       .set('blueScore', blueScore.toString());
+
+    this.httpClient
+      .get<any>(APIRestService.serverURL, {
+        responseType: 'text' as 'json',
+        params: PARAMS
+      })
+      .subscribe((response: string) => {
+        callback(JSON.parse(response));
+      });
+  }
+
+  /**
+   * This function returns the list of users who have access to BETA features.
+   * @param callback Callback fonction.
+   */
+  public getBetaUsers(callback: Function): void {
+    const PARAMS = new HttpParams().set('r', 'betaUsers');
 
     this.httpClient
       .get<any>(APIRestService.serverURL, {

@@ -1148,7 +1148,9 @@ let projectLatestVersion /* string */ = '';
                                                     setVideoAsUploaded(
                                                         gameID,
                                                         () => {
-                                                            //@TODO : Remove spinner from client
+                                                            mainWindow.webContents.send(
+                                                                'game-is-uploaded'
+                                                            );
                                                         }
                                                     );
                                                 }

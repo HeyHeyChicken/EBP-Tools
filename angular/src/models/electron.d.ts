@@ -61,6 +61,7 @@ export interface ElectronAPI {
 
   //#region Server to Client
 
+  gameIsUploaded: (callback: () => void) => void;
   gamesAreExported: (callback: (filePath: string | undefined) => void) => void;
   replayDownloaderError: (callback: (error: string) => void) => void;
   replayDownloaderSuccess: (callback: (path: string) => void) => void;

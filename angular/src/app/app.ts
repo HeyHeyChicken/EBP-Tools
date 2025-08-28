@@ -21,6 +21,7 @@ import { GlobalService } from './core/services/global.service';
 import { TranslateModule } from '@ngx-translate/core';
 import { Versions } from '../models/versions';
 import { IdentityService } from './core/services/identity.service';
+import { APIRestService } from './core/services/api-rest.service';
 
 //#endregion
 @Component({
@@ -50,7 +51,8 @@ export class App implements OnInit {
     protected readonly globalService: GlobalService,
     private readonly router: Router,
     private readonly ngZone: NgZone,
-    private readonly identityService: IdentityService
+    private readonly identityService: IdentityService,
+    private readonly apiRestService: APIRestService
   ) {}
 
   //#region Functions
@@ -94,7 +96,15 @@ export class App implements OnInit {
 
     // Getting logged user informations from his JWT.
     window.electronAPI.getJWTAccessToken().then((accessToken: string) => {
-      this.identityService.set(accessToken);
+      if (accessToken) {
+        this.identityService.set(accessToken);
+
+        this.apiRestService.getBetaUsers((betaUsers: number[]) => {
+          this.globalService.betaUsers = betaUsers;
+        });
+      } else {
+        window.location.reload();
+      }
     });
   }
 

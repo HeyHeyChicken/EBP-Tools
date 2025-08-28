@@ -106,7 +106,10 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   </button>
                   <button
                     class="squared"
-                    [disabled]="!isDevMode"
+                    [disabled]="
+                      identityService.supporterLevel == 0 ||
+                      !identityService.isBetaUser
+                    "
                     (click)="selectWhichGameToAttachMinimap(i)"
                   >
                     <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>

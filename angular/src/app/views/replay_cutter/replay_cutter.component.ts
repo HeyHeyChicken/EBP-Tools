@@ -33,6 +33,7 @@ import { CropperPosition } from 'ngx-image-cropper';
 import { APIRestService } from '../../core/services/api-rest.service';
 import { RestGame } from './models/rest-game';
 import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
+import { IdentityService } from '../../core/services/identity.service';
 
 //#endregion
 @Component({
@@ -76,6 +77,7 @@ export class ReplayCutterComponent implements OnInit {
   //#endregion
 
   constructor(
+    protected readonly identityService: IdentityService,
     protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
@@ -99,6 +101,12 @@ export class ReplayCutterComponent implements OnInit {
           .subscribe((translated: string) => {
             this.toastrService.error(translated);
           });
+      });
+    });
+
+    window.electronAPI.gameIsUploaded(() => {
+      this.ngZone.run(() => {
+        this.globalService.loading = false;
       });
     });
 
