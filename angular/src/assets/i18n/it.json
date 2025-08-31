@@ -1,4 +1,10 @@
 {
+  "common": {
+    "ok": "Ok",
+    "cancel": "Annulla",
+    "reset": "Reimposta",
+    "settings": "Impostazioni"
+  },
   "view": {
     "home": {
       "welcomeTo": "Benvenuto su ",
@@ -17,7 +23,14 @@
       "infos": "Informazioni",
       "noFilesSelected": "Nessun file selezionato",
       "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti",
-      "outputPath": "Percorso di output"
+      "outputPath": "Percorso di output",
+      "dialog": {
+        "settings": {
+          "orangeTeamName": "Nome della squadra arancione",
+          "blueTeamName": "Nome della squadra blu",
+          "teamNameDescription": "È possibile forzare i nomi delle squadre durante il rilevamento."
+        }
+      }
     },
     "game_history": {
       "title": "Esporta la cronologia delle tue partite",
@@ -45,11 +58,6 @@
         }
       }
     }
-  },
-  "common": {
-    "ok": "Ok",
-    "cancel": "Annulla",
-    "reset": "Reimposta"
   },
   "shared": {
     "header": {

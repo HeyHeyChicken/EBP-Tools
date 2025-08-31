@@ -1,4 +1,10 @@
 {
+  "common": {
+    "ok": "Ok",
+    "cancel": "Anulează",
+    "reset": "Resetare",
+    "settings": "Setări"
+  },
   "view": {
     "home": {
       "welcomeTo": "Bine ai venit la ",
@@ -17,7 +23,14 @@
       "infos": "Informații",
       "noFilesSelected": "Niciun fișier selectat",
       "timeCodesCopiedClipboard": "Codurile de timp au fost copiate în clipboard",
-      "outputPath": "Cale fișier ieșire"
+      "outputPath": "Cale fișier ieșire",
+      "dialog": {
+        "settings": {
+          "orangeTeamName": "Numele echipei portocalii",
+          "blueTeamName": "Numele echipei albastre",
+          "teamNameDescription": "Puteți forța numele echipelor în timpul detectării."
+        }
+      }
     },
     "game_history": {
       "title": "Exportă istoricul jocurilor",
@@ -45,11 +58,6 @@
         }
       }
     }
-  },
-  "common": {
-    "ok": "Ok",
-    "cancel": "Anulează",
-    "reset": "Resetare"
   },
   "shared": {
     "header": {

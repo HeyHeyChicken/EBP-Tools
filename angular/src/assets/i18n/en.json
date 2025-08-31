@@ -1,4 +1,10 @@
 {
+  "common": {
+    "ok": "Ok",
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "settings": "Settings"
+  },
   "view": {
     "home": {
       "welcomeTo": "Welcome to ",
@@ -17,7 +23,14 @@
       "infos": "Informations",
       "noFilesSelected": "No files selected",
       "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
-      "outputPath": "Output path"
+      "outputPath": "Output path",
+      "dialog": {
+        "settings": {
+          "orangeTeamName": "Orange team name",
+          "blueTeamName": "Blue team name",
+          "teamNameDescription": "You can force the team names during detection."
+        }
+      }
     },
     "game_history": {
       "title": "Export your game history",
@@ -45,11 +58,6 @@
         }
       }
     }
-  },
-  "common": {
-    "ok": "Ok",
-    "cancel": "Cancel",
-    "reset": "Reset"
   },
   "shared": {
     "header": {

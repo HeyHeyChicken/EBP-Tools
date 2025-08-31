@@ -1,4 +1,10 @@
 {
+  "common": {
+    "ok": "Ok",
+    "cancel": "Abbrechen",
+    "reset": "Zurücksetzen",
+    "settings": "Einstellungen"
+  },
   "view": {
     "home": {
       "welcomeTo": "Willkommen bei ",
@@ -17,7 +23,14 @@
       "infos": "Informationen",
       "noFilesSelected": "Keine Datei ausgewählt",
       "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
-      "outputPath": "Ausgabepfad"
+      "outputPath": "Ausgabepfad",
+      "dialog": {
+        "settings": {
+          "orangeTeamName": "Name des orangenen Teams",
+          "blueTeamName": "Name des blauen Teams",
+          "teamNameDescription": "Sie können die Teamnamen bei der Erkennung erzwingen."
+        }
+      }
     },
     "game_history": {
       "title": "Exportieren Sie Ihren Spielverlauf",
@@ -45,11 +58,6 @@
         }
       }
     }
-  },
-  "common": {
-    "ok": "Ok",
-    "cancel": "Abbrechen",
-    "reset": "Zurücksetzen"
   },
   "shared": {
     "header": {

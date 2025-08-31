@@ -1,4 +1,10 @@
 {
+  "common": {
+    "ok": "Ok",
+    "cancel": "Annuler",
+    "reset": "Réinitialiser",
+    "settings": "Réglages"
+  },
   "view": {
     "home": {
       "welcomeTo": "Bienvenue sur ",
@@ -17,7 +23,14 @@
       "infos": "Informations",
       "noFilesSelected": "Aucun fichier sélectionné",
       "timeCodesCopiedClipboard": "Les timecodes ont été ajoutés à votre presse-papiers",
-      "outputPath": "Dossier de sortie"
+      "outputPath": "Dossier de sortie",
+      "dialog": {
+        "settings": {
+          "orangeTeamName": "Nom de l’équipe orange",
+          "blueTeamName": "Nom de l’équipe bleue",
+          "teamNameDescription": "Vous pouvez forcer le nom des équipes lors de la détection."
+        }
+      }
     },
     "game_history": {
       "title": "Exportez l'historique de vos parties",
@@ -45,11 +58,6 @@
         }
       }
     }
-  },
-  "common": {
-    "ok": "Ok",
-    "cancel": "Annuler",
-    "reset": "Réinitialiser"
   },
   "shared": {
     "header": {

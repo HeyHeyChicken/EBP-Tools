@@ -2,20 +2,58 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-@use "../../../styles/imports/variables" as variables;
+@use '../../../styles/imports/variables' as variables;
 
 video:not(.visible) {
   pointer-events: none;
   width: 1920px;
 }
 
+.p-relative {
+  position: relative;
+
+  > .buttons {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    padding: variables.$margin 0 0 variables.$margin;
+    border-style: dashed;
+    border-width: 1px 0 0 1px;
+    border-color: variables.$border_color;
+  }
+}
+
 .dropper {
-  border: 1px dashed #d0dce7;
+  border-style: dashed;
+  border-width: 1px 0 0 1px;
+  border-color: variables.$border_color;
   padding: calc(#{variables.$margin} * 2);
   text-align: center;
-  transition: all 0.2s ease-in-out;
   position: relative;
-  background-color: variables.$dark_color;
+
+  &:before,
+  &:after {
+    content: '';
+    position: absolute;
+    background-color: variables.$dark_color;
+    left: 0;
+    top: 0;
+    z-index: 0;
+    transition: all 0.2s ease-in-out;
+  }
+
+  &:before {
+    height: 100%;
+    width: calc(100% - #{variables.$form_height} - #{variables.$margin});
+    border-bottom: 1px dashed variables.$border_color;
+  }
+
+  &:after {
+    width: 100%;
+    height: calc(100% - #{variables.$form_height} - #{variables.$margin});
+    border-right: 1px dashed variables.$border_color;
+  }
 
   &:not(.disabled) {
     cursor: pointer;
@@ -28,8 +66,10 @@ video:not(.visible) {
 
   &:hover,
   &.dropping {
-    background-color: #251e1b;
-    border-color: white;
+    &:before,
+    &:after {
+      background-color: #251e1b;
+    }
 
     > .icons {
       > i {
@@ -55,6 +95,7 @@ video:not(.visible) {
     height: $size;
     width: $size;
     margin: 0 auto 12px auto;
+    z-index: 1;
 
     > i {
       position: absolute;
@@ -86,8 +127,12 @@ video:not(.visible) {
   }
 
   > p {
+    z-index: 1;
+    position: relative;
     margin: 0;
     color: variables.$main_color;
+    max-width: calc(100% - #{variables.$form_height} * 2);
+    margin: 0 auto;
   }
 }
 
@@ -134,10 +179,10 @@ table {
         width: 100%;
 
         .orange {
-          color: #b86d00;
+          color: variables.$orange_color;
         }
         .blue {
-          color: #0073bb;
+          color: variables.$blue_color;
         }
       }
 

@@ -2,8 +2,8 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-@use "../../imports/variables" as variables;
-@use "../../imports/material_colors" as material_colors;
+@use '../../imports/variables' as variables;
+@use '../../imports/material_colors' as material_colors;
 
 mat-form-field {
   width: 100%;
@@ -74,7 +74,7 @@ mat-form-field {
           line-height: calc(#{variables.$form_height} - #{$border-size} * 2);
           -webkit-appearance: none;
 
-          &[type="number"] {
+          &[type='number'] {
             -moz-appearance: textfield; // Firefox
           }
 
@@ -108,7 +108,7 @@ mat-form-field {
             overflow: visible;
 
             &:after {
-              content: "";
+              content: '';
               position: absolute;
               height: 9px;
               width: 4px;
@@ -173,13 +173,69 @@ mat-form-field {
             overflow: visible;
 
             &:after {
-              content: "";
+              content: '';
               position: absolute;
               height: 8px;
               width: 4px;
               background-color: variables.$dark_color;
               bottom: 0;
               right: calc(0px - 2px);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  &.orange {
+    &.mat-focused {
+      > .mat-mdc-text-field-wrapper {
+        border-color: variables.$orange_color;
+
+        > .mat-mdc-form-field-flex {
+          > .mat-mdc-form-field-infix {
+            > .buttons {
+              > button {
+                border-color: transparent transparent transparent
+                  variables.$orange_color;
+              }
+            }
+
+            > input {
+              caret-color: variables.$orange_color;
+            }
+
+            > label {
+              color: variables.$orange_color !important;
+              border-color: variables.$orange_color;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  &.blue {
+    &.mat-focused {
+      > .mat-mdc-text-field-wrapper {
+        border-color: variables.$blue_color;
+
+        > .mat-mdc-form-field-flex {
+          > .mat-mdc-form-field-infix {
+            > .buttons {
+              > button {
+                border-color: transparent transparent transparent
+                  variables.$blue_color;
+              }
+            }
+
+            > input {
+              caret-color: variables.$blue_color;
+            }
+
+            > label {
+              color: variables.$blue_color !important;
+              border-color: variables.$blue_color;
             }
           }
         }
@@ -211,7 +267,7 @@ label {
 
     &:before,
     &:after {
-      content: "";
+      content: '';
       position: absolute;
       top: 0;
     }
@@ -321,9 +377,9 @@ textarea {
 }
 
 input {
-  &[type="date"],
-  &[type="time"],
-  &[type="datetime-local"] {
+  &[type='date'],
+  &[type='time'],
+  &[type='datetime-local'] {
     cursor: pointer;
 
     &::-webkit-calendar-picker-indicator {
@@ -331,13 +387,13 @@ input {
     }
   }
 
-  &[type="text"],
-  &[type="url"],
-  &[type="email"],
-  &[type="number"],
-  &[type="date"],
-  &[type="time"],
-  &[type="datetime-local"] {
+  &[type='text'],
+  &[type='url'],
+  &[type='email'],
+  &[type='number'],
+  &[type='date'],
+  &[type='time'],
+  &[type='datetime-local'] {
     height: variables.$form_height;
     line-height: calc(#{variables.$form_height} - 2px);
     background-color: variables.$dark_color;
@@ -359,7 +415,7 @@ input {
     }
   }
 
-  &[type="checkbox"] {
+  &[type='checkbox'] {
     outline: none;
     border: 1px solid variables.$border_color;
     background-color: transparent;
@@ -394,12 +450,12 @@ input {
 }
 
 label:has(
-    input[type="text"]:not(.readonly):focus,
-    input[type="url"]:not(.readonly):focus,
-    input[type="email"]:not(.readonly):focus,
-    input[type="number"]:not(.readonly):focus,
-    input[type="date"]:not(.readonly):focus,
-    input[type="time"]:not(.readonly):focus
+    input[type='text']:not(.readonly):focus,
+    input[type='url']:not(.readonly):focus,
+    input[type='email']:not(.readonly):focus,
+    input[type='number']:not(.readonly):focus,
+    input[type='date']:not(.readonly):focus,
+    input[type='time']:not(.readonly):focus
   ) {
   color: variables.$main_color;
 }

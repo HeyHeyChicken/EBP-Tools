@@ -4,125 +4,125 @@ This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
-<ebp-container>
-  <ebp-row>
-    <ebp-column></ebp-column>
-    <ebp-column [xs]="7">
-      <div
-        class="dropper"
-        [class.disabled]="inputFileDisabled"
-        *ngIf="percent < 0"
-        (click)="onInputFileClick()"
-      >
-        <div class="icons">
-          <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
-          <i class="fa-sharp fa-solid fa-file"></i>
-          <i class="fa-sharp fa-solid fa-file-video"></i>
-        </div>
-        <p>{{ 'view.replay_cutter.inputFile' | translate }}</p>
-      </div>
-      <div *ngIf="percent >= 0">
-        <ebp-loader [value]="percent"></ebp-loader>
-        <ebp-message class="mt-2">
-          {{ 'view.replay_cutter.videoIsBeingAnalyzed' | translate }}<br />
-          {{ 'view.replay_cutter.nbGamesFound' | translate }}:<b>
-            {{ games.length }}</b
-          >
-        </ebp-message>
-      </div>
-      <ng-container *ngIf="percent < 0 && games.length">
-        <mat-form-field
-          class="mt-2"
-          (click)="setOutputPath()"
-          (keypress)="setOutputPath()"
-        >
-          <mat-label>{{
-            'view.replay_cutter.outputPath' | translate
-          }}</mat-label>
-          <input matInput readonly type="text" [value]="outputPath" />
-          <div class="buttons">
-            <button class="btn squared" tabindex="-1">
-              <i class="fa-sharp fa-solid fa-gear"></i>
-            </button>
+<ebp-row>
+  <ebp-column></ebp-column>
+  <ebp-column [xs]="6" class="pr-2 pl-0 pt-0">
+    <ebp-row>
+      <ebp-column [xs]="12">
+        @if (percent < 0) {
+          <div class="p-relative">
+            <div
+              class="dropper"
+              [class.disabled]="inputFileDisabled"
+              (click)="onInputFileClick()"
+            >
+              <div class="icons">
+                <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
+                <i class="fa-sharp fa-solid fa-file"></i>
+                <i class="fa-sharp fa-solid fa-file-video"></i>
+              </div>
+              <p>{{ 'view.replay_cutter.inputFile' | translate }}</p>
+            </div>
+            <div class="buttons">
+              <button class="btn squared" (click)="openSettings()">
+                <i class="fa-sharp fa-solid fa-gear"></i>
+              </button>
+            </div>
           </div>
-        </mat-form-field>
-        <table class="mt-1">
-          <thead>
-            <tr>
-              <th>{{ 'view.replay_cutter.map' | translate }}</th>
-              <th>{{ 'view.replay_cutter.infos' | translate }}</th>
-              <th>
-                <div>
-                  <button
-                    class="squared"
-                    (click)="saveAll()"
-                    matTooltip="{{ 'view.replay_cutter.saveAll' | translate }}"
-                    matTooltipPosition="above"
-                  >
-                    <i class="fa-sharp fa-solid fa-floppy-disk"></i>
-                  </button>
-                  <button
-                    class="squared"
-                    (click)="copyTimeCodes()"
-                    matTooltip="{{
-                      'view.replay_cutter.copyTimecodes' | translate
-                    }}"
-                    matTooltipPosition="above"
-                  >
-                    <i class="fa-sharp fa-solid fa-copy"></i>
-                  </button>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let game of games; let i = index">
-              <th
-                [style.background-image]="
-                  'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
-                  game.map.replaceAll(' ', '_') +
-                  '_EBP-300x169.webp)'
-                "
+        } @else {
+          <div>
+            <ebp-loader [value]="percent"></ebp-loader>
+            <ebp-message class="mt-2">
+              {{ 'view.replay_cutter.videoIsBeingAnalyzed' | translate }}<br />
+              {{ 'view.replay_cutter.nbGamesFound' | translate }}:<b>
+                {{ games.length }}</b
               >
-                {{ game.map }}
-              </th>
-              <td class="infos">
-                <p class="orange">
-                  {{ game.orangeTeam.name }} ({{ game.orangeTeam.score }})
-                </p>
-                <p class="blue">
-                  {{ game.blueTeam.name }} ({{ game.blueTeam.score }})
-                </p>
-              </td>
-              <td class="buttons">
-                <div>
-                  <button
-                    class="squared"
-                    (click)="save(game)"
-                    matTooltip="{{ 'view.replay_cutter.save' | translate }}"
-                    matTooltipPosition="left"
-                  >
-                    <i class="fa-solid fa-floppy-disk"></i>
-                  </button>
-                  <button
-                    class="squared"
-                    [disabled]="
-                      identityService.supporterLevel == 0 ||
-                      !identityService.isBetaUser
-                    "
-                    (click)="selectWhichGameToAttachMinimap(i)"
-                  >
-                    <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </ng-container>
-    </ebp-column>
-  </ebp-row>
-</ebp-container>
+            </ebp-message>
+          </div>
+        }
+      </ebp-column>
+      @if (percent < 0 && games.length) {
+        <ebp-column [xs]="12">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ 'view.replay_cutter.map' | translate }}</th>
+                <th>{{ 'view.replay_cutter.infos' | translate }}</th>
+                <th>
+                  <div>
+                    <button
+                      class="squared"
+                      (click)="saveAll()"
+                      matTooltip="{{
+                        'view.replay_cutter.saveAll' | translate
+                      }}"
+                      matTooltipPosition="above"
+                    >
+                      <i class="fa-sharp fa-solid fa-floppy-disk"></i>
+                    </button>
+                    <button
+                      class="squared"
+                      (click)="copyTimeCodes()"
+                      matTooltip="{{
+                        'view.replay_cutter.copyTimecodes' | translate
+                      }}"
+                      matTooltipPosition="above"
+                    >
+                      <i class="fa-sharp fa-solid fa-copy"></i>
+                    </button>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let game of games; let i = index">
+                <th
+                  [style.background-image]="
+                    'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
+                    game.map.replaceAll(' ', '_') +
+                    '_EBP-300x169.webp)'
+                  "
+                >
+                  {{ game.map }}
+                </th>
+                <td class="infos">
+                  <p class="orange">
+                    {{ game.orangeTeam.name }} ({{ game.orangeTeam.score }})
+                  </p>
+                  <p class="blue">
+                    {{ game.blueTeam.name }} ({{ game.blueTeam.score }})
+                  </p>
+                </td>
+                <td class="buttons">
+                  <div>
+                    <button
+                      class="squared"
+                      (click)="save(game)"
+                      matTooltip="{{ 'view.replay_cutter.save' | translate }}"
+                      matTooltipPosition="left"
+                    >
+                      <i class="fa-solid fa-floppy-disk"></i>
+                    </button>
+                    <button
+                      class="squared"
+                      [disabled]="
+                        identityService.supporterLevel == 0 ||
+                        !identityService.isBetaUser
+                      "
+                      (click)="selectWhichGameToAttachMinimap(i)"
+                    >
+                      <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </ebp-column>
+      }
+    </ebp-row>
+  </ebp-column>
+</ebp-row>
 <div id="debug" #debug [class.invisible]="!debugMode">
   <div class="buttons">
     <button class="squared" (click)="playPauseDebug()">

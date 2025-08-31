@@ -57,7 +57,7 @@ const YTDLP_PATH = path.join(
 
 const EBP_DOMAIN = 'evabattleplan.com';
 const SETTINGS_PATH = path.join(ROOT_PATH, 'settings.json');
-const WINDOW_WIDTH = 800;
+const WINDOW_WIDTH = 900;
 const WINDOW_DEV_PANEL_WIDTH = 540;
 const WINDOW_HEIGHT = 800;
 let mainWindow;

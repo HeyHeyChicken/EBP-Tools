@@ -34,6 +34,8 @@ import { APIRestService } from '../../core/services/api-rest.service';
 import { RestGame } from './models/rest-game';
 import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
 import { IdentityService } from '../../core/services/identity.service';
+import { ReplayCutterSettingsDialog } from './dialog/settings/settings.dialog';
+import { Settings } from './models/settings';
 
 //#endregion
 @Component({
@@ -57,13 +59,13 @@ export class ReplayCutterComponent implements OnInit {
   @ViewChild('debug') debug?: ElementRef<HTMLDivElement>;
   protected debugMode: boolean = false;
   protected debugPause: boolean = false;
+  private settings: Settings = new Settings();
 
   protected percent: number = -1;
   protected games: Game[] = [];
   protected inputFileDisabled: boolean = true;
   protected videoPath: string | undefined;
   protected uploadingVideoPath: string | undefined;
-  protected outputPath: string | undefined;
   private lastDetectedGamePlayingFrame?: number;
 
   private start: number = 0;
@@ -107,12 +109,6 @@ export class ReplayCutterComponent implements OnInit {
     window.electronAPI.gameIsUploaded(() => {
       this.ngZone.run(() => {
         this.globalService.loading = false;
-      });
-    });
-
-    window.electronAPI.getVideoCutterOutputPath().then((path: string) => {
-      this.ngZone.run(() => {
-        this.outputPath = path;
       });
     });
 
@@ -178,21 +174,12 @@ export class ReplayCutterComponent implements OnInit {
     this.inputFileDisabled = false;
   }
 
-  /**
-   * This function allows user to change the folder where the cut games are stored.
-   */
-  protected setOutputPath(): void {
-    this.globalService.loading = true;
-    window.electronAPI
-      .setSetting('videoCutterOutputPath')
-      .then((path: string) => {
-        this.ngZone.run(() => {
-          this.globalService.loading = false;
-          if (path) {
-            this.outputPath = path;
-          }
-        });
-      });
+  protected openSettings(): void {
+    this.dialogService.open(ReplayCutterSettingsDialog, {
+      data: this.settings,
+      autoFocus: false,
+      disableClose: true
+    });
   }
 
   /**
@@ -374,7 +361,14 @@ export class ReplayCutterComponent implements OnInit {
                         GAME.mode == 1 ? 217 : 189,
                         7
                       );
-                    if (ORANGE_TEAM_NAME && ORANGE_TEAM_NAME.length >= 2) {
+                    if (this.settings.orangeTeamName.trim()) {
+                      GAME.orangeTeam.name = this.settings.orangeTeamName
+                        .trim()
+                        .toUpperCase();
+                    } else if (
+                      ORANGE_TEAM_NAME &&
+                      ORANGE_TEAM_NAME.length >= 2
+                    ) {
                       GAME.orangeTeam.name = ORANGE_TEAM_NAME.toUpperCase();
                     }
 
@@ -461,7 +455,12 @@ export class ReplayCutterComponent implements OnInit {
                         GAME.mode == 1 ? 667 : 679,
                         7
                       );
-                    if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
+
+                    if (this.settings.blueTeamName.trim()) {
+                      GAME.blueTeam.name = this.settings.blueTeamName
+                        .trim()
+                        .toUpperCase();
+                    } else if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
                       GAME.blueTeam.name = BLUE_TEAM_NAME.toUpperCase();
                     }
 
