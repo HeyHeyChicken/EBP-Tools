@@ -924,7 +924,8 @@ export class ReplayCutterComponent implements OnInit {
       new Map('Polaris', ['polaris']),
       new Map('Silva', ['silva']),
       new Map('The Cliff', ['cliff']),
-      new Map('The Rock', ['rock'])
+      new Map('The Rock', ['rock']),
+      new Map('Horizon', ['horizon'])
     ];
     const SPLITTED = search
       .replace(/(\r\n|\n|\r)/gm, '')
