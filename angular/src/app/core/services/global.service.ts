@@ -25,7 +25,7 @@ export class GlobalService {
   public devMode: boolean = false;
 
   // Block the entire interface under a loading display.
-  public loading: boolean = false;
+  public loading: string | undefined = undefined;
 
   /** URL to access the EBP Discord server. */
   public readonly discordServerURL: string = 'https://discord.gg/tAHAc9q3aX';

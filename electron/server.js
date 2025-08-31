@@ -353,6 +353,77 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
+     * This function upscales a video.
+     * @param {*} inputPath Unupscaled input video file path.
+     * @param {*} outputPath Upscaled output video file path.
+     */
+    function upscaleVideo(
+        inputPath /* string */,
+        outputPath /* string */,
+        callback /* Function */
+    ) {
+        if (fs.existsSync(outputPath)) {
+            fs.unlinkSync(outputPath);
+        }
+
+        const FFMPEG = spawn(FFMPEG_PATH, [
+            '-i',
+            inputPath,
+            '-vf',
+            'scale=1920:1080:flags=lanczos',
+            '-c:v',
+            'libx264',
+            '-preset',
+            'ultrafast',
+            '-crf',
+            '18',
+            '-c:a',
+            'copy',
+            outputPath
+        ]);
+
+        let duration = 0;
+
+        // Retrieving duration + progress information
+        FFMPEG.stderr.on('data', (data) => {
+            const DATA = data.toString();
+
+            // Total duration
+            const DURATION_MATCH = DATA.match(
+                /Duration: (\d+):(\d+):(\d+\.\d+)/
+            );
+            if (DURATION_MATCH) {
+                const HOURS = parseInt(DURATION_MATCH[1]);
+                const MINUTES = parseInt(DURATION_MATCH[2]);
+                const SECONDES = parseFloat(DURATION_MATCH[3]);
+                duration = HOURS * 3600 + MINUTES * 60 + SECONDES;
+            }
+
+            // Progress
+            const TIME_MATCH = DATA.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+            if (TIME_MATCH && duration > 0) {
+                const HOURS = parseInt(TIME_MATCH[1]);
+                const MINUTES = parseInt(TIME_MATCH[2]);
+                const SECONDES = parseFloat(TIME_MATCH[3]);
+                const CURRENT = HOURS * 3600 + MINUTES * 60 + SECONDES;
+
+                const PERCENT = Math.ceil((CURRENT / duration) * 100);
+                mainWindow.webContents.send(
+                    'global-message',
+                    'view.replay_cutter.upscalePercent',
+                    {
+                        percent: PERCENT
+                    }
+                );
+            }
+        });
+
+        FFMPEG.on('close', (code) => {
+            callback();
+        });
+    }
+
+    /**
      * This function retrieves the number of the latest published version of the project.
      * @param {Function} callback Callback function.
      */
@@ -382,12 +453,11 @@ let projectLatestVersion /* string */ = '';
 
     /**
      * This function retrieves the resolution of a video file.
-     * @param {string} ffmpegPath Path of the ffmpeg binary.
      * @param {string} videoPath Path of the video file.
      * @param {Function} callback Callback function with width and height information.
      */
-    function getVideoResolution(ffmpegPath, videoPath, callback) {
-        const COMMAND = `${ffmpegPath} -i "${videoPath}" 2>&1`;
+    function getVideoResolution(videoPath, callback) {
+        const COMMAND = `${FFMPEG_PATH} -i "${videoPath}" 2>&1`;
         exec(COMMAND, (err, stdout, stderr) => {
             const OUTPUT = stderr || stdout;
             const RESOLUTION = OUTPUT.match(/, (\d+)x(\d+)[ ,]/);
@@ -1026,48 +1096,67 @@ let projectLatestVersion /* string */ = '';
         );
 
         // The front-end asks the server to ask the user to choose a video file.
-        ipcMain.handle('open-video-file', async () => {
-            const { canceled, filePaths } = await dialog.showOpenDialog({
-                properties: ['openFile'],
-                filters: [{ name: 'EVA video', extensions: ['mp4', 'mkv'] }]
-            });
-            if (canceled) {
-                mainWindow.webContents.send('set-video-file', '');
-                mainWindow.webContents.send(
-                    'error',
-                    'view.replay_cutter.noFilesSelected'
+        ipcMain.handle('open-video-file', async (event, videoPath) => {
+            // If the user indicates that they want to upscale their video source...
+            if (videoPath) {
+                const OUTPUT_FOLDER_PATH = getOutputPath(
+                    'videoCutterOutputPath',
+                    path.join(os.homedir(), 'Downloads')
                 );
+                const SPLIT = videoPath.split('.');
+                const FILE_EXTENSION = SPLIT[SPLIT.length - 1];
+                const OUTPUT_PATH = path.join(
+                    OUTPUT_FOLDER_PATH,
+                    `ebp_tools_temp.${FILE_EXTENSION}`
+                );
+                upscaleVideo(videoPath, OUTPUT_PATH, () => {
+                    mainWindow.webContents.send('set-video-file', OUTPUT_PATH);
+                });
             } else {
-                // Check that the video file resolution is correct.
-                getVideoResolution(
-                    FFMPEG_PATH,
-                    filePaths[0],
-                    (width, height, duration) => {
-                        const EXPECTED_WIDTH /* number */ = 1920;
-                        const EXPECTED_HEIGHT /* number */ = 1080;
-                        if (
-                            width == EXPECTED_WIDTH &&
-                            height == EXPECTED_HEIGHT
-                        ) {
-                            mainWindow.webContents.send(
-                                'set-video-file',
-                                filePaths[0]
-                            );
-                        } else {
-                            mainWindow.webContents.send(
-                                'error',
-                                'view.replay_cutter.wrongResolution',
-                                {
-                                    expectedWidth: EXPECTED_WIDTH,
-                                    expectedHeight: EXPECTED_HEIGHT,
-                                    currentWidth: width,
-                                    currentHeight: height
-                                }
-                            );
-                            mainWindow.webContents.send('set-video-file', '');
+                const { canceled, filePaths } = await dialog.showOpenDialog({
+                    properties: ['openFile'],
+                    filters: [{ name: 'EVA video', extensions: ['mp4', 'mkv'] }]
+                });
+                if (canceled) {
+                    mainWindow.webContents.send('set-video-file', '');
+                    mainWindow.webContents.send(
+                        'error',
+                        'view.replay_cutter.noFilesSelected'
+                    );
+                } else {
+                    // Check that the video file resolution is correct.
+                    getVideoResolution(
+                        filePaths[0],
+                        (width, height, duration) => {
+                            const EXPECTED_HEIGHT /* number */ = 1080;
+                            if (height == EXPECTED_HEIGHT) {
+                                mainWindow.webContents.send(
+                                    'set-video-file',
+                                    filePaths[0]
+                                );
+                            } else if (height == 720) {
+                                mainWindow.webContents.send(
+                                    'replay_cutter_upscale',
+                                    filePaths[0]
+                                );
+                            } else {
+                                mainWindow.webContents.send(
+                                    'error',
+                                    'view.replay_cutter.wrongResolution',
+                                    {
+                                        expectedHeight: EXPECTED_HEIGHT,
+                                        currentWidth: width,
+                                        currentHeight: height
+                                    }
+                                );
+                                mainWindow.webContents.send(
+                                    'set-video-file',
+                                    ''
+                                );
+                            }
                         }
-                    }
-                );
+                    );
+                }
             }
         });
 

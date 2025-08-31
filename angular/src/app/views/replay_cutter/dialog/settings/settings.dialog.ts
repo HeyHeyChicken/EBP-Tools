@@ -60,12 +60,12 @@ export class ReplayCutterSettingsDialog implements OnInit {
    * This function allows user to change the folder where the cut games are stored.
    */
   protected setOutputPath(): void {
-    this.globalService.loading = true;
+    this.globalService.loading = '';
     window.electronAPI
       .setSetting('videoCutterOutputPath')
       .then((path: string) => {
         this.ngZone.run(() => {
-          this.globalService.loading = false;
+          this.globalService.loading = undefined;
           if (path) {
             this.outputPath = path;
           }

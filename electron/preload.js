@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to play a video file that has just been cut.
   openFile: (path) => ipcRenderer.invoke("open-file", path),
   // The front-end asks the server to ask the user to select a video file.
-  openVideoFile: () => ipcRenderer.invoke("open-video-file"),
+  openVideoFile: (videoPath) => ipcRenderer.invoke("open-video-file", videoPath),
   // The front-end asks the server to extract the public player games.
   extractPublicPseudoGames: (tag, nbPages, seasonIndex, skip, timeToWait) => ipcRenderer.invoke("extract-public-pseudo-games", tag, nbPages, seasonIndex, skip, timeToWait),
   // The front-end asks the server to extract the private player games.
@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   //#region Server -> Client
 
+  // The server asks the font-end if the user wants upscaling before analyzing.
+  replayCutterUpscale: (callback) => ipcRenderer.on("replay_cutter_upscale", (event, filePath) => callback(filePath)),
   // The server gives the path of the video file selected by the user.
   gameIsUploaded: (callback) => ipcRenderer.on("game-is-uploaded", (event) => callback()),
   // The server gives the path of the video file selected by the user.
@@ -71,6 +73,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   replayDownloaderSuccess: (callback) => ipcRenderer.on("replay-downloader-success", (event, path) => callback(path)),
   // The server asks the font-end the downloading percent.
   replayDownloaderPercent: (callback) => ipcRenderer.on("replay-downloader-percent", (event, percent) => callback(percent)),
+  // The server asks the font-end to display a global message.
+  globalMessage: (callback) => ipcRenderer.on("global-message", (event, i18nPath, i18nVariables) => callback(i18nPath, i18nVariables)),
 
   //#endregion
 });

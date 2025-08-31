@@ -75,47 +75,49 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let game of games; let i = index">
-                <th
-                  [style.background-image]="
-                    'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
-                    game.map.replaceAll(' ', '_') +
-                    '_EBP-300x169.webp)'
-                  "
-                >
-                  {{ game.map }}
-                </th>
-                <td class="infos">
-                  <p class="orange">
-                    {{ game.orangeTeam.name }} ({{ game.orangeTeam.score }})
-                  </p>
-                  <p class="blue">
-                    {{ game.blueTeam.name }} ({{ game.blueTeam.score }})
-                  </p>
-                </td>
-                <td class="buttons">
-                  <div>
-                    <button
-                      class="squared"
-                      (click)="save(game)"
-                      matTooltip="{{ 'view.replay_cutter.save' | translate }}"
-                      matTooltipPosition="left"
-                    >
-                      <i class="fa-solid fa-floppy-disk"></i>
-                    </button>
-                    <button
-                      class="squared"
-                      [disabled]="
-                        identityService.supporterLevel == 0 ||
-                        !identityService.isBetaUser
-                      "
-                      (click)="selectWhichGameToAttachMinimap(i)"
-                    >
-                      <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              @for (game of games; track $index) {
+                <tr>
+                  <th
+                    [style.background-image]="
+                      'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
+                      game.map.replaceAll(' ', '_') +
+                      '_EBP-300x169.webp)'
+                    "
+                  >
+                    {{ game.map }}
+                  </th>
+                  <td class="infos">
+                    <p class="orange">
+                      {{ game.orangeTeam.name }} ({{ game.orangeTeam.score }})
+                    </p>
+                    <p class="blue">
+                      {{ game.blueTeam.name }} ({{ game.blueTeam.score }})
+                    </p>
+                  </td>
+                  <td class="buttons">
+                    <div>
+                      <button
+                        class="squared"
+                        (click)="save(game)"
+                        matTooltip="{{ 'view.replay_cutter.save' | translate }}"
+                        matTooltipPosition="left"
+                      >
+                        <i class="fa-solid fa-floppy-disk"></i>
+                      </button>
+                      <button
+                        class="squared"
+                        [disabled]="
+                          identityService.supporterLevel == 0 ||
+                          !identityService.isBetaUser
+                        "
+                        (click)="selectWhichGameToAttachMinimap($index)"
+                      >
+                        <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
             </tbody>
           </table>
         </ebp-column>
@@ -136,40 +138,41 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <i class="fa-sharp fa-solid fa-xmark"></i>
     </button>
   </div>
-  <div class="video" *ngIf="videoPath">
-    <!-- This video is used to analyze the timecodes of games in a replay -->
-    <video
-      muted
-      [src]="
-        'http://localhost:' +
-        globalService.serverPort +
-        '/file?path=' +
-        videoPath
-      "
-      (loadeddata)="videoLoadedData($event)"
-      (timeupdate)="videoTimeUpdate($event)"
-    ></video>
-  </div>
-  <div class="video" *ngIf="uploadingVideoPath">
-    <!-- This video is used to upload the game in a replay -->
-    <video
-      muted
-      [src]="
-        'http://localhost:' +
-        globalService.serverPort +
-        '/file?path=' +
-        uploadingVideoPath
-      "
-      (loadeddata)="uploadingVideoLoadedData($event)"
-      (timeupdate)="uploadingVideoTimeUpdate($event)"
-    ></video>
-  </div>
+  @if (videoPath) {
+    <div class="video">
+      <!-- This video is used to analyze the timecodes of games in a replay -->
+      <video
+        muted
+        [src]="
+          'http://localhost:' +
+          globalService.serverPort +
+          '/file?path=' +
+          videoPath
+        "
+        (loadeddata)="videoLoadedData($event)"
+        (timeupdate)="videoTimeUpdate($event)"
+      ></video>
+    </div>
+  }
+  @if (uploadingVideoPath) {
+    <div class="video">
+      <!-- This video is used to upload the game in a replay -->
+      <video
+        muted
+        [src]="
+          'http://localhost:' +
+          globalService.serverPort +
+          '/file?path=' +
+          uploadingVideoPath
+        "
+        (loadeddata)="uploadingVideoLoadedData($event)"
+        (timeupdate)="uploadingVideoTimeUpdate($event)"
+      ></video>
+    </div>
+  }
 </div>
-<button
-  id="debugButton"
-  class="squared"
-  (click)="debugMode = !debugMode"
-  *ngIf="globalService.devMode"
->
-  <i class="fa-sharp fa-solid fa-bug"></i>
-</button>
+@if (globalService.devMode) {
+  <button id="debugButton" class="squared" (click)="debugMode = !debugMode">
+    <i class="fa-sharp fa-solid fa-bug"></i>
+  </button>
+}

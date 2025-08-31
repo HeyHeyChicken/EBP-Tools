@@ -12,21 +12,21 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <span
     >{{ "shared.footer.version" | translate }}: {{ versions?.current }}</span
   >
-  <ng-container *ngIf="versions && versions.last">
-    <a
-      class="ml-auto"
-      *ngIf="versions.current < versions.last"
-      (click)="onNewUpdateLinkClick()"
-    >
-      {{ "shared.footer.newUpdate" | translate }}
-    </a>
-    <a class="ml-auto beta" *ngIf="versions.current > versions.last">
-      {{ "shared.footer.beta" | translate }}
-    </a>
-  </ng-container>
+  @if(versions && versions.last){ @if(versions.current < versions.last){
+  <a class="ml-auto" (click)="onNewUpdateLinkClick()">
+    {{ "shared.footer.newUpdate" | translate }}
+  </a>
+  } @if(versions.current > versions.last){
+  <a class="ml-auto beta"> {{ "shared.footer.beta" | translate }} </a>
+  } }
 </ebp-footer>
-<div id="loader" *ngIf="globalService.loading">
+@if(globalService.loading !== undefined){
+<div id="loader">
   <div>
     <div></div>
   </div>
+  @if(globalService.loading.trim().length > 0){
+  <p>{{globalService.loading}}</p>
+  }
 </div>
+}

@@ -44,11 +44,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 [(ngModel)]="seasonIndex"
                 [ngModelOptions]="{ standalone: true }"
               >
-                <mat-option
-                  *ngFor="let season of seasons; let i = index"
-                  [value]="i + 1"
-                  >{{ season }}</mat-option
-                >
+                @for (season of seasons; track season) {
+                  <mat-option [value]="$index + 1">{{ season }}</mat-option>
+                }
               </mat-select>
             </mat-form-field>
             <!-- TIME TO WAIT -->
@@ -83,9 +81,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 [(ngModel)]="nbPages"
                 [ngModelOptions]="{ standalone: true }"
               >
-                <mat-option *ngFor="let page of maxPages" [value]="page">{{
-                  page
-                }}</mat-option>
+                @for (page of maxPages; track page) {
+                  <mat-option [value]="page">{{ page }}</mat-option>
+                }
               </mat-select>
             </mat-form-field>
             <!-- NB PAGE TO SKIP -->

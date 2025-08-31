@@ -74,7 +74,7 @@ export class GameHistoryComponent implements OnInit {
 
     window.electronAPI.gamesAreExported((filePath?: string) => {
       this.ngZone.run(() => {
-        this.globalService.loading = false;
+        this.globalService.loading = undefined;
         if (filePath) {
           this.toastrService
             .success('Your games have been exported here: ' + filePath)
@@ -106,12 +106,12 @@ export class GameHistoryComponent implements OnInit {
    * This function allows user to change the folder where game histories are stored.
    */
   protected setOutputPath(): void {
-    this.globalService.loading = true;
+    this.globalService.loading = '';
     window.electronAPI
       .setSetting('gameHistoryOutputPath')
       .then((path: string) => {
         this.ngZone.run(() => {
-          this.globalService.loading = false;
+          this.globalService.loading = undefined;
           if (path) {
             this.outputPath = path;
           }

@@ -12,7 +12,7 @@
       "thanksToTheContributors": "Thanks to the contributors"
     },
     "replay_cutter": {
-      "wrongResolution": "Your video must be {{ expectedWidth }}x{{ expectedHeight }} in resolution, yours is {{ currentWidth }}x{{ currentHeight }}.",
+      "wrongResolution": "Your video must be in {{ expectedHeight }}p, yours is in {{ currentHeight }}p",
       "inputFile": "Click here to send your video file",
       "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
       "nbGamesFound": "Number of games found",
@@ -24,11 +24,16 @@
       "noFilesSelected": "No files selected",
       "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
       "outputPath": "Output path",
+      "upscalePercent": "Upscaling ... ({{percent}}%)",
       "dialog": {
         "settings": {
           "orangeTeamName": "Orange team name",
           "blueTeamName": "Blue team name",
           "teamNameDescription": "You can force the team names during detection."
+        },
+        "upscale": {
+          "title": "Upscaling",
+          "description": "Your video is in 720p, but Tools only supports 1080p.<br/>Do you want to upscale it before analysis?<br/>Be aware, this may take some time…"
         }
       }
     },

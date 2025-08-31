@@ -18,10 +18,11 @@ import { WizzComponent } from './shared/wizz/wizz.component';
 import { FooterComponent } from './shared/footer/footer.component';
 import { CommonModule } from '@angular/common';
 import { GlobalService } from './core/services/global.service';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Versions } from '../models/versions';
 import { IdentityService } from './core/services/identity.service';
 import { APIRestService } from './core/services/api-rest.service';
+import { ToastrService } from 'ngx-toastr';
 
 //#endregion
 @Component({
@@ -52,7 +53,9 @@ export class App implements OnInit {
     private readonly router: Router,
     private readonly ngZone: NgZone,
     private readonly identityService: IdentityService,
-    private readonly apiRestService: APIRestService
+    private readonly apiRestService: APIRestService,
+    private readonly translateService: TranslateService,
+    private readonly toastrService: ToastrService
   ) {}
 
   //#region Functions
@@ -106,6 +109,30 @@ export class App implements OnInit {
         window.location.reload();
       }
     });
+
+    window.electronAPI.error((i18nPath: string, i18nVariables: object) => {
+      this.ngZone.run(() => {
+        this.globalService.loading = undefined;
+
+        this.translateService
+          .get(i18nPath, i18nVariables)
+          .subscribe((translated: string) => {
+            this.toastrService.error(translated);
+          });
+      });
+    });
+
+    window.electronAPI.globalMessage(
+      (i18nPath: string, i18nVariables: object) => {
+        this.ngZone.run(() => {
+          this.translateService
+            .get(i18nPath, i18nVariables)
+            .subscribe((translated: string) => {
+              this.globalService.loading = translated;
+            });
+        });
+      }
+    );
   }
 
   @HostListener('document:keydown', ['$event'])

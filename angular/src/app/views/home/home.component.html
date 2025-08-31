@@ -13,14 +13,14 @@ See LICENSE for terms. Unauthorized use is prohibited.
           <img src="/assets/img/arrow.svg" />
           <ebp-message class="mt-2">
             <h2 class="mt-0 mb-1">
-              {{ "view.home.welcomeTo" | translate }}<br />EBP - EVA Battle Plan
+              {{ 'view.home.welcomeTo' | translate }}<br />EBP - EVA Battle Plan
               - Tools !
             </h2>
-            {{ "view.home.tuto" | translate }}
+            {{ 'view.home.tuto' | translate }}
           </ebp-message>
         </div>
         <div class="box">
-          <h2>{{ "view.home.thanksToTheContributors" | translate }}</h2>
+          <h2>{{ 'view.home.thanksToTheContributors' | translate }}</h2>
           <div class="scroller">
             <div class="d-flex">
               <div
@@ -29,18 +29,16 @@ See LICENSE for terms. Unauthorized use is prohibited.
               >
                 <div><i class="fa-sharp fa-solid fa-plus"></i></div>
               </div>
-              <div
-                class="developper"
-                *ngFor="let developper of developpers"
-                matTooltip="{{ developper }}"
-              >
-                <div
-                  (click)="openURL(`https://github.com/${developper}`)"
-                  [style.background-image]="
-                    'url(\'/assets/img/developpers/' + developper + '.png\')'
-                  "
-                ></div>
-              </div>
+              @for (developper of developpers; track developper) {
+                <div class="developper" matTooltip="{{ developper }}">
+                  <div
+                    (click)="openURL(`https://github.com/${developper}`)"
+                    [style.background-image]="
+                      'url(\'/assets/img/developpers/' + developper + '.png\')'
+                    "
+                  ></div>
+                </div>
+              }
             </div>
           </div>
         </div>

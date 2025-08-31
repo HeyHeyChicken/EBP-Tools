@@ -2,6 +2,8 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
+@use '../styles/imports/variables' as variables;
+
 #loader {
   position: fixed;
   top: 0;
@@ -12,6 +14,7 @@
   cursor: wait;
   z-index: 999;
 
+  $spinnerSize: calc(#{variables.$margin} * 4);
   > div {
     position: absolute;
     top: 50%;
@@ -19,8 +22,8 @@
     transform: translate(-50%, -50%);
 
     > div {
-      width: 48px;
-      height: 48px;
+      width: $spinnerSize;
+      height: $spinnerSize;
       border: 5px solid #fff;
       border-bottom-color: transparent;
       border-radius: 50%;
@@ -37,6 +40,14 @@
         transform: rotate(360deg);
       }
     }
+  }
+
+  > p {
+    position: absolute;
+    top: calc(50% + #{$spinnerSize});
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
   }
 }
 

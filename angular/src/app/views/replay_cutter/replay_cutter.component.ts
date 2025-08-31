@@ -36,6 +36,7 @@ import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.d
 import { IdentityService } from '../../core/services/identity.service';
 import { ReplayCutterSettingsDialog } from './dialog/settings/settings.dialog';
 import { Settings } from './models/settings';
+import { ReplayCutterUpscaleConfirmationDialog } from './dialog/upscale-confirmation/upscale-confirmation.dialog';
 
 //#endregion
 @Component({
@@ -94,21 +95,9 @@ export class ReplayCutterComponent implements OnInit {
   ngOnInit(): void {
     this.initServices();
 
-    window.electronAPI.error((i18nPath: string, i18nVariables: object) => {
-      this.ngZone.run(() => {
-        this.globalService.loading = false;
-
-        this.translateService
-          .get(i18nPath, i18nVariables)
-          .subscribe((translated: string) => {
-            this.toastrService.error(translated);
-          });
-      });
-    });
-
     window.electronAPI.gameIsUploaded(() => {
       this.ngZone.run(() => {
-        this.globalService.loading = false;
+        this.globalService.loading = undefined;
       });
     });
 
@@ -119,9 +108,27 @@ export class ReplayCutterComponent implements OnInit {
           this.videoPath = encodeURIComponent(path);
           this.percent = 0;
         }
-        this.globalService.loading = false;
+        this.globalService.loading = undefined;
         this.inputFileDisabled = false;
       });
+    });
+
+    // The server asks the font-end if the user wants upscaling before analyzing.
+    window.electronAPI.replayCutterUpscale((videoPath: string) => {
+      this.dialogService
+        .open(ReplayCutterUpscaleConfirmationDialog, {
+          autoFocus: false,
+          disableClose: true
+        })
+        .afterClosed()
+        .subscribe((upscale: boolean) => {
+          if (upscale) {
+            window.electronAPI.openVideoFile(videoPath);
+          } else {
+            this.globalService.loading = undefined;
+            this.inputFileDisabled = false;
+          }
+        });
     });
   }
 
@@ -275,7 +282,7 @@ export class ReplayCutterComponent implements OnInit {
     gameID: number
   ): void {
     if (this.videoPath) {
-      this.globalService.loading = true;
+      this.globalService.loading = '';
 
       window.electronAPI.uploadGameMiniMap(
         this.games[gameIndex],
@@ -291,7 +298,7 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected onInputFileClick(): void {
     if (!this.inputFileDisabled) {
-      this.globalService.loading = true;
+      this.globalService.loading = '';
       this.videoPath = undefined;
       this.inputFileDisabled = true;
       this.games = [];
@@ -1054,10 +1061,12 @@ export class ReplayCutterComponent implements OnInit {
       this.toastrService.error('Video file not found.');
       return;
     }
+    this.globalService.loading = '';
     const FILE_PATH = await window.electronAPI.cutVideoFile(
       game,
       decodeURIComponent(this.videoPath)
     );
+    this.globalService.loading = undefined;
     this.toastrService
       .success('Your video has been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {
@@ -1073,11 +1082,13 @@ export class ReplayCutterComponent implements OnInit {
       this.toastrService.error('Video file not found.');
       return;
     }
+    this.globalService.loading = '';
     const FILE_PATH = await window.electronAPI.cutVideoFiles(
       this.games,
       decodeURIComponent(this.videoPath)
     );
 
+    this.globalService.loading = undefined;
     this.toastrService
       .success('Your videos have been cut here: ' + FILE_PATH)
       .onTap.subscribe(() => {

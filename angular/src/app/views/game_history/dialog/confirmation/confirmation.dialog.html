@@ -30,6 +30,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
     attr.aria-label="{{ 'common.ok' | translate }}"
   >
     <i class="fa-sharp fa-solid fa-check"></i>{{ "common.ok" | translate }}
-    <span *ngIf="timeToWait > 0">({{timeToWait}}s)</span>
+    @if(timeToWait > 0){
+    <span>({{timeToWait}}s)</span>
+    }
   </button>
 </mat-dialog-actions>

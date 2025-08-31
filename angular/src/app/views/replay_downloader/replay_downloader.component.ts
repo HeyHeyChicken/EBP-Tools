@@ -87,12 +87,12 @@ export class ReplayDownloaderComponent implements OnInit {
    * This function allows user to change the folder where the replay downloader are stored.
    */
   protected setOutputPath(): void {
-    this.globalService.loading = true;
+    this.globalService.loading = '';
     window.electronAPI
       .setSetting('replayDownloaderOutputPath')
       .then((path: string) => {
         this.ngZone.run(() => {
-          this.globalService.loading = false;
+          this.globalService.loading = undefined;
           if (path) {
             this.outputPath = path;
           }

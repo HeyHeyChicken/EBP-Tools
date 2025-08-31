@@ -46,7 +46,7 @@ export interface ElectronAPI {
   isDevMode: () => Promise<boolean>;
   logout: () => Promise<void>;
   openFile: (pathFile: string) => Promise<void>;
-  openVideoFile: () => void;
+  openVideoFile: (videoPath?: string) => void;
   openURL: (url: string) => void;
   setSetting: (setting: string) => Promise<string>;
   setVideoFile: (callback: (path: string) => void) => Promise<void>;
@@ -61,12 +61,16 @@ export interface ElectronAPI {
 
   //#region Server to Client
 
+  replayCutterUpscale: (callback: (filePath: string) => void) => void;
   gameIsUploaded: (callback: () => void) => void;
   gamesAreExported: (callback: (filePath: string | undefined) => void) => void;
   replayDownloaderError: (callback: (error: string) => void) => void;
   replayDownloaderSuccess: (callback: (path: string) => void) => void;
   replayDownloaderPercent: (callback: (percent: number) => void) => void;
   error: (callback: (i18nPath: string, i18nVariables: object) => void) => void;
+  globalMessage: (
+    callback: (i18nPath: string, i18nVariables: object) => void
+  ) => void;
 
   //#endregion
 }

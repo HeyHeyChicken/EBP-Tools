@@ -12,7 +12,7 @@
       "thanksToTheContributors": "Grazie ai collaboratori"
     },
     "replay_cutter": {
-      "wrongResolution": "Il vostro video deve avere una risoluzione di {{ expectedWidth }}x{{ expectedHeight }}, il vostro è in {{ currentWidth }}x{{ currentHeight }}.",
+      "wrongResolution": "Il tuo video deve essere in {{ expectedHeight }}p, il tuo è in {{ currentHeight }}p.",
       "inputFile": "Clicca qui per inviare il tuo file video",
       "videoIsBeingAnalyzed": "Attendere prego, il video è in fase di analisi...",
       "nbGamesFound": "Numero di giochi trovati",
@@ -24,11 +24,16 @@
       "noFilesSelected": "Nessun file selezionato",
       "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti",
       "outputPath": "Percorso di output",
+      "upscalePercent": "Ingrandimento ... ({{percent}}%)",
       "dialog": {
         "settings": {
           "orangeTeamName": "Nome della squadra arancione",
           "blueTeamName": "Nome della squadra blu",
           "teamNameDescription": "È possibile forzare i nomi delle squadre durante il rilevamento."
+        },
+        "upscale": {
+          "title": "Ingrandimento",
+          "description": "Il tuo video è in 720p, ma Tools supporta solo il 1080p.<br/>Vuoi eseguirne l’upscaling prima dell’analisi?<br/>Attenzione, potrebbe richiedere del tempo…"
         }
       }
     },

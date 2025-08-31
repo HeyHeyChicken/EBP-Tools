@@ -8,20 +8,18 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <ebp-row>
     <ebp-column></ebp-column>
     <ebp-column [xs]="7">
-      <ebp-loader
-        *ngIf="percent != undefined; else form"
-        [value]="percent"
-      ></ebp-loader>
-      <ng-template #form>
+      @if (percent != undefined) {
+        <ebp-loader [value]="percent"></ebp-loader>
+      } @else {
         <div class="box">
           <!-- STEP 1 -->
-          <p>{{ "view.game_history.step" | translate }} 1</p>
+          <p>{{ 'view.game_history.step' | translate }} 1</p>
           <mat-form-field
             (click)="setOutputPath()"
             (keypress)="setOutputPath()"
           >
             <mat-label>{{
-              "view.replay_cutter.outputPath" | translate
+              'view.replay_cutter.outputPath' | translate
             }}</mat-label>
             <input matInput readonly type="text" [value]="outputPath" />
             <div class="buttons">
@@ -31,7 +29,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
             </div>
           </mat-form-field>
           <!-- STEP 2 -->
-          <p>{{ "view.game_history.step" | translate }} 2</p>
+          <p>{{ 'view.game_history.step' | translate }} 2</p>
           <form style="margin-top: -12px" (submit)="onDownloadYouTube()">
             <mat-form-field>
               <mat-label>YouTube</mat-label>
@@ -67,7 +65,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
             </mat-form-field>
           </form>
         </div>
-      </ng-template>
+      }
     </ebp-column>
   </ebp-row>
 </ebp-container>

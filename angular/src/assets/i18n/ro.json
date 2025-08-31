@@ -12,7 +12,7 @@
       "thanksToTheContributors": "Mulțumiri contributorilor"
     },
     "replay_cutter": {
-      "wrongResolution": "Videoclipul trebuie să aibă rezoluția {{ expectedWidth }}x{{ expectedHeight }}, al tău are {{ currentWidth }}x{{ currentHeight }}.",
+      "wrongResolution": "Videoclipul dvs. trebuie să fie în {{ expectedHeight }}p, al dvs. este în {{ currentHeight }}p.",
       "inputFile": "Click aici pentru a trimite fișierul video",
       "videoIsBeingAnalyzed": "Te rugăm să aștepți, videoclipul este analizat...",
       "nbGamesFound": "Număr de jocuri găsite",
@@ -24,11 +24,16 @@
       "noFilesSelected": "Niciun fișier selectat",
       "timeCodesCopiedClipboard": "Codurile de timp au fost copiate în clipboard",
       "outputPath": "Cale fișier ieșire",
+      "upscalePercent": "Mărire ... ({{percent}}%)",
       "dialog": {
         "settings": {
           "orangeTeamName": "Numele echipei portocalii",
           "blueTeamName": "Numele echipei albastre",
           "teamNameDescription": "Puteți forța numele echipelor în timpul detectării."
+        },
+        "upscale": {
+          "title": "Mărire",
+          "description": "Videoclipul dumneavoastră este în 720p, dar Tools acceptă doar 1080p.<br/>Doriți să îl upscalați înainte de analiză?<br/>Atenție, acest proces poate dura ceva timp…"
         }
       }
     },

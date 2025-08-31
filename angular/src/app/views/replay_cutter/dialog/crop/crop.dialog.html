@@ -6,14 +6,15 @@ See LICENSE for terms. Unauthorized use is prohibited.
 
 <mat-dialog-content>
   <div #imageCropperContainer>
+    @if(currentImgBase64){
     <image-cropper
-      *ngIf="currentImgBase64"
       [imageBase64]="currentImgBase64"
       [cropper]="cropper"
       [maintainAspectRatio]="false"
       (cropperReady)="onCropperReady($event)"
       (cropperChange)="onCropperChange($event)"
     ></image-cropper>
+    }
   </div>
 </mat-dialog-content>
 <mat-dialog-actions align="end">

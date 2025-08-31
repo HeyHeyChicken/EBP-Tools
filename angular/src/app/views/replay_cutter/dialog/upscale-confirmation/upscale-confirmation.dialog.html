@@ -1,0 +1,33 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+<div mat-dialog-title>
+  {{ "view.replay_cutter.dialog.upscale.title" | translate }}
+</div>
+<mat-dialog-content>
+  <ebp-row>
+    <ebp-column
+      [xs]="12"
+      innerHTML="{{ 'view.replay_cutter.dialog.upscale.description' | translate}}"
+    ></ebp-column>
+  </ebp-row>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button
+    type="button"
+    [mat-dialog-close]="false"
+    attr.aria-label="{{ 'common.cancel' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-check"></i>{{"common.cancel"|translate}}
+  </button>
+  <button
+    class="ml-2 green"
+    type="button"
+    [mat-dialog-close]="true"
+    attr.aria-label="{{ 'common.ok' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-check"></i>{{"common.ok"|translate}}
+  </button>
+</mat-dialog-actions>

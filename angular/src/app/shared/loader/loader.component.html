@@ -6,6 +6,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
 <div [class]="'loader t' + value" id="loader">
   <span></span>
   <div>
-    <div *ngFor="let i of [].constructor(50)"></div>
+    @for (i of [].constructor(50); track i) {
+      <div></div>
+    }
   </div>
 </div>

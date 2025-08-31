@@ -21,9 +21,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
 </a>
 <mat-form-field matTooltip="{{ 'shared.header.changeTool' | translate }}">
   <mat-select [(ngModel)]="page" (selectionChange)="changeTool($event)">
-    <mat-option *ngFor="let page of pages" [value]="page">
-      {{ "shared.header.tools." + page | translate }}
-    </mat-option>
+    @for (page of pages; track page) {
+      <mat-option [value]="page">
+        {{ 'shared.header.tools.' + page | translate }}
+      </mat-option>
+    }
   </mat-select>
 </mat-form-field>
 <!-- #endregion -->
@@ -38,13 +40,14 @@ See LICENSE for terms. Unauthorized use is prohibited.
       aria-label="Language selector"
       (change)="languageSelectChanged($event)"
     >
-      <option
-        *ngFor="let lang of translateService.langs"
-        value="{{ lang }}"
-        [selected]="lang == translateService.currentLang"
-      >
-        {{ lang }}
-      </option>
+      @for (lang of translateService.langs; track lang) {
+        <option
+          value="{{ lang }}"
+          [selected]="lang == translateService.currentLang"
+        >
+          {{ lang }}
+        </option>
+      }
     </select>
   </div>
   <div>
