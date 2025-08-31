@@ -31,7 +31,7 @@ export class IdentityService {
     const PAYLOAD = accessToken.split('.')[1];
     const DATA = JSON.parse(atob(PAYLOAD));
 
-    this._userID = DATA.sub;
+    this._userID = parseInt(DATA.sub);
 
     this._supporterLevel = parseInt(DATA.supporterLevel);
     if (isNaN(this._supporterLevel)) {
