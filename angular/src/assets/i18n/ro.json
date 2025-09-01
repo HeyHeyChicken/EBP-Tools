@@ -29,7 +29,8 @@
         "settings": {
           "orangeTeamName": "Numele echipei portocalii",
           "blueTeamName": "Numele echipei albastre",
-          "teamNameDescription": "Puteți forța numele echipelor în timpul detectării."
+          "teamNameDescription": "Puteți forța numele echipelor în timpul detectării.",
+          "maxTimePerGame": "Timp maxim pe joc (minute)"
         },
         "upscale": {
           "title": "Mărire",

@@ -29,7 +29,8 @@
         "settings": {
           "orangeTeamName": "Orange team name",
           "blueTeamName": "Blue team name",
-          "teamNameDescription": "You can force the team names during detection."
+          "teamNameDescription": "You can force the team names during detection.",
+          "maxTimePerGame": "Maximum time per game (minutes)"
         },
         "upscale": {
           "title": "Upscaling",

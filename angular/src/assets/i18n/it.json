@@ -29,7 +29,8 @@
         "settings": {
           "orangeTeamName": "Nome della squadra arancione",
           "blueTeamName": "Nome della squadra blu",
-          "teamNameDescription": "È possibile forzare i nomi delle squadre durante il rilevamento."
+          "teamNameDescription": "È possibile forzare i nomi delle squadre durante il rilevamento.",
+          "maxTimePerGame": "Tempo massimo per partita (minuti)"
         },
         "upscale": {
           "title": "Ingrandimento",

@@ -339,7 +339,7 @@ export class ReplayCutterComponent implements OnInit {
         if (event.target) {
           const VIDEO = event.target as HTMLVideoElement;
           let found: boolean = false;
-          const DEFAULT_STEP: number = 2;
+          const DEFAULT_STEP: number = 1;
           if (VIDEO.currentTime > 0) {
             const NOW: number = VIDEO.currentTime;
 
@@ -351,7 +351,6 @@ export class ReplayCutterComponent implements OnInit {
               const MODE = this.detectGameScoreFrame(VIDEO);
               if (MODE > 0) {
                 found = true;
-
                 if (this.games.length == 0 || this.games[0].start != -1) {
                   if (MODE > 0) {
                     const GAME: Game = new Game(MODE);
@@ -475,12 +474,17 @@ export class ReplayCutterComponent implements OnInit {
                       await this.getTextFromImage(
                         VIDEO,
                         this.tesseractWorker_number!,
-                        GAME.mode == 1 ? 1294 : 1286,
+                        GAME.mode == 1 ? 1285 : 1286,
                         GAME.mode == 1 ? 89 : 54,
                         GAME.mode == 1 ? 1384 : 1376,
                         GAME.mode == 1 ? 127 : 93,
                         7
                       );
+                    console.log(' ----------------- ', GAME.mode);
+                    // DEBUG
+                    this.debug?.nativeElement.append(
+                      this.videoToCanvas(VIDEO)!
+                    );
                     if (BLUE_TEAM_SCORE) {
                       const INT_VALUE = parseInt(BLUE_TEAM_SCORE);
                       if (INT_VALUE <= 100) {
@@ -660,8 +664,6 @@ export class ReplayCutterComponent implements OnInit {
                     this.games[0].mode == 1 ? 102 : 110,
                     7
                   );
-                  // DEBUG
-                  this.debug?.nativeElement.append(this.videoToCanvas(VIDEO)!);
 
                   if (TEXT) {
                     found = true;
@@ -732,11 +734,15 @@ export class ReplayCutterComponent implements OnInit {
                       if (SPLITTED.length == 2) {
                         const MINUTES = parseInt(SPLITTED[0]);
                         const SECONDES = parseInt(SPLITTED[1]);
-                        const DIFFERENCE = (10 - MINUTES) * 60 - SECONDES;
+                        const DIFFERENCE =
+                          (this.settings.maxTimePerGame - MINUTES) * 60 -
+                          SECONDES;
                         if (MINUTES <= 9) {
                           if (!this.games[0].__debug__jumped) {
                             this.games[0].__debug__jumped = true;
-                            console.log("Jumping to the game's start !");
+                            console.log(
+                              `Jumping to the game's start ! (${MINUTES}:${SECONDES}) (${NOW - DIFFERENCE})`
+                            );
                             this.lastDetectedGamePlayingFrame =
                               NOW - DIFFERENCE;
                             this.setVideoCurrentTime(

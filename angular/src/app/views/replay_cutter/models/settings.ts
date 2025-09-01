@@ -5,6 +5,8 @@
 export class Settings {
   constructor(
     public orangeTeamName: string = '',
-    public blueTeamName: string = ''
+    public blueTeamName: string = '',
+    public maxTimePerGame: number = 10,
+    public freeText: string = ''
   ) {}
 }
