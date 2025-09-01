@@ -6,7 +6,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
 <div [class]="'loader t' + value" id="loader">
   <span></span>
   <div>
-    @for (i of [].constructor(50); track i) {
+    @for (i of [].constructor(50); track $index) {
       <div></div>
     }
   </div>
