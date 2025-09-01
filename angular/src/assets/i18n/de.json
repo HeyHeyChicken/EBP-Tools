@@ -30,7 +30,8 @@
           "orangeTeamName": "Name des orangenen Teams",
           "blueTeamName": "Name des blauen Teams",
           "teamNameDescription": "Sie können die Teamnamen bei der Erkennung erzwingen.",
-          "maxTimePerGame": "Maximale Zeit pro Spiel (Minuten)"
+          "maxTimePerGame": "Maximale Zeit pro Spiel (Minuten)",
+          "freeText": "Freitext am Ende des Dateinamens"
         },
         "upscale": {
           "title": "Hochskalieren",

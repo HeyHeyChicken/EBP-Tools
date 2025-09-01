@@ -1070,7 +1070,8 @@ export class ReplayCutterComponent implements OnInit {
     this.globalService.loading = '';
     const FILE_PATH = await window.electronAPI.cutVideoFile(
       game,
-      decodeURIComponent(this.videoPath)
+      decodeURIComponent(this.videoPath),
+      this.settings.freeText
     );
     this.globalService.loading = undefined;
     this.toastrService
@@ -1091,7 +1092,8 @@ export class ReplayCutterComponent implements OnInit {
     this.globalService.loading = '';
     const FILE_PATH = await window.electronAPI.cutVideoFiles(
       this.games,
-      decodeURIComponent(this.videoPath)
+      decodeURIComponent(this.videoPath),
+      this.settings.freeText
     );
 
     this.globalService.loading = undefined;

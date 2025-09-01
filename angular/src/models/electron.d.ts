@@ -16,8 +16,16 @@ export interface ElectronAPI {
   //#region Client to Server
 
   setWindowSize: (width?: number, height?: number) => Promise<void>;
-  cutVideoFile: (game: Game, videoPath: string) => Promise<string>;
-  cutVideoFiles: (games: Game[], videoPath: string) => Promise<string>;
+  cutVideoFile: (
+    game: Game,
+    videoPath: string,
+    customText: string
+  ) => Promise<string>;
+  cutVideoFiles: (
+    games: Game[],
+    videoPath: string,
+    customText: string
+  ) => Promise<string>;
   debugMode: () => Promise<void>;
   downloadReplay: (url: string, platform: VideoPlatform) => Promise<void>;
   extractPublicPseudoGames: (

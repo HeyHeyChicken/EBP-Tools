@@ -39,9 +39,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to logout.
   logout: () => ipcRenderer.invoke("logout"),
   // The front-end asks the server to cut a video file.
-  cutVideoFile: (game, videoPath) => ipcRenderer.invoke("cut-video-file", game, videoPath),
+  cutVideoFile: (game, videoPath, customText) => ipcRenderer.invoke("cut-video-file", game, videoPath, customText),
   // The front-end asks the server to cut all video files.
-  cutVideoFiles: (game, videoPath) => ipcRenderer.invoke("cut-video-files", game, videoPath),
+  cutVideoFiles: (game, videoPath, customText) => ipcRenderer.invoke("cut-video-files", game, videoPath, customText),
   // The front-end asks the server to play a video file that has just been cut.
   openFile: (path) => ipcRenderer.invoke("open-file", path),
   // The front-end asks the server to ask the user to select a video file.
