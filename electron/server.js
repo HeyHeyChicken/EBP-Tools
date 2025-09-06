@@ -348,7 +348,7 @@ let projectLatestVersion /* string */ = '';
                   } (${new Date().getTime()})`) + `.${EXTENSION}`
         );
 
-        const COMMAND /* string */ = `"${FFMPEG_PATH}" -i "${videoPath}" -filter:v "crop=${cropPosition.x2 - cropPosition.x1}:${cropPosition.y2 - cropPosition.y1}:${cropPosition.x1}:${cropPosition.y1}" -an "${OUTPUT_FILE_PATH}"`;
+        const COMMAND /* string */ = `"${FFMPEG_PATH}" -i "${videoPath}" -filter:v "crop=${cropPosition.x2 - cropPosition.x1}:${cropPosition.y2 - cropPosition.y1}:${cropPosition.x1}:${cropPosition.y1}" -r 10 -an "${OUTPUT_FILE_PATH}"`;
 
         return new Promise((resolve, reject) => {
             exec(COMMAND, (error, stdout, stderr) => {
