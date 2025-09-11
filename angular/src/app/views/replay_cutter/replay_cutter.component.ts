@@ -326,6 +326,21 @@ export class ReplayCutterComponent implements OnInit {
     }
   }
 
+  /**
+   * This function ensures that the value passed as a parameter (coming from Tesseract) corresponds to a score.
+   * @param value Value found by tesseract.
+   * @returns Corrected value.
+   */
+  private scoreChecker(value: string): string {
+    let score = parseInt(value.slice(0, 3));
+    if (!isNaN(score)) {
+      score = Math.max(score, 0);
+      score = Math.min(score, 100);
+      return score.toString();
+    }
+    return '0';
+  }
+
   protected async videoTimeUpdate(event: Event): Promise<void> {
     if (this.debugPause) {
       setTimeout(() => {
@@ -365,7 +380,9 @@ export class ReplayCutterComponent implements OnInit {
                         GAME.mode == 1 ? 187 : 159,
                         GAME.mode == 1 ? 620 : 618,
                         GAME.mode == 1 ? 217 : 189,
-                        7
+                        7,
+                        225,
+                        true
                       );
                     if (this.settings.orangeTeamName.trim()) {
                       GAME.orangeTeam.name = this.settings.orangeTeamName
@@ -386,7 +403,11 @@ export class ReplayCutterComponent implements OnInit {
                         GAME.mode == 1 ? 89 : 54,
                         620,
                         GAME.mode == 1 ? 127 : 92,
-                        7
+                        7,
+                        200,
+                        true,
+                        undefined,
+                        this.scoreChecker
                       );
                     if (ORANGE_TEAM_SCORE) {
                       const INT_VALUE = parseInt(ORANGE_TEAM_SCORE);
@@ -459,7 +480,10 @@ export class ReplayCutterComponent implements OnInit {
                         GAME.mode == 1 ? 637 : 629,
                         620,
                         GAME.mode == 1 ? 667 : 679,
-                        7
+                        7,
+                        225,
+                        false,
+                        true
                       );
 
                     if (this.settings.blueTeamName.trim()) {
@@ -478,7 +502,11 @@ export class ReplayCutterComponent implements OnInit {
                         GAME.mode == 1 ? 89 : 54,
                         GAME.mode == 1 ? 1384 : 1376,
                         GAME.mode == 1 ? 127 : 93,
-                        7
+                        7,
+                        200,
+                        true,
+                        undefined,
+                        this.scoreChecker
                       );
                     console.log(' ----------------- ', GAME.mode);
                     // DEBUG
@@ -1532,6 +1560,80 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
+   * This function returns the most common value in a list.
+   * @param arr List of where to find the most present value.
+   * @returns Most present value in the list.
+   */
+  private arrayMostFrequent(arr: string[]): string | null {
+    if (arr.length === 0) return null;
+
+    const FREQUENCY: Record<string, number> = {};
+
+    // Counting occurrences
+    for (const VALUE of arr) {
+      FREQUENCY[VALUE] = (FREQUENCY[VALUE] || 0) + 1;
+    }
+
+    let maxCount = 0;
+    let mostCommon: string = arr[0];
+
+    // Route in table order to respect "first in case of a tie".
+    for (const VALUE of arr) {
+      if (FREQUENCY[VALUE] > maxCount) {
+        maxCount = FREQUENCY[VALUE];
+        mostCommon = VALUE;
+      }
+    }
+
+    return mostCommon;
+  }
+
+  /**
+   * This function returns a black and white canvas from a canvas ctx passed as a parameter.
+   * @param ctx Canvas ctx to copy.
+   * @param luminance Boundary luminance between white and black.
+   * @returns Transformed canvas.
+   */
+  private setCanvasBlackAndWhite(
+    ctx: CanvasRenderingContext2D,
+    luminance: number
+  ): HTMLCanvasElement {
+    const CANVAS = document.createElement('canvas');
+    CANVAS.width = ctx.canvas.width;
+    CANVAS.height = ctx.canvas.height;
+    const CTX = CANVAS.getContext('2d');
+    if (CTX) {
+      // Après drawImage(...)
+      const IMAGE_DATA = ctx.getImageData(
+        0,
+        0,
+        ctx.canvas.width,
+        ctx.canvas.height
+      );
+      const DATA = IMAGE_DATA.data;
+
+      for (let i = 0; i < DATA.length; i += 4) {
+        const RED = DATA[i];
+        const GREEN = DATA[i + 1];
+        const BLUE = DATA[i + 2];
+
+        // Luminance simple
+        const PIXEL_LUMINANCE = 0.299 * RED + 0.587 * GREEN + 0.114 * BLUE;
+
+        // Seuil à ajuster (200 = clair, donc blanc ; le reste devient noir)
+        const VALUE = PIXEL_LUMINANCE > luminance ? 255 : 0;
+
+        DATA[i] = VALUE; // R
+        DATA[i + 1] = VALUE; // G
+        DATA[i + 2] = VALUE; // B
+      }
+
+      CTX.putImageData(IMAGE_DATA, 0, 0);
+    }
+    return CANVAS;
+  }
+
+  /**
    * This function attempts to find text present in a canvas at specific coordinates.
    * @param video HTML DOM of the video element to be analyzed.
    * @param tesseractWorker Tesseract instance.
@@ -1540,8 +1642,10 @@ export class ReplayCutterComponent implements OnInit {
    * @param x2 X position of the bottom right corner of the rectangle to be analyzed.
    * @param y2 Y position of the bottom right corner of the rectangle to be analyzed.
    * @param tesseditPagesegMode Page segmentation mode (how Tesseract divides the text to be recognized).
-   * @param imageModeIndex // Index of the transformation list to apply to the rectangle to make it more readable by OCR.
-   * @param imageModeOrder // Transformation list to apply to the rectangle to make it more readable by OCR.
+   * @param luminance // If the translation is not always reliable, the image will be analyzed once more, in black and white, split by the luminance passed as a parameter.
+   * @param filter // ???
+   * @param disableInitialScan // ???
+   * @param checker // Function to verify the value found by Tesseract.
    * @returns Text found by OCR.
    */
   private async getTextFromImage(
@@ -1552,8 +1656,10 @@ export class ReplayCutterComponent implements OnInit {
     x2: number,
     y2: number,
     tesseditPagesegMode: number = 3,
-    imageModeIndex: number = 0,
-    imageModeOrder: number[] = [0, 1, 2]
+    luminance?: number,
+    filter: boolean = false,
+    disableInitialScan: boolean = false,
+    checker?: Function
   ): Promise<string> {
     if (video) {
       const CANVAS = document.createElement('canvas');
@@ -1563,14 +1669,6 @@ export class ReplayCutterComponent implements OnInit {
       CANVAS.height = HEIGHT;
       const CTX = CANVAS.getContext('2d');
       if (CTX) {
-        switch (imageModeOrder[imageModeIndex]) {
-          case 1:
-            CTX.filter = 'grayscale(1) contrast(100) brightness(1)';
-            break;
-          case 2:
-            CTX.filter = 'grayscale(1) contrast(100) brightness(1) invert(1)';
-            break;
-        }
         CTX.drawImage(
           video /* Image */,
           x1 /* Image X */,
@@ -1582,25 +1680,131 @@ export class ReplayCutterComponent implements OnInit {
           WIDTH /* Canvas width */,
           HEIGHT /* Canvas height */
         );
+
         const IMG = CANVAS.toDataURL('image/png');
+        // DEBUG
+        this.debug?.nativeElement.append(CANVAS);
+
+        // On scan sans transformations.
         await tesseractWorker.setParameters({
           tessedit_pageseg_mode: tesseditPagesegMode.toString() as PSM
         });
-        const DATA = await tesseractWorker.recognize(IMG);
-        if (!DATA.data.text && imageModeIndex < imageModeOrder.length - 1) {
-          return this.getTextFromImage(
-            video,
-            tesseractWorker,
-            x1,
-            y1,
-            x2,
-            y2,
-            tesseditPagesegMode,
-            imageModeIndex + 1,
-            imageModeOrder
+        const TESSERACT_VALUES = [];
+
+        if (!disableInitialScan) {
+          TESSERACT_VALUES.push(
+            (await tesseractWorker.recognize(IMG)).data.text.replace(
+              /\r?\n|\r/,
+              ''
+            )
           );
         }
-        return DATA.data.text.replace(/\r?\n|\r/, '');
+
+        // On scan avec luminence s'il est activé.
+        if (luminance) {
+          const CORRECTED_CANVAS = this.setCanvasBlackAndWhite(CTX, luminance);
+          // DEBUG
+          this.debug?.nativeElement.append(CORRECTED_CANVAS);
+          const IMG_STRING = CORRECTED_CANVAS.toDataURL('image/png');
+          TESSERACT_VALUES.push(
+            (await tesseractWorker.recognize(IMG_STRING)).data.text.replace(
+              /\r?\n|\r/,
+              ''
+            )
+          );
+        }
+
+        // On scan avec filtre s'il est activé.
+        if (filter) {
+          const FILTER1_CANVAS = document.createElement('canvas');
+          FILTER1_CANVAS.width = CANVAS.width;
+          FILTER1_CANVAS.height = CANVAS.height;
+          const FILTER1_CTX = FILTER1_CANVAS.getContext('2d');
+          if (FILTER1_CTX) {
+            FILTER1_CTX.filter = 'invert(1) contrast(200%) brightness(150%)';
+            FILTER1_CTX.drawImage(
+              CANVAS /* Image */,
+              0 /* Image X */,
+              0 /* Image Y */,
+              CANVAS.width /* Image width */,
+              CANVAS.height /* Image height */
+            );
+
+            // DEBUG
+            this.debug?.nativeElement.append(FILTER1_CANVAS);
+
+            const IMG_STRING = FILTER1_CANVAS.toDataURL('image/png');
+            TESSERACT_VALUES.push(
+              (await tesseractWorker.recognize(IMG_STRING)).data.text.replace(
+                /\r?\n|\r/,
+                ''
+              )
+            );
+          }
+
+          const FILTER2_CANVAS = document.createElement('canvas');
+          FILTER2_CANVAS.width = CANVAS.width;
+          FILTER2_CANVAS.height = CANVAS.height;
+          const FILTER2_CTX = FILTER2_CANVAS.getContext('2d');
+          if (FILTER2_CTX) {
+            FILTER2_CTX.filter = 'grayscale(1) contrast(300%) brightness(150%)';
+            FILTER2_CTX.drawImage(
+              CANVAS /* Image */,
+              0 /* Image X */,
+              0 /* Image Y */,
+              CANVAS.width /* Image width */,
+              CANVAS.height /* Image height */
+            );
+
+            // DEBUG
+            this.debug?.nativeElement.append(FILTER2_CANVAS);
+
+            const IMG_STRING = FILTER2_CANVAS.toDataURL('image/png');
+            TESSERACT_VALUES.push(
+              (await tesseractWorker.recognize(IMG_STRING)).data.text.replace(
+                /\r?\n|\r/,
+                ''
+              )
+            );
+          }
+
+          const FILTER3_CANVAS = document.createElement('canvas');
+          FILTER3_CANVAS.width = CANVAS.width;
+          FILTER3_CANVAS.height = CANVAS.height;
+          const FILTER3_CTX = FILTER3_CANVAS.getContext('2d');
+          if (FILTER3_CTX) {
+            CTX.filter = 'grayscale(1) contrast(100) brightness(1) invert(1)';
+            FILTER3_CTX.drawImage(
+              CANVAS /* Image */,
+              0 /* Image X */,
+              0 /* Image Y */,
+              CANVAS.width /* Image width */,
+              CANVAS.height /* Image height */
+            );
+
+            // DEBUG
+            this.debug?.nativeElement.append(FILTER3_CANVAS);
+
+            const IMG_STRING = FILTER3_CANVAS.toDataURL('image/png');
+            TESSERACT_VALUES.push(
+              (await tesseractWorker.recognize(IMG_STRING)).data.text.replace(
+                /\r?\n|\r/,
+                ''
+              )
+            );
+          }
+        }
+
+        if (checker) {
+          for (let i = 0; i < TESSERACT_VALUES.length; i++) {
+            TESSERACT_VALUES[i] = checker(TESSERACT_VALUES[i]);
+          }
+        }
+
+        console.log(TESSERACT_VALUES);
+        const RESULT = this.arrayMostFrequent(TESSERACT_VALUES);
+
+        return RESULT ?? '';
       }
     }
     return Promise.resolve('');
