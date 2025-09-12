@@ -86,7 +86,7 @@ export class App implements OnInit {
     // Getting the project version.
     window.electronAPI.getVersion().then((versions: Versions) => {
       this.ngZone.run(() => {
-        this.versions = versions;
+        this.versions = new Versions(versions.current, versions.last);
       });
     });
 

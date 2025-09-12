@@ -12,11 +12,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <span
     >{{ "shared.footer.version" | translate }}: {{ versions?.current }}</span
   >
-  @if(versions && versions.last){ @if(versions.current < versions.last){
+  @if(versions && versions.last){ @if(versions.isUpToDate < 0){
   <a class="ml-auto" (click)="onNewUpdateLinkClick()">
     {{ "shared.footer.newUpdate" | translate }}
   </a>
-  } @if(versions.current > versions.last){
+  } @if(versions.isUpToDate > 0){
   <a class="ml-auto beta"> {{ "shared.footer.beta" | translate }} </a>
   } }
 </ebp-footer>
