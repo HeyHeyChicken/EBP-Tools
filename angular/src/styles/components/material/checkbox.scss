@@ -53,7 +53,13 @@ mat-checkbox {
       selected-icon-color: variables.$main_color,
       selected-focus-icon-color: variables.$main_color,
       selected-hover-icon-color: variables.$main_color,
-      selected-checkmark-color: material_colors.$black
+      selected-checkmark-color: material_colors.$black,
+      unselected-focus-state-layer-color: variables.$main_color,
+      unselected-hover-state-layer-color: variables.$main_color,
+      unselected-pressed-state-layer-color: variables.$main_color,
+      selected-focus-state-layer-color: variables.$main_color,
+      selected-hover-state-layer-color: variables.$main_color,
+      selected-pressed-state-layer-color: variables.$main_color
     )
   );
 }
