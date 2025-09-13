@@ -1129,7 +1129,11 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected async save(game: Game): Promise<void> {
     if (this.videoPath === undefined) {
-      this.toastrService.error('Video file not found.');
+      this.translateService
+        .get('view.replay_cutter.toast.videoFileNotFound')
+        .subscribe((translated: string) => {
+          this.toastrService.error(translated);
+        });
       return;
     }
     this.globalService.loading = '';
@@ -1151,7 +1155,11 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected async saveAll(): Promise<void> {
     if (this.videoPath === undefined) {
-      this.toastrService.error('Video file not found.');
+      this.translateService
+        .get('view.replay_cutter.toast.videoFileNotFound')
+        .subscribe((translated: string) => {
+          this.toastrService.error(translated);
+        });
       return;
     }
     this.globalService.loading = '';

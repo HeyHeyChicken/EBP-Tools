@@ -24,7 +24,8 @@
       "noFilesSelected": "Keine Datei ausgewählt",
       "toast": {
         "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
-        "videosCutHere": "Ihre Videos wurden hier geschnitten: {{filePath}}"
+        "videosCutHere": "Ihre Videos wurden hier geschnitten: {{filePath}}",
+        "videoFileNotFound": "Videodatei nicht gefunden."
       },
       "outputPath": "Ausgabepfad",
       "upscalePercent": "Hochskalieren ... ({{percent}}%)",

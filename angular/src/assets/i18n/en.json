@@ -24,7 +24,8 @@
       "noFilesSelected": "No files selected",
       "toast": {
         "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
-        "videosCutHere": "Your videos have been cut here: {{filePath}}"
+        "videosCutHere": "Your videos have been cut here: {{filePath}}",
+        "videoFileNotFound": "Video file not found."
       },
       "outputPath": "Output path",
       "upscalePercent": "Upscaling ... ({{percent}}%)",

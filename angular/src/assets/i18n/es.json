@@ -24,7 +24,8 @@
       "noFilesSelected": "Ningún archivo seleccionado",
       "toast": {
         "timeCodesCopiedClipboard": "Los códigos de tiempo se han añadido al portapapeles",
-        "videosCutHere": "Tus videos han sido cortados aquí: {{filePath}}"
+        "videosCutHere": "Tus videos han sido cortados aquí: {{filePath}}",
+        "videoFileNotFound": "Archivo de video no encontrado."
       },
       "outputPath": "Ruta de salida",
       "upscalePercent": "Ampliando ... ({{percent}}%)",

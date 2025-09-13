@@ -24,7 +24,8 @@
       "noFilesSelected": "Aucun fichier sélectionné",
       "toast": {
         "timeCodesCopiedClipboard": "Les timecodes ont été ajoutés à votre presse-papiers",
-        "videosCutHere": "Vos vidéos ont été découpées ici : {{filePath}}"
+        "videosCutHere": "Vos vidéos ont été découpées ici : {{filePath}}",
+        "videoFileNotFound": "Fichier vidéo introuvable."
       },
       "outputPath": "Dossier de sortie",
       "upscalePercent": "Agrandissement ... ({{percent}}%)",

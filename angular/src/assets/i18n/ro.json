@@ -24,7 +24,8 @@
       "noFilesSelected": "Niciun fișier selectat",
       "toast": {
         "timeCodesCopiedClipboard": "Codurile de timp au fost copiate în clipboard",
-        "videosCutHere": "Videoclipurile tale au fost tăiate aici: {{filePath}}"
+        "videosCutHere": "Videoclipurile tale au fost tăiate aici: {{filePath}}",
+        "videoFileNotFound": "Fișierul video nu a fost găsit."
       },
       "outputPath": "Cale fișier ieșire",
       "upscalePercent": "Mărire ... ({{percent}}%)",
