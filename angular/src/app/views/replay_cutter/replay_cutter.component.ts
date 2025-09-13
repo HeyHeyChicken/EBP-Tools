@@ -229,12 +229,18 @@ export class ReplayCutterComponent implements OnInit {
                 });
             }
           } else {
-            this.toastrService
-              .error(
-                `No games were found on ${this.games[gameIndex].map} with these scores (${this.games[gameIndex].orangeTeam.score} vs ${this.games[gameIndex].blueTeam.score}). If you think this is an error, please let me know.`
-              )
-              .onTap.subscribe(() => {
-                window.electronAPI.openURL(this.globalService.discordServerURL);
+            this.translateService
+              .get('view.replay_cutter.toast.noGamesFound', {
+                map: this.games[gameIndex].map,
+                orangeScore: this.games[gameIndex].orangeTeam.score,
+                blueScore: this.games[gameIndex].blueTeam.score
+              })
+              .subscribe((translated: string) => {
+                this.toastrService
+                  .error(translated)
+                  .onTap.subscribe(() => {
+                    window.electronAPI.openURL(this.globalService.discordServerURL);
+                  });
               });
           }
         }

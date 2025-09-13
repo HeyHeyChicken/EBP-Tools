@@ -25,7 +25,8 @@
       "toast": {
         "timeCodesCopiedClipboard": "Los códigos de tiempo se han añadido al portapapeles",
         "videosCutHere": "Tus videos han sido cortados aquí: {{filePath}}",
-        "videoFileNotFound": "Archivo de video no encontrado."
+        "videoFileNotFound": "Archivo de video no encontrado.",
+        "noGamesFound": "No se encontraron juegos en {{map}} con estas puntuaciones ({{orangeScore}} vs {{blueScore}}). Si crees que es un error, házmelo saber."
       },
       "outputPath": "Ruta de salida",
       "upscalePercent": "Ampliando ... ({{percent}}%)",

@@ -25,7 +25,8 @@
       "toast": {
         "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
         "videosCutHere": "Your videos have been cut here: {{filePath}}",
-        "videoFileNotFound": "Video file not found."
+        "videoFileNotFound": "Video file not found.",
+        "noGamesFound": "No games were found on {{map}} with these scores ({{orangeScore}} vs {{blueScore}}). If you think this is an error, please let me know."
       },
       "outputPath": "Output path",
       "upscalePercent": "Upscaling ... ({{percent}}%)",
