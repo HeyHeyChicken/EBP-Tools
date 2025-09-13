@@ -37,6 +37,8 @@ import { IdentityService } from '../../core/services/identity.service';
 import { ReplayCutterSettingsDialog } from './dialog/settings/settings.dialog';
 import { Settings } from './models/settings';
 import { ReplayCutterUpscaleConfirmationDialog } from './dialog/upscale-confirmation/upscale-confirmation.dialog';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { FormsModule } from '@angular/forms';
 
 //#endregion
 @Component({
@@ -51,7 +53,9 @@ import { ReplayCutterUpscaleConfirmationDialog } from './dialog/upscale-confirma
     TranslateModule,
     LoaderComponent,
     MessageComponent,
-    MatInputModule
+    MatInputModule,
+    MatCheckboxModule,
+    FormsModule
   ]
 })
 export class ReplayCutterComponent implements OnInit {
@@ -132,6 +136,39 @@ export class ReplayCutterComponent implements OnInit {
     });
   }
 
+  /**
+   * Returns true if all games in the list are checked.
+   * Used to determine the checked state of the master checkbox in the table header.
+   * @returns true if there are games and all are checked, false otherwise.
+   */
+  protected get allGamesChecked(): boolean {
+    return this.games.length > 0 && this.games.every((game) => game.checked);
+  }
+
+  /**
+   * Returns true if at least one game in the list is checked.
+   * Used to determine the indeterminate state of the master checkbox in the table header.
+   * @returns true if any game is checked, false if no games are checked.
+   */
+  protected get someGamesChecked(): boolean {
+    return this.games.some((game) => game.checked);
+  }
+
+  /**
+   * Toggles the checked state of all games in the list.
+   * If all games are currently checked, it will uncheck them all.
+   * If not all games are checked, it will check them all.
+   * Triggered by clicking the master checkbox in the table header.
+   */
+  protected toggleAllGames(): void {
+    const SHOULD_CHECK = !this.allGamesChecked;
+    this.games.forEach((game) => (game.checked = SHOULD_CHECK));
+  }
+
+  /**
+   * Returns true if the application is running in development mode.
+   * @returns true if in development mode, false otherwise.
+   */
   protected get isDevMode(): boolean {
     return isDevMode();
   }
@@ -152,33 +189,6 @@ export class ReplayCutterComponent implements OnInit {
         this.toastrService.error("Erreur lors du chargement d'OpenCV");
       }
     });
-  }
-
-  /**
-   * This function initializes the different instances of the OCR.
-   */
-  private async initTesseract(): Promise<void> {
-    this.tesseractWorker_basic = await createWorker('eng');
-    this.tesseractWorker_number = await createWorker('eng');
-    this.tesseractWorker_letter = await createWorker('eng');
-    this.tesseractWorker_time = await createWorker('eng');
-
-    this.tesseractWorker_basic.setParameters({
-      tessedit_char_whitelist:
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    });
-    this.tesseractWorker_number.setParameters({
-      tessedit_char_whitelist: '0123456789'
-    });
-    this.tesseractWorker_letter.setParameters({
-      tessedit_char_whitelist:
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz '
-    });
-    this.tesseractWorker_time.setParameters({
-      tessedit_char_whitelist: '0123456789:'
-    });
-
-    this.inputFileDisabled = false;
   }
 
   protected openSettings(): void {
@@ -268,6 +278,33 @@ export class ReplayCutterComponent implements OnInit {
         }
       );
     }
+  }
+
+  /**
+   * This function initializes the different instances of the OCR.
+   */
+  private async initTesseract(): Promise<void> {
+    this.tesseractWorker_basic = await createWorker('eng');
+    this.tesseractWorker_number = await createWorker('eng');
+    this.tesseractWorker_letter = await createWorker('eng');
+    this.tesseractWorker_time = await createWorker('eng');
+
+    this.tesseractWorker_basic.setParameters({
+      tessedit_char_whitelist:
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    });
+    this.tesseractWorker_number.setParameters({
+      tessedit_char_whitelist: '0123456789'
+    });
+    this.tesseractWorker_letter.setParameters({
+      tessedit_char_whitelist:
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz '
+    });
+    this.tesseractWorker_time.setParameters({
+      tessedit_char_whitelist: '0123456789:'
+    });
+
+    this.inputFileDisabled = false;
   }
 
   /**
@@ -1119,7 +1156,7 @@ export class ReplayCutterComponent implements OnInit {
     }
     this.globalService.loading = '';
     const FILE_PATH = await window.electronAPI.cutVideoFiles(
-      this.games,
+      this.games.filter((game) => game.checked),
       decodeURIComponent(this.videoPath),
       this.settings.freeText
     );
@@ -1137,9 +1174,11 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected copyTimeCodes(): void {
     let result = '';
-    this.games.forEach((game) => {
-      result += `${game.readableStart} ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map}\n`;
-    });
+    this.games
+      .filter((game) => game.checked)
+      .forEach((game) => {
+        result += `${game.readableStart} ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map}\n`;
+      });
     navigator.clipboard.writeText(result);
 
     this.translateService

@@ -11,6 +11,8 @@ import { Team } from './team';
 export class Game {
   //#region Attributes
 
+  public checked: boolean = false;
+
   //#region Debug
 
   public __debug__jumped: boolean = false;

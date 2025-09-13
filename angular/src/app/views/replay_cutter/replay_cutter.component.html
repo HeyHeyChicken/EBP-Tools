@@ -4,7 +4,7 @@ This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
-<ebp-row>
+<ebp-row [size]="11">
   <ebp-column></ebp-column>
   <ebp-column [xs]="6" class="pr-2 pl-0 pt-0">
     <ebp-row>
@@ -43,40 +43,52 @@ See LICENSE for terms. Unauthorized use is prohibited.
       </ebp-column>
       @if (percent < 0 && games.length) {
         <ebp-column [xs]="12">
+          <div class="box mb-1">
+            <button
+              class="squared"
+              (click)="saveAll()"
+              matTooltip="{{ 'view.replay_cutter.saveAll' | translate }}"
+              [disabled]="!someGamesChecked"
+              matTooltipPosition="above"
+            >
+              <i class="fa-sharp fa-solid fa-floppy-disk"></i>
+            </button>
+            <button
+              class="squared"
+              (click)="copyTimeCodes()"
+              matTooltip="{{ 'view.replay_cutter.copyTimecodes' | translate }}"
+              [disabled]="!someGamesChecked"
+              matTooltipPosition="above"
+            >
+              <i class="fa-sharp fa-solid fa-copy"></i>
+            </button>
+          </div>
           <table>
             <thead>
               <tr>
-                <th>{{ 'view.replay_cutter.map' | translate }}</th>
-                <th>{{ 'view.replay_cutter.infos' | translate }}</th>
                 <th>
-                  <div>
-                    <button
-                      class="squared"
-                      (click)="saveAll()"
-                      matTooltip="{{
-                        'view.replay_cutter.saveAll' | translate
-                      }}"
-                      matTooltipPosition="above"
+                  <div class="checkbox">
+                    <mat-checkbox
+                      [checked]="allGamesChecked"
+                      [indeterminate]="someGamesChecked && !allGamesChecked"
+                      (change)="toggleAllGames()"
                     >
-                      <i class="fa-sharp fa-solid fa-floppy-disk"></i>
-                    </button>
-                    <button
-                      class="squared"
-                      (click)="copyTimeCodes()"
-                      matTooltip="{{
-                        'view.replay_cutter.copyTimecodes' | translate
-                      }}"
-                      matTooltipPosition="above"
-                    >
-                      <i class="fa-sharp fa-solid fa-copy"></i>
-                    </button>
+                    </mat-checkbox>
                   </div>
                 </th>
+                <th>{{ 'view.replay_cutter.map' | translate }}</th>
+                <th>{{ 'view.replay_cutter.infos' | translate }}</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               @for (game of games; track $index) {
                 <tr>
+                  <th>
+                    <div class="checkbox">
+                      <mat-checkbox [(ngModel)]="game.checked"></mat-checkbox>
+                    </div>
+                  </th>
                   <th
                     [style.background-image]="
                       'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
