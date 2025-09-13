@@ -62,6 +62,13 @@ See LICENSE for terms. Unauthorized use is prohibited.
             >
               <i class="fa-sharp fa-solid fa-copy"></i>
             </button>
+            <button
+              class="squared"
+              [class.disabled]="true"
+              matTooltip="{{ 'view.replay_cutter.uploadAll' | translate }}"
+            >
+              <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
+            </button>
           </div>
           <table>
             <thead>
@@ -118,11 +125,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
                       </button>
                       <button
                         class="squared"
-                        [disabled]="
-                          identityService.supporterLevel == 0 ||
-                          !identityService.isBetaUser
-                        "
+                        [class.disabled]="disableUploadButton"
                         (click)="selectWhichGameToAttachMinimap($index)"
+                        matTooltip="{{
+                          'view.replay_cutter.upload' | translate
+                        }}"
                       >
                         <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
                       </button>

@@ -136,6 +136,14 @@ export class ReplayCutterComponent implements OnInit {
     });
   }
 
+  protected get disableUploadButton(): boolean {
+    return (
+      this.identityService.supporterLevel == 0 ||
+      !this.identityService.isBetaUser ||
+      !this.videoPath
+    );
+  }
+
   /**
    * Returns true if all games in the list are checked.
    * Used to determine the checked state of the master checkbox in the table header.
@@ -204,7 +212,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param gameIndex Index of the game to attach.
    */
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
-    if (this.videoPath) {
+    if (!this.disableUploadButton) {
       this.apiRestService.getGames(
         this.games[gameIndex].map,
         this.games[gameIndex].orangeTeam.score,
@@ -236,11 +244,11 @@ export class ReplayCutterComponent implements OnInit {
                 blueScore: this.games[gameIndex].blueTeam.score
               })
               .subscribe((translated: string) => {
-                this.toastrService
-                  .error(translated)
-                  .onTap.subscribe(() => {
-                    window.electronAPI.openURL(this.globalService.discordServerURL);
-                  });
+                this.toastrService.error(translated).onTap.subscribe(() => {
+                  window.electronAPI.openURL(
+                    this.globalService.discordServerURL
+                  );
+                });
               });
           }
         }
@@ -1122,11 +1130,9 @@ export class ReplayCutterComponent implements OnInit {
       this.translateService
         .get('view.replay_cutter.toast.noGamesFoundInVideo')
         .subscribe((translated: string) => {
-          this.toastrService
-            .error(translated)
-            .onTap.subscribe(() => {
-              window.electronAPI.openURL(this.globalService.discordServerURL);
-            });
+          this.toastrService.error(translated).onTap.subscribe(() => {
+            window.electronAPI.openURL(this.globalService.discordServerURL);
+          });
         });
     }
   }
@@ -1154,11 +1160,9 @@ export class ReplayCutterComponent implements OnInit {
     this.translateService
       .get('view.replay_cutter.toast.videoCutHere', { filePath: FILE_PATH })
       .subscribe((translated: string) => {
-        this.toastrService
-          .success(translated)
-          .onTap.subscribe(() => {
-            window.electronAPI.openFile(FILE_PATH);
-          });
+        this.toastrService.success(translated).onTap.subscribe(() => {
+          window.electronAPI.openFile(FILE_PATH);
+        });
       });
   }
 
@@ -1185,11 +1189,9 @@ export class ReplayCutterComponent implements OnInit {
     this.translateService
       .get('view.replay_cutter.toast.videosCutHere', { filePath: FILE_PATH })
       .subscribe((translated: string) => {
-        this.toastrService
-          .success(translated)
-          .onTap.subscribe(() => {
-            window.electronAPI.openFile(FILE_PATH);
-          });
+        this.toastrService.success(translated).onTap.subscribe(() => {
+          window.electronAPI.openFile(FILE_PATH);
+        });
       });
   }
 
