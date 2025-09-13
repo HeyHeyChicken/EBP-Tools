@@ -2,8 +2,10 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-@use "../../../styles/imports/variables" as variables;
+@use '../../../styles/imports/variables' as variables;
+@use '../../../styles/imports/material_colors.scss' as material_colors;
 
+$paddingLeft: calc(#{variables.$margin} * 4);
 :host {
   display: flex;
   gap: variables.$margin;
@@ -30,16 +32,33 @@
   > .logo {
     width: fit-content;
     display: flex;
-    cursor: pointer;
-
-    &.center {
-      margin: 0 auto;
-      float: none;
-    }
+    position: relative;
 
     > img {
+      cursor: pointer;
       margin: calc(#{variables.$form_height} / 2) variables.$margin
-        calc(#{variables.$form_height} / 2) calc(#{variables.$margin} * 4);
+        calc(#{variables.$form_height} / 2) $paddingLeft;
+    }
+
+    $size: 27px;
+    > .beta {
+      color: material_colors.$material_red_500;
+      background-color: variables.$dark_color;
+      position: absolute;
+      top: 100%;
+      left: calc(50% + #{$paddingLeft} / 2 - #{variables.$margin} / 2);
+      padding: calc(#{variables.$margin} / 4) calc(#{variables.$margin} / 2);
+      font-size: variables.$margin;
+      font-weight: bold;
+      white-space: nowrap;
+      transform: translate(-50%, -50%);
+      cursor: default;
+      text-transform: uppercase;
+      border: 1px solid variables.$border_color;
+
+      &::selection {
+        background-color: transparent;
+      }
     }
   }
 

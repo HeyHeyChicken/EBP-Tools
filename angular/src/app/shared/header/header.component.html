@@ -4,12 +4,16 @@ This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
 <!-- #region LEFT -->
-<a
-  class="logo"
-  (click)="openURLExternalBrowser(globalService.webSiteURL)"
-  matTooltip="{{ 'shared.header.accessWebsite' | translate }}"
->
-  <img height="24px" alt="EBP's logo" src="/assets/img/logo.svg" />
+<a class="logo" (click)="openURLExternalBrowser(globalService.webSiteURL)">
+  <img
+    height="24px"
+    alt="EBP's logo"
+    src="/assets/img/logo.svg"
+    matTooltip="{{ 'shared.header.accessWebsite' | translate }}"
+  />
+  @if (identityService.isBetaUser) {
+    <span class="beta" (click)="$event.stopPropagation()">beta</span>
+  }
 </a>
 <a
   class="btn squared"
