@@ -1,5 +1,6 @@
 @use '../../imports/variables' as variables;
 @use '../../imports/material_colors' as material_colors;
+@use '@angular/material' as mat;
 
 mat-checkbox {
   transform: translateX(-9px);
@@ -29,20 +30,12 @@ mat-checkbox {
     transform: translate(-2px, -2px);
 
     border-radius: 0;
-    > svg {
-      color: material_colors.$black !important;
-    }
-  }
-
-  .mdc-checkbox__ripple {
-    background: variables.$main_color !important;
   }
 
   &:not(.mdc-checkbox--disabled) {
     &.mat-mdc-checkbox-checked {
       .mdc-checkbox__background {
         border-color: variables.$main_color !important;
-        background-color: variables.$main_color !important;
       }
     }
   }
@@ -52,29 +45,15 @@ mat-checkbox {
       border-color: variables.$main_color !important;
     }
   }
+}
 
-  &[color='white'] {
-    .mdc-checkbox__ripple {
-      background: material_colors.$white !important;
-    }
-
-    &:not(.mdc-checkbox--disabled) {
-      &.mat-mdc-checkbox-checked {
-        .mdc-checkbox__background {
-          border-color: material_colors.$white !important;
-          background-color: material_colors.$white !important;
-
-          > svg {
-            color: material_colors.$black !important;
-          }
-        }
-      }
-    }
-
-    &:hover {
-      .mdc-checkbox__background {
-        border-color: material_colors.$white !important;
-      }
-    }
-  }
+:root {
+  @include mat.checkbox-overrides(
+    (
+      selected-icon-color: variables.$main_color,
+      selected-focus-icon-color: variables.$main_color,
+      selected-hover-icon-color: variables.$main_color,
+      selected-checkmark-color: material_colors.$black
+    )
+  );
 }
