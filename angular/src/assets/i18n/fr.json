@@ -25,8 +25,10 @@
       "toast": {
         "timeCodesCopiedClipboard": "Les timecodes ont été ajoutés à votre presse-papiers",
         "videosCutHere": "Vos vidéos ont été découpées ici : {{filePath}}",
+        "videoCutHere": "Votre vidéo a été découpée ici : {{filePath}}",
         "videoFileNotFound": "Fichier vidéo introuvable.",
-        "noGamesFound": "Aucune partie n'a été trouvée sur {{map}} avec ces scores ({{orangeScore}} vs {{blueScore}}). Si vous pensez que c'est une erreur, faites-le moi savoir."
+        "noGamesFoundInStatistics": "Aucune partie n'a été trouvée sur {{map}} avec ces scores ({{orangeScore}} vs {{blueScore}}). Si vous pensez que c'est une erreur, faites-le moi savoir.",
+        "noGamesFoundInVideo": "Aucune partie n'a été trouvée dans votre vidéo. Si vous pensez que c'est une erreur, faites-le moi savoir."
       },
       "outputPath": "Dossier de sortie",
       "upscalePercent": "Agrandissement ... ({{percent}}%)",

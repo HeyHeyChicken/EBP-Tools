@@ -25,8 +25,10 @@
       "toast": {
         "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
         "videosCutHere": "Ihre Videos wurden hier geschnitten: {{filePath}}",
+        "videoCutHere": "Ihr Video wurde hier geschnitten: {{filePath}}",
         "videoFileNotFound": "Videodatei nicht gefunden.",
-        "noGamesFound": "Es wurden keine Spiele auf {{map}} mit diesen Ergebnissen gefunden ({{orangeScore}} vs {{blueScore}}). Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen."
+        "noGamesFoundInStatistics": "Es wurden keine Spiele auf {{map}} mit diesen Ergebnissen gefunden ({{orangeScore}} vs {{blueScore}}). Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen.",
+        "noGamesFoundInVideo": "Es wurden keine Spiele in Ihrem Video gefunden. Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen."
       },
       "outputPath": "Ausgabepfad",
       "upscalePercent": "Hochskalieren ... ({{percent}}%)",

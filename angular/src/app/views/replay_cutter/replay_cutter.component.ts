@@ -230,7 +230,7 @@ export class ReplayCutterComponent implements OnInit {
             }
           } else {
             this.translateService
-              .get('view.replay_cutter.toast.noGamesFound', {
+              .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
                 map: this.games[gameIndex].map,
                 orangeScore: this.games[gameIndex].orangeTeam.score,
                 blueScore: this.games[gameIndex].blueTeam.score
@@ -1119,12 +1119,14 @@ export class ReplayCutterComponent implements OnInit {
   private onVideoEnded(games: Game[]): void {
     this.percent = -1;
     if (games.length == 0) {
-      this.toastrService
-        .error(
-          'No games were found in your video. If you think this is a mistake, please let me know.'
-        )
-        .onTap.subscribe(() => {
-          window.electronAPI.openURL(this.globalService.discordServerURL);
+      this.translateService
+        .get('view.replay_cutter.toast.noGamesFoundInVideo')
+        .subscribe((translated: string) => {
+          this.toastrService
+            .error(translated)
+            .onTap.subscribe(() => {
+              window.electronAPI.openURL(this.globalService.discordServerURL);
+            });
         });
     }
   }
@@ -1149,10 +1151,14 @@ export class ReplayCutterComponent implements OnInit {
       this.settings.freeText
     );
     this.globalService.loading = undefined;
-    this.toastrService
-      .success('Your video has been cut here: ' + FILE_PATH)
-      .onTap.subscribe(() => {
-        window.electronAPI.openFile(FILE_PATH);
+    this.translateService
+      .get('view.replay_cutter.toast.videoCutHere', { filePath: FILE_PATH })
+      .subscribe((translated: string) => {
+        this.toastrService
+          .success(translated)
+          .onTap.subscribe(() => {
+            window.electronAPI.openFile(FILE_PATH);
+          });
       });
   }
 
