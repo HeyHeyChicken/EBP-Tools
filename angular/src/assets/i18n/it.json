@@ -22,7 +22,10 @@
       "map": "Mappa",
       "infos": "Informazioni",
       "noFilesSelected": "Nessun file selezionato",
-      "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti",
+      "toast": {
+        "timeCodesCopiedClipboard": "I codici temporali sono stati copiati negli appunti",
+        "videosCutHere": "I tuoi video sono stati tagliati qui: {{filePath}}"
+      },
       "outputPath": "Percorso di output",
       "upscalePercent": "Ingrandimento ... ({{percent}}%)",
       "dialog": {

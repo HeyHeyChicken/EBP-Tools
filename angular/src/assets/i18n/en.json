@@ -22,7 +22,10 @@
       "map": "Map",
       "infos": "Informations",
       "noFilesSelected": "No files selected",
-      "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
+      "toast": {
+        "timeCodesCopiedClipboard": "Timecodes have been added to your clipboard",
+        "videosCutHere": "Your videos have been cut here: {{filePath}}"
+      },
       "outputPath": "Output path",
       "upscalePercent": "Upscaling ... ({{percent}}%)",
       "dialog": {

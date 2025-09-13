@@ -22,7 +22,10 @@
       "map": "Karte",
       "infos": "Informationen",
       "noFilesSelected": "Keine Datei ausgewählt",
-      "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
+      "toast": {
+        "timeCodesCopiedClipboard": "Zeitcodes wurden in Ihre Zwischenablage kopiert",
+        "videosCutHere": "Ihre Videos wurden hier geschnitten: {{filePath}}"
+      },
       "outputPath": "Ausgabepfad",
       "upscalePercent": "Hochskalieren ... ({{percent}}%)",
       "dialog": {

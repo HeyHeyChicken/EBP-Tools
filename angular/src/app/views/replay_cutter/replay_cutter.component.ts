@@ -1162,10 +1162,14 @@ export class ReplayCutterComponent implements OnInit {
     );
 
     this.globalService.loading = undefined;
-    this.toastrService
-      .success('Your videos have been cut here: ' + FILE_PATH)
-      .onTap.subscribe(() => {
-        window.electronAPI.openFile(FILE_PATH);
+    this.translateService
+      .get('view.replay_cutter.toast.videosCutHere', { filePath: FILE_PATH })
+      .subscribe((translated: string) => {
+        this.toastrService
+          .success(translated)
+          .onTap.subscribe(() => {
+            window.electronAPI.openFile(FILE_PATH);
+          });
       });
   }
 
@@ -1182,7 +1186,7 @@ export class ReplayCutterComponent implements OnInit {
     navigator.clipboard.writeText(result);
 
     this.translateService
-      .get('view.replay_cutter.timeCodesCopiedClipboard')
+      .get('view.replay_cutter.toast.timeCodesCopiedClipboard')
       .subscribe((translated: string) => {
         this.toastrService.success(translated);
       });

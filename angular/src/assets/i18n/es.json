@@ -22,7 +22,10 @@
       "map": "Mapa",
       "infos": "Información",
       "noFilesSelected": "Ningún archivo seleccionado",
-      "timeCodesCopiedClipboard": "Los códigos de tiempo se han añadido al portapapeles",
+      "toast": {
+        "timeCodesCopiedClipboard": "Los códigos de tiempo se han añadido al portapapeles",
+        "videosCutHere": "Tus videos han sido cortados aquí: {{filePath}}"
+      },
       "outputPath": "Ruta de salida",
       "upscalePercent": "Ampliando ... ({{percent}}%)",
       "dialog": {

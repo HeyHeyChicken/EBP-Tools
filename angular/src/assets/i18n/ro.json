@@ -22,7 +22,10 @@
       "map": "Hartă",
       "infos": "Informații",
       "noFilesSelected": "Niciun fișier selectat",
-      "timeCodesCopiedClipboard": "Codurile de timp au fost copiate în clipboard",
+      "toast": {
+        "timeCodesCopiedClipboard": "Codurile de timp au fost copiate în clipboard",
+        "videosCutHere": "Videoclipurile tale au fost tăiate aici: {{filePath}}"
+      },
       "outputPath": "Cale fișier ieșire",
       "upscalePercent": "Mărire ... ({{percent}}%)",
       "dialog": {

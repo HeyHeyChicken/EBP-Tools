@@ -22,7 +22,10 @@
       "map": "Carte",
       "infos": "Informations",
       "noFilesSelected": "Aucun fichier sélectionné",
-      "timeCodesCopiedClipboard": "Les timecodes ont été ajoutés à votre presse-papiers",
+      "toast": {
+        "timeCodesCopiedClipboard": "Les timecodes ont été ajoutés à votre presse-papiers",
+        "videosCutHere": "Vos vidéos ont été découpées ici : {{filePath}}"
+      },
       "outputPath": "Dossier de sortie",
       "upscalePercent": "Agrandissement ... ({{percent}}%)",
       "dialog": {
