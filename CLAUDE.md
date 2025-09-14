@@ -63,6 +63,7 @@ npm test  # Run Jest tests (in angular/ directory)
 - **Testing**: Jest with jest-preset-angular
 - **Imports**: Organized with `//#region Imports` comments
 - **Copyright**: All files include copyright header for Antoine Duval
+- **Constants**: All `const` declarations must use SCREAMING_SNAKE_CASE (e.g., `const UN_MOT` instead of `const unMot`)
 
 ### Angular-Specific
 - Uses Angular 20 with standalone components
