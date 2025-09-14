@@ -63,6 +63,7 @@
       "timeBetweenPagesExplanations": "Tiempo en segundos a esperar entre cada página. Cuantas más páginas exportes, más deberás aumentar este tiempo.",
       "ignore": "Páginas a omitir",
       "ignoreExplanations": "Número de páginas a ignorar",
+      "edgeIsNotInstalled": "Edge no parece estar instalado en su computadora. Por favor instálelo.",
       "dialog": {
         "confirmation": {
           "p1": "Por favor, no interactúe con nada durante la exportación. Si todo va bien, una notificación verde lo confirmará.",

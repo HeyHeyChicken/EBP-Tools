@@ -669,10 +669,9 @@ let projectLatestVersion /* string */ = '';
      * Exports game statistics to an Excel file using a predefined template.
      * @param games Array of game objects containing match data to export.
      * @param playerName Name of the player being exported.
-     * @param seasonIndex Index of the season being exported.
      * @returns Promise that resolves when the Excel file has been generated and saved.
      */
-    async function exportGamesToExcel(games, playerName, seasonIndex) {
+    async function exportGamesToExcel(games, playerName) {
         const WORKBOOK = new ExcelJS.Workbook();
         await WORKBOOK.xlsx.readFile(path.join(ROOT_PATH, 'template.xlsx'));
 
@@ -751,7 +750,7 @@ let projectLatestVersion /* string */ = '';
                 'gameHistoryOutputPath',
                 path.join(os.homedir(), 'Downloads')
             ),
-            `EBP - ${playerName} - Season ${seasonIndex} (${new Date().getTime()}).xlsx`
+            `EBP - ${playerName} (${new Date().getTime()}).xlsx`
         );
         // Save to a new file
         await WORKBOOK.xlsx.writeFile(FILE_PATH);
@@ -1076,12 +1075,12 @@ let projectLatestVersion /* string */ = '';
                     skip,
                     timeToWait,
                     dialog,
+                    mainWindow,
                     async (games) => {
                         if (games.length > 0) {
                             const FILE_PATH = await exportGamesToExcel(
                                 games,
-                                'private',
-                                seasonIndex
+                                'private'
                             );
                             mainWindow.webContents.send(
                                 'games-are-exported',
@@ -1110,12 +1109,12 @@ let projectLatestVersion /* string */ = '';
                         skip,
                         timeToWait,
                         dialog,
+                        mainWindow,
                         async (games) => {
                             if (games.length > 0) {
                                 const FILE_PATH = await exportGamesToExcel(
                                     games,
-                                    tag.split('#')[0],
-                                    seasonIndex
+                                    tag.split('#')[0]
                                 );
                                 mainWindow.webContents.send(
                                     'games-are-exported',

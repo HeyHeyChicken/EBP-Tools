@@ -63,6 +63,7 @@
       "timeBetweenPagesExplanations": "Tempo in secondi da attendere tra ogni pagina. Più pagine esporti, più potrebbe essere necessario aumentare questo tempo.",
       "ignore": "Pagine da ignorare",
       "ignoreExplanations": "Numero di pagine da ignorare",
+      "edgeIsNotInstalled": "Edge non sembra essere installato sul tuo computer. Si prega di installarlo.",
       "dialog": {
         "confirmation": {
           "p1": "Si prega di non interagire durante l'esportazione. Se va a buon fine, una notifica verde lo confermerà.",

@@ -63,6 +63,7 @@
       "timeBetweenPagesExplanations": "Timpul în secunde de așteptat între pagini. Cu cât exportezi mai multe pagini, cu atât e posibil să trebuiască să mărești acest timp.",
       "ignore": "Pagini de sărit",
       "ignoreExplanations": "Numărul de pagini de sărit",
+      "edgeIsNotInstalled": "Edge nu pare să fie instalat pe computerul dumneavoastră. Vă rugăm să îl instalați.",
       "dialog": {
         "confirmation": {
           "p1": "Te rugăm să nu interacționezi cu nimic în timpul exportului. Dacă exportul reușește, o notificare verde va confirma.",

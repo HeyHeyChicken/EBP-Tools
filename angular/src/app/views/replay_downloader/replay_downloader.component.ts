@@ -132,7 +132,7 @@ export class ReplayDownloaderComponent implements OnInit {
 
   private isYouTubeUrl(url: string): boolean {
     const regex =
-      /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]{11}(&\S*)?$/;
+      /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)[\w-]{11}(&\S*)?$/;
     return regex.test(url);
   }
 

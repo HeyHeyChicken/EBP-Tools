@@ -6,6 +6,7 @@
 
 const puppeteer = require('puppeteer-core');
 const os = require('os');
+const fs = require('fs');
 
 //#endregion
 
@@ -56,12 +57,29 @@ function addGame(games, game) {
     games.push(NEW_GAME);
 }
 
-function getBrowserPath() {
+function getBrowserPath(mainWindow, callback) {
+    let browserPath;
+
     switch (os.platform()) {
         case 'win32':
-            return 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+            browserPath =
+                'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+            break;
         case 'darwin':
-            return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+            browserPath =
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+            break;
+        default:
+            return null;
+    }
+
+    if (fs.existsSync(browserPath)) {
+        callback(browserPath);
+    } else {
+        mainWindow.webContents.send(
+            'error',
+            'view.game_history.edgeIsNotInstalled'
+        );
     }
 }
 
@@ -174,42 +192,48 @@ async function extractGames(
     });
 }
 
-async function extractPublicPseudoGames(
+function extractPublicPseudoGames(
     tag,
     nbPages,
     seasonIndex,
     skip,
     timeToWait,
     dialog,
+    mainWindow,
     callback
 ) {
-    try {
-        const BROWSER = await puppeteer.launch({
-            executablePath: getBrowserPath(),
-            headless: false,
-            defaultViewport: null,
-            args: ['--start-maximized']
-        });
+    getBrowserPath(mainWindow, async (browserPath) => {
+        try {
+            const BROWSER = await puppeteer.launch({
+                executablePath: browserPath,
+                headless: false,
+                defaultViewport: null,
+                args: ['--start-maximized']
+            });
 
-        const PAGE = (await BROWSER.pages())[0];
+            const PAGE = (await BROWSER.pages())[0];
 
-        await extractGames(
-            BROWSER,
-            PAGE,
-            nbPages,
-            seasonIndex,
-            skip,
-            timeToWait,
-            dialog,
-            callback
-        );
+            await extractGames(
+                BROWSER,
+                PAGE,
+                nbPages,
+                seasonIndex,
+                skip,
+                timeToWait,
+                dialog,
+                callback
+            );
 
-        await PAGE.goto(`https://app.eva.gg/profile/public/${tag}/history/`, {
-            waitUntil: 'networkidle2'
-        });
-    } catch (err) {
-        dialog.showErrorBox('Error', err);
-    }
+            await PAGE.goto(
+                `https://app.eva.gg/profile/public/${tag}/history/`,
+                {
+                    waitUntil: 'networkidle2'
+                }
+            );
+        } catch (err) {
+            dialog.showErrorBox('Error', err);
+        }
+    });
 }
 
 async function extractPrivatePseudoGames(
@@ -218,59 +242,64 @@ async function extractPrivatePseudoGames(
     skip,
     timeToWait,
     dialog,
+    mainWindow,
     callback
 ) {
-    try {
-        const BROWSER = await puppeteer.launch({
-            executablePath: getBrowserPath(),
-            headless: false,
-            defaultViewport: null,
-            args: ['--start-maximized']
-        });
+    getBrowserPath(mainWindow, async (browserPath) => {
+        try {
+            const BROWSER = await puppeteer.launch({
+                executablePath: browserPath,
+                headless: false,
+                defaultViewport: null,
+                args: ['--start-maximized']
+            });
 
-        // Cet espion permet de relancer la fonction si elle ne s'est pas bien passée.
-        setTimeout(async () => {
+            // Cet espion permet de relancer la fonction si elle ne s'est pas bien passée.
+            setTimeout(async () => {
+                const PAGE = (await BROWSER.pages())[0];
+                const URL = await PAGE.url();
+                if (URL == 'about:blank') {
+                    BROWSER.close();
+                    extractPrivatePseudoGames(
+                        nbPages,
+                        seasonIndex,
+                        skip,
+                        timeToWait,
+                        dialog,
+                        callback
+                    );
+                }
+            }, 2000);
+
             const PAGE = (await BROWSER.pages())[0];
-            const URL = await PAGE.url();
-            if (URL == 'about:blank') {
-                BROWSER.close();
-                extractPrivatePseudoGames(
-                    nbPages,
-                    seasonIndex,
-                    skip,
-                    timeToWait,
-                    dialog,
-                    callback
-                );
-            }
-        }, 2000);
 
-        const PAGE = (await BROWSER.pages())[0];
+            PAGE.on('framenavigated', async (frame) => {
+                // When the user is logged in, he is redirected to the games page.
+                if (frame.url().endsWith('/profile/dashboard')) {
+                    await PAGE.goto(
+                        `https://app.eva.gg/fr-FR/profile/history/`
+                    );
+                }
+            });
 
-        PAGE.on('framenavigated', async (frame) => {
-            // When the user is logged in, he is redirected to the games page.
-            if (frame.url().endsWith('/profile/dashboard')) {
-                await PAGE.goto(`https://app.eva.gg/fr-FR/profile/history/`);
-            }
-        });
+            await extractGames(
+                BROWSER,
+                PAGE,
+                nbPages,
+                seasonIndex,
+                skip,
+                timeToWait,
+                dialog,
+                callback
+            );
 
-        await extractGames(
-            BROWSER,
-            PAGE,
-            nbPages,
-            seasonIndex,
-            skip,
-            timeToWait,
-            dialog,
-            callback
-        );
-
-        await PAGE.goto(`https://app.eva.gg/fr-FR/login`, {
-            waitUntil: 'networkidle2'
-        });
-    } catch (err) {
-        dialog.showErrorBox('Error', err);
-    }
+            await PAGE.goto(`https://app.eva.gg/fr-FR/login`, {
+                waitUntil: 'networkidle2'
+            });
+        } catch (err) {
+            dialog.showErrorBox('Error', err);
+        }
+    });
 }
 
 module.exports = {
