@@ -39,6 +39,7 @@ import { Settings } from './models/settings';
 import { ReplayCutterUpscaleConfirmationDialog } from './dialog/upscale-confirmation/upscale-confirmation.dialog';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
+import { MODES } from './models/mode';
 
 //#endregion
 @Component({
@@ -81,6 +82,8 @@ export class ReplayCutterComponent implements OnInit {
   private tesseractWorker_letter: Tesseract.Worker | undefined;
   private tesseractWorker_time: Tesseract.Worker | undefined;
 
+  private miniMapPositionsByMap: { [mapName: string]: CropperPosition } = {};
+
   //#endregion
 
   constructor(
@@ -113,6 +116,7 @@ export class ReplayCutterComponent implements OnInit {
           this.videoPath = encodeURIComponent(path);
           this.percent = 0;
         }
+        this.miniMapPositionsByMap = {};
         this.globalService.loading = undefined;
         this.inputFileDisabled = false;
       });
@@ -263,6 +267,18 @@ export class ReplayCutterComponent implements OnInit {
    * @param gameID ID of the game.
    */
   protected cropGameMinimap(gameIndex: number, gameID: number): void {
+    const MAP_NAME = this.games[gameIndex].map;
+
+    // Si les positions sont déjà définies pour cette map, les utiliser directement.
+    if (this.miniMapPositionsByMap[MAP_NAME]) {
+      this.uploadGameMiniMap(
+        gameIndex,
+        this.miniMapPositionsByMap[MAP_NAME],
+        gameID
+      );
+      return;
+    }
+
     if (this.videoPath) {
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
@@ -286,6 +302,7 @@ export class ReplayCutterComponent implements OnInit {
               .subscribe((miniMapPositions: CropperPosition) => {
                 window.electronAPI.setWindowSize();
                 if (miniMapPositions) {
+                  this.miniMapPositionsByMap[MAP_NAME] = miniMapPositions;
                   this.uploadGameMiniMap(gameIndex, miniMapPositions, gameID);
                 }
               });
@@ -416,10 +433,10 @@ export class ReplayCutterComponent implements OnInit {
 
             if (!found) {
               const MODE = this.detectGameScoreFrame(VIDEO);
-              if (MODE > 0) {
+              if (MODE >= 0) {
                 found = true;
                 if (this.games.length == 0 || this.games[0].start != -1) {
-                  if (MODE > 0) {
+                  if (MODE >= 0) {
                     const GAME: Game = new Game(MODE);
                     GAME.end = NOW;
                     //#region Orange team
@@ -428,10 +445,10 @@ export class ReplayCutterComponent implements OnInit {
                       await this.getTextFromImage(
                         VIDEO,
                         this.tesseractWorker_basic!,
-                        GAME.mode == 1 ? 390 : 388,
-                        GAME.mode == 1 ? 187 : 159,
-                        GAME.mode == 1 ? 620 : 618,
-                        GAME.mode == 1 ? 217 : 189,
+                        MODES[MODE].scoreFrame.orangeName[0].x,
+                        MODES[MODE].scoreFrame.orangeName[0].y,
+                        MODES[MODE].scoreFrame.orangeName[1].x,
+                        MODES[MODE].scoreFrame.orangeName[1].y,
                         7,
                         225,
                         true
@@ -451,10 +468,10 @@ export class ReplayCutterComponent implements OnInit {
                       await this.getTextFromImage(
                         VIDEO,
                         this.tesseractWorker_number!,
-                        530,
-                        GAME.mode == 1 ? 89 : 54,
-                        620,
-                        GAME.mode == 1 ? 127 : 92,
+                        MODES[MODE].scoreFrame.orangeScore[0].x,
+                        MODES[MODE].scoreFrame.orangeScore[0].y,
+                        MODES[MODE].scoreFrame.orangeScore[1].x,
+                        MODES[MODE].scoreFrame.orangeScore[1].y,
                         7,
                         200,
                         true,
@@ -528,10 +545,10 @@ export class ReplayCutterComponent implements OnInit {
                       await this.getTextFromImage(
                         VIDEO,
                         this.tesseractWorker_basic!,
-                        390,
-                        GAME.mode == 1 ? 637 : 629,
-                        620,
-                        GAME.mode == 1 ? 667 : 679,
+                        MODES[MODE].scoreFrame.blueName[0].x,
+                        MODES[MODE].scoreFrame.blueName[0].y,
+                        MODES[MODE].scoreFrame.blueName[1].x,
+                        MODES[MODE].scoreFrame.blueName[1].y,
                         7,
                         225,
                         false,
@@ -550,10 +567,10 @@ export class ReplayCutterComponent implements OnInit {
                       await this.getTextFromImage(
                         VIDEO,
                         this.tesseractWorker_number!,
-                        GAME.mode == 1 ? 1285 : 1286,
-                        GAME.mode == 1 ? 89 : 54,
-                        GAME.mode == 1 ? 1384 : 1376,
-                        GAME.mode == 1 ? 127 : 93,
+                        MODES[MODE].scoreFrame.blueScore[0].x,
+                        MODES[MODE].scoreFrame.blueScore[0].y,
+                        MODES[MODE].scoreFrame.blueScore[1].x,
+                        MODES[MODE].scoreFrame.blueScore[1].y,
                         7,
                         200,
                         true,
@@ -738,11 +755,13 @@ export class ReplayCutterComponent implements OnInit {
                   const TEXT /* string */ = await this.getTextFromImage(
                     VIDEO,
                     this.tesseractWorker_letter!,
-                    825,
-                    this.games[0].mode == 1 ? 81 : 89,
-                    1093,
-                    this.games[0].mode == 1 ? 102 : 110,
-                    7
+                    MODES[this.games[0].mode].gameFrame.map[0].x,
+                    MODES[this.games[0].mode].gameFrame.map[0].y,
+                    MODES[this.games[0].mode].gameFrame.map[1].x,
+                    MODES[this.games[0].mode].gameFrame.map[1].y,
+                    7,
+                    225,
+                    true
                   );
 
                   if (TEXT) {
@@ -760,10 +779,10 @@ export class ReplayCutterComponent implements OnInit {
                   const TEXT /* string */ = await this.getTextFromImage(
                     VIDEO,
                     this.tesseractWorker_basic!,
-                    686,
-                    22,
-                    833,
-                    68,
+                    MODES[this.games[0].mode].gameFrame.orangeName[0].x,
+                    MODES[this.games[0].mode].gameFrame.orangeName[0].y,
+                    MODES[this.games[0].mode].gameFrame.orangeName[1].x,
+                    MODES[this.games[0].mode].gameFrame.orangeName[1].y,
                     6
                   );
                   if (TEXT && TEXT.length >= 2) {
@@ -779,10 +798,10 @@ export class ReplayCutterComponent implements OnInit {
                   const TEXT /* string */ = await this.getTextFromImage(
                     VIDEO,
                     this.tesseractWorker_basic!,
-                    1087,
-                    22,
-                    1226,
-                    68,
+                    MODES[this.games[0].mode].gameFrame.blueName[0].x,
+                    MODES[this.games[0].mode].gameFrame.blueName[0].y,
+                    MODES[this.games[0].mode].gameFrame.blueName[1].x,
+                    MODES[this.games[0].mode].gameFrame.blueName[1].y,
                     6
                   );
                   if (TEXT && TEXT.length >= 2) {
@@ -802,10 +821,10 @@ export class ReplayCutterComponent implements OnInit {
                     const TEXT /* string */ = await this.getTextFromImage(
                       VIDEO,
                       this.tesseractWorker_time!,
-                      935,
-                      0,
-                      985,
-                      28,
+                      MODES[this.games[0].mode].gameFrame.timer[0].x,
+                      MODES[this.games[0].mode].gameFrame.timer[0].y,
+                      MODES[this.games[0].mode].gameFrame.timer[1].x,
+                      MODES[this.games[0].mode].gameFrame.timer[1].y,
                       7
                     );
                     if (TEXT) {
@@ -1012,7 +1031,7 @@ export class ReplayCutterComponent implements OnInit {
       new Map('Engine', ['engine']),
       new Map('Helios Station', ['helios', 'station']),
       new Map('Lunar Outpost', ['lunar', 'outpost']),
-      new Map('Outlaw', ['outlaw']),
+      new Map('Outlaw', ['outlaw', 'qutlaw']),
       new Map('Polaris', ['polaris']),
       new Map('Silva', ['silva']),
       new Map('The Cliff', ['cliff']),
@@ -1065,37 +1084,32 @@ export class ReplayCutterComponent implements OnInit {
    * @returns Is the current frame a game score frame?
    */
   private detectGameScoreFrame(video: HTMLVideoElement): number {
-    if (
-      /* Orange logo */
-      this.colorSimilarity(
-        this.getPixelColor(video, 325, 153),
-        new RGB(239, 203, 14)
-      ) &&
-      /* Blue logo */
-      this.colorSimilarity(
-        this.getPixelColor(video, 313, 613),
-        new RGB(50, 138, 230)
-      )
-    ) {
-      console.log('Detect game score frame (mode 1)');
-      return 1;
+    for (let i = 0; i < MODES.length; i++) {
+      if (
+        /* Orange logo */
+        this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[i].scoreFrame.orangeLogo.x,
+            MODES[i].scoreFrame.orangeLogo.y
+          ),
+          new RGB(239, 203, 14)
+        ) &&
+        /* Blue logo */
+        this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[i].scoreFrame.blueLogo.x,
+            MODES[i].scoreFrame.blueLogo.y
+          ),
+          new RGB(50, 138, 230)
+        )
+      ) {
+        console.log(`Detect game score frame (mode ${i + 1})`);
+        return i;
+      }
     }
-    if (
-      /* Orange logo */
-      this.colorSimilarity(
-        this.getPixelColor(video, 325, 123),
-        new RGB(239, 203, 14)
-      ) &&
-      /* Blue logo */
-      this.colorSimilarity(
-        this.getPixelColor(video, 313, 618),
-        new RGB(50, 138, 230)
-      )
-    ) {
-      console.log('Detect game score frame (mode 2)');
-      return 2;
-    }
-    return 0;
+    return -1;
   }
 
   /**
@@ -1226,47 +1240,74 @@ export class ReplayCutterComponent implements OnInit {
     games: Game[]
   ): boolean {
     if (games.length > 0 && games[0].end != -1 && games[0].start == -1) {
-      switch (games[0].mode) {
-        case 1:
-        case 2:
-          if (
-            /* Logo top */ this.colorSimilarity(
-              this.getPixelColor(video, 958, 427),
-              new RGB(255, 255, 255)
-            ) &&
-            /* Logo left */ this.colorSimilarity(
-              this.getPixelColor(video, 857, 653),
-              new RGB(255, 255, 255)
-            ) &&
-            /* Logo right */ this.colorSimilarity(
-              this.getPixelColor(video, 1060, 653),
-              new RGB(255, 255, 255)
-            ) &&
-            /* Logo middle */ this.colorSimilarity(
-              this.getPixelColor(video, 958, 642),
-              new RGB(255, 255, 255)
-            ) &&
-            /* Logo black 1 */ this.colorSimilarity(
-              this.getPixelColor(video, 958, 463),
-              new RGB(0, 0, 0)
-            ) &&
-            /* Logo black 2 */ this.colorSimilarity(
-              this.getPixelColor(video, 880, 653),
-              new RGB(0, 0, 0)
-            ) &&
-            /* Logo black 3 */ this.colorSimilarity(
-              this.getPixelColor(video, 1037, 653),
-              new RGB(0, 0, 0)
-            ) &&
-            /* Logo black 4 */ this.colorSimilarity(
-              this.getPixelColor(video, 958, 610),
-              new RGB(0, 0, 0)
-            )
-          ) {
-            console.log('Detect game loading frame');
-            return true;
-          }
-          break;
+      if (
+        /* Logo top */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoTop.x,
+            MODES[games[0].mode].loadingFrame.logoTop.y
+          ),
+          new RGB(255, 255, 255)
+        ) &&
+        /* Logo left */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoLeft.x,
+            MODES[games[0].mode].loadingFrame.logoLeft.y
+          ),
+          new RGB(255, 255, 255)
+        ) &&
+        /* Logo right */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoRight.x,
+            MODES[games[0].mode].loadingFrame.logoRight.y
+          ),
+          new RGB(255, 255, 255)
+        ) &&
+        /* Logo middle */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoMiddle.x,
+            MODES[games[0].mode].loadingFrame.logoMiddle.y
+          ),
+          new RGB(255, 255, 255)
+        ) &&
+        /* Logo black 1 */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoBlack1.x,
+            MODES[games[0].mode].loadingFrame.logoBlack1.y
+          ),
+          new RGB(0, 0, 0)
+        ) &&
+        /* Logo black 2 */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoBlack2.x,
+            MODES[games[0].mode].loadingFrame.logoBlack2.y
+          ),
+          new RGB(0, 0, 0)
+        ) &&
+        /* Logo black 3 */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoBlack3.x,
+            MODES[games[0].mode].loadingFrame.logoBlack3.y
+          ),
+          new RGB(0, 0, 0)
+        ) &&
+        /* Logo black 4 */ this.colorSimilarity(
+          this.getPixelColor(
+            video,
+            MODES[games[0].mode].loadingFrame.logoBlack4.x,
+            MODES[games[0].mode].loadingFrame.logoBlack4.y
+          ),
+          new RGB(0, 0, 0)
+        )
+      ) {
+        console.log('Detect game loading frame');
+        return true;
       }
     }
     return false;
@@ -1532,43 +1573,43 @@ export class ReplayCutterComponent implements OnInit {
       // Trying to detect the color of all players' life bars.
       const J1_PIXEL = this.getPixelColor(
         video,
-        118,
-        games[0].mode == 1 ? 742 : 717
+        MODES[games[0].mode].gameFrame.playersX[0],
+        MODES[games[0].mode].gameFrame.playersY[0]
       );
       const J2_PIXEL = this.getPixelColor(
         video,
-        118,
-        games[0].mode == 1 ? 825 : 806
+        MODES[games[0].mode].gameFrame.playersX[0],
+        MODES[games[0].mode].gameFrame.playersY[1]
       );
       const J3_PIXEL = this.getPixelColor(
         video,
-        118,
-        games[0].mode == 1 ? 907 : 896
+        MODES[games[0].mode].gameFrame.playersX[0],
+        MODES[games[0].mode].gameFrame.playersY[2]
       );
       const J4_PIXEL = this.getPixelColor(
         video,
-        118,
-        games[0].mode == 1 ? 991 : 985
+        MODES[games[0].mode].gameFrame.playersX[0],
+        MODES[games[0].mode].gameFrame.playersY[3]
       );
       const J5_PIXEL = this.getPixelColor(
         video,
-        1801,
-        games[0].mode == 1 ? 742 : 717
+        MODES[games[0].mode].gameFrame.playersX[1],
+        MODES[games[0].mode].gameFrame.playersY[0]
       );
       const J6_PIXEL = this.getPixelColor(
         video,
-        1801,
-        games[0].mode == 1 ? 825 : 806
+        MODES[games[0].mode].gameFrame.playersX[1],
+        MODES[games[0].mode].gameFrame.playersY[1]
       );
       const J7_PIXEL = this.getPixelColor(
         video,
-        1801,
-        games[0].mode == 1 ? 907 : 896
+        MODES[games[0].mode].gameFrame.playersX[1],
+        MODES[games[0].mode].gameFrame.playersY[2]
       );
       const J8_PIXEL = this.getPixelColor(
         video,
-        1801,
-        games[0].mode == 1 ? 991 : 985
+        MODES[games[0].mode].gameFrame.playersX[1],
+        MODES[games[0].mode].gameFrame.playersY[3]
       );
 
       const ORANGE = new RGB(231, 123, 9);
