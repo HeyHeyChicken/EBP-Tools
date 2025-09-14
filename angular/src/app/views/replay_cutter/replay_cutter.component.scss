@@ -157,7 +157,7 @@ table {
     > tr {
       th:has(> .checkbox) {
         padding: 0;
-        min-width: 66px;
+        min-width: 48px;
 
         .checkbox {
           position: relative;
