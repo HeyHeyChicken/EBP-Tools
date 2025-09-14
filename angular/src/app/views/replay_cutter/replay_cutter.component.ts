@@ -97,6 +97,7 @@ export class ReplayCutterComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
+    this.videoPath = undefined;
     this.initServices();
 
     window.electronAPI.gameIsUploaded(() => {
