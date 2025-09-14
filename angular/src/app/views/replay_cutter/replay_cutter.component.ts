@@ -71,7 +71,6 @@ export class ReplayCutterComponent implements OnInit {
   protected games: Game[] = [];
   protected inputFileDisabled: boolean = true;
   protected videoPath: string | undefined;
-  protected uploadingVideoPath: string | undefined;
   private lastDetectedGamePlayingFrame?: number;
 
   private start: number = 0;
@@ -285,9 +284,7 @@ export class ReplayCutterComponent implements OnInit {
         Math.round((this.games[gameIndex].start + 10) * 1000),
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
-            this.uploadingVideoPath = undefined;
             this.uploadingGameIndex = gameIndex;
-            //this.uploadingVideoPath = `${this.videoPath}&v=${new Date().getTime()}`;
             const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
             this.dialogService
               .open(ReplayCutterCropDialog, {
@@ -340,6 +337,104 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
+   * Automatically detects the position boundaries of a team's player information area on a replay video frame by analyzing team color pixels to determine the UI bounds.
+   * @param gameIndex Index of the game to analyze.
+   * @param color RGB color of the team to detect (orange or blue).
+   * @param callback Function called with the detected position bounds {left, top, bottom, right}.
+   */
+  private getTeamInfosPosition(
+    gameIndex: number,
+    color: RGB,
+    callback: Function
+  ): void {
+    if (this.videoPath) {
+      const TEAM_IS_ORANGE = color.r > 255 / 2;
+      this.videoURLToCanvas(
+        `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
+        this.games[gameIndex].start,
+        (videoFrame?: HTMLCanvasElement) => {
+          if (videoFrame) {
+            let step = 0;
+
+            let top = 0;
+            let right = 0;
+            let bottom = 0;
+            let left = 0;
+
+            // We are looking for the bottom and the top.
+            const X: number = TEAM_IS_ORANGE ? 125 : 1806;
+            for (let y = videoFrame.height; y >= 0; y--) {
+              const IS_PRIMARY_COLOR = this.colorSimilarity(
+                this.getPixelColor(videoFrame, X, y),
+                color
+              );
+
+              if (IS_PRIMARY_COLOR && bottom == 0) {
+                bottom = Math.floor(y + videoFrame.height * 0.058);
+                step = 1;
+                continue;
+              }
+
+              if (
+                (!IS_PRIMARY_COLOR && step == 1) ||
+                (IS_PRIMARY_COLOR && step == 2) ||
+                (!IS_PRIMARY_COLOR && step == 3) ||
+                (IS_PRIMARY_COLOR && step == 4) ||
+                (!IS_PRIMARY_COLOR && step == 5) ||
+                (IS_PRIMARY_COLOR && step == 6) ||
+                (!IS_PRIMARY_COLOR && step == 7)
+              ) {
+                step++;
+                continue;
+              }
+
+              if (!IS_PRIMARY_COLOR && step == 8) {
+                top = y;
+                break;
+              }
+            }
+
+            // We are looking for the left and the right.
+            const Y = Math.floor(top + videoFrame.height * 0.005);
+            for (let x = 0; x < videoFrame.width / 4; x++) {
+              const IS_PRIMARY_COLOR = this.colorSimilarity(
+                this.getPixelColor(
+                  videoFrame,
+                  TEAM_IS_ORANGE ? x : videoFrame.width - x,
+                  Y
+                ),
+                color,
+                30
+              );
+
+              if (IS_PRIMARY_COLOR) {
+                if (TEAM_IS_ORANGE) {
+                  if (left == 0) {
+                    left = x;
+                  }
+                  right = x;
+                } else {
+                  if (right == 0) {
+                    right = videoFrame.width - x;
+                  }
+                  left = videoFrame.width - x;
+                }
+              }
+            }
+
+            callback({
+              x1: left,
+              y1: top,
+              x2: right,
+              y2: bottom
+            });
+          }
+        }
+      );
+    }
+  }
+
+  /**
    * This function allows the user to upload their cut game.
    * @param gameIndex Index of the game to upload.
    * @param miniMapPositions Position of the minimap.
@@ -352,12 +447,27 @@ export class ReplayCutterComponent implements OnInit {
   ): void {
     if (this.videoPath) {
       this.globalService.loading = '';
-
-      window.electronAPI.uploadGameMiniMap(
-        this.games[gameIndex],
-        miniMapPositions,
-        decodeURIComponent(this.videoPath),
-        gameID
+      // We get the coordinates of the orange team's information.
+      this.getTeamInfosPosition(
+        gameIndex,
+        new RGB(235, 121, 0),
+        (orangeTeamInfosPosition: CropperPosition) => {
+          // We get the coordinates of the blue team's information.
+          this.getTeamInfosPosition(
+            gameIndex,
+            new RGB(29, 127, 255),
+            (blueTeamInfosPosition: CropperPosition) => {
+              window.electronAPI.uploadGameMiniMap(
+                this.games[gameIndex],
+                miniMapPositions,
+                decodeURIComponent(this.videoPath!),
+                gameID,
+                orangeTeamInfosPosition,
+                blueTeamInfosPosition
+              );
+            }
+          );
+        }
       );
     }
   }
@@ -384,14 +494,6 @@ export class ReplayCutterComponent implements OnInit {
     if (event.target) {
       const VIDEO = event.target as HTMLVideoElement;
       VIDEO.currentTime = VIDEO.duration;
-    }
-  }
-
-  protected uploadingVideoLoadedData(event: Event): void {
-    if (event.target && this.uploadingGameIndex) {
-      const VIDEO = event.target as HTMLVideoElement;
-      VIDEO.currentTime = this.games[this.uploadingGameIndex].start + 10;
-      console.log('uploadingVideoLoadedData');
     }
   }
 
@@ -918,36 +1020,6 @@ export class ReplayCutterComponent implements OnInit {
     return { position, size, confidence: maxVal };
   }
 
-  protected async uploadingVideoTimeUpdate(event: Event): Promise<void> {
-    if (this.uploadingVideoPath && event.target && this.uploadingGameIndex) {
-      const _cv: typeof cv = this.openCVService.cv!;
-      const VIDEO = event.target as HTMLVideoElement;
-
-      if (this.detectGamePlaying(VIDEO, this.games, true)) {
-        const VIDEO_MAT = _cv.imread(this.videoToCanvas(VIDEO));
-        this.urlToCanvas(
-          `/assets/img/maps/${this.games[this.uploadingGameIndex].map}.png`,
-          (mapCanvas: HTMLCanvasElement) => {
-            const MAP_MAT = _cv.imread(mapCanvas);
-
-            const { position, size, confidence } = this.detectImage(
-              VIDEO_MAT,
-              MAP_MAT
-            );
-            console.log(
-              'Position:',
-              position,
-              'Taille:',
-              size,
-              'Confiance:',
-              confidence
-            );
-          }
-        );
-      }
-    }
-  }
-
   private urlToCanvas(
     url: string,
     callback: (canvas: HTMLCanvasElement) => void
@@ -973,7 +1045,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param y  Y coordinate of the pixel on the video.
    * @returns RGB color of the video pixel.
    */
-  private getPixelColor(video: HTMLVideoElement, x: number, y: number): RGB {
+  private getPixelColor(video: CanvasImageSource, x: number, y: number): RGB {
     if (video) {
       const CANVAS = document.createElement('canvas');
       CANVAS.width = 1;

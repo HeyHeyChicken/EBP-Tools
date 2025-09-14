@@ -62,13 +62,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
             >
               <i class="fa-sharp fa-solid fa-copy"></i>
             </button>
-            <button
-              class="squared"
-              [class.disabled]="true"
-              matTooltip="{{ 'view.replay_cutter.uploadAll' | translate }}"
-            >
-              <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
-            </button>
           </div>
           <table>
             <thead>
@@ -170,22 +163,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
         "
         (loadeddata)="videoLoadedData($event)"
         (timeupdate)="videoTimeUpdate($event)"
-      ></video>
-    </div>
-  }
-  @if (uploadingVideoPath) {
-    <div class="video">
-      <!-- This video is used to upload the game in a replay -->
-      <video
-        muted
-        [src]="
-          'http://localhost:' +
-          globalService.serverPort +
-          '/file?path=' +
-          uploadingVideoPath
-        "
-        (loadeddata)="uploadingVideoLoadedData($event)"
-        (timeupdate)="uploadingVideoTimeUpdate($event)"
       ></video>
     </div>
   }

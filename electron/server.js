@@ -188,6 +188,7 @@ let projectLatestVersion /* string */ = '';
                   } ${customText ? '- ' + customText + ' ' : ''}(${new Date().getTime()})`) +
                 `.${EXTENSION}`
         );
+        unlinkSync(OUTPUT_FILE_PATH);
 
         const COMMAND /* string */ = `"${FFMPEG_PATH}" -ss ${
             game._start
@@ -210,6 +211,7 @@ let projectLatestVersion /* string */ = '';
      * @param {*} callback Callback function.
      */
     function uploadVideo(url, videoPath, callback) {
+        const VIDEO_PATH = videoPath.normalize('NFC');
         const UPLOAD_URL = new URL(url);
 
         const UPLOAD_OPTIONS = {
@@ -233,7 +235,7 @@ let projectLatestVersion /* string */ = '';
 
         UPLOAD_REQUEST.on('error', (err) => console.error('Error:', err));
 
-        fs.createReadStream(videoPath).pipe(UPLOAD_REQUEST);
+        fs.createReadStream(VIDEO_PATH).pipe(UPLOAD_REQUEST);
     }
 
     /**
@@ -282,7 +284,7 @@ let projectLatestVersion /* string */ = '';
      * @param {*} gameID ID of the game to attach the video to.
      * @param {*} callback Callback function.
      */
-    function getVideoUploadURL(gameID, callback) {
+    function getVideoUploadURLs(gameID, callback) {
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
 
         const PARAMS = new URLSearchParams({
@@ -309,7 +311,7 @@ let projectLatestVersion /* string */ = '';
             });
 
             res.on('end', () => {
-                callback(data);
+                callback(JSON.parse(data));
             });
         });
 
@@ -321,12 +323,23 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
-     * This function crop a video file.
-     * @param {Game} game Game's data.
-     * @param {string} videoPath Full video path.
-     * @param {*} cropPosition Cropp positions and dimentions.
-     * @param {string} fileName (optional) File name.
-     * @returns {string} Cutted video path.
+     * Safely deletes a file/folder if it exists, with Unicode normalization for proper file path handling.
+     * @param path The file/folder path to delete.
+     */
+    function unlinkSync(path) {
+        const NORMALIZED_CUT_PATH = path.normalize('NFC');
+        if (fs.existsSync(NORMALIZED_CUT_PATH)) {
+            fs.unlinkSync(NORMALIZED_CUT_PATH);
+        }
+    }
+
+    /**
+     * Crops a video file to a specific rectangular region using FFmpeg and saves it with reduced framerate (10fps).
+     * @param game Game object containing team names and map information for filename generation.
+     * @param videoPath Path to the source video file to crop.
+     * @param cropPosition Object with x1, y1, x2, y2 coordinates defining the crop area.
+     * @param fileName Optional custom filename, otherwise auto-generated from game data.
+     * @returns Promise that resolves to the output file path when cropping is complete.
      */
     function cropVideoFile(
         game,
@@ -335,7 +348,7 @@ let projectLatestVersion /* string */ = '';
         fileName = undefined
     ) {
         const EXTENSION = videoPath.split('.').pop().toLowerCase();
-        // A unique number is added to the end of the file name to ensure that an existing file is not overwritten.
+        // If "fileName" is not set, a unique number is added to the end of the file name to ensure that an existing file is not overwritten.
         const OUTPUT_FILE_PATH /* string */ = path.join(
             getOutputPath(
                 'videoCutterOutputPath',
@@ -347,6 +360,7 @@ let projectLatestVersion /* string */ = '';
                       game.map
                   } (${new Date().getTime()})`) + `.${EXTENSION}`
         );
+        unlinkSync(OUTPUT_FILE_PATH);
 
         const COMMAND /* string */ = `"${FFMPEG_PATH}" -i "${videoPath}" -filter:v "crop=${cropPosition.x2 - cropPosition.x1}:${cropPosition.y2 - cropPosition.y1}:${cropPosition.x1}:${cropPosition.y1}" -r 10 -an "${OUTPUT_FILE_PATH}"`;
 
@@ -359,9 +373,11 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
-     * This function upscales a video.
-     * @param {*} inputPath Unupscaled input video file path.
-     * @param {*} outputPath Upscaled output video file path.
+     * Upscales a video to 1920x1080 resolution using FFmpeg with progress tracking.
+     * Sends real-time progress updates to the main window.
+     * @param inputPath Path to the source video file to upscale.
+     * @param outputPath Path where the upscaled video will be saved.
+     * @param callback Function called when the upscaling process is complete.
      */
     function upscaleVideo(
         inputPath /* string */,
@@ -649,6 +665,13 @@ let projectLatestVersion /* string */ = '';
         });
     }
 
+    /**
+     * Exports game statistics to an Excel file using a predefined template.
+     * @param games Array of game objects containing match data to export.
+     * @param playerName Name of the player being exported.
+     * @param seasonIndex Index of the season being exported.
+     * @returns Promise that resolves when the Excel file has been generated and saved.
+     */
     async function exportGamesToExcel(games, playerName, seasonIndex) {
         const WORKBOOK = new ExcelJS.Workbook();
         await WORKBOOK.xlsx.readFile(path.join(ROOT_PATH, 'template.xlsx'));
@@ -728,7 +751,7 @@ let projectLatestVersion /* string */ = '';
                 'gameHistoryOutputPath',
                 path.join(os.homedir(), 'Downloads')
             ),
-            `EBP - ${playerName} (${new Date().getTime()}).xlsx`
+            `EBP - ${playerName} - Season ${seasonIndex} (${new Date().getTime()}).xlsx`
         );
         // Save to a new file
         await WORKBOOK.xlsx.writeFile(FILE_PATH);
@@ -1217,61 +1240,97 @@ let projectLatestVersion /* string */ = '';
         // The front-end asks the server to open a video file.
         ipcMain.handle(
             'upload-game-mini-map',
-            (event, game, cropPosition, videoPath, gameID) => {
+            (
+                event,
+                game,
+                cropPosition,
+                videoPath,
+                gameID,
+                orangeTeamInfosPosition,
+                blueTeamInfosPosition
+            ) => {
                 // We check that the user is logged in.
                 checkJwtToken((isLoggedIn) => {
                     if (isLoggedIn) {
                         // We cut the video...
                         cutVideoFile(game, videoPath, 'temp1').then(
                             (cuttedPath) => {
-                                // We crop the video...
+                                // We crop the minimap of the video...
                                 cropVideoFile(
                                     game,
                                     cuttedPath,
                                     cropPosition,
                                     'temp2'
-                                ).then((croppedPath) => {
-                                    // We delete the cut video.
-                                    const NORMALIZED_CUT_PATH =
-                                        cuttedPath.normalize('NFC');
-                                    if (fs.existsSync(NORMALIZED_CUT_PATH)) {
-                                        fs.unlinkSync(NORMALIZED_CUT_PATH);
-                                    }
+                                ).then((croppedMapPath) => {
+                                    // We crop the orange team infos of the video...
+                                    cropVideoFile(
+                                        game,
+                                        cuttedPath,
+                                        orangeTeamInfosPosition,
+                                        'temp3'
+                                    ).then((croppedOrangeInfosPath) => {
+                                        // We crop the blue team infos of the video...
+                                        cropVideoFile(
+                                            game,
+                                            cuttedPath,
+                                            blueTeamInfosPosition,
+                                            'temp4'
+                                        ).then((croppedBlueInfosPath) => {
+                                            // We delete the cut video.
+                                            unlinkSync(cuttedPath);
 
-                                    // We retrieve the link allowing the video to be uploaded.
-                                    getVideoUploadURL(
-                                        gameID,
-                                        (videoUploadURL) => {
-                                            // On upload la vidéo...
-                                            const NORMALIZED_CROPPED_PATH =
-                                                croppedPath.normalize('NFC');
-                                            uploadVideo(
-                                                videoUploadURL,
-                                                NORMALIZED_CROPPED_PATH,
-                                                () => {
-                                                    // We delete the cropped video.
-                                                    if (
-                                                        fs.existsSync(
-                                                            NORMALIZED_CROPPED_PATH
-                                                        )
-                                                    ) {
-                                                        fs.unlinkSync(
-                                                            NORMALIZED_CROPPED_PATH
-                                                        );
-                                                    }
-
-                                                    setVideoAsUploaded(
-                                                        gameID,
+                                            // We retrieve the link allowing the video to be uploaded.
+                                            getVideoUploadURLs(
+                                                gameID,
+                                                (videoUploadURLs) => {
+                                                    // We upload the minimap video...
+                                                    uploadVideo(
+                                                        videoUploadURLs[0],
+                                                        croppedMapPath,
                                                         () => {
-                                                            mainWindow.webContents.send(
-                                                                'game-is-uploaded'
+                                                            // We delete the cropped video.
+                                                            unlinkSync(
+                                                                croppedMapPath
+                                                            );
+
+                                                            // We upload the orange infos video...
+                                                            uploadVideo(
+                                                                videoUploadURLs[1],
+                                                                croppedOrangeInfosPath,
+                                                                () => {
+                                                                    // We delete the cropped video.
+                                                                    unlinkSync(
+                                                                        croppedOrangeInfosPath
+                                                                    );
+
+                                                                    // We upload the orange infos video...
+                                                                    uploadVideo(
+                                                                        videoUploadURLs[2],
+                                                                        croppedBlueInfosPath,
+                                                                        () => {
+                                                                            // We delete the cropped video.
+                                                                            unlinkSync(
+                                                                                croppedBlueInfosPath
+                                                                            );
+
+                                                                            setVideoAsUploaded(
+                                                                                gameID,
+                                                                                () => {
+                                                                                    mainWindow.webContents.send(
+                                                                                        'game-is-uploaded'
+                                                                                    );
+                                                                                }
+                                                                            );
+                                                                        }
+                                                                    );
+                                                                }
                                                             );
                                                         }
                                                     );
                                                 }
                                             );
-                                        }
-                                    );
+                                        });
+                                    });
                                 });
                             }
                         );

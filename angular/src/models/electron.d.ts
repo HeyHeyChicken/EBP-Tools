@@ -63,7 +63,9 @@ export interface ElectronAPI {
     game: Game,
     c: CropperPosition,
     videoPath: string,
-    gameID: number
+    gameID: number,
+    orangeTeamInfosPosition: CropperPosition,
+    blueTeamInfosPosition: CropperPosition
   ) => void;
 
   //#endregion
