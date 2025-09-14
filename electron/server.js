@@ -1008,6 +1008,15 @@ let projectLatestVersion /* string */ = '';
                 });
         });
 
+        // The front-end asks the server to check JWT token.
+        ipcMain.handle('check-jwt-token', () => {
+            return new Promise((resolve) => {
+                checkJwtToken(() => {
+                    resolve();
+                });
+            });
+        });
+
         // The front-end asks the server to logout.
         ipcMain.handle('logout', () => {
             const SESSION = session.defaultSession;

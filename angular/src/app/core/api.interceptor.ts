@@ -4,9 +4,9 @@
 
 //#region Imports
 
-import { HttpEvent, HttpHandlerFn, HttpRequest } from '@angular/common/http';
+import { HttpEvent, HttpHandlerFn, HttpRequest, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, catchError, throwError } from 'rxjs';
 import { IdentityService } from './services/identity.service';
 
 //#endregion
@@ -36,5 +36,12 @@ export function APIInterceptor(
     }
   });
 
-  return next(NEW_REQ);
+  return next(NEW_REQ).pipe(
+    catchError((error: HttpErrorResponse) => {
+      if (error.status === 401) {
+        window.electronAPI?.checkJwtToken();
+      }
+      return throwError(() => error);
+    })
+  );
 }

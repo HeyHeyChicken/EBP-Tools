@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setSetting: (setting) => ipcRenderer.invoke("set-setting", setting),
   // The front-end asks the server to logout.
   logout: () => ipcRenderer.invoke("logout"),
+  // The front-end asks the server to check JWT token.
+  checkJwtToken: () => ipcRenderer.invoke("check-jwt-token"),
   // The front-end asks the server to cut a video file.
   cutVideoFile: (game, videoPath, customText) => ipcRenderer.invoke("cut-video-file", game, videoPath, customText),
   // The front-end asks the server to cut all video files.

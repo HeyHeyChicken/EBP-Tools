@@ -53,6 +53,7 @@ export interface ElectronAPI {
   getVideoCutterOutputPath: () => Promise<string>;
   isDevMode: () => Promise<boolean>;
   logout: () => Promise<void>;
+  checkJwtToken: () => Promise<void>;
   openFile: (pathFile: string) => Promise<void>;
   openVideoFile: (videoPath?: string) => void;
   openURL: (url: string) => void;
