@@ -100,14 +100,21 @@ export class ReplayDownloaderComponent implements OnInit {
       });
   }
 
+  private cleanYouTubeURL(url: string): string {
+    const URL_OBJ = new URL(url);
+    const VIDEO_ID = URL_OBJ.searchParams.get('v');
+    if (VIDEO_ID) {
+      return `https://www.youtube.com/watch?v=${VIDEO_ID}`;
+    }
+    return url;
+  }
+
   protected onDownloadYouTube(): void {
     if (this.youTubeURL) {
       if (this.isYouTubeUrl(this.youTubeURL)) {
         this.percent = 0;
-        window.electronAPI.downloadReplay(
-          this.youTubeURL,
-          VideoPlatform.YOUTUBE
-        );
+        const cleanUrl = this.cleanYouTubeURL(this.youTubeURL);
+        window.electronAPI.downloadReplay(cleanUrl, VideoPlatform.YOUTUBE);
         this.youTubeURL = undefined;
       }
     }
