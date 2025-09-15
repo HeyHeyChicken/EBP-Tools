@@ -34,6 +34,16 @@
       },
       "outputPath": "Ruta de salida",
       "upscalePercent": "Ampliando ... ({{percent}}%)",
+      "detectingPlayerNicknames": "Detectando apodos de jugadores...",
+      "detectingOrangeInfoZone": "Detectando zona de información naranja...",
+      "detectingBlueInfoZone": "Detectando zona de información azul...",
+      "cuttingVideo": "Cortando video...",
+      "croppingMap": "Recortando mapa...",
+      "croppingOrangeInfos": "Recortando información del equipo naranja...",
+      "croppingBlueInfos": "Recortando información del equipo azul...",
+      "uploadingMap": "Subiendo mapa...",
+      "uploadingOrangeInfos": "Subiendo información del equipo naranja...",
+      "uploadingBlueInfos": "Subiendo información del equipo azul...",
       "dialog": {
         "settings": {
           "orangeTeamName": "Nombre del equipo naranja",

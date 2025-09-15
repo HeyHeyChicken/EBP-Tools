@@ -243,7 +243,12 @@ let projectLatestVersion /* string */ = '';
      * @param {*} gameID ID of the game.
      * @param {*} callback Callback function.
      */
-    function setVideoAsUploaded(gameID, callback) {
+    function setVideoAsUploaded(
+        gameID,
+        sortedOrangePlayersNames,
+        sortedBluePlayersNames,
+        callback
+    ) {
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
 
         const URL_PARAMS = new URLSearchParams({
@@ -262,6 +267,11 @@ let projectLatestVersion /* string */ = '';
             }
         };
 
+        const REQUEST_BODY = JSON.stringify({
+            orangePlayersNames: sortedOrangePlayersNames,
+            bluePlayersNames: sortedBluePlayersNames
+        });
+
         const REQUEST = https.request(OPTIONS, (res) => {
             // This line This line is essential.
             // Without it, 'end' will never fire.
@@ -276,6 +286,7 @@ let projectLatestVersion /* string */ = '';
             console.error('Error:', e);
         });
 
+        REQUEST.write(REQUEST_BODY);
         REQUEST.end();
     }
 
@@ -1246,15 +1257,25 @@ let projectLatestVersion /* string */ = '';
                 videoPath,
                 gameID,
                 orangeTeamInfosPosition,
-                blueTeamInfosPosition
+                blueTeamInfosPosition,
+                sortedOrangePlayersNames,
+                sortedBluePlayersNames
             ) => {
                 // We check that the user is logged in.
                 checkJwtToken((isLoggedIn) => {
                     if (isLoggedIn) {
                         // We cut the video...
+                        mainWindow.webContents.send(
+                            'global-message',
+                            'view.replay_cutter.cuttingVideo'
+                        );
                         cutVideoFile(game, videoPath, 'temp1').then(
                             (cuttedPath) => {
                                 // We crop the minimap of the video...
+                                mainWindow.webContents.send(
+                                    'global-message',
+                                    'view.replay_cutter.croppingMap'
+                                );
                                 cropVideoFile(
                                     game,
                                     cuttedPath,
@@ -1262,6 +1283,10 @@ let projectLatestVersion /* string */ = '';
                                     'temp2'
                                 ).then((croppedMapPath) => {
                                     // We crop the orange team infos of the video...
+                                    mainWindow.webContents.send(
+                                        'global-message',
+                                        'view.replay_cutter.croppingOrangeInfos'
+                                    );
                                     cropVideoFile(
                                         game,
                                         cuttedPath,
@@ -1269,6 +1294,10 @@ let projectLatestVersion /* string */ = '';
                                         'temp3'
                                     ).then((croppedOrangeInfosPath) => {
                                         // We crop the blue team infos of the video...
+                                        mainWindow.webContents.send(
+                                            'global-message',
+                                            'view.replay_cutter.croppingBlueInfos'
+                                        );
                                         cropVideoFile(
                                             game,
                                             cuttedPath,
@@ -1283,6 +1312,10 @@ let projectLatestVersion /* string */ = '';
                                                 gameID,
                                                 (videoUploadURLs) => {
                                                     // We upload the minimap video...
+                                                    mainWindow.webContents.send(
+                                                        'global-message',
+                                                        'view.replay_cutter.uploadingMap'
+                                                    );
                                                     uploadVideo(
                                                         videoUploadURLs[0],
                                                         croppedMapPath,
@@ -1293,6 +1326,10 @@ let projectLatestVersion /* string */ = '';
                                                             );
 
                                                             // We upload the orange infos video...
+                                                            mainWindow.webContents.send(
+                                                                'global-message',
+                                                                'view.replay_cutter.uploadingOrangeInfos'
+                                                            );
                                                             uploadVideo(
                                                                 videoUploadURLs[1],
                                                                 croppedOrangeInfosPath,
@@ -1302,7 +1339,11 @@ let projectLatestVersion /* string */ = '';
                                                                         croppedOrangeInfosPath
                                                                     );
 
-                                                                    // We upload the orange infos video...
+                                                                    // We upload the blue infos video...
+                                                                    mainWindow.webContents.send(
+                                                                        'global-message',
+                                                                        'view.replay_cutter.uploadingBlueInfos'
+                                                                    );
                                                                     uploadVideo(
                                                                         videoUploadURLs[2],
                                                                         croppedBlueInfosPath,
@@ -1314,6 +1355,8 @@ let projectLatestVersion /* string */ = '';
 
                                                                             setVideoAsUploaded(
                                                                                 gameID,
+                                                                                sortedOrangePlayersNames,
+                                                                                sortedBluePlayersNames,
                                                                                 () => {
                                                                                     mainWindow.webContents.send(
                                                                                         'game-is-uploaded'

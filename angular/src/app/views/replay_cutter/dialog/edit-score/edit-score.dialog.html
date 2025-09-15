@@ -3,7 +3,8 @@ Copyright (c) 2025, Antoine Duval
 This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
-<div class="dialog-container">
+
+<form (submit)="dialogRef.close(value)">
   <h2 mat-dialog-title>
     {{ 'view.replay_cutter.dialog.edit-score.title' | translate }}
   </h2>
@@ -19,6 +20,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
           <input
             matInput
             type="number"
+            [ngModelOptions]="{ standalone: true }"
             [(ngModel)]="value"
             [min]="0"
             [max]="100"
@@ -34,8 +36,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <i class="fa-sharp fa-solid fa-xmark"></i>{{ 'common.cancel' | translate
       }}
     </button>
-    <button class="ml-2 green" [mat-dialog-close]="value">
+    <button class="ml-2 green" type="submit">
       <i class="fa-sharp fa-solid fa-check"></i>{{ 'common.ok' | translate }}
     </button>
   </mat-dialog-actions>
-</div>
+</form>

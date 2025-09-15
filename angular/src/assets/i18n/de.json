@@ -34,6 +34,16 @@
       },
       "outputPath": "Ausgabepfad",
       "upscalePercent": "Hochskalieren ... ({{percent}}%)",
+      "detectingPlayerNicknames": "Erkennung von Spieler-Nicknames...",
+      "detectingOrangeInfoZone": "Erkennung der orangenen Informationszone...",
+      "detectingBlueInfoZone": "Erkennung der blauen Informationszone...",
+      "cuttingVideo": "Video wird geschnitten...",
+      "croppingMap": "Karte wird zugeschnitten...",
+      "croppingOrangeInfos": "Zuschneiden der orangenen Team-Informationen...",
+      "croppingBlueInfos": "Zuschneiden der blauen Team-Informationen...",
+      "uploadingMap": "Karte wird hochgeladen...",
+      "uploadingOrangeInfos": "Orangene Team-Informationen werden hochgeladen...",
+      "uploadingBlueInfos": "Blaue Team-Informationen werden hochgeladen...",
       "dialog": {
         "settings": {
           "orangeTeamName": "Name des orangenen Teams",

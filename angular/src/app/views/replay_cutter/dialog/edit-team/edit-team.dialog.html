@@ -3,7 +3,7 @@ Copyright (c) 2025, Antoine Duval
 This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
-<div class="dialog-container">
+<form (submit)="dialogRef.close(value.toUpperCase())">
   <h2 mat-dialog-title>
     {{ 'view.replay_cutter.dialog.edit-team.title' | translate }}
   </h2>
@@ -16,7 +16,12 @@ See LICENSE for terms. Unauthorized use is prohibited.
             >{{ 'view.replay_cutter.dialog.edit-team.label' | translate
             }}</mat-label
           >
-          <input matInput type="text" [(ngModel)]="value" />
+          <input
+            matInput
+            type="text"
+            [(ngModel)]="value"
+            [ngModelOptions]="{ standalone: true }"
+          />
         </mat-form-field>
       </ebp-column>
     </ebp-row>
@@ -27,8 +32,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <i class="fa-sharp fa-solid fa-xmark"></i>{{ 'common.cancel' | translate
       }}
     </button>
-    <button class="ml-2 green" [mat-dialog-close]="value.trim()">
+    <button class="ml-2 green" type="submit">
       <i class="fa-sharp fa-solid fa-check"></i>{{ 'common.ok' | translate }}
     </button>
   </mat-dialog-actions>
-</div>
+</form>

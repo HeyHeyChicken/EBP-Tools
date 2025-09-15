@@ -42,6 +42,7 @@ import { MODES } from './models/mode';
 import { EditTeamScoreDialog } from './dialog/edit-score/edit-score.dialog';
 import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
 import { EditTeamNameDialog } from './dialog/edit-team/edit-team.dialog';
+import { distance } from 'fastest-levenshtein';
 
 //#endregion
 @Component({
@@ -226,7 +227,7 @@ export class ReplayCutterComponent implements OnInit {
         (games: RestGame[]) => {
           if (games.length > 0) {
             if (games.length == 1) {
-              this.cropGameMinimap(gameIndex, games[0].ID);
+              this.cropGameMinimap(gameIndex, games[0]);
             } else {
               this.dialogService
                 .open(ReplayCutterAttachGameDialog, {
@@ -238,7 +239,10 @@ export class ReplayCutterComponent implements OnInit {
                 .afterClosed()
                 .subscribe((gameID: number | undefined) => {
                   if (gameID) {
-                    this.cropGameMinimap(gameIndex, gameID);
+                    this.cropGameMinimap(
+                      gameIndex,
+                      games.find((game) => game.ID == gameID)!
+                    );
                   }
                 });
             }
@@ -265,9 +269,12 @@ export class ReplayCutterComponent implements OnInit {
   /**
    * This function allows the user to set the game mini map position.
    * @param gameIndex Index of the game to upload.
-   * @param gameID ID of the game.
+   * @param gameFromStatistics Game infos from EBP's API.
    */
-  protected cropGameMinimap(gameIndex: number, gameID: number): void {
+  protected cropGameMinimap(
+    gameIndex: number,
+    gameFromStatistics: RestGame
+  ): void {
     const MAP_NAME = this.games[gameIndex].map;
 
     // Si les positions sont déjà définies pour cette map, les utiliser directement.
@@ -275,7 +282,7 @@ export class ReplayCutterComponent implements OnInit {
       this.uploadGameMiniMap(
         gameIndex,
         this.miniMapPositionsByMap[MAP_NAME],
-        gameID
+        gameFromStatistics
       );
       return;
     }
@@ -302,7 +309,11 @@ export class ReplayCutterComponent implements OnInit {
                 window.electronAPI.setWindowSize();
                 if (miniMapPositions) {
                   this.miniMapPositionsByMap[MAP_NAME] = miniMapPositions;
-                  this.uploadGameMiniMap(gameIndex, miniMapPositions, gameID);
+                  this.uploadGameMiniMap(
+                    gameIndex,
+                    miniMapPositions,
+                    gameFromStatistics
+                  );
                 }
               });
           }
@@ -353,7 +364,7 @@ export class ReplayCutterComponent implements OnInit {
       const TEAM_IS_ORANGE = color.r > 255 / 2;
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
-        this.games[gameIndex].start,
+        this.games[gameIndex].start * 1000,
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             let step = 0;
@@ -437,6 +448,121 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
+   * Sorts a list of player names from the API to match the order detected by Tesseract OCR.
+   * The API provides correct spelling but wrong order, while Tesseract provides correct order but potentially incorrect spelling.
+   * This function combines both to get correctly spelled names in the correct order.
+   * @param original Array of player names from the API (correct spelling, wrong order).
+   * @param tesseract Array of player names detected by OCR (correct order, potentially wrong spelling).
+   * @returns Array of correctly spelled player names sorted in the order detected by Tesseract.
+   */
+  private sortByTesseractOrder(
+    original: string[],
+    tesseract: string[]
+  ): string[] {
+    const USED: Set<number> = new Set();
+
+    return tesseract.map((tPseudo) => {
+      // 1) Check if there is an exact match.
+      const EXACT_INDEX = original.findIndex(
+        (o) => o === tPseudo && !USED.has(original.indexOf(o))
+      );
+      if (EXACT_INDEX !== -1) {
+        USED.add(EXACT_INDEX);
+        return original[EXACT_INDEX];
+      }
+
+      // 2) Otherwise, find the most similar nickname not yet used.
+      let bestIndex = -1;
+      let bestDistance = Infinity;
+
+      original.forEach((o, idx) => {
+        if (USED.has(idx)) return;
+        const DISTANCE = distance(tPseudo.toLowerCase(), o.toLowerCase());
+        if (DISTANCE < bestDistance) {
+          bestDistance = DISTANCE;
+          bestIndex = idx;
+        }
+      });
+
+      if (bestIndex !== -1) {
+        USED.add(bestIndex);
+        return original[bestIndex];
+      }
+
+      // 3) If no match, return the original nickname itself.
+      return tPseudo;
+    });
+  }
+
+  /**
+   * Extracts player names from a video frame using OCR and sorts API player data based on the detected order.
+   * This function captures a frame from the game replay, reads player names using Tesseract OCR, then uses the detected order to correctly sort the player names from the API.
+   * @param gameIndex Index of the game being processed.
+   * @param gameFromStatistics Game data from the API containing player information.
+   * @param callback Function called with the sorted orange and blue player names arrays.
+   */
+  private sortPlayersFromGameFrame(
+    gameIndex: number,
+    gameFromStatistics: RestGame,
+    callback: Function
+  ): void {
+    if (this.videoPath) {
+      this.videoURLToCanvas(
+        `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
+        this.games[gameIndex].start * 1000,
+        async (videoFrame?: HTMLCanvasElement) => {
+          if (videoFrame) {
+            const ORANGE_PLAYERS_NAMES: string[] = [];
+            const BLUE_PLAYERS_NAMES: string[] = [];
+            for (
+              let i = 0;
+              i < MODES[this.games[gameIndex].mode].gameFrame.playersY.length;
+              i++
+            ) {
+              ORANGE_PLAYERS_NAMES.push(
+                await this.getTextFromImage(
+                  videoFrame,
+                  this.tesseractWorker_basic!,
+                  MODES[this.games[gameIndex].mode].gameFrame.orangePlayersX[0],
+                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][0],
+                  MODES[this.games[gameIndex].mode].gameFrame.orangePlayersX[1],
+                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][1],
+                  7,
+                  225,
+                  true
+                )
+              );
+              BLUE_PLAYERS_NAMES.push(
+                await this.getTextFromImage(
+                  videoFrame,
+                  this.tesseractWorker_basic!,
+                  MODES[this.games[gameIndex].mode].gameFrame.bluePlayersX[0],
+                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][0],
+                  MODES[this.games[gameIndex].mode].gameFrame.bluePlayersX[1],
+                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][1],
+                  7,
+                  225,
+                  true
+                )
+              );
+            }
+
+            const SORTED_ORANGE_PLAYERS_NAMES = this.sortByTesseractOrder(
+              gameFromStatistics.orangePlayers,
+              ORANGE_PLAYERS_NAMES
+            );
+            const SORTED_BLUE_PLAYERS_NAMES = this.sortByTesseractOrder(
+              gameFromStatistics.bluePlayers,
+              BLUE_PLAYERS_NAMES
+            );
+            callback(SORTED_ORANGE_PLAYERS_NAMES, SORTED_BLUE_PLAYERS_NAMES);
+          }
+        }
+      );
+    }
+  }
+
+  /**
    * This function allows the user to upload their cut game.
    * @param gameIndex Index of the game to upload.
    * @param miniMapPositions Position of the minimap.
@@ -445,27 +571,47 @@ export class ReplayCutterComponent implements OnInit {
   private uploadGameMiniMap(
     gameIndex: number,
     miniMapPositions: CropperPosition,
-    gameID: number
+    gameFromStatistics: RestGame
   ): void {
     if (this.videoPath) {
-      this.globalService.loading = '';
-      // We get the coordinates of the orange team's information.
-      this.getTeamInfosPosition(
+      // We sort the list of players in the correct order.
+      this.globalService.loading = this.translateService.instant(
+        'view.replay_cutter.detectingPlayerNicknames'
+      );
+      this.sortPlayersFromGameFrame(
         gameIndex,
-        new RGB(235, 121, 0),
-        (orangeTeamInfosPosition: CropperPosition) => {
-          // We get the coordinates of the blue team's information.
+        gameFromStatistics,
+        (
+          sortedOrangePlayersNames: string[],
+          sortedBluePlayersNames: string[]
+        ) => {
+          // We get the coordinates of the orange team's information.
+          this.globalService.loading = this.translateService.instant(
+            'view.replay_cutter.detectingOrangeInfoZone'
+          );
           this.getTeamInfosPosition(
             gameIndex,
-            new RGB(29, 127, 255),
-            (blueTeamInfosPosition: CropperPosition) => {
-              window.electronAPI.uploadGameMiniMap(
-                this.games[gameIndex],
-                miniMapPositions,
-                decodeURIComponent(this.videoPath!),
-                gameID,
-                orangeTeamInfosPosition,
-                blueTeamInfosPosition
+            new RGB(235, 121, 0),
+            (orangeTeamInfosPosition: CropperPosition) => {
+              // We get the coordinates of the blue team's information.
+              this.globalService.loading = this.translateService.instant(
+                'view.replay_cutter.detectingBlueInfoZone'
+              );
+              this.getTeamInfosPosition(
+                gameIndex,
+                new RGB(29, 127, 255),
+                (blueTeamInfosPosition: CropperPosition) => {
+                  window.electronAPI.uploadGameMiniMap(
+                    this.games[gameIndex],
+                    miniMapPositions,
+                    decodeURIComponent(this.videoPath!),
+                    gameFromStatistics.ID,
+                    orangeTeamInfosPosition,
+                    blueTeamInfosPosition,
+                    sortedOrangePlayersNames,
+                    sortedBluePlayersNames
+                  );
+                }
               );
             }
           );
@@ -1590,13 +1736,54 @@ export class ReplayCutterComponent implements OnInit {
     return false;
   }
 
-  private videoToCanvas(video: HTMLVideoElement): HTMLCanvasElement {
+  /**
+   * Gets the actual dimensions (width and height) of a canvas image source.
+   * Handles different types of image sources (HTMLVideoElement, HTMLImageElement, HTMLCanvasElement, OffscreenCanvas).
+   * @param src The canvas image source to get dimensions from.
+   * @returns An object containing the width and height of the source.
+   * @throws Error if the source type is not supported.
+   */
+  private getSourceSize(src: CanvasImageSource): {
+    width: number;
+    height: number;
+  } {
+    if (src instanceof HTMLVideoElement)
+      return {
+        width: src.videoWidth,
+        height: src.videoHeight
+      };
+    if (src instanceof HTMLImageElement)
+      return {
+        width: src.width,
+        height: src.height
+      };
+    if (src instanceof HTMLCanvasElement)
+      return {
+        width: src.width,
+        height: src.height
+      };
+    if (src instanceof OffscreenCanvas)
+      return {
+        width: src.width,
+        height: src.height
+      };
+    throw new Error('Type non géré');
+  }
+
+  /**
+   * Converts a canvas image source to an HTMLCanvasElement by drawing it onto a new canvas.
+   * The resulting canvas will have the same dimensions as the source.
+   * @param source The image source to convert (video, image, or canvas).
+   * @returns A new HTMLCanvasElement containing the rendered source.
+   */
+  private videoToCanvas(source: CanvasImageSource): HTMLCanvasElement {
     const CANVAS = document.createElement('canvas');
-    CANVAS.width = video.videoWidth;
-    CANVAS.height = video.videoHeight;
+    const SIZE = this.getSourceSize(source);
+    CANVAS.width = SIZE.width;
+    CANVAS.height = SIZE.height;
     const CTX = CANVAS.getContext('2d');
     if (CTX) {
-      CTX.drawImage(video, 0, 0, CANVAS.width, CANVAS.height);
+      CTX.drawImage(source, 0, 0, CANVAS.width, CANVAS.height);
     }
     return CANVAS;
   }
@@ -1648,42 +1835,58 @@ export class ReplayCutterComponent implements OnInit {
       const J1_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[0],
-        MODES[games[0].mode].gameFrame.playersY[0]
+        (MODES[games[0].mode].gameFrame.playersY[0][0] +
+          MODES[games[0].mode].gameFrame.playersY[0][1]) /
+          2
       );
       const J2_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[0],
-        MODES[games[0].mode].gameFrame.playersY[1]
+        (MODES[games[0].mode].gameFrame.playersY[1][0] +
+          MODES[games[0].mode].gameFrame.playersY[1][1]) /
+          2
       );
       const J3_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[0],
-        MODES[games[0].mode].gameFrame.playersY[2]
+        (MODES[games[0].mode].gameFrame.playersY[2][0] +
+          MODES[games[0].mode].gameFrame.playersY[2][1]) /
+          2
       );
       const J4_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[0],
-        MODES[games[0].mode].gameFrame.playersY[3]
+        (MODES[games[0].mode].gameFrame.playersY[3][0] +
+          MODES[games[0].mode].gameFrame.playersY[3][1]) /
+          2
       );
       const J5_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[1],
-        MODES[games[0].mode].gameFrame.playersY[0]
+        (MODES[games[0].mode].gameFrame.playersY[0][0] +
+          MODES[games[0].mode].gameFrame.playersY[0][1]) /
+          2
       );
       const J6_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[1],
-        MODES[games[0].mode].gameFrame.playersY[1]
+        (MODES[games[0].mode].gameFrame.playersY[1][0] +
+          MODES[games[0].mode].gameFrame.playersY[1][1]) /
+          2
       );
       const J7_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[1],
-        MODES[games[0].mode].gameFrame.playersY[2]
+        (MODES[games[0].mode].gameFrame.playersY[2][0] +
+          MODES[games[0].mode].gameFrame.playersY[2][1]) /
+          2
       );
       const J8_PIXEL = this.getPixelColor(
         video,
         MODES[games[0].mode].gameFrame.playersX[1],
-        MODES[games[0].mode].gameFrame.playersY[3]
+        (MODES[games[0].mode].gameFrame.playersY[3][0] +
+          MODES[games[0].mode].gameFrame.playersY[3][1]) /
+          2
       );
 
       const ORANGE = new RGB(231, 123, 9);
@@ -1816,7 +2019,7 @@ export class ReplayCutterComponent implements OnInit {
 
   /**
    * This function attempts to find text present in a canvas at specific coordinates.
-   * @param video HTML DOM of the video element to be analyzed.
+   * @param source HTML DOM of the video element to be analyzed.
    * @param tesseractWorker Tesseract instance.
    * @param x1 X position of the top left corner of the rectangle to be analyzed.
    * @param y1 Y position of the top left corner of the rectangle to be analyzed.
@@ -1830,7 +2033,7 @@ export class ReplayCutterComponent implements OnInit {
    * @returns Text found by OCR.
    */
   private async getTextFromImage(
-    video: HTMLVideoElement,
+    source: CanvasImageSource,
     tesseractWorker: Tesseract.Worker,
     x1: number,
     y1: number,
@@ -1842,7 +2045,8 @@ export class ReplayCutterComponent implements OnInit {
     disableInitialScan: boolean = false,
     checker?: Function
   ): Promise<string> {
-    if (video) {
+    console.log(x1, y1, x2, y2);
+    if (source) {
       const CANVAS = document.createElement('canvas');
       const WIDTH /* number */ = x2 - x1;
       const HEIGHT /* number */ = y2 - y1;
@@ -1851,7 +2055,7 @@ export class ReplayCutterComponent implements OnInit {
       const CTX = CANVAS.getContext('2d');
       if (CTX) {
         CTX.drawImage(
-          video /* Image */,
+          source /* Image */,
           x1 /* Image X */,
           y1 /* Image Y */,
           WIDTH /* Image width */,
@@ -1870,7 +2074,7 @@ export class ReplayCutterComponent implements OnInit {
         await tesseractWorker.setParameters({
           tessedit_pageseg_mode: tesseditPagesegMode.toString() as PSM
         });
-        const TESSERACT_VALUES = [];
+        const TESSERACT_VALUES: string[] = [];
 
         if (!disableInitialScan) {
           TESSERACT_VALUES.push(
@@ -1983,7 +2187,9 @@ export class ReplayCutterComponent implements OnInit {
         }
 
         console.log(TESSERACT_VALUES);
-        const RESULT = this.arrayMostFrequent(TESSERACT_VALUES);
+        const RESULT = this.arrayMostFrequent(
+          TESSERACT_VALUES.filter((x) => x != '')
+        );
 
         return RESULT ?? '';
       }
@@ -2003,7 +2209,6 @@ export class ReplayCutterComponent implements OnInit {
     this.dialogService
       .open(EditTeamScoreDialog, {
         data: CURRENT_SCORE,
-        autoFocus: false,
         width: '400px'
       })
       .afterClosed()
@@ -2030,7 +2235,6 @@ export class ReplayCutterComponent implements OnInit {
     this.dialogService
       .open(EditTeamNameDialog, {
         data: CURRENT_NAME,
-        autoFocus: false,
         width: '400px'
       })
       .afterClosed()

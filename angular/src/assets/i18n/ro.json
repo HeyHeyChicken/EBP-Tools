@@ -34,6 +34,16 @@
       },
       "outputPath": "Cale fișier ieșire",
       "upscalePercent": "Mărire ... ({{percent}}%)",
+      "detectingPlayerNicknames": "Detectarea pseudonimelor jucătorilor...",
+      "detectingOrangeInfoZone": "Detectarea zonei de informații portocalii...",
+      "detectingBlueInfoZone": "Detectarea zonei de informații albastre...",
+      "cuttingVideo": "Tăierea videoclipului...",
+      "croppingMap": "Decuparea hărții...",
+      "croppingOrangeInfos": "Decuparea informațiilor echipei portocalii...",
+      "croppingBlueInfos": "Decuparea informațiilor echipei albastre...",
+      "uploadingMap": "Încărcarea hărții...",
+      "uploadingOrangeInfos": "Încărcarea informațiilor echipei portocalii...",
+      "uploadingBlueInfos": "Încărcarea informațiilor echipei albastre...",
       "dialog": {
         "settings": {
           "orangeTeamName": "Numele echipei portocalii",
