@@ -45,6 +45,14 @@
         "upscale": {
           "title": "Upscaling",
           "description": "Your video is in 720p, but Tools only supports 1080p.<br/>Do you want to upscale it before analysis?<br/>Be aware, this may take some time…"
+        },
+        "edit-score": {
+          "title": "Edit score",
+          "label": "Score"
+        },
+        "edit-team": {
+          "title": "Edit team name",
+          "label": "Team name"
         }
       }
     },

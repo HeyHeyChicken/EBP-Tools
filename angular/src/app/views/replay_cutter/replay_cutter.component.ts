@@ -32,7 +32,6 @@ import { ReplayCutterCropDialog } from './dialog/crop/crop.dialog';
 import { CropperPosition } from 'ngx-image-cropper';
 import { APIRestService } from '../../core/services/api-rest.service';
 import { RestGame } from './models/rest-game';
-import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
 import { IdentityService } from '../../core/services/identity.service';
 import { ReplayCutterSettingsDialog } from './dialog/settings/settings.dialog';
 import { Settings } from './models/settings';
@@ -40,6 +39,9 @@ import { ReplayCutterUpscaleConfirmationDialog } from './dialog/upscale-confirma
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { MODES } from './models/mode';
+import { EditTeamScoreDialog } from './dialog/edit-score/edit-score.dialog';
+import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
+import { EditTeamNameDialog } from './dialog/edit-team/edit-team.dialog';
 
 //#endregion
 @Component({
@@ -1987,6 +1989,60 @@ export class ReplayCutterComponent implements OnInit {
       }
     }
     return Promise.resolve('');
+  }
+
+  /**
+   * Opens a dialog to edit the score of a specific team for a given game.
+   * @param game The game object to modify.
+   * @param team The team whose score should be edited ('orange' or 'blue').
+   */
+  protected editTeamScore(game: Game, team: 'orange' | 'blue'): void {
+    const CURRENT_SCORE =
+      team === 'orange' ? game.orangeTeam.score : game.blueTeam.score;
+
+    this.dialogService
+      .open(EditTeamScoreDialog, {
+        data: CURRENT_SCORE,
+        autoFocus: false,
+        width: '400px'
+      })
+      .afterClosed()
+      .subscribe((newScore: number | undefined) => {
+        if (newScore) {
+          if (team === 'orange') {
+            game.orangeTeam.score = newScore;
+          } else {
+            game.blueTeam.score = newScore;
+          }
+        }
+      });
+  }
+
+  /**
+   * Opens a dialog to edit the name of a specific team for a given game.
+   * @param game The game object to modify.
+   * @param team The team whose name should be edited ('orange' or 'blue').
+   */
+  protected editTeamName(game: Game, team: 'orange' | 'blue'): void {
+    const CURRENT_NAME =
+      team === 'orange' ? game.orangeTeam.name : game.blueTeam.name;
+
+    this.dialogService
+      .open(EditTeamNameDialog, {
+        data: CURRENT_NAME,
+        autoFocus: false,
+        width: '400px'
+      })
+      .afterClosed()
+      .subscribe((newName: string | undefined) => {
+        if (newName) {
+          if (team === 'orange') {
+            game.orangeTeam.name = newName;
+          } else {
+            game.blueTeam.name = newName;
+          }
+        }
+      });
   }
 
   //#endregion

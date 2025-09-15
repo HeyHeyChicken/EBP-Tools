@@ -44,7 +44,15 @@
         },
         "upscale": {
           "title": "Agrandissement",
-          "description": "Votre vidéo est en 720p, mais Tools ne prend en charge que le 1080p.<br/>Voulez-vous l’upscaler avant analyse ?<br/>Attention, cela peut être long…"
+          "description": "Votre vidéo est en 720p, mais Tools ne prend en charge que le 1080p.<br/>Voulez-vous l'upscaler avant analyse ?<br/>Attention, cela peut être long…"
+        },
+        "edit-score": {
+          "title": "Modifier le score",
+          "label": "Score"
+        },
+        "edit-team": {
+          "title": "Modifier le nom de l'équipe",
+          "label": "Nom de l'équipe"
         }
       }
     },

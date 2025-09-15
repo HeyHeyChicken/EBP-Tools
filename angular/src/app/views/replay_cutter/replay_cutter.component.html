@@ -100,10 +100,22 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   </th>
                   <td class="infos">
                     <p class="orange">
-                      {{ game.orangeTeam.name }} ({{ game.orangeTeam.score }})
+                      <span (click)="editTeamName(game, 'orange')">{{
+                        game.orangeTeam.name
+                      }}</span>
+                      (<span (click)="editTeamScore(game, 'orange')">{{
+                        game.orangeTeam.score
+                      }}</span
+                      >)
                     </p>
                     <p class="blue">
-                      {{ game.blueTeam.name }} ({{ game.blueTeam.score }})
+                      <span (click)="editTeamName(game, 'blue')">{{
+                        game.blueTeam.name
+                      }}</span>
+                      (<span (click)="editTeamScore(game, 'blue')">{{
+                        game.blueTeam.score
+                      }}</span
+                      >)
                     </p>
                   </td>
                   <td class="buttons">

@@ -45,6 +45,14 @@
         "upscale": {
           "title": "Mărire",
           "description": "Videoclipul dumneavoastră este în 720p, dar Tools acceptă doar 1080p.<br/>Doriți să îl upscalați înainte de analiză?<br/>Atenție, acest proces poate dura ceva timp…"
+        },
+        "edit-score": {
+          "title": "Editează scorul",
+          "label": "Scor"
+        },
+        "edit-team": {
+          "title": "Editează numele echipei",
+          "label": "Numele echipei"
         }
       }
     },

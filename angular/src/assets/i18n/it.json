@@ -44,7 +44,15 @@
         },
         "upscale": {
           "title": "Ingrandimento",
-          "description": "Il tuo video è in 720p, ma Tools supporta solo il 1080p.<br/>Vuoi eseguirne l’upscaling prima dell’analisi?<br/>Attenzione, potrebbe richiedere del tempo…"
+          "description": "Il tuo video è in 720p, ma Tools supporta solo il 1080p.<br/>Vuoi eseguirne l'upscaling prima dell'analisi?<br/>Attenzione, potrebbe richiedere del tempo…"
+        },
+        "edit-score": {
+          "title": "Modifica punteggio",
+          "label": "Punteggio"
+        },
+        "edit-team": {
+          "title": "Modifica nome squadra",
+          "label": "Nome squadra"
         }
       }
     },

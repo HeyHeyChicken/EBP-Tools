@@ -45,6 +45,14 @@
         "upscale": {
           "title": "Ampliando",
           "description": "Su video está en 720p, pero Tools solo admite 1080p.<br/>¿Desea escalarlo antes del análisis?<br/>Atención, esto puede tardar un poco…"
+        },
+        "edit-score": {
+          "title": "Editar puntuación",
+          "label": "Puntuación"
+        },
+        "edit-team": {
+          "title": "Editar nombre del equipo",
+          "label": "Nombre del equipo"
         }
       }
     },

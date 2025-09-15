@@ -45,6 +45,14 @@
         "upscale": {
           "title": "Hochskalieren",
           "description": "Ihr Video ist in 720p, aber Tools unterstützt nur 1080p.<br/>Möchten Sie es vor der Analyse hochskalieren?<br/>Achtung, das könnte einige Zeit dauern…"
+        },
+        "edit-score": {
+          "title": "Punkte bearbeiten",
+          "label": "Punkte"
+        },
+        "edit-team": {
+          "title": "Teamnamen bearbeiten",
+          "label": "Teamname"
         }
       }
     },

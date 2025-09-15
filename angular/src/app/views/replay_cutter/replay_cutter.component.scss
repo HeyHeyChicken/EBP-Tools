@@ -213,6 +213,14 @@ table {
         .blue {
           color: variables.$blue_color;
         }
+
+        span {
+          cursor: pointer;
+
+          &:hover {
+            text-decoration: underline;
+          }
+        }
       }
 
       &.buttons {

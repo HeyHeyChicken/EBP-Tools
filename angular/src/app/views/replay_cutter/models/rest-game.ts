@@ -8,6 +8,8 @@ export interface RestGame {
   ID: number;
   tags: string[];
   date: Date;
+  orangePlayers: string[];
+  bluePlayers: string[];
 
   //#endregion
 }
