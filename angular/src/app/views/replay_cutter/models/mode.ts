@@ -178,10 +178,10 @@ export const MODES = [
       [124, 385], // orangePlayersX
       [1539, 1800], // bluePlayersX
       [
-        [732, 755],
-        [814, 838],
-        [898, 921],
-        [980, 1004]
+        [707, 732],
+        [796, 821],
+        [885, 909],
+        [974, 998]
       ] // playersY
     ),
     new LoadingFrame(
