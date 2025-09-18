@@ -63,6 +63,10 @@
         "edit-team": {
           "title": "Editează numele echipei",
           "label": "Numele echipei"
+        },
+        "check-players-order": {
+          "title": "Verifică ordinea jucătorilor",
+          "player": "Jucător"
         }
       }
     },

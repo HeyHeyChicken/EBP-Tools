@@ -63,6 +63,10 @@
         "edit-team": {
           "title": "Teamnamen bearbeiten",
           "label": "Teamname"
+        },
+        "check-players-order": {
+          "title": "Spielerreihenfolge überprüfen",
+          "player": "Spieler"
         }
       }
     },

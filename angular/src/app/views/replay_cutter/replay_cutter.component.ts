@@ -43,6 +43,7 @@ import { EditTeamScoreDialog } from './dialog/edit-score/edit-score.dialog';
 import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
 import { EditTeamNameDialog } from './dialog/edit-team/edit-team.dialog';
 import { distance } from 'fastest-levenshtein';
+import { CheckPlayersOrderDialog } from './dialog/check-players-order/check-players-order.dialog';
 
 //#endregion
 @Component({
@@ -71,10 +72,18 @@ export class ReplayCutterComponent implements OnInit {
   private settings: Settings = new Settings();
 
   protected percent: number = -1;
-  protected games: Game[] = [];
   protected inputFileDisabled: boolean = true;
-  protected videoPath: string | undefined;
   private lastDetectedGamePlayingFrame?: number;
+
+  private _videoPath: string | undefined;
+  public get videoPath(): string | undefined {
+    return this._videoPath;
+  }
+
+  private _games: Game[] = [];
+  public get games(): Game[] {
+    return this._games;
+  }
 
   private start: number = 0;
   private uploadingGameIndex: number | undefined;
@@ -102,7 +111,7 @@ export class ReplayCutterComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
-    this.videoPath = undefined;
+    this._videoPath = undefined;
     this.initServices();
 
     window.electronAPI.gameIsUploaded(() => {
@@ -115,7 +124,7 @@ export class ReplayCutterComponent implements OnInit {
     window.electronAPI.setVideoFile((path: string) => {
       this.ngZone.run(() => {
         if (path) {
-          this.videoPath = encodeURIComponent(path);
+          this._videoPath = encodeURIComponent(path);
           this.percent = 0;
         }
         this.miniMapPositionsByMap = {};
@@ -147,7 +156,7 @@ export class ReplayCutterComponent implements OnInit {
     return (
       this.identityService.supporterLevel == 0 ||
       !this.identityService.isBetaUser ||
-      !this.videoPath
+      !this._videoPath
     );
   }
 
@@ -157,7 +166,7 @@ export class ReplayCutterComponent implements OnInit {
    * @returns true if there are games and all are checked, false otherwise.
    */
   protected get allGamesChecked(): boolean {
-    return this.games.length > 0 && this.games.every((game) => game.checked);
+    return this._games.length > 0 && this._games.every((game) => game.checked);
   }
 
   /**
@@ -166,7 +175,7 @@ export class ReplayCutterComponent implements OnInit {
    * @returns true if any game is checked, false if no games are checked.
    */
   protected get someGamesChecked(): boolean {
-    return this.games.some((game) => game.checked);
+    return this._games.some((game) => game.checked);
   }
 
   /**
@@ -177,7 +186,7 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected toggleAllGames(): void {
     const SHOULD_CHECK = !this.allGamesChecked;
-    this.games.forEach((game) => (game.checked = SHOULD_CHECK));
+    this._games.forEach((game) => (game.checked = SHOULD_CHECK));
   }
 
   /**
@@ -221,9 +230,9 @@ export class ReplayCutterComponent implements OnInit {
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
     if (!this.disableUploadButton) {
       this.apiRestService.getGames(
-        this.games[gameIndex].map,
-        this.games[gameIndex].orangeTeam.score,
-        this.games[gameIndex].blueTeam.score,
+        this._games[gameIndex].map,
+        this._games[gameIndex].orangeTeam.score,
+        this._games[gameIndex].blueTeam.score,
         (games: RestGame[]) => {
           if (games.length > 0) {
             if (games.length == 1) {
@@ -249,9 +258,9 @@ export class ReplayCutterComponent implements OnInit {
           } else {
             this.translateService
               .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
-                map: this.games[gameIndex].map,
-                orangeScore: this.games[gameIndex].orangeTeam.score,
-                blueScore: this.games[gameIndex].blueTeam.score
+                map: this._games[gameIndex].map,
+                orangeScore: this._games[gameIndex].orangeTeam.score,
+                blueScore: this._games[gameIndex].blueTeam.score
               })
               .subscribe((translated: string) => {
                 this.toastrService.error(translated).onTap.subscribe(() => {
@@ -275,7 +284,7 @@ export class ReplayCutterComponent implements OnInit {
     gameIndex: number,
     gameFromStatistics: RestGame
   ): void {
-    const MAP_NAME = this.games[gameIndex].map;
+    const MAP_NAME = this._games[gameIndex].map;
 
     // Si les positions sont déjà définies pour cette map, les utiliser directement.
     if (this.miniMapPositionsByMap[MAP_NAME]) {
@@ -287,10 +296,10 @@ export class ReplayCutterComponent implements OnInit {
       return;
     }
 
-    if (this.videoPath) {
+    if (this._videoPath) {
       this.videoURLToCanvas(
-        `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
-        Math.round((this.games[gameIndex].start + 10) * 1000),
+        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+        Math.round((this._games[gameIndex].start + 10) * 1000),
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             this.uploadingGameIndex = gameIndex;
@@ -360,11 +369,11 @@ export class ReplayCutterComponent implements OnInit {
     color: RGB,
     callback: Function
   ): void {
-    if (this.videoPath) {
+    if (this._videoPath) {
       const TEAM_IS_ORANGE = color.r > 255 / 2;
       this.videoURLToCanvas(
-        `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
-        this.games[gameIndex].start * 1000,
+        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+        this._games[gameIndex].start * 1000,
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             let step = 0;
@@ -506,27 +515,29 @@ export class ReplayCutterComponent implements OnInit {
     gameFromStatistics: RestGame,
     callback: Function
   ): void {
-    if (this.videoPath) {
+    if (this._videoPath) {
       this.videoURLToCanvas(
-        `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`,
-        this.games[gameIndex].start * 1000,
+        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+        this._games[gameIndex].start * 1000,
         async (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             const ORANGE_PLAYERS_NAMES: string[] = [];
             const BLUE_PLAYERS_NAMES: string[] = [];
             for (
               let i = 0;
-              i < MODES[this.games[gameIndex].mode].gameFrame.playersY.length;
+              i < MODES[this._games[gameIndex].mode].gameFrame.playersY.length;
               i++
             ) {
               ORANGE_PLAYERS_NAMES.push(
                 await this.getTextFromImage(
                   videoFrame,
                   this.tesseractWorker_basic!,
-                  MODES[this.games[gameIndex].mode].gameFrame.orangePlayersX[0],
-                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][0],
-                  MODES[this.games[gameIndex].mode].gameFrame.orangePlayersX[1],
-                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][1],
+                  MODES[this._games[gameIndex].mode].gameFrame
+                    .orangePlayersX[0],
+                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][0],
+                  MODES[this._games[gameIndex].mode].gameFrame
+                    .orangePlayersX[1],
+                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][1],
                   7,
                   225,
                   true
@@ -536,10 +547,10 @@ export class ReplayCutterComponent implements OnInit {
                 await this.getTextFromImage(
                   videoFrame,
                   this.tesseractWorker_basic!,
-                  MODES[this.games[gameIndex].mode].gameFrame.bluePlayersX[0],
-                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][0],
-                  MODES[this.games[gameIndex].mode].gameFrame.bluePlayersX[1],
-                  MODES[this.games[gameIndex].mode].gameFrame.playersY[i][1],
+                  MODES[this._games[gameIndex].mode].gameFrame.bluePlayersX[0],
+                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][0],
+                  MODES[this._games[gameIndex].mode].gameFrame.bluePlayersX[1],
+                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][1],
                   7,
                   225,
                   true
@@ -573,7 +584,7 @@ export class ReplayCutterComponent implements OnInit {
     miniMapPositions: CropperPosition,
     gameFromStatistics: RestGame
   ): void {
-    if (this.videoPath) {
+    if (this._videoPath) {
       // We sort the list of players in the correct order.
       this.globalService.loading = this.translateService.instant(
         'view.replay_cutter.detectingPlayerNicknames'
@@ -601,16 +612,43 @@ export class ReplayCutterComponent implements OnInit {
                 gameIndex,
                 new RGB(29, 127, 255),
                 (blueTeamInfosPosition: CropperPosition) => {
-                  window.electronAPI.uploadGameMiniMap(
-                    this.games[gameIndex],
-                    miniMapPositions,
-                    decodeURIComponent(this.videoPath!),
-                    gameFromStatistics.ID,
-                    orangeTeamInfosPosition,
-                    blueTeamInfosPosition,
-                    sortedOrangePlayersNames,
-                    sortedBluePlayersNames
-                  );
+                  this.dialogService
+                    .open(CheckPlayersOrderDialog, {
+                      data: {
+                        orangePlayersNames: sortedOrangePlayersNames,
+                        bluePlayersNames: sortedBluePlayersNames,
+                        orangeTeamInfosPosition: orangeTeamInfosPosition,
+                        blueTeamInfosPosition: blueTeamInfosPosition,
+                        replayCutterComponent: this,
+                        gameIndex: gameIndex
+                      },
+                      autoFocus: false,
+                      width: '500px'
+                    })
+                    .afterClosed()
+                    .subscribe(
+                      (newData: {
+                        orangePlayersNames: string[];
+                        bluePlayersNames: string[];
+                        orangeTeamInfosPosition: CropperPosition;
+                        blueTeamInfosPosition: CropperPosition;
+                      }) => {
+                        if (newData) {
+                          window.electronAPI.uploadGameMiniMap(
+                            this._games[gameIndex],
+                            miniMapPositions,
+                            decodeURIComponent(this._videoPath!),
+                            gameFromStatistics.ID,
+                            newData.orangeTeamInfosPosition,
+                            newData.blueTeamInfosPosition,
+                            newData.orangePlayersNames,
+                            newData.bluePlayersNames
+                          );
+                        } else {
+                          this.globalService.loading = undefined;
+                        }
+                      }
+                    );
                 }
               );
             }
@@ -626,9 +664,9 @@ export class ReplayCutterComponent implements OnInit {
   protected onInputFileClick(): void {
     if (!this.inputFileDisabled) {
       this.globalService.loading = '';
-      this.videoPath = undefined;
+      this._videoPath = undefined;
       this.inputFileDisabled = true;
-      this.games = [];
+      this._games = [];
 
       window.electronAPI.openVideoFile();
     }
@@ -666,7 +704,7 @@ export class ReplayCutterComponent implements OnInit {
         this.videoTimeUpdate(event);
       }, 1000);
     } else {
-      if (this.videoPath) {
+      if (this._videoPath) {
         if (this.start == 0) {
           this.start = Date.now();
         }
@@ -685,7 +723,7 @@ export class ReplayCutterComponent implements OnInit {
               const MODE = this.detectGameScoreFrame(VIDEO);
               if (MODE >= 0) {
                 found = true;
-                if (this.games.length == 0 || this.games[0].start != -1) {
+                if (this._games.length == 0 || this._games[0].start != -1) {
                   if (MODE >= 0) {
                     const GAME: Game = new Game(MODE);
                     GAME.end = NOW;
@@ -893,17 +931,17 @@ export class ReplayCutterComponent implements OnInit {
 
                     //#endregion
 
-                    this.games.unshift(GAME);
+                    this._games.unshift(GAME);
                   }
                 } else if (
                   this.lastDetectedGamePlayingFrame &&
-                  this.games[0].start == -1
+                  this._games[0].start == -1
                 ) {
                   /*
                   console.log('SUPER SOLVE');
-                  this.games[0].start = this.lastDetectedGamePlayingFrame;
+                  this._games[0].start = this.lastDetectedGamePlayingFrame;
                   this.lastDetectedGamePlayingFrame = undefined;
-                  console.log(this.games[0].map);
+                  console.log(this._games[0].map);
                   */
                 }
               }
@@ -917,7 +955,7 @@ export class ReplayCutterComponent implements OnInit {
               if (this.detectGameEndFrame(VIDEO)) {
                 found = true;
 
-                if (this.games.length == 0 || this.games[0].start != -1) {
+                if (this._games.length == 0 || this._games[0].start != -1) {
                   const GAME: Game = new Game(1);
                   GAME.end = NOW;
 
@@ -955,16 +993,16 @@ export class ReplayCutterComponent implements OnInit {
                     }
                   }
 
-                  this.games.unshift(GAME);
+                  this._games.unshift(GAME);
                 } else if (
                   this.lastDetectedGamePlayingFrame &&
-                  this.games[0].start == -1
+                  this._games[0].start == -1
                 ) {
                   /*
                   console.log('SUPER SOLVE 2222222222222');
-                  this.games[0].start = this.lastDetectedGamePlayingFrame;
+                  this._games[0].start = this.lastDetectedGamePlayingFrame;
                   this.lastDetectedGamePlayingFrame = undefined;
-                  console.log(this.games[0].map);
+                  console.log(this._games[0].map);
                   */
                 }
               }
@@ -975,21 +1013,21 @@ export class ReplayCutterComponent implements OnInit {
             //#region Détéction du début d'une game
 
             if (!found) {
-              if (this.detectGameLoadingFrame(VIDEO, this.games)) {
+              if (this.detectGameLoadingFrame(VIDEO, this._games)) {
                 found = true;
                 this.lastDetectedGamePlayingFrame = undefined;
-                this.games[0].start =
+                this._games[0].start =
                   NOW + 2 /* On vire le bout de loader de map. */;
               }
             }
 
             if (!found) {
-              if (this.detectGameIntro(VIDEO, this.games)) {
+              if (this.detectGameIntro(VIDEO, this._games)) {
                 found = true;
                 this.lastDetectedGamePlayingFrame = undefined;
-                this.games[0].start =
+                this._games[0].start =
                   NOW + 2 /* On vire le bout d'animation de map. */;
-                console.log(this.games[0].map);
+                console.log(this._games[0].map);
               }
             }
 
@@ -998,17 +1036,17 @@ export class ReplayCutterComponent implements OnInit {
             //#region Detecting card name during game.
 
             if (!found) {
-              if (this.detectGamePlaying(VIDEO, this.games)) {
+              if (this.detectGamePlaying(VIDEO, this._games)) {
                 this.lastDetectedGamePlayingFrame = NOW;
                 // On cherche le nom de la carte.
-                if (this.games[0].map == '') {
+                if (this._games[0].map == '') {
                   const TEXT /* string */ = await this.getTextFromImage(
                     VIDEO,
                     this.tesseractWorker_letter!,
-                    MODES[this.games[0].mode].gameFrame.map[0].x,
-                    MODES[this.games[0].mode].gameFrame.map[0].y,
-                    MODES[this.games[0].mode].gameFrame.map[1].x,
-                    MODES[this.games[0].mode].gameFrame.map[1].y,
+                    MODES[this._games[0].mode].gameFrame.map[0].x,
+                    MODES[this._games[0].mode].gameFrame.map[0].y,
+                    MODES[this._games[0].mode].gameFrame.map[1].x,
+                    MODES[this._games[0].mode].gameFrame.map[1].y,
                     7,
                     225,
                     true
@@ -1016,65 +1054,65 @@ export class ReplayCutterComponent implements OnInit {
 
                   if (TEXT) {
                     found = true;
-                    if (this.games[0].map == '') {
+                    if (this._games[0].map == '') {
                       const MAP_NAME /* string */ = this.getMapByName(TEXT);
-                      this.games[0].map = MAP_NAME;
-                      console.log('----- ', this.games[0].map);
+                      this._games[0].map = MAP_NAME;
+                      console.log('----- ', this._games[0].map);
                     }
                   }
                 }
 
                 // We are looking for the name of the orange team.
-                if (this.games[0].orangeTeam.name == '') {
+                if (this._games[0].orangeTeam.name == '') {
                   const TEXT /* string */ = await this.getTextFromImage(
                     VIDEO,
                     this.tesseractWorker_basic!,
-                    MODES[this.games[0].mode].gameFrame.orangeName[0].x,
-                    MODES[this.games[0].mode].gameFrame.orangeName[0].y,
-                    MODES[this.games[0].mode].gameFrame.orangeName[1].x,
-                    MODES[this.games[0].mode].gameFrame.orangeName[1].y,
+                    MODES[this._games[0].mode].gameFrame.orangeName[0].x,
+                    MODES[this._games[0].mode].gameFrame.orangeName[0].y,
+                    MODES[this._games[0].mode].gameFrame.orangeName[1].x,
+                    MODES[this._games[0].mode].gameFrame.orangeName[1].y,
                     6
                   );
                   if (TEXT && TEXT.length >= 2) {
                     found = true;
-                    if (this.games[0].orangeTeam.name == '') {
-                      this.games[0].orangeTeam.name = TEXT.toUpperCase();
+                    if (this._games[0].orangeTeam.name == '') {
+                      this._games[0].orangeTeam.name = TEXT.toUpperCase();
                     }
                   }
                 }
 
                 // We are looking for the name of the blue team.
-                if (this.games[0].blueTeam.name == '') {
+                if (this._games[0].blueTeam.name == '') {
                   const TEXT /* string */ = await this.getTextFromImage(
                     VIDEO,
                     this.tesseractWorker_basic!,
-                    MODES[this.games[0].mode].gameFrame.blueName[0].x,
-                    MODES[this.games[0].mode].gameFrame.blueName[0].y,
-                    MODES[this.games[0].mode].gameFrame.blueName[1].x,
-                    MODES[this.games[0].mode].gameFrame.blueName[1].y,
+                    MODES[this._games[0].mode].gameFrame.blueName[0].x,
+                    MODES[this._games[0].mode].gameFrame.blueName[0].y,
+                    MODES[this._games[0].mode].gameFrame.blueName[1].x,
+                    MODES[this._games[0].mode].gameFrame.blueName[1].y,
                     6
                   );
                   if (TEXT && TEXT.length >= 2) {
                     found = true;
-                    if (this.games[0].blueTeam.name == '') {
-                      this.games[0].blueTeam.name = TEXT.toUpperCase();
+                    if (this._games[0].blueTeam.name == '') {
+                      this._games[0].blueTeam.name = TEXT.toUpperCase();
                     }
                   }
                 }
 
                 if (
-                  this.games[0].orangeTeam.name &&
-                  this.games[0].blueTeam.name &&
-                  this.games[0].map
+                  this._games[0].orangeTeam.name &&
+                  this._games[0].blueTeam.name &&
+                  this._games[0].map
                 ) {
-                  if (!this.games[0].__debug__jumped) {
+                  if (!this._games[0].__debug__jumped) {
                     const TEXT /* string */ = await this.getTextFromImage(
                       VIDEO,
                       this.tesseractWorker_time!,
-                      MODES[this.games[0].mode].gameFrame.timer[0].x,
-                      MODES[this.games[0].mode].gameFrame.timer[0].y,
-                      MODES[this.games[0].mode].gameFrame.timer[1].x,
-                      MODES[this.games[0].mode].gameFrame.timer[1].y,
+                      MODES[this._games[0].mode].gameFrame.timer[0].x,
+                      MODES[this._games[0].mode].gameFrame.timer[0].y,
+                      MODES[this._games[0].mode].gameFrame.timer[1].x,
+                      MODES[this._games[0].mode].gameFrame.timer[1].y,
                       7
                     );
                     if (TEXT) {
@@ -1087,8 +1125,8 @@ export class ReplayCutterComponent implements OnInit {
                           (this.settings.maxTimePerGame - MINUTES) * 60 -
                           SECONDES;
                         if (MINUTES <= 9) {
-                          if (!this.games[0].__debug__jumped) {
-                            this.games[0].__debug__jumped = true;
+                          if (!this._games[0].__debug__jumped) {
+                            this._games[0].__debug__jumped = true;
                             console.log(
                               `Jumping to the game's start ! (${MINUTES}:${SECONDES}) (${NOW - DIFFERENCE})`
                             );
@@ -1097,7 +1135,7 @@ export class ReplayCutterComponent implements OnInit {
                             this.setVideoCurrentTime(
                               VIDEO,
                               NOW - DIFFERENCE,
-                              this.games
+                              this._games
                             );
                             return;
                           }
@@ -1111,9 +1149,9 @@ export class ReplayCutterComponent implements OnInit {
 
             //#endregion
 
-            this.setVideoCurrentTime(VIDEO, NOW - DEFAULT_STEP, this.games);
+            this.setVideoCurrentTime(VIDEO, NOW - DEFAULT_STEP, this._games);
           } else {
-            this.onVideoEnded(this.games);
+            this.onVideoEnded(this._games);
 
             const DIFFERENCE = Date.now() - this.start;
             const MINUTES = Math.floor(DIFFERENCE / 60000);
@@ -1356,8 +1394,6 @@ export class ReplayCutterComponent implements OnInit {
   /**
    * This function is executed when the video scan is complete.
    * @param games List of detected games.
-   * @param videoPath Path of the analyzed video file.
-   * @param discordServerURL EBP Discord server URL.
    */
   private onVideoEnded(games: Game[]): void {
     this.percent = -1;
@@ -1377,7 +1413,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param game Game to cut.
    */
   protected async save(game: Game): Promise<void> {
-    if (this.videoPath === undefined) {
+    if (this._videoPath === undefined) {
       this.translateService
         .get('view.replay_cutter.toast.videoFileNotFound')
         .subscribe((translated: string) => {
@@ -1388,7 +1424,7 @@ export class ReplayCutterComponent implements OnInit {
     this.globalService.loading = '';
     const FILE_PATH = await window.electronAPI.cutVideoFile(
       game,
-      decodeURIComponent(this.videoPath),
+      decodeURIComponent(this._videoPath),
       this.settings.freeText
     );
     this.globalService.loading = undefined;
@@ -1405,7 +1441,7 @@ export class ReplayCutterComponent implements OnInit {
    * This function allows the user to cut all games with a single click.
    */
   protected async saveAll(): Promise<void> {
-    if (this.videoPath === undefined) {
+    if (this._videoPath === undefined) {
       this.translateService
         .get('view.replay_cutter.toast.videoFileNotFound')
         .subscribe((translated: string) => {
@@ -1415,8 +1451,8 @@ export class ReplayCutterComponent implements OnInit {
     }
     this.globalService.loading = '';
     const FILE_PATH = await window.electronAPI.cutVideoFiles(
-      this.games.filter((game) => game.checked),
-      decodeURIComponent(this.videoPath),
+      this._games.filter((game) => game.checked),
+      decodeURIComponent(this._videoPath),
       this.settings.freeText
     );
 
@@ -1435,7 +1471,7 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected copyTimeCodes(): void {
     let result = '';
-    this.games
+    this._games
       .filter((game) => game.checked)
       .forEach((game) => {
         result += `${game.readableStart} ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map}\n`;
@@ -1788,11 +1824,10 @@ export class ReplayCutterComponent implements OnInit {
     return CANVAS;
   }
 
-  private videoURLToCanvas(
+  public videoURLToCanvas(
     url: string,
     timeMs: number,
-    callback: (video?: HTMLCanvasElement) => void,
-    onError?: (err: Error) => void
+    callback: (video?: HTMLCanvasElement) => void
   ): void {
     const VIDEO = document.createElement('video');
     VIDEO.src = url;
@@ -2045,7 +2080,6 @@ export class ReplayCutterComponent implements OnInit {
     disableInitialScan: boolean = false,
     checker?: Function
   ): Promise<string> {
-    console.log(x1, y1, x2, y2);
     if (source) {
       const CANVAS = document.createElement('canvas');
       const WIDTH /* number */ = x2 - x1;

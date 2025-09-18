@@ -1,0 +1,105 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<form (submit)="dialogRef.close(value)">
+  <h2 mat-dialog-title>
+    {{ 'view.replay_cutter.dialog.check-players-order.title' | translate }}
+  </h2>
+
+  <mat-dialog-content>
+    <ebp-row>
+      <ebp-column [xs]="6">
+        <div class="canvasContainer">
+          <canvas #canvasOrangeRef></canvas>
+        </div>
+      </ebp-column>
+      <ebp-column [xs]="6">
+        @for(player of data.orangePlayersNames; track $index){
+        <mat-form-field class="orange">
+          <mat-label
+            >{{ 'view.replay_cutter.dialog.check-players-order.player' |
+            translate }} {{$index + 1}}</mat-label
+          >
+          <input
+            matInput
+            readonly=""
+            type="text"
+            value="{{player}}"
+            #orangeInput
+          />
+          <div class="buttons">
+            <button
+              type="button"
+              [disabled]="$index == 0"
+              (click)="movePlayerUp('orange', $index)"
+            >
+              <i class="fa-sharp fa-solid fa-chevron-up"></i>
+            </button>
+            <button
+              type="button"
+              [disabled]="$index == data.orangePlayersNames.length - 1"
+              (click)="movePlayerDown('orange', $index)"
+            >
+              <i class="fa-sharp fa-solid fa-chevron-down"></i>
+            </button>
+          </div>
+        </mat-form-field>
+        }
+      </ebp-column>
+    </ebp-row>
+    <hr />
+    <ebp-row>
+      <ebp-column [xs]="6">
+        <div class="canvasContainer">
+          <canvas #canvasBlueRef></canvas>
+        </div>
+      </ebp-column>
+      <ebp-column [xs]="6">
+        @for(player of data.bluePlayersNames; track $index){
+        <mat-form-field class="blue">
+          <mat-label
+            >{{ 'view.replay_cutter.dialog.check-players-order.player' |
+            translate }} {{$index + 6}}</mat-label
+          >
+          <input
+            matInput
+            readonly=""
+            type="text"
+            value="{{player}}"
+            #blueInput
+          />
+          <div class="buttons">
+            <button
+              type="button"
+              [disabled]="$index == 0"
+              (click)="movePlayerUp('blue', $index)"
+            >
+              <i class="fa-sharp fa-solid fa-chevron-up"></i>
+            </button>
+            <button
+              type="button"
+              [disabled]="$index == data.bluePlayersNames.length - 1"
+              (click)="movePlayerDown('blue', $index)"
+            >
+              <i class="fa-sharp fa-solid fa-chevron-down"></i>
+            </button>
+          </div>
+        </mat-form-field>
+        }
+      </ebp-column>
+    </ebp-row>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-dialog-close>
+      <i class="fa-sharp fa-solid fa-xmark"></i>{{ 'common.cancel' | translate
+      }}
+    </button>
+    <button class="ml-2 green" type="submit">
+      <i class="fa-sharp fa-solid fa-check"></i>{{ 'common.ok' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

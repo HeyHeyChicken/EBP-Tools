@@ -63,6 +63,10 @@
         "edit-team": {
           "title": "Editar nombre del equipo",
           "label": "Nombre del equipo"
+        },
+        "check-players-order": {
+          "title": "Verificar orden de los jugadores",
+          "player": "Jugador"
         }
       }
     },
