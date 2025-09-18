@@ -67,6 +67,10 @@
         "check-players-order": {
           "title": "Verifică ordinea jucătorilor",
           "player": "Jucător"
+        },
+        "replay-uploaded": {
+          "title": "Replay trimis pentru analiză AI",
+          "description": "Replay-ul a fost trimis pentru analiză la AI-ul EBP.<br/>Vei primi un email de confirmare când totul va fi analizat."
         }
       }
     },

@@ -44,6 +44,7 @@ import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.d
 import { EditTeamNameDialog } from './dialog/edit-team/edit-team.dialog';
 import { distance } from 'fastest-levenshtein';
 import { CheckPlayersOrderDialog } from './dialog/check-players-order/check-players-order.dialog';
+import { ReplayUploadedDialog } from './dialog/replay-uploaded/replay-uploaded.dialog';
 
 //#endregion
 @Component({
@@ -86,7 +87,6 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   private start: number = 0;
-  private uploadingGameIndex: number | undefined;
 
   private tesseractWorker_basic: Tesseract.Worker | undefined;
   private tesseractWorker_number: Tesseract.Worker | undefined;
@@ -117,6 +117,7 @@ export class ReplayCutterComponent implements OnInit {
     window.electronAPI.gameIsUploaded(() => {
       this.ngZone.run(() => {
         this.globalService.loading = undefined;
+        this.dialogService.open(ReplayUploadedDialog);
       });
     });
 
@@ -302,7 +303,6 @@ export class ReplayCutterComponent implements OnInit {
         Math.round((this._games[gameIndex].start + 10) * 1000),
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
-            this.uploadingGameIndex = gameIndex;
             const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
             this.dialogService
               .open(ReplayCutterCropDialog, {

@@ -208,10 +208,11 @@ export class CheckPlayersOrderDialog implements AfterViewInit {
    */
   private focusOnInput(team: 'orange' | 'blue', index: number): void {
     setTimeout(() => {
-      const inputs = team === 'orange' ? this.orangeInputs : this.blueInputs;
-      const inputArray = inputs?.toArray();
-      if (inputArray && inputArray[index]) {
-        inputArray[index].nativeElement.focus();
+      const INPUTS = (
+        team === 'orange' ? this.orangeInputs : this.blueInputs
+      )?.toArray();
+      if (INPUTS && INPUTS[index]) {
+        INPUTS[index].nativeElement.focus();
       }
     });
   }

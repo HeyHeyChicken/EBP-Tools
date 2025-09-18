@@ -67,6 +67,10 @@
         "check-players-order": {
           "title": "Vérifier l'ordre des joueurs",
           "player": "Joueur"
+        },
+        "replay-uploaded": {
+          "title": "Replay envoyé pour analyse à l'IA",
+          "description": "Le replay a été envoyé pour analyse à l'IA d'EBP.<br/>Vous recevrez un email de confirmation lorsque tout aura été analysé."
         }
       }
     },

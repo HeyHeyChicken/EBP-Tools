@@ -1,0 +1,24 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+<h2 mat-dialog-title>
+  {{ 'view.replay_cutter.dialog.replay-uploaded.title' | translate }}
+</h2>
+
+<mat-dialog-content>
+  <ebp-row>
+    <ebp-column
+      [xs]="12"
+      innerHTML="{{ 'view.replay_cutter.dialog.replay-uploaded.description' | translate }}"
+    >
+    </ebp-column>
+  </ebp-row>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-dialog-close>
+    <i class="fa-sharp fa-solid fa-check"></i>{{ 'common.ok' | translate }}
+  </button>
+</mat-dialog-actions>

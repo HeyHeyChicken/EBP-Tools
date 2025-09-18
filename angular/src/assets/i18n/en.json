@@ -67,6 +67,10 @@
         "check-players-order": {
           "title": "Check players order",
           "player": "Player"
+        },
+        "replay-uploaded": {
+          "title": "Replay sent for AI analysis",
+          "description": "The replay has been sent for analysis to EBP's AI.<br/>You will receive a confirmation email when everything has been analyzed."
         }
       }
     },
