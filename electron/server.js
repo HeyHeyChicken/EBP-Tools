@@ -247,6 +247,7 @@ let projectLatestVersion /* string */ = '';
         gameID,
         sortedOrangePlayersNames,
         sortedBluePlayersNames,
+        gameStart,
         callback
     ) {
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
@@ -269,7 +270,8 @@ let projectLatestVersion /* string */ = '';
 
         const REQUEST_BODY = JSON.stringify({
             orangePlayersNames: sortedOrangePlayersNames,
-            bluePlayersNames: sortedBluePlayersNames
+            bluePlayersNames: sortedBluePlayersNames,
+            gameStart: gameStart
         });
 
         const REQUEST = https.request(OPTIONS, (res) => {
@@ -1357,6 +1359,8 @@ let projectLatestVersion /* string */ = '';
                                                                                 gameID,
                                                                                 sortedOrangePlayersNames,
                                                                                 sortedBluePlayersNames,
+                                                                                game._start *
+                                                                                    1000,
                                                                                 () => {
                                                                                     mainWindow.webContents.send(
                                                                                         'game-is-uploaded'
