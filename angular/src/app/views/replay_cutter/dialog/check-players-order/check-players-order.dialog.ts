@@ -87,7 +87,7 @@ export class CheckPlayersOrderDialog implements AfterViewInit {
       Math.round(
         (this.data.replayCutterComponent.games[this.data.gameIndex].start +
           10) *
-          10000
+          1000
       ),
       (videoFrame?: HTMLCanvasElement) => {
         if (videoFrame) {
