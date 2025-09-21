@@ -66,6 +66,7 @@ export interface ElectronAPI {
     gameID: number,
     orangeTeamInfosPosition: CropperPosition,
     blueTeamInfosPosition: CropperPosition,
+    topInfosPosition: CropperPosition,
     sortedOrangePlayersNames: string[],
     sortedBluePlayersNames: string[]
   ) => void;

@@ -1260,6 +1260,7 @@ let projectLatestVersion /* string */ = '';
                 gameID,
                 orangeTeamInfosPosition,
                 blueTeamInfosPosition,
+                topInfosPosition,
                 sortedOrangePlayersNames,
                 sortedBluePlayersNames
             ) => {
@@ -1306,75 +1307,103 @@ let projectLatestVersion /* string */ = '';
                                             blueTeamInfosPosition,
                                             'temp4'
                                         ).then((croppedBlueInfosPath) => {
-                                            // We delete the cut video.
-                                            unlinkSync(cuttedPath);
-
-                                            // We retrieve the link allowing the video to be uploaded.
-                                            getVideoUploadURLs(
-                                                gameID,
-                                                (videoUploadURLs) => {
-                                                    // We upload the minimap video...
-                                                    mainWindow.webContents.send(
-                                                        'global-message',
-                                                        'view.replay_cutter.uploadingMap'
-                                                    );
-                                                    uploadVideo(
-                                                        videoUploadURLs[0],
-                                                        croppedMapPath,
-                                                        () => {
-                                                            // We delete the cropped video.
-                                                            unlinkSync(
-                                                                croppedMapPath
-                                                            );
-
-                                                            // We upload the orange infos video...
-                                                            mainWindow.webContents.send(
-                                                                'global-message',
-                                                                'view.replay_cutter.uploadingOrangeInfos'
-                                                            );
-                                                            uploadVideo(
-                                                                videoUploadURLs[1],
-                                                                croppedOrangeInfosPath,
-                                                                () => {
-                                                                    // We delete the cropped video.
-                                                                    unlinkSync(
-                                                                        croppedOrangeInfosPath
-                                                                    );
-
-                                                                    // We upload the blue infos video...
-                                                                    mainWindow.webContents.send(
-                                                                        'global-message',
-                                                                        'view.replay_cutter.uploadingBlueInfos'
-                                                                    );
-                                                                    uploadVideo(
-                                                                        videoUploadURLs[2],
-                                                                        croppedBlueInfosPath,
-                                                                        () => {
-                                                                            // We delete the cropped video.
-                                                                            unlinkSync(
-                                                                                croppedBlueInfosPath
-                                                                            );
-
-                                                                            setVideoAsUploaded(
-                                                                                gameID,
-                                                                                sortedOrangePlayersNames,
-                                                                                sortedBluePlayersNames,
-                                                                                game._start *
-                                                                                    1000,
-                                                                                () => {
-                                                                                    mainWindow.webContents.send(
-                                                                                        'game-is-uploaded'
-                                                                                    );
-                                                                                }
-                                                                            );
-                                                                        }
-                                                                    );
-                                                                }
-                                                            );
-                                                        }
-                                                    );
-                                                }
+                                            // We crop the top infos of the video...
+                                            mainWindow.webContents.send(
+                                                'global-message',
+                                                'view.replay_cutter.croppingTopInfos'
                                             );
+                                            cropVideoFile(
+                                                game,
+                                                cuttedPath,
+                                                topInfosPosition,
+                                                'temp5'
+                                            ).then((croppedTopInfosPath) => {
+                                                // We delete the cut video.
+                                                unlinkSync(cuttedPath);
+
+                                                // We retrieve the link allowing the video to be uploaded.
+                                                getVideoUploadURLs(
+                                                    gameID,
+                                                    (videoUploadURLs) => {
+                                                        // We upload the minimap video...
+                                                        mainWindow.webContents.send(
+                                                            'global-message',
+                                                            'view.replay_cutter.uploadingMap'
+                                                        );
+                                                        uploadVideo(
+                                                            videoUploadURLs[0],
+                                                            croppedMapPath,
+                                                            () => {
+                                                                // We delete the cropped video.
+                                                                unlinkSync(
+                                                                    croppedMapPath
+                                                                );
+
+                                                                // We upload the orange infos video...
+                                                                mainWindow.webContents.send(
+                                                                    'global-message',
+                                                                    'view.replay_cutter.uploadingOrangeInfos'
+                                                                );
+                                                                uploadVideo(
+                                                                    videoUploadURLs[1],
+                                                                    croppedOrangeInfosPath,
+                                                                    () => {
+                                                                        // We delete the cropped video.
+                                                                        unlinkSync(
+                                                                            croppedOrangeInfosPath
+                                                                        );
+
+                                                                        // We upload the blue infos video...
+                                                                        mainWindow.webContents.send(
+                                                                            'global-message',
+                                                                            'view.replay_cutter.uploadingBlueInfos'
+                                                                        );
+                                                                        uploadVideo(
+                                                                            videoUploadURLs[2],
+                                                                            croppedBlueInfosPath,
+                                                                            () => {
+                                                                                // We delete the cropped video.
+                                                                                unlinkSync(
+                                                                                    croppedBlueInfosPath
+                                                                                );
+
+                                                                                // We upload the top infos video...
+                                                                                mainWindow.webContents.send(
+                                                                                    'global-message',
+                                                                                    'view.replay_cutter.uploadingTopInfos'
+                                                                                );
+                                                                                uploadVideo(
+                                                                                    videoUploadURLs[3],
+                                                                                    croppedTopInfosPath,
+                                                                                    () => {
+                                                                                        // We delete the cropped video.
+                                                                                        unlinkSync(
+                                                                                            croppedTopInfosPath
+                                                                                        );
+
+                                                                                        setVideoAsUploaded(
+                                                                                            gameID,
+                                                                                            sortedOrangePlayersNames,
+                                                                                            sortedBluePlayersNames,
+                                                                                            game._start *
+                                                                                                1000,
+                                                                                            () => {
+                                                                                                mainWindow.webContents.send(
+                                                                                                    'game-is-uploaded'
+                                                                                                );
+                                                                                            }
+                                                                                        );
+                                                                                    }
+                                                                                );
+                                                                            }
+                                                                        );
+                                                                    }
+                                                                );
+                                                            }
+                                                        );
+                                                    }
+                                                );
+                                            });
                                         });
                                     });
                                 });

@@ -634,6 +634,14 @@ export class ReplayCutterComponent implements OnInit {
                         blueTeamInfosPosition: CropperPosition;
                       }) => {
                         if (newData) {
+                          const TOP_INFOS_WIDTH: number = 556;
+                          const TOP_INFOS_HEIGHT: number = 78;
+                          const TOP_INFOS_POSITION: CropperPosition = {
+                            x1: (1920 - TOP_INFOS_WIDTH) / 2,
+                            y1: 0,
+                            x2: (1920 + TOP_INFOS_WIDTH) / 2,
+                            y2: TOP_INFOS_HEIGHT
+                          };
                           window.electronAPI.uploadGameMiniMap(
                             this._games[gameIndex],
                             miniMapPositions,
@@ -641,6 +649,7 @@ export class ReplayCutterComponent implements OnInit {
                             gameFromStatistics.ID,
                             newData.orangeTeamInfosPosition,
                             newData.blueTeamInfosPosition,
+                            TOP_INFOS_POSITION,
                             newData.orangePlayersNames,
                             newData.bluePlayersNames
                           );

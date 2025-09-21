@@ -40,9 +40,11 @@
       "cuttingVideo": "Cutting video...",
       "croppingMap": "Cropping map...",
       "croppingOrangeInfos": "Cropping orange team infos...",
+      "croppingTopInfos": "Cropping general infos...",
       "croppingBlueInfos": "Cropping blue team infos...",
       "uploadingMap": "Uploading map...",
       "uploadingOrangeInfos": "Uploading orange team infos...",
+      "uploadingTopInfos": "Uploading general infos...",
       "uploadingBlueInfos": "Uploading blue team infos...",
       "dialog": {
         "settings": {

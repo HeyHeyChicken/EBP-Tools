@@ -40,9 +40,11 @@
       "cuttingVideo": "Taglio video...",
       "croppingMap": "Ritaglio mappa...",
       "croppingOrangeInfos": "Ritaglio informazioni squadra arancione...",
+      "croppingTopInfos": "Ritaglio informazioni generali...",
       "croppingBlueInfos": "Ritaglio informazioni squadra blu...",
       "uploadingMap": "Caricamento mappa...",
       "uploadingOrangeInfos": "Caricamento informazioni squadra arancione...",
+      "uploadingTopInfos": "Caricamento informazioni generali...",
       "uploadingBlueInfos": "Caricamento informazioni squadra blu...",
       "dialog": {
         "settings": {

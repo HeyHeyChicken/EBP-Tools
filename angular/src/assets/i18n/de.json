@@ -40,9 +40,11 @@
       "cuttingVideo": "Video wird geschnitten...",
       "croppingMap": "Karte wird zugeschnitten...",
       "croppingOrangeInfos": "Zuschneiden der orangenen Team-Informationen...",
+      "croppingTopInfos": "Zuschneiden der allgemeinen Informationen...",
       "croppingBlueInfos": "Zuschneiden der blauen Team-Informationen...",
       "uploadingMap": "Karte wird hochgeladen...",
       "uploadingOrangeInfos": "Orangene Team-Informationen werden hochgeladen...",
+      "uploadingTopInfos": "Allgemeine Informationen werden hochgeladen...",
       "uploadingBlueInfos": "Blaue Team-Informationen werden hochgeladen...",
       "dialog": {
         "settings": {

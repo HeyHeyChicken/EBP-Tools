@@ -40,9 +40,11 @@
       "cuttingVideo": "Tăierea videoclipului...",
       "croppingMap": "Decuparea hărții...",
       "croppingOrangeInfos": "Decuparea informațiilor echipei portocalii...",
+      "croppingTopInfos": "Decuparea informațiilor generale...",
       "croppingBlueInfos": "Decuparea informațiilor echipei albastre...",
       "uploadingMap": "Încărcarea hărții...",
       "uploadingOrangeInfos": "Încărcarea informațiilor echipei portocalii...",
+      "uploadingTopInfos": "Încărcarea informațiilor generale...",
       "uploadingBlueInfos": "Încărcarea informațiilor echipei albastre...",
       "dialog": {
         "settings": {

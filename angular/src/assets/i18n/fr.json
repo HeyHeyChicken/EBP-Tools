@@ -40,9 +40,11 @@
       "cuttingVideo": "Découpage de la vidéo...",
       "croppingMap": "Recadrage de la map...",
       "croppingOrangeInfos": "Recadrage des infos de l'équipe orange...",
+      "croppingTopInfos": "Recadrage des infos générales...",
       "croppingBlueInfos": "Recadrage des infos de l'équipe bleue...",
       "uploadingMap": "Téléversement de la map...",
       "uploadingOrangeInfos": "Téléversement des infos de l'équipe orange...",
+      "uploadingTopInfos": "Téléversement des infos générales...",
       "uploadingBlueInfos": "Téléversement des infos de l'équipe bleue...",
       "dialog": {
         "settings": {

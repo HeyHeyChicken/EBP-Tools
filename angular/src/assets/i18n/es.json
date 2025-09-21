@@ -40,9 +40,11 @@
       "cuttingVideo": "Cortando video...",
       "croppingMap": "Recortando mapa...",
       "croppingOrangeInfos": "Recortando información del equipo naranja...",
+      "croppingTopInfos": "Recortando información general...",
       "croppingBlueInfos": "Recortando información del equipo azul...",
       "uploadingMap": "Subiendo mapa...",
       "uploadingOrangeInfos": "Subiendo información del equipo naranja...",
+      "uploadingTopInfos": "Subiendo información general...",
       "uploadingBlueInfos": "Subiendo información del equipo azul...",
       "dialog": {
         "settings": {
