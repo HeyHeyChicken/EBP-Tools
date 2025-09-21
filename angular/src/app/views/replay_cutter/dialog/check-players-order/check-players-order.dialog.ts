@@ -32,7 +32,7 @@ import { GlobalService } from '../../../../core/services/global.service';
 //#endregion
 
 @Component({
-  selector: 'app-check-players-order-dialog',
+  selector: 'replay-cutter-dialog-check-players-order',
   templateUrl: './check-players-order.dialog.html',
   styleUrls: ['./check-players-order.dialog.scss'],
   standalone: true,

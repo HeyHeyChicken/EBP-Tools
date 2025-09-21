@@ -15,7 +15,7 @@ import { IdentityService } from '../../../../core/services/identity.service';
 //#endregion
 
 @Component({
-  selector: 'app-replay-uploaded-dialog',
+  selector: 'replay-cutter-dialog-replay-uploaded',
   templateUrl: './replay-uploaded.dialog.html',
   standalone: true,
   imports: [

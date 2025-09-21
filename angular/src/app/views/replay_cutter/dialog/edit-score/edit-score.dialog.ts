@@ -21,7 +21,7 @@ import { GridModule } from '../../../../shared/grid/grid.module';
 //#endregion
 
 @Component({
-  selector: 'app-edit-score-dialog',
+  selector: 'replay-cutter-dialog-edit-score',
   templateUrl: './edit-score.dialog.html',
   standalone: true,
   imports: [

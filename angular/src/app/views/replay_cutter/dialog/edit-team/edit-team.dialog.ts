@@ -21,7 +21,7 @@ import { GridModule } from '../../../../shared/grid/grid.module';
 //#endregion
 
 @Component({
-  selector: 'app-edit-team-dialog',
+  selector: 'replay-cutter-dialog-edit-team-name',
   templateUrl: './edit-team.dialog.html',
   styleUrls: ['./edit-team.dialog.scss'],
   standalone: true,
