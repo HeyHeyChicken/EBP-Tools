@@ -26,6 +26,6 @@ import { IdentityService } from '../../../../core/services/identity.service';
     GridModule
   ]
 })
-export class ReplayUploadedDialog {
+export class ReplayCutterReplayUploadedDialog {
   constructor(protected readonly identityService: IdentityService) {}
 }

@@ -36,7 +36,7 @@ import { GridModule } from '../../../../shared/grid/grid.module';
     GridModule
   ]
 })
-export class EditTeamNameDialog {
+export class ReplayCutterEditTeamNameDialog {
   //#region Attributes
 
   protected value: string;
@@ -44,7 +44,7 @@ export class EditTeamNameDialog {
   //#endregion
 
   constructor(
-    public readonly dialogRef: MatDialogRef<EditTeamNameDialog>,
+    public readonly dialogRef: MatDialogRef<ReplayCutterEditTeamNameDialog>,
     @Inject(MAT_DIALOG_DATA) public readonly data: string
   ) {
     this.value = data;

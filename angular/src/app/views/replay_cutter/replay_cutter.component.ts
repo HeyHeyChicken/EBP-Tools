@@ -39,12 +39,12 @@ import { ReplayCutterUpscaleConfirmationDialog } from './dialog/upscale-confirma
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { MODES } from './models/mode';
-import { EditTeamScoreDialog } from './dialog/edit-score/edit-score.dialog';
+import { ReplayCutterEditTeamScoreDialog } from './dialog/edit-score/edit-score.dialog';
 import { ReplayCutterAttachGameDialog } from './dialog/attach-game/attach-game.dialog';
-import { EditTeamNameDialog } from './dialog/edit-team/edit-team.dialog';
+import { ReplayCutterEditTeamNameDialog } from './dialog/edit-team/edit-team.dialog';
 import { distance } from 'fastest-levenshtein';
-import { CheckPlayersOrderDialog } from './dialog/check-players-order/check-players-order.dialog';
-import { ReplayUploadedDialog } from './dialog/replay-uploaded/replay-uploaded.dialog';
+import { ReplayCutterCheckPlayersOrderDialog } from './dialog/check-players-order/check-players-order.dialog';
+import { ReplayCutterReplayUploadedDialog } from './dialog/replay-uploaded/replay-uploaded.dialog';
 
 //#endregion
 @Component({
@@ -132,7 +132,7 @@ export class ReplayCutterComponent implements OnInit {
     window.electronAPI.gameIsUploaded(() => {
       this.ngZone.run(() => {
         this.globalService.loading = undefined;
-        this.dialogService.open(ReplayUploadedDialog);
+        this.dialogService.open(ReplayCutterReplayUploadedDialog);
       });
     });
 
@@ -642,7 +642,7 @@ export class ReplayCutterComponent implements OnInit {
                 new RGB(29, 127, 255),
                 (blueTeamInfosPosition: CropperPosition) => {
                   this.dialogService
-                    .open(CheckPlayersOrderDialog, {
+                    .open(ReplayCutterCheckPlayersOrderDialog, {
                       data: {
                         orangePlayersNames: sortedOrangePlayersNames,
                         bluePlayersNames: sortedBluePlayersNames,
@@ -2266,7 +2266,7 @@ export class ReplayCutterComponent implements OnInit {
       team === 'orange' ? game.orangeTeam.score : game.blueTeam.score;
 
     this.dialogService
-      .open(EditTeamScoreDialog, {
+      .open(ReplayCutterEditTeamScoreDialog, {
         data: CURRENT_SCORE,
         width: '400px'
       })
@@ -2292,7 +2292,7 @@ export class ReplayCutterComponent implements OnInit {
       team === 'orange' ? game.orangeTeam.name : game.blueTeam.name;
 
     this.dialogService
-      .open(EditTeamNameDialog, {
+      .open(ReplayCutterEditTeamNameDialog, {
         data: CURRENT_NAME,
         width: '400px'
       })

@@ -47,7 +47,7 @@ import { GlobalService } from '../../../../core/services/global.service';
     GridModule
   ]
 })
-export class CheckPlayersOrderDialog implements AfterViewInit {
+export class ReplayCutterCheckPlayersOrderDialog implements AfterViewInit {
   //#region Attributes
 
   protected value: {
@@ -66,7 +66,7 @@ export class CheckPlayersOrderDialog implements AfterViewInit {
   //#endregion
 
   constructor(
-    public readonly dialogRef: MatDialogRef<CheckPlayersOrderDialog>,
+    public readonly dialogRef: MatDialogRef<ReplayCutterCheckPlayersOrderDialog>,
     @Inject(MAT_DIALOG_DATA)
     public readonly data: {
       orangePlayersNames: string[];
