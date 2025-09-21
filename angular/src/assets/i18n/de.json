@@ -72,7 +72,7 @@
         },
         "replay-uploaded": {
           "title": "Replay zur KI-Analyse gesendet",
-          "description": "Das Replay wurde zur Analyse an EBPs KI gesendet.<br/>Sie erhalten eine Bestätigungs-E-Mail, wenn alles analysiert wurde."
+          "description": "Das Replay wurde zur Analyse an EBPs KI gesendet.<br/>Sie erhalten eine Bestätigungs-E-Mail, wenn alles analysiert wurde ({{ email }})."
         }
       }
     },

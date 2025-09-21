@@ -17,6 +17,7 @@ export class IdentityService {
 
   private _accessToken: string = '';
   private _userID: number = 0;
+  private _email: number = 0;
   private _supporterLevel: number = 0;
 
   //#endregion
@@ -33,6 +34,8 @@ export class IdentityService {
 
     this._userID = parseInt(DATA.sub);
 
+    this._email = DATA.email;
+
     this._supporterLevel = parseInt(DATA.supporterLevel);
     if (isNaN(this._supporterLevel)) {
       this._supporterLevel = 0;
@@ -47,6 +50,10 @@ export class IdentityService {
 
   public get userID(): number {
     return this._userID;
+  }
+
+  public get email(): number {
+    return this._email;
   }
 
   public get supporterLevel(): number {

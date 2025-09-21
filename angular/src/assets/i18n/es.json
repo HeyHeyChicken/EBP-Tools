@@ -72,7 +72,7 @@
         },
         "replay-uploaded": {
           "title": "Replay enviado para análisis de IA",
-          "description": "El replay ha sido enviado para análisis a la IA de EBP.<br/>Recibirás un email de confirmación cuando todo haya sido analizado."
+          "description": "El replay ha sido enviado para análisis a la IA de EBP.<br/>Recibirás un email de confirmación cuando todo haya sido analizado ({{ email }})."
         }
       }
     },
