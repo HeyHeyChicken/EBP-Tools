@@ -30,7 +30,8 @@
         "videoCutHere": "Ihr Video wurde hier geschnitten: {{filePath}}",
         "videoFileNotFound": "Videodatei nicht gefunden.",
         "noGamesFoundInStatistics": "Es wurden keine Spiele auf {{map}} mit diesen Ergebnissen gefunden ({{orangeScore}} vs {{blueScore}}). Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen.",
-        "noGamesFoundInVideo": "Es wurden keine Spiele in Ihrem Video gefunden. Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen."
+        "noGamesFoundInVideo": "Es wurden keine Spiele in Ihrem Video gefunden. Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen.",
+        "mapNotAICompatible": "Die Karte {{map}} ist noch nicht mit EBPs KI kompatibel, wird aber in kommenden Updates verfügbar sein."
       },
       "outputPath": "Ausgabepfad",
       "upscalePercent": "Hochskalieren ... ({{percent}}%)",

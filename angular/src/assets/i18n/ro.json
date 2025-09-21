@@ -30,7 +30,8 @@
         "videoCutHere": "Videoclipul tău a fost tăiat aici: {{filePath}}",
         "videoFileNotFound": "Fișierul video nu a fost găsit.",
         "noGamesFoundInStatistics": "Nu au fost găsite jocuri pe {{map}} cu aceste scoruri ({{orangeScore}} vs {{blueScore}}). Dacă crezi că este o eroare, spune-mi.",
-        "noGamesFoundInVideo": "Nu au fost găsite jocuri în videoclipul tău. Dacă crezi că este o eroare, spune-mi."
+        "noGamesFoundInVideo": "Nu au fost găsite jocuri în videoclipul tău. Dacă crezi că este o eroare, spune-mi.",
+        "mapNotAICompatible": "Harta {{map}} nu este încă compatibilă cu AI-ul EBP, dar va fi în actualizările viitoare."
       },
       "outputPath": "Cale fișier ieșire",
       "upscalePercent": "Mărire ... ({{percent}}%)",

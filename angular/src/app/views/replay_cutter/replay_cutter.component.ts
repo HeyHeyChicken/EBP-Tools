@@ -95,6 +95,21 @@ export class ReplayCutterComponent implements OnInit {
 
   private miniMapPositionsByMap: { [mapName: string]: CropperPosition } = {};
 
+  protected maps: Map[] = [
+    new Map('Artefact', ['artefact']),
+    new Map('Atlantis', ['atlantis']),
+    new Map('Ceres', ['ceres'], true),
+    new Map('Engine', ['engine']),
+    new Map('Helios Station', ['helios', 'station']),
+    new Map('Lunar Outpost', ['lunar', 'outpost']),
+    new Map('Outlaw', ['outlaw', 'qutlaw']),
+    new Map('Polaris', ['polaris']),
+    new Map('Silva', ['silva']),
+    new Map('The Cliff', ['cliff']),
+    new Map('The Rock', ['rock']),
+    new Map('Horizon', ['horizon'])
+  ];
+
   //#endregion
 
   constructor(
@@ -153,11 +168,12 @@ export class ReplayCutterComponent implements OnInit {
     });
   }
 
-  protected get disableUploadButton(): boolean {
+  protected disableUploadButton(mapName: string): boolean {
     return (
       this.identityService.supporterLevel == 0 ||
       !this.identityService.isBetaUser ||
-      !this._videoPath
+      !this._videoPath ||
+      !this.getMapByName(mapName)?.isAICompatible
     );
   }
 
@@ -230,49 +246,59 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
     if (!this.disableUploadButton) {
-      this.apiRestService.getGames(
-        this._games[gameIndex].map,
-        this._games[gameIndex].orangeTeam.score,
-        this._games[gameIndex].blueTeam.score,
-        (games: RestGame[]) => {
-          if (games.length > 0) {
-            if (games.length == 1) {
-              this.cropGameMinimap(gameIndex, games[0]);
+      if (this.getMapByName(this._games[gameIndex].map)?.isAICompatible) {
+        this.apiRestService.getGames(
+          this._games[gameIndex].map,
+          this._games[gameIndex].orangeTeam.score,
+          this._games[gameIndex].blueTeam.score,
+          (games: RestGame[]) => {
+            if (games.length > 0) {
+              if (games.length == 1) {
+                this.cropGameMinimap(gameIndex, games[0]);
+              } else {
+                this.dialogService
+                  .open(ReplayCutterAttachGameDialog, {
+                    data: {
+                      games: games
+                    },
+                    autoFocus: false
+                  })
+                  .afterClosed()
+                  .subscribe((gameID: number | undefined) => {
+                    if (gameID) {
+                      this.cropGameMinimap(
+                        gameIndex,
+                        games.find((game) => game.ID == gameID)!
+                      );
+                    }
+                  });
+              }
             } else {
-              this.dialogService
-                .open(ReplayCutterAttachGameDialog, {
-                  data: {
-                    games: games
-                  },
-                  autoFocus: false
+              this.translateService
+                .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
+                  map: this._games[gameIndex].map,
+                  orangeScore: this._games[gameIndex].orangeTeam.score,
+                  blueScore: this._games[gameIndex].blueTeam.score
                 })
-                .afterClosed()
-                .subscribe((gameID: number | undefined) => {
-                  if (gameID) {
-                    this.cropGameMinimap(
-                      gameIndex,
-                      games.find((game) => game.ID == gameID)!
+                .subscribe((translated: string) => {
+                  this.toastrService.error(translated).onTap.subscribe(() => {
+                    window.electronAPI.openURL(
+                      this.globalService.discordServerURL
                     );
-                  }
+                  });
                 });
             }
-          } else {
-            this.translateService
-              .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
-                map: this._games[gameIndex].map,
-                orangeScore: this._games[gameIndex].orangeTeam.score,
-                blueScore: this._games[gameIndex].blueTeam.score
-              })
-              .subscribe((translated: string) => {
-                this.toastrService.error(translated).onTap.subscribe(() => {
-                  window.electronAPI.openURL(
-                    this.globalService.discordServerURL
-                  );
-                });
-              });
           }
-        }
-      );
+        );
+      } else {
+        this.translateService
+          .get('view.replay_cutter.toast.mapNotAICompatible', {
+            map: this._games[gameIndex].map
+          })
+          .subscribe((translated: string) => {
+            this.toastrService.error(translated);
+          });
+      }
     }
   }
 
@@ -1067,7 +1093,8 @@ export class ReplayCutterComponent implements OnInit {
                   if (TEXT) {
                     found = true;
                     if (this._games[0].map == '') {
-                      const MAP_NAME /* string */ = this.getMapByName(TEXT);
+                      const MAP_NAME /* string */ =
+                        this.getMapByName(TEXT)?.name ?? '';
                       this._games[0].map = MAP_NAME;
                       console.log('----- ', this._games[0].map);
                     }
@@ -1291,34 +1318,20 @@ export class ReplayCutterComponent implements OnInit {
   /**
    * This function returns the map that resembles what the OCR found.
    * @param search Text found by OCR.
-   * @returns Name of the map found.
+   * @returns Map found.
    */
-  private getMapByName(search: string): string {
-    const MAPS: Map[] = [
-      new Map('Artefact', ['artefact']),
-      new Map('Atlantis', ['atlantis']),
-      new Map('Ceres', ['ceres']),
-      new Map('Engine', ['engine']),
-      new Map('Helios Station', ['helios', 'station']),
-      new Map('Lunar Outpost', ['lunar', 'outpost']),
-      new Map('Outlaw', ['outlaw', 'qutlaw']),
-      new Map('Polaris', ['polaris']),
-      new Map('Silva', ['silva']),
-      new Map('The Cliff', ['cliff']),
-      new Map('The Rock', ['rock']),
-      new Map('Horizon', ['horizon'])
-    ];
+  protected getMapByName(search: string): Map | undefined {
     const SPLITTED = search
       .replace(/(\r\n|\n|\r)/gm, '')
       .toLowerCase()
       .split(' ');
-    const RESULT = MAPS.find((x) =>
+    const RESULT = this.maps.find((x) =>
       SPLITTED.some((s) => x.dictionnary.includes(s))
     );
     if (RESULT) {
-      return RESULT.name;
+      return RESULT;
     }
-    return '';
+    return undefined;
   }
 
   private detectGameEndFrame(video: HTMLVideoElement): boolean {
