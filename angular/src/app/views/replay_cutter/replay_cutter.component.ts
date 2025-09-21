@@ -246,7 +246,10 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
     if (this.identityService.isBetaUser) {
-      if (this.getMapByName(this._games[gameIndex].map)?.isAICompatible) {
+      if (
+        isDevMode() ||
+        this.getMapByName(this._games[gameIndex].map)?.isAICompatible
+      ) {
         this.apiRestService
           .getGames(
             this._games[gameIndex].map,
