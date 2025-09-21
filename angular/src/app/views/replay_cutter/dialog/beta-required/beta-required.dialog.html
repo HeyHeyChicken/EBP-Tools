@@ -1,0 +1,28 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<h2 mat-dialog-title>
+  {{ 'view.replay_cutter.dialog.beta-required.title' | translate }}
+</h2>
+<mat-dialog-content>
+  <ebp-row>
+    <ebp-column [xs]="7">
+      <div>
+        <p
+          innerHTML="{{ 'view.replay_cutter.dialog.beta-required.description' | translate }}"
+        ></p>
+        <div>
+          <video autoplay src="/assets/video/ai-demo.mp4" muted loop></video>
+        </div>
+      </div>
+    </ebp-column>
+  </ebp-row>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-dialog-close attr.aria-label="{{ 'common.close' | translate }}">
+    <i class="fa-sharp fa-solid fa-xmark"></i>{{"common.close" | translate}}
+  </button>
+</mat-dialog-actions>

@@ -45,6 +45,7 @@ import { ReplayCutterEditTeamNameDialog } from './dialog/edit-team/edit-team.dia
 import { distance } from 'fastest-levenshtein';
 import { ReplayCutterCheckPlayersOrderDialog } from './dialog/check-players-order/check-players-order.dialog';
 import { ReplayCutterReplayUploadedDialog } from './dialog/replay-uploaded/replay-uploaded.dialog';
+import { ReplayCutterBetaRequiredDialog } from './dialog/beta-required/beta-required.dialog';
 
 //#endregion
 @Component({
@@ -170,10 +171,9 @@ export class ReplayCutterComponent implements OnInit {
 
   protected disableUploadButton(mapName: string): boolean {
     return (
-      this.identityService.supporterLevel == 0 ||
-      !this.identityService.isBetaUser ||
       !this._videoPath ||
-      !this.getMapByName(mapName)?.isAICompatible
+      (!this.getMapByName(mapName)?.isAICompatible &&
+        this.identityService.isBetaUser)
     );
   }
 
@@ -245,51 +245,54 @@ export class ReplayCutterComponent implements OnInit {
    * @param gameIndex Index of the game to attach.
    */
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
-    if (!this.disableUploadButton) {
+    if (this.identityService.isBetaUser) {
       if (this.getMapByName(this._games[gameIndex].map)?.isAICompatible) {
-        this.apiRestService.getGames(
-          this._games[gameIndex].map,
-          this._games[gameIndex].orangeTeam.score,
-          this._games[gameIndex].blueTeam.score,
-          (games: RestGame[]) => {
-            if (games.length > 0) {
-              if (games.length == 1) {
-                this.cropGameMinimap(gameIndex, games[0]);
+        this.apiRestService
+          .getGames(
+            this._games[gameIndex].map,
+            this._games[gameIndex].orangeTeam.score,
+            this._games[gameIndex].blueTeam.score
+          )
+          .subscribe({
+            next: (games: RestGame[]) => {
+              if (games && games.length > 0) {
+                if (games.length == 1) {
+                  this.cropGameMinimap(gameIndex, games[0]);
+                } else {
+                  this.dialogService
+                    .open(ReplayCutterAttachGameDialog, {
+                      data: {
+                        games: games
+                      },
+                      autoFocus: false
+                    })
+                    .afterClosed()
+                    .subscribe((gameID: number | undefined) => {
+                      if (gameID) {
+                        this.cropGameMinimap(
+                          gameIndex,
+                          games.find((game) => game.ID == gameID)!
+                        );
+                      }
+                    });
+                }
               } else {
-                this.dialogService
-                  .open(ReplayCutterAttachGameDialog, {
-                    data: {
-                      games: games
-                    },
-                    autoFocus: false
+                this.translateService
+                  .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
+                    map: this._games[gameIndex].map,
+                    orangeScore: this._games[gameIndex].orangeTeam.score,
+                    blueScore: this._games[gameIndex].blueTeam.score
                   })
-                  .afterClosed()
-                  .subscribe((gameID: number | undefined) => {
-                    if (gameID) {
-                      this.cropGameMinimap(
-                        gameIndex,
-                        games.find((game) => game.ID == gameID)!
+                  .subscribe((translated: string) => {
+                    this.toastrService.error(translated).onTap.subscribe(() => {
+                      window.electronAPI.openURL(
+                        this.globalService.discordServerURL
                       );
-                    }
+                    });
                   });
               }
-            } else {
-              this.translateService
-                .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
-                  map: this._games[gameIndex].map,
-                  orangeScore: this._games[gameIndex].orangeTeam.score,
-                  blueScore: this._games[gameIndex].blueTeam.score
-                })
-                .subscribe((translated: string) => {
-                  this.toastrService.error(translated).onTap.subscribe(() => {
-                    window.electronAPI.openURL(
-                      this.globalService.discordServerURL
-                    );
-                  });
-                });
             }
-          }
-        );
+          });
       } else {
         this.translateService
           .get('view.replay_cutter.toast.mapNotAICompatible', {
@@ -299,6 +302,13 @@ export class ReplayCutterComponent implements OnInit {
             this.toastrService.error(translated);
           });
       }
+    } else {
+      this.dialogService.open(ReplayCutterBetaRequiredDialog, {
+        width: '700px',
+        maxWidth: '700px',
+        height: '500px',
+        autoFocus: false
+      });
     }
   }
 

@@ -3,7 +3,8 @@
     "ok": "Ok",
     "cancel": "Cancelar",
     "reset": "Restablecer",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "close": "Cerrar"
   },
   "view": {
     "home": {
@@ -74,6 +75,10 @@
         "replay-uploaded": {
           "title": "Replay enviado para análisis de IA",
           "description": "El replay ha sido enviado para análisis a la IA de EBP.<br/>Recibirás un email de confirmación cuando todo haya sido analizado ({{ email }})."
+        },
+        "beta-required": {
+          "title": "El análisis IA de EBP está en beta",
+          "description": "<b>Próximamente disponible:</b><br/>¡análisis de tus partidas gracias a la IA de EBP!<br/>Actualmente en última fase de desarrollo y probada en BETA por algunos usuarios, llega muy pronto…<br/>¡Un poco más de paciencia!"
         }
       }
     },

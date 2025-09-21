@@ -6,6 +6,8 @@
 
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { RestGame } from '../../views/replay_cutter/models/rest-game';
+import { Observable } from 'rxjs';
 
 //#endregion
 
@@ -29,28 +31,21 @@ export class APIRestService {
    * @param mapName Name of the card.
    * @param orangeScore Orange team score.
    * @param blueScore Blue team score.
-   * @param callback Callback fonction.
    */
   public getGames(
     mapName: string,
     orangeScore: number,
-    blueScore: number,
-    callback: Function
-  ): void {
-    const PARAMS = new HttpParams()
+    blueScore: number
+  ): Observable<RestGame[]> {
+    const params = new HttpParams()
       .set('r', 'games')
       .set('map', mapName)
       .set('orangeScore', orangeScore.toString())
       .set('blueScore', blueScore.toString());
 
-    this.httpClient
-      .get<any>(APIRestService.serverURL, {
-        responseType: 'text' as 'json',
-        params: PARAMS
-      })
-      .subscribe((response: string) => {
-        callback(JSON.parse(response));
-      });
+    return this.httpClient.get<RestGame[]>(APIRestService.serverURL, {
+      params
+    });
   }
 
   /**

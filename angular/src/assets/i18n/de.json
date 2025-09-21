@@ -3,7 +3,8 @@
     "ok": "Ok",
     "cancel": "Abbrechen",
     "reset": "Zurücksetzen",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "close": "Schließen"
   },
   "view": {
     "home": {
@@ -74,6 +75,10 @@
         "replay-uploaded": {
           "title": "Replay zur KI-Analyse gesendet",
           "description": "Das Replay wurde zur Analyse an EBPs KI gesendet.<br/>Sie erhalten eine Bestätigungs-E-Mail, wenn alles analysiert wurde ({{ email }})."
+        },
+        "beta-required": {
+          "title": "EBPs KI-Analyse ist in der Beta",
+          "description": "<b>Bald verfügbar:</b><br/>Analyse Ihrer Spiele mit EBPs KI!<br/>Derzeit in der finalen Entwicklungsphase und von einigen Benutzern in der BETA getestet, kommt sie sehr bald…<br/>Noch ein wenig Geduld!"
         }
       }
     },

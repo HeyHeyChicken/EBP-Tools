@@ -3,7 +3,8 @@
     "ok": "Ok",
     "cancel": "Cancel",
     "reset": "Reset",
-    "settings": "Settings"
+    "settings": "Settings",
+    "close": "Close"
   },
   "view": {
     "home": {
@@ -74,6 +75,10 @@
         "replay-uploaded": {
           "title": "Replay sent for AI analysis",
           "description": "The replay has been sent for analysis to EBP's AI.<br/>You will receive a confirmation email when everything has been analyzed ({{ email }})."
+        },
+        "beta-required": {
+          "title": "EBP's AI analysis is in beta",
+          "description": "<b>Coming soon:</b><br/>analysis of your games using EBP's AI!<br/>Currently in final development phase and tested in BETA by a few users, it's coming very soon…<br/>Just a little more patience!"
         }
       }
     },

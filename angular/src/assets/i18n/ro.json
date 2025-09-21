@@ -3,7 +3,8 @@
     "ok": "Ok",
     "cancel": "Anulează",
     "reset": "Resetare",
-    "settings": "Setări"
+    "settings": "Setări",
+    "close": "Închide"
   },
   "view": {
     "home": {
@@ -74,6 +75,10 @@
         "replay-uploaded": {
           "title": "Replay trimis pentru analiză AI",
           "description": "Replay-ul a fost trimis pentru analiză la AI-ul EBP.<br/>Vei primi un email de confirmare când totul va fi analizat ({{ email }})."
+        },
+        "beta-required": {
+          "title": "Analiza IA a EBP este în beta",
+          "description": "<b>Disponibilă în curând:</b><br/>analiza jocurilor tale datorită AI-ului EBP!<br/>În prezent în faza finală de dezvoltare și testată în BETA de câțiva utilizatori, vine foarte curând…<br/>Încă puțină răbdare!"
         }
       }
     },
