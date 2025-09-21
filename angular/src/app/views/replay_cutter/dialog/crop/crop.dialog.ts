@@ -41,6 +41,30 @@ import {
 export class ReplayCutterCropDialog implements OnInit {
   //#region Attributes
 
+  @ViewChild('matDialogContent') matDialogContent?: ElementRef<HTMLDivElement>;
+
+  protected get matDialogContentWidth(): number {
+    if (this.matDialogContent?.nativeElement) {
+      const STYLE = getComputedStyle(this.matDialogContent?.nativeElement);
+      return (
+        this.matDialogContent?.nativeElement.clientWidth -
+        parseInt(STYLE.paddingLeft) -
+        parseInt(STYLE.paddingRight)
+      );
+    }
+    return 0;
+  }
+  protected get matDialogContentHeight(): number {
+    if (this.matDialogContent?.nativeElement) {
+      const STYLE = getComputedStyle(this.matDialogContent?.nativeElement);
+      return (
+        this.matDialogContent?.nativeElement.clientHeight -
+        parseInt(STYLE.paddingTop)
+      );
+    }
+    return 0;
+  }
+
   private static DEFAULT_CROPPER: CropperPosition = {
     x1: 0,
     y1: 0,

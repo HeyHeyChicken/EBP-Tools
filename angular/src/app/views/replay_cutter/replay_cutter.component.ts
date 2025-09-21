@@ -304,13 +304,16 @@ export class ReplayCutterComponent implements OnInit {
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
+            const DIALOG_HEIGHT: string = 'calc(100vh - 12px * 4)';
             this.dialogService
               .open(ReplayCutterCropDialog, {
                 data: {
                   imgBase64: videoFrame?.toDataURL('image/png')
                 },
                 maxWidth: DIALOG_WIDTH,
+                maxHeight: DIALOG_HEIGHT,
                 width: DIALOG_WIDTH,
+                height: DIALOG_HEIGHT,
                 autoFocus: false
               })
               .afterClosed()

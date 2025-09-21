@@ -4,7 +4,7 @@ This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
-<mat-dialog-content>
+<mat-dialog-content #matDialogContent>
   <div #imageCropperContainer>
     @if(currentImgBase64){
     <image-cropper
@@ -13,6 +13,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
       [maintainAspectRatio]="false"
       (cropperReady)="onCropperReady($event)"
       (cropperChange)="onCropperChange($event)"
+      [style.maxWidth]="matDialogContentWidth + 'px'"
+      [style.maxHeight]="matDialogContentHeight + 'px'"
     ></image-cropper>
     }
   </div>
