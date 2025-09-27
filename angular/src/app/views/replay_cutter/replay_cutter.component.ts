@@ -151,6 +151,7 @@ export class ReplayCutterComponent implements OnInit {
           }
         } else {
           if (path) {
+            this.training = true;
             const URL = encodeURIComponent(path);
             const DIALOG_WIDTH = 'calc(100vw - 12px * 4)';
             this.dialogService
@@ -164,7 +165,6 @@ export class ReplayCutterComponent implements OnInit {
               .subscribe((response: VideoChunk[] | undefined) => {
                 window.electronAPI.setWindowSize();
                 if (response) {
-                  this.training = true;
                   this.globalService.loading = '';
                   window.electronAPI.manualCutVideoFile(path, response);
                 }
