@@ -15,22 +15,24 @@ video:not(.visible) {
   > .buttons {
     position: absolute;
     bottom: 0;
-    right: 0;
+    left: calc(100% + #{variables.$margin});
     display: flex;
-    padding: variables.$margin 0 0 variables.$margin;
-    border-style: dashed;
-    border-width: 1px 0 0 1px;
-    border-color: variables.$border_color;
+    padding: variables.$margin variables.$margin 0 variables.$margin;
+    transform: translateX(-50%);
+    z-index: 1;
+    background-image: url('/assets/img/border.png');
+    background-size: 100% 100%;
   }
 }
 
 .dropper {
   border-style: dashed;
-  border-width: 1px 0 0 1px;
   border-color: variables.$border_color;
   padding: calc(#{variables.$margin} * 2);
   text-align: center;
   position: relative;
+  height: 100%;
+  box-sizing: border-box;
 
   &:before,
   &:after {
@@ -41,18 +43,39 @@ video:not(.visible) {
     top: 0;
     z-index: 0;
     transition: all 0.2s ease-in-out;
+    box-sizing: border-box;
   }
 
   &:before {
     height: 100%;
-    width: calc(100% - #{variables.$form_height} - #{variables.$margin});
+    width: calc(100% - #{variables.$margin} * 1.5);
     border-bottom: 1px dashed variables.$border_color;
   }
 
   &:after {
     width: 100%;
     height: calc(100% - #{variables.$form_height} - #{variables.$margin});
-    border-right: 1px dashed variables.$border_color;
+  }
+
+  &:not(.right) {
+    border-width: 1px 0 0 1px;
+
+    &:after {
+      border-right: 1px dashed variables.$border_color;
+    }
+  }
+
+  &.right {
+    border-width: 1px 1px 0 0;
+
+    &:before {
+      right: 0;
+      left: initial;
+    }
+
+    &:after {
+      border-left: 1px dashed variables.$border_color;
+    }
   }
 
   &:not(.disabled) {
@@ -64,32 +87,36 @@ video:not(.visible) {
     opacity: 0.5;
   }
 
-  &:hover,
-  &.dropping {
+  &:hover {
     &:before,
     &:after {
       background-color: #251e1b;
     }
 
-    > .icons {
+    > .icon {
+      @keyframes iconWiggle {
+        0% {
+          transform: translate(-50%, -50%) rotate(0deg);
+        }
+        25% {
+          transform: translate(-50%, -50%) rotate(-15deg);
+        }
+        75% {
+          transform: translate(-50%, -50%) rotate(15deg);
+        }
+        100% {
+          transform: translate(-50%, -50%) rotate(0deg);
+        }
+      }
+
       > i {
-        &:nth-child(1),
-        &:nth-child(2) {
-          opacity: 0.5;
-        }
-
-        &:nth-child(1) {
-          transform: rotate(-15deg) translateY(-120%);
-        }
-
-        &:nth-child(2) {
-          transform: rotate(15deg) translate(+130%, -142%);
-        }
+        animation-name: iconWiggle;
+        animation-duration: 0.5s;
       }
     }
   }
 
-  > .icons {
+  > .icon {
     $size: 40px;
     position: relative;
     height: $size;
@@ -102,27 +129,7 @@ video:not(.visible) {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      transition: all 0.2s ease-in-out;
-      color: white;
-
-      &:nth-child(1),
-      &:nth-child(2) {
-        font-size: 30px;
-        opacity: 0;
-      }
-
-      &:nth-child(1) {
-        transform-origin: 100px 100px;
-      }
-
-      &:nth-child(2) {
-        transform-origin: -100px -100px;
-      }
-
-      &:nth-child(3) {
-        font-size: 40px;
-        background: black;
-      }
+      font-size: calc(#{variables.$margin} * 3);
     }
   }
 
@@ -131,7 +138,7 @@ video:not(.visible) {
     position: relative;
     margin: 0;
     color: variables.$main_color;
-    max-width: calc(100% - #{variables.$form_height} * 2);
+    max-width: calc(100% - #{variables.$margin} * 2);
     margin: 0 auto;
   }
 }

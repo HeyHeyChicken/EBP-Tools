@@ -1,0 +1,103 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use '../../../../../styles/imports/variables' as variables;
+
+.d-flex {
+  flex-direction: column;
+
+  > div {
+    border: 1px solid variables.$border_color;
+
+    > video {
+      width: 100%;
+    }
+  }
+
+  > footer {
+    margin-top: variables.$margin;
+    display: flex;
+    gap: variables.$margin;
+
+    > .bar {
+      border: 1px solid variables.$border_color;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+
+      > .chunks {
+        > .chunk {
+          position: absolute;
+          top: 0;
+          height: 100%;
+          box-sizing: border-box;
+          border: 1px solid variables.$border_color;
+
+          &.removed {
+            background-color: rgba(244, 67, 54, 0.25);
+          }
+
+          &:not(:last-child) {
+            border-right-width: 0px;
+          }
+
+          &:not(:only-child):hover {
+            border-width: 2px;
+            border-color: white;
+          }
+
+          &:not(:hover) {
+            > button {
+              opacity: 0;
+              pointer-events: none;
+            }
+          }
+
+          > button {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translate(-50%, 25%);
+          }
+        }
+      }
+
+      > .cursor {
+        position: absolute;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        background-color: variables.$main_color;
+        cursor: pointer;
+
+        > div {
+          pointer-events: none;
+          transform: translate(-50%, -50%) scaleX(0);
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transition: transform 0.2s ease-in-out;
+
+          > div {
+            background: variables.$dark_color;
+            transform: rotate(45deg);
+            height: calc(#{variables.$form_height} * 0.7);
+            width: calc(#{variables.$form_height} * 0.7);
+            border: 2px solid variables.$main_color;
+            box-sizing: border-box;
+          }
+        }
+      }
+
+      &:hover,
+      &.dragging {
+        > .cursor {
+          > div {
+            transform: translate(-50%, -50%) scaleX(1);
+          }
+        }
+      }
+    }
+  }
+}

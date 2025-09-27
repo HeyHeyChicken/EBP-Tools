@@ -14,7 +14,7 @@
     },
     "replay_cutter": {
       "wrongResolution": "Votre vidéo doit être en {{ expectedHeight }}p, la vôtre est en {{ currentHeight }}p.",
-      "inputFile": "Cliquez ici pour envoyer votre fichier vidéo",
+      "inputTrainingFile": "Cliquez ici pour découper automatiquement votre fichier vidéo d’entraînement",
       "videoIsBeingAnalyzed": "Veuillez patienter, la vidéo est en cours d'analyse...",
       "nbGamesFound": "Nombre de parties trouvés",
       "save": "Enregistrer",
@@ -80,7 +80,8 @@
           "title": "L'analyse IA d'EBP est en beta",
           "description": "<b>Bientôt disponible :</b><br/>l'analyse de vos parties grâce à l'IA d'EBP !<br/>Actuellement en dernière phase de développement et testée en BETA par quelques utilisateurs, elle arrive très vite…<br/>Encore un peu de patience !"
         }
-      }
+      },
+      "inputOfficialFile": "Cliquez ici pour découper manuellement votre fichier vidéo officiel"
     },
     "game_history": {
       "title": "Exportez l'historique de vos parties",

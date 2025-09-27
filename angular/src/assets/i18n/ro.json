@@ -14,7 +14,7 @@
     },
     "replay_cutter": {
       "wrongResolution": "Videoclipul dvs. trebuie să fie în {{ expectedHeight }}p, al dvs. este în {{ currentHeight }}p.",
-      "inputFile": "Click aici pentru a trimite fișierul video",
+      "inputTrainingFile": "Faceți clic aici pentru a tăia automat fișierul video de antrenament",
       "videoIsBeingAnalyzed": "Te rugăm să aștepți, videoclipul este analizat...",
       "nbGamesFound": "Număr de jocuri găsite",
       "save": "Salvează",
@@ -80,7 +80,8 @@
           "title": "Analiza IA a EBP este în beta",
           "description": "<b>Disponibilă în curând:</b><br/>analiza jocurilor tale datorită AI-ului EBP!<br/>În prezent în faza finală de dezvoltare și testată în BETA de câțiva utilizatori, vine foarte curând…<br/>Încă puțină răbdare!"
         }
-      }
+      },
+      "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"
     },
     "game_history": {
       "title": "Exportă istoricul jocurilor",

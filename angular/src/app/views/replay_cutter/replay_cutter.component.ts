@@ -46,6 +46,7 @@ import { distance } from 'fastest-levenshtein';
 import { ReplayCutterCheckPlayersOrderDialog } from './dialog/check-players-order/check-players-order.dialog';
 import { ReplayCutterReplayUploadedDialog } from './dialog/replay-uploaded/replay-uploaded.dialog';
 import { ReplayCutterBetaRequiredDialog } from './dialog/beta-required/beta-required.dialog';
+import { ReplayCutterManualVideoCutDialog } from './dialog/manual-video-cut/manual-video-cut.dialog';
 
 //#endregion
 @Component({
@@ -94,21 +95,23 @@ export class ReplayCutterComponent implements OnInit {
   private tesseractWorker_letter: Tesseract.Worker | undefined;
   private tesseractWorker_time: Tesseract.Worker | undefined;
 
+  private training: boolean | undefined;
+
   private miniMapPositionsByMap: { [mapName: string]: CropperPosition } = {};
 
   protected maps: Map[] = [
-    new Map('Artefact', ['artefact']),
-    new Map('Atlantis', ['atlantis']),
+    new Map('Artefact', ['artefact'], true),
+    new Map('Atlantis', ['atlantis'], true),
     new Map('Ceres', ['ceres'], true),
-    new Map('Engine', ['engine']),
+    new Map('Engine', ['engine'], true),
     new Map('Helios Station', ['helios', 'station']),
     new Map('Lunar Outpost', ['lunar', 'outpost']),
     new Map('Outlaw', ['outlaw', 'qutlaw']),
-    new Map('Polaris', ['polaris']),
-    new Map('Silva', ['silva']),
-    new Map('The Cliff', ['cliff']),
-    new Map('The Rock', ['rock']),
-    new Map('Horizon', ['horizon'])
+    new Map('Polaris', ['polaris'], true),
+    new Map('Silva', ['silva'], true),
+    new Map('The Cliff', ['cliff'], true),
+    new Map('The Rock', ['rock'], true),
+    new Map('Horizon', ['horizon'], true)
   ];
 
   //#endregion
@@ -140,9 +143,25 @@ export class ReplayCutterComponent implements OnInit {
     // The server gives the path of the video file selected by the user.
     window.electronAPI.setVideoFile((path: string) => {
       this.ngZone.run(() => {
-        if (path) {
-          this._videoPath = encodeURIComponent(path);
-          this.percent = 0;
+        if (this.training) {
+          if (path) {
+            this._videoPath = encodeURIComponent(path);
+            this.percent = 0;
+          }
+        } else {
+          const URL = encodeURIComponent(path);
+          const DIALOG_WIDTH = 'calc(100vw - 12px * 4)';
+          this.dialogService
+            .open(ReplayCutterManualVideoCutDialog, {
+              autoFocus: false,
+              data: URL,
+              width: DIALOG_WIDTH,
+              maxWidth: DIALOG_WIDTH
+            })
+            .afterClosed()
+            .subscribe((response: any) => {
+              console.log(response);
+            });
         }
         this.miniMapPositionsByMap = {};
         this.globalService.loading = undefined;
@@ -712,8 +731,9 @@ export class ReplayCutterComponent implements OnInit {
   /**
    * This function is triggered when the user clicks on the "input" to select a replay.
    */
-  protected onInputFileClick(): void {
+  protected onInputFileClick(training: boolean): void {
     if (!this.inputFileDisabled) {
+      this.training = training;
       this.globalService.loading = '';
       this._videoPath = undefined;
       this.inputFileDisabled = true;

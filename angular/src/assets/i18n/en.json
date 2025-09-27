@@ -14,7 +14,7 @@
     },
     "replay_cutter": {
       "wrongResolution": "Your video must be in {{ expectedHeight }}p, yours is in {{ currentHeight }}p",
-      "inputFile": "Click here to send your video file",
+      "inputTrainingFile": "Click here to auto cut your training video file",
       "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
       "nbGamesFound": "Number of games found",
       "save": "Save",
@@ -80,7 +80,8 @@
           "title": "EBP's AI analysis is in beta",
           "description": "<b>Coming soon:</b><br/>analysis of your games using EBP's AI!<br/>Currently in final development phase and tested in BETA by a few users, it's coming very soon…<br/>Just a little more patience!"
         }
-      }
+      },
+      "inputOfficialFile": "Click here to manually cut your official video file"
     },
     "game_history": {
       "title": "Export your game history",

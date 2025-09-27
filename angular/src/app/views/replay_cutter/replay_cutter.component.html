@@ -8,20 +8,18 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <ebp-column></ebp-column>
   <ebp-column [xs]="6" class="pr-2 pl-0 pt-0">
     <ebp-row>
-      <ebp-column [xs]="12">
-        @if (percent < 0) {
-          <div class="p-relative">
+      @if (percent < 0) {
+        <ebp-column [xs]="6">
+          <div class="p-relative h-100">
             <div
               class="dropper"
               [class.disabled]="inputFileDisabled"
-              (click)="onInputFileClick()"
+              (click)="onInputFileClick(true)"
             >
-              <div class="icons">
-                <i class="fa-sharp fa-solid fa-file-arrow-up"></i>
-                <i class="fa-sharp fa-solid fa-file"></i>
-                <i class="fa-sharp fa-solid fa-file-video"></i>
+              <div class="icon">
+                <i class="fa-sharp fa-solid fa-dumbbell"></i>
               </div>
-              <p>{{ 'view.replay_cutter.inputFile' | translate }}</p>
+              <p>{{ 'view.replay_cutter.inputTrainingFile' | translate }}</p>
             </div>
             <div class="buttons">
               <button class="btn squared" (click)="openSettings()">
@@ -29,7 +27,19 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </button>
             </div>
           </div>
-        } @else {
+        </ebp-column>
+        <ebp-column [xs]="6">
+          <div class="p-relative h-100">
+            <div class="dropper right" [class.disabled]="true">
+              <div class="icon">
+                <i class="fa-sharp fa-solid fa-trophy"></i>
+              </div>
+              <p>{{ 'view.replay_cutter.inputOfficialFile' | translate }}</p>
+            </div>
+          </div>
+        </ebp-column>
+      } @else {
+        <ebp-column [xs]="12">
           <div>
             <ebp-loader [value]="percent"></ebp-loader>
             <ebp-message class="mt-2">
@@ -39,8 +49,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
               >
             </ebp-message>
           </div>
-        }
-      </ebp-column>
+        </ebp-column>
+      }
       @if (percent < 0 && games.length) {
         <ebp-column [xs]="12">
           <div class="box mb-1">

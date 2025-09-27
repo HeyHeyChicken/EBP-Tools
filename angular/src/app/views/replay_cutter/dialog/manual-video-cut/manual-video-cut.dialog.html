@@ -1,0 +1,71 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<mat-dialog-content #matDialogContent>
+  <div class="d-flex">
+    <div>
+      <video
+        #videoPlayer
+        autoplay
+        muted
+        (timeupdate)="onTimeUpdate(videoPlayer)"
+        (loadedmetadata)="onLoadedMetadata(videoPlayer)"
+        [src]="
+          'http://localhost:' +
+          globalService.serverPort +
+          '/file?path=' +
+          data
+        "
+      ></video>
+    </div>
+    <footer>
+      <button class="squared" (click)="playPause()">
+        <i
+          class="fa-sharp fa-solid"
+          [class.fa-pause]="playing"
+          [class.fa-play]="!playing"
+        ></i>
+      </button>
+      <button class="squared" (click)="cut()">
+        <i class="fa-sharp fa-solid fa-scissors"></i>
+      </button>
+      <div #videoBar class="bar" (mousedown)="mouseDownOnBar($event)">
+        <div class="chunks">
+          <div
+            *ngFor="let chunk of chunks"
+            class="chunk"
+            [class.removed]="chunk.remove"
+            [style.left]="(chunk.start / videoDuration * 100) + '%'"
+            [style.width]="((chunk.end - chunk.start) / videoDuration * 100) + '%'"
+          >
+            <button
+              *ngIf="chunks.length > 1"
+              class="squared"
+              [class.green]="chunk.remove"
+              [class.red]="!chunk.remove"
+              (click)="removeChunk(chunk, $event)"
+            >
+              <i
+                class="fa-sharp fa-solid"
+                [class.fa-arrow-up]="chunk.remove"
+                [class.fa-trash]="!chunk.remove"
+              ></i>
+            </button>
+          </div>
+        </div>
+        <div
+          class="cursor"
+          [style.left]="(videoCurrentTime / (videoDuration + 12)) * 100 + '%'"
+        >
+          <div><div></div></div>
+        </div>
+      </div>
+      <button class="squared green">
+        <i class="fa-sharp fa-solid fa-floppy-disk"></i>
+      </button>
+    </footer>
+  </div>
+</mat-dialog-content>

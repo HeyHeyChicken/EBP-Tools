@@ -14,7 +14,7 @@
     },
     "replay_cutter": {
       "wrongResolution": "Ihr Video muss in {{ expectedHeight }}p sein, Ihres ist in {{ currentHeight }}p.",
-      "inputFile": "Klicken Sie hier, um Ihre Videodatei zu senden",
+      "inputTrainingFile": "Klicken Sie hier, um Ihre Trainingsvideodatei automatisch zu schneiden",
       "videoIsBeingAnalyzed": "Bitte warten, das Video wird gerade analysiert...",
       "nbGamesFound": "Anzahl gefundener Spiele",
       "save": "Speichern",
@@ -80,7 +80,8 @@
           "title": "EBPs KI-Analyse ist in der Beta",
           "description": "<b>Bald verfügbar:</b><br/>Analyse Ihrer Spiele mit EBPs KI!<br/>Derzeit in der finalen Entwicklungsphase und von einigen Benutzern in der BETA getestet, kommt sie sehr bald…<br/>Noch ein wenig Geduld!"
         }
-      }
+      },
+      "inputOfficialFile": "Klicken Sie hier, um Ihre offizielle Videodatei manuell zu schneiden"
     },
     "game_history": {
       "title": "Exportieren Sie Ihren Spielverlauf",
