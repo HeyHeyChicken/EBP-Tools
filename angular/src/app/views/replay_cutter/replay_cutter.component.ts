@@ -47,6 +47,7 @@ import { ReplayCutterCheckPlayersOrderDialog } from './dialog/check-players-orde
 import { ReplayCutterReplayUploadedDialog } from './dialog/replay-uploaded/replay-uploaded.dialog';
 import { ReplayCutterBetaRequiredDialog } from './dialog/beta-required/beta-required.dialog';
 import { ReplayCutterManualVideoCutDialog } from './dialog/manual-video-cut/manual-video-cut.dialog';
+import { VideoChunk } from './models/video-chunk';
 
 //#endregion
 @Component({
@@ -159,8 +160,10 @@ export class ReplayCutterComponent implements OnInit {
               maxWidth: DIALOG_WIDTH
             })
             .afterClosed()
-            .subscribe((response: any) => {
-              console.log(response);
+            .subscribe((response: VideoChunk[] | undefined) => {
+              if (response) {
+                console.log(response);
+              }
             });
         }
         this.miniMapPositionsByMap = {};

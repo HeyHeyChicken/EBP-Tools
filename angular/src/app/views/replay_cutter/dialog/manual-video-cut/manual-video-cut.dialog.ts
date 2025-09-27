@@ -9,7 +9,6 @@ import {
   ElementRef,
   HostListener,
   Inject,
-  OnInit,
   ViewChild
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -32,7 +31,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   imports: [CommonModule, MatDialogModule, TranslateModule, MatTooltipModule],
   standalone: true
 })
-export class ReplayCutterManualVideoCutDialog implements OnInit {
+export class ReplayCutterManualVideoCutDialog {
   //#region Attributes
 
   @ViewChild('videoPlayer') video: ElementRef<HTMLVideoElement> | undefined;
@@ -56,20 +55,46 @@ export class ReplayCutterManualVideoCutDialog implements OnInit {
 
   //#region Functions
 
-  ngOnInit(): void {}
+  /**
+   * Submit the video chunks and close the dialog.
+   * Only submits if the button is not disabled.
+   */
+  protected submit(): void {
+    if (!this.submitButtonIsDisabled) {
+      this.dialogRef.close(this.chunks);
+    }
+  }
 
-  protected submit(): void {}
+  /**
+   * Check if the submit button should be disabled.
+   * @returns True if no chunks are marked for removal, false otherwise.
+   */
+  protected get submitButtonIsDisabled(): boolean {
+    return !this.chunks.some((chunk) => chunk.remove === true);
+  }
 
+  /**
+   * Update the current time when the video position changes.
+   * @param video HTML video element.
+   */
   protected onTimeUpdate(video: HTMLVideoElement) {
     this.videoCurrentTime = video.currentTime;
   }
 
+  /**
+   * When the video metadata is loaded, the video duration is stored and we create the initial chunk.
+   * @param video HTML video element.
+   */
   protected onLoadedMetadata(video: HTMLVideoElement) {
     this.videoDuration = video.duration;
 
-    this.chunks.push(new VideoChunk(0, this.videoDuration));
+    this.chunks = [new VideoChunk(0, this.videoDuration)];
   }
 
+  /**
+   * Get the current playing state of the video.
+   * @returns True if the video is playing, false if paused or video element is not available.
+   */
   protected get playing(): boolean {
     if (this.video) {
       return !this.video.nativeElement.paused;
@@ -77,11 +102,20 @@ export class ReplayCutterManualVideoCutDialog implements OnInit {
     return false;
   }
 
+  /**
+   * Add or subtract time to/from the current video position.
+   * @param video HTML video element.
+   * @param timeToAdd Time in seconds to add or subtract.
+   */
   protected addVideoTime(video: HTMLVideoElement, timeToAdd: number): void {
     this.videoCurrentTime += timeToAdd;
     video.currentTime = this.videoCurrentTime;
   }
 
+  /**
+   * Split a video chunk at the current time position.
+   * Creates a new chunk from the start of the current chunk to the current time, and modifies the existing chunk to start from the current time.
+   */
   protected cut(): void {
     if (this.video) {
       for (let i = 0; i < this.chunks.length; i++) {
@@ -100,31 +134,33 @@ export class ReplayCutterManualVideoCutDialog implements OnInit {
     }
   }
 
+  /**
+   * Toggle the removal state of a video chunk.
+   * @param chunk The video chunk to toggle.
+   * @param event Mouse event to prevent propagation.
+   */
   protected removeChunk(chunk: VideoChunk, event: MouseEvent): void {
     chunk.remove = !chunk.remove;
     event.stopPropagation();
   }
 
-  protected playPause(): void {
-    if (this.video) {
-      if (this.playing) {
-        this.video.nativeElement.pause();
-      } else {
-        this.video.nativeElement.play();
-      }
+  /**
+   * Toggle video playback between play and pause states.
+   * @param video HTML video element to control.
+   */
+  protected playPause(video: HTMLVideoElement): void {
+    if (this.playing) {
+      video.pause();
+    } else {
+      video.play();
     }
   }
 
-  @HostListener('document:mouseup', ['$event'])
-  handleMouseUpEvent() {
-    this.frameCursorDragging = false;
-
-    const VIDEO = this.video?.nativeElement;
-    if (VIDEO && this.videoWasPlaying) {
-      VIDEO.play();
-    }
-  }
-
+  /**
+   * Handle mouse down event on the video progress bar to seek to a specific position.
+   * Pauses video if playing, starts dragging mode, and calculates the clicked position.
+   * @param event Mouse down event.
+   */
   protected mouseDownOnBar(event: Event): void {
     if (event.target) {
       const BAR = this.bar?.nativeElement;
@@ -150,6 +186,23 @@ export class ReplayCutterManualVideoCutDialog implements OnInit {
     }
   }
 
+  /**
+   * Handle mouse up event to stop dragging and resume video playback if it was playing before.
+   */
+  @HostListener('document:mouseup', ['$event'])
+  handleMouseUpEvent() {
+    this.frameCursorDragging = false;
+
+    const VIDEO = this.video?.nativeElement;
+    if (VIDEO && this.videoWasPlaying) {
+      VIDEO.play();
+    }
+  }
+
+  /**
+   * Handle mouse move event during dragging to continuously update video position.
+   * @param event Mouse move event.
+   */
   @HostListener('document:mousemove', ['$event'])
   handleMouseMoveEvent(event: MouseEvent) {
     if (this.frameCursorDragging) {

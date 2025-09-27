@@ -5,7 +5,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
 <mat-dialog-content #matDialogContent>
-  <button class="squared" matTooltip="{{ 'common.close' | translate }}">
+  <button
+    class="squared"
+    mat-dialog-close
+    matTooltip="{{ 'common.close' | translate }}"
+  >
     <i class="fa-sharp fa-solid fa-xmark"></i>
   </button>
   <div class="d-flex">
@@ -13,7 +17,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
       <video
         #videoPlayer
         autoplay
-        muted
+        [muted]="true"
         (timeupdate)="onTimeUpdate(videoPlayer)"
         (loadedmetadata)="onLoadedMetadata(videoPlayer)"
         [src]="
@@ -35,7 +39,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
       </button>
       <button
         class="squared"
-        (click)="playPause()"
+        (click)="playPause(videoPlayer)"
         matTooltipPosition="above"
         matTooltip="{{ 'view.replay_cutter.dialog.manual-video-cut.' + (playing ? 'pause' : 'play' )| translate }}"
       >
@@ -96,8 +100,10 @@ See LICENSE for terms. Unauthorized use is prohibited.
       </div>
       <button
         class="squared green"
+        [class.disabled]="submitButtonIsDisabled"
         matTooltipPosition="above"
         matTooltip="{{ 'common.save' | translate }}"
+        (click)="submit()"
       >
         <i class="fa-sharp fa-solid fa-floppy-disk"></i>
       </button>
