@@ -30,7 +30,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
         </ebp-column>
         <ebp-column [xs]="6">
           <div class="p-relative h-100">
-            <div class="dropper right" [class.disabled]="true">
+            <div
+              class="dropper right"
+              [class.disabled]="inputFileDisabled"
+              (click)="onInputFileClick(false)"
+            >
               <div class="icon">
                 <i class="fa-sharp fa-solid fa-trophy"></i>
               </div>

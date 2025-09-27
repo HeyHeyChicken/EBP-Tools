@@ -4,7 +4,8 @@
     "cancel": "Cancel",
     "reset": "Reset",
     "settings": "Settings",
-    "close": "Close"
+    "close": "Close",
+    "save": "Save"
   },
   "view": {
     "home": {
@@ -17,7 +18,6 @@
       "inputTrainingFile": "Click here to auto cut your training video file",
       "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
       "nbGamesFound": "Number of games found",
-      "save": "Save",
       "saveAll": "Save selected games",
       "copyTimecodes": "Copy selected games timecodes",
       "map": "Map",
@@ -79,6 +79,13 @@
         "beta-required": {
           "title": "EBP's AI analysis is in beta",
           "description": "<b>Coming soon:</b><br/>analysis of your games using EBP's AI!<br/>Currently in final development phase and tested in BETA by a few users, it's coming very soon…<br/>Just a little more patience!"
+        },
+        "manual-video-cut": {
+          "removeTime": "-1 second",
+          "addTime": "+1 second",
+          "play": "Play",
+          "pause": "Pause",
+          "cut": "Cut"
         }
       },
       "inputOfficialFile": "Click here to manually cut your official video file"

@@ -5,6 +5,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
 <mat-dialog-content #matDialogContent>
+  <button class="squared" matTooltip="{{ 'common.close' | translate }}">
+    <i class="fa-sharp fa-solid fa-xmark"></i>
+  </button>
   <div class="d-flex">
     <div>
       <video
@@ -22,20 +25,47 @@ See LICENSE for terms. Unauthorized use is prohibited.
       ></video>
     </div>
     <footer>
-      <button class="squared" (click)="playPause()">
+      <button
+        class="squared"
+        (click)="addVideoTime(videoPlayer, -1)"
+        matTooltipPosition="above"
+        matTooltip="{{ 'view.replay_cutter.dialog.manual-video-cut.removeTime' | translate }}"
+      >
+        <i class="fa-sharp fa-solid fa-backward"></i>
+      </button>
+      <button
+        class="squared"
+        (click)="playPause()"
+        matTooltipPosition="above"
+        matTooltip="{{ 'view.replay_cutter.dialog.manual-video-cut.' + (playing ? 'pause' : 'play' )| translate }}"
+      >
         <i
           class="fa-sharp fa-solid"
           [class.fa-pause]="playing"
           [class.fa-play]="!playing"
         ></i>
       </button>
-      <button class="squared" (click)="cut()">
+      <button
+        class="squared"
+        (click)="addVideoTime(videoPlayer, +1)"
+        matTooltipPosition="above"
+        matTooltip="{{ 'view.replay_cutter.dialog.manual-video-cut.addTime' | translate }}"
+      >
+        <i class="fa-sharp fa-solid fa-forward"></i>
+      </button>
+      <hr />
+      <button
+        class="squared"
+        (click)="cut()"
+        matTooltipPosition="above"
+        matTooltip="{{ 'view.replay_cutter.dialog.manual-video-cut.cut' | translate }}"
+      >
         <i class="fa-sharp fa-solid fa-scissors"></i>
       </button>
       <div #videoBar class="bar" (mousedown)="mouseDownOnBar($event)">
         <div class="chunks">
+          @for(chunk of chunks; track $index){
           <div
-            *ngFor="let chunk of chunks"
             class="chunk"
             [class.removed]="chunk.remove"
             [style.left]="(chunk.start / videoDuration * 100) + '%'"
@@ -46,7 +76,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
               class="squared"
               [class.green]="chunk.remove"
               [class.red]="!chunk.remove"
-              (click)="removeChunk(chunk, $event)"
+              (mousedown)="removeChunk(chunk, $event)"
             >
               <i
                 class="fa-sharp fa-solid"
@@ -55,6 +85,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
               ></i>
             </button>
           </div>
+          }
         </div>
         <div
           class="cursor"
@@ -63,7 +94,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
           <div><div></div></div>
         </div>
       </div>
-      <button class="squared green">
+      <button
+        class="squared green"
+        matTooltipPosition="above"
+        matTooltip="{{ 'common.save' | translate }}"
+      >
         <i class="fa-sharp fa-solid fa-floppy-disk"></i>
       </button>
     </footer>

@@ -21,6 +21,7 @@ import {
 import { TranslateModule } from '@ngx-translate/core';
 import { GlobalService } from '../../../../core/services/global.service';
 import { VideoChunk } from '../../models/video-chunk';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 //#endregion
 
@@ -28,7 +29,7 @@ import { VideoChunk } from '../../models/video-chunk';
   selector: 'replay-cutter-dialog-manual-video-cut',
   templateUrl: './manual-video-cut.dialog.html',
   styleUrls: ['./manual-video-cut.dialog.scss'],
-  imports: [CommonModule, MatDialogModule, TranslateModule],
+  imports: [CommonModule, MatDialogModule, TranslateModule, MatTooltipModule],
   standalone: true
 })
 export class ReplayCutterManualVideoCutDialog implements OnInit {
@@ -59,12 +60,12 @@ export class ReplayCutterManualVideoCutDialog implements OnInit {
 
   protected submit(): void {}
 
-  protected onTimeUpdate(player: HTMLVideoElement) {
-    this.videoCurrentTime = player.currentTime;
+  protected onTimeUpdate(video: HTMLVideoElement) {
+    this.videoCurrentTime = video.currentTime;
   }
 
-  protected onLoadedMetadata(player: HTMLVideoElement) {
-    this.videoDuration = player.duration;
+  protected onLoadedMetadata(video: HTMLVideoElement) {
+    this.videoDuration = video.duration;
 
     this.chunks.push(new VideoChunk(0, this.videoDuration));
   }
@@ -74,6 +75,11 @@ export class ReplayCutterManualVideoCutDialog implements OnInit {
       return !this.video.nativeElement.paused;
     }
     return false;
+  }
+
+  protected addVideoTime(video: HTMLVideoElement, timeToAdd: number): void {
+    this.videoCurrentTime += timeToAdd;
+    video.currentTime = this.videoCurrentTime;
   }
 
   protected cut(): void {
@@ -131,10 +137,10 @@ export class ReplayCutterManualVideoCutDialog implements OnInit {
 
         this.frameCursorDragging = true;
         const POINTER_EVENT = event as PointerEvent;
-        let x: number = POINTER_EVENT.offsetX;
-        if (x < 0) {
-          x = 0;
-        }
+        let x: number = Math.max(
+          0,
+          POINTER_EVENT.clientX - BAR.getBoundingClientRect().left
+        );
         this.videoCurrentTime = Math.min(
           Math.ceil((x / BAR.clientWidth) * this.videoDuration),
           this.videoDuration

@@ -4,7 +4,8 @@
     "cancel": "Abbrechen",
     "reset": "Zurücksetzen",
     "settings": "Einstellungen",
-    "close": "Schließen"
+    "close": "Schließen",
+    "save": "Speichern"
   },
   "view": {
     "home": {
@@ -17,7 +18,6 @@
       "inputTrainingFile": "Klicken Sie hier, um Ihre Trainingsvideodatei automatisch zu schneiden",
       "videoIsBeingAnalyzed": "Bitte warten, das Video wird gerade analysiert...",
       "nbGamesFound": "Anzahl gefundener Spiele",
-      "save": "Speichern",
       "saveAll": "Ausgewählte Spiele speichern",
       "copyTimecodes": "Zeitstempel der ausgewählten Spiele kopieren",
       "map": "Karte",
@@ -79,6 +79,13 @@
         "beta-required": {
           "title": "EBPs KI-Analyse ist in der Beta",
           "description": "<b>Bald verfügbar:</b><br/>Analyse Ihrer Spiele mit EBPs KI!<br/>Derzeit in der finalen Entwicklungsphase und von einigen Benutzern in der BETA getestet, kommt sie sehr bald…<br/>Noch ein wenig Geduld!"
+        },
+        "manual-video-cut": {
+          "removeTime": "-1 Sekunde",
+          "addTime": "+1 Sekunde",
+          "play": "Abspielen",
+          "pause": "Pause",
+          "cut": "Schneiden"
         }
       },
       "inputOfficialFile": "Klicken Sie hier, um Ihre offizielle Videodatei manuell zu schneiden"

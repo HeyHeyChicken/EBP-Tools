@@ -4,7 +4,8 @@
     "cancel": "Cancelar",
     "reset": "Restablecer",
     "settings": "Configuración",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "save": "Guardar"
   },
   "view": {
     "home": {
@@ -17,7 +18,6 @@
       "inputTrainingFile": "Haga clic aquí para cortar automáticamente su archivo de video de entrenamiento",
       "videoIsBeingAnalyzed": "Por favor espera, el video está siendo analizado...",
       "nbGamesFound": "Número de juegos encontrados",
-      "save": "Guardar",
       "saveAll": "Guardar juegos seleccionados",
       "copyTimecodes": "Copiar códigos de tiempo de juegos seleccionados",
       "map": "Mapa",
@@ -79,6 +79,13 @@
         "beta-required": {
           "title": "El análisis IA de EBP está en beta",
           "description": "<b>Próximamente disponible:</b><br/>¡análisis de tus partidas gracias a la IA de EBP!<br/>Actualmente en última fase de desarrollo y probada en BETA por algunos usuarios, llega muy pronto…<br/>¡Un poco más de paciencia!"
+        },
+        "manual-video-cut": {
+          "removeTime": "-1 segundo",
+          "addTime": "+1 segundo",
+          "play": "Reproducir",
+          "pause": "Pausa",
+          "cut": "Cortar"
         }
       },
       "inputOfficialFile": "Haga clic aquí para cortar manualmente su archivo de video oficial"

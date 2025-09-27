@@ -4,7 +4,8 @@
     "cancel": "Anulează",
     "reset": "Resetare",
     "settings": "Setări",
-    "close": "Închide"
+    "close": "Închide",
+    "save": "Salvează"
   },
   "view": {
     "home": {
@@ -17,7 +18,6 @@
       "inputTrainingFile": "Faceți clic aici pentru a tăia automat fișierul video de antrenament",
       "videoIsBeingAnalyzed": "Te rugăm să aștepți, videoclipul este analizat...",
       "nbGamesFound": "Număr de jocuri găsite",
-      "save": "Salvează",
       "saveAll": "Salvează jocurile selectate",
       "copyTimecodes": "Copiază codurile de timp ale jocurilor selectate",
       "map": "Hartă",
@@ -79,6 +79,13 @@
         "beta-required": {
           "title": "Analiza IA a EBP este în beta",
           "description": "<b>Disponibilă în curând:</b><br/>analiza jocurilor tale datorită AI-ului EBP!<br/>În prezent în faza finală de dezvoltare și testată în BETA de câțiva utilizatori, vine foarte curând…<br/>Încă puțină răbdare!"
+        },
+        "manual-video-cut": {
+          "removeTime": "-1 secundă",
+          "addTime": "+1 secundă",
+          "play": "Redare",
+          "pause": "Pauză",
+          "cut": "Tăiere"
         }
       },
       "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"
