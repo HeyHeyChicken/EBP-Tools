@@ -54,7 +54,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   extractPrivatePseudoGames: (tag, nbPages, seasonIndex, skip, timeToWait) => ipcRenderer.invoke("extract-private-pseudo-games", tag, nbPages, seasonIndex, skip, timeToWait),
   // The front-end asks the server to crop, cut and upload a video to the EBP's S3 server.
   uploadGameMiniMap: (game, cropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames) => ipcRenderer.invoke("upload-game-mini-map", game, cropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames),
-
+  // The front-end asks the server to cut a video file manualy edited.
+  manualCutVideoFile: (videoPath, chunks) => ipcRenderer.invoke("manual-cut-video-file", videoPath, chunks),
+  
   //#endregion
 
   //#region Server -> Client

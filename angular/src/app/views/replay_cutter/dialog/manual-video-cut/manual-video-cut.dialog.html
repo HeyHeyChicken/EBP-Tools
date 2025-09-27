@@ -9,25 +9,25 @@ See LICENSE for terms. Unauthorized use is prohibited.
     class="squared"
     mat-dialog-close
     matTooltip="{{ 'common.close' | translate }}"
+    [class.invisible]="loading"
   >
     <i class="fa-sharp fa-solid fa-xmark"></i>
   </button>
-  <div class="d-flex">
-    <div>
-      <video
-        #videoPlayer
-        autoplay
-        [muted]="true"
-        (timeupdate)="onTimeUpdate(videoPlayer)"
-        (loadedmetadata)="onLoadedMetadata(videoPlayer)"
-        [src]="
+  <div class="d-flex" [class.invisible]="loading">
+    <video
+      #videoPlayer
+      autoplay
+      [muted]="true"
+      (timeupdate)="onTimeUpdate(videoPlayer)"
+      (loadedmetadata)="onLoadedMetadata(videoPlayer)"
+      (loadeddata)="resizeVideo()"
+      [src]="
           'http://localhost:' +
           globalService.serverPort +
           '/file?path=' +
           data
         "
-      ></video>
-    </div>
+    ></video>
     <footer>
       <button
         class="squared"
@@ -109,4 +109,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
       </button>
     </footer>
   </div>
+  @if(loading){
+  <mat-spinner></mat-spinner>
+  }
 </mat-dialog-content>

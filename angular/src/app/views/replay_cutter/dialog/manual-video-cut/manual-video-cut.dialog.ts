@@ -14,6 +14,7 @@ import {
 import { CommonModule } from '@angular/common';
 import {
   MAT_DIALOG_DATA,
+  MatDialogContent,
   MatDialogModule,
   MatDialogRef
 } from '@angular/material/dialog';
@@ -21,6 +22,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { GlobalService } from '../../../../core/services/global.service';
 import { VideoChunk } from '../../models/video-chunk';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 //#endregion
 
@@ -28,7 +30,13 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   selector: 'replay-cutter-dialog-manual-video-cut',
   templateUrl: './manual-video-cut.dialog.html',
   styleUrls: ['./manual-video-cut.dialog.scss'],
-  imports: [CommonModule, MatDialogModule, TranslateModule, MatTooltipModule],
+  imports: [
+    CommonModule,
+    MatDialogModule,
+    TranslateModule,
+    MatTooltipModule,
+    MatProgressSpinnerModule
+  ],
   standalone: true
 })
 export class ReplayCutterManualVideoCutDialog {
@@ -36,6 +44,9 @@ export class ReplayCutterManualVideoCutDialog {
 
   @ViewChild('videoPlayer') video: ElementRef<HTMLVideoElement> | undefined;
   @ViewChild('videoBar') bar: ElementRef<HTMLDivElement> | undefined;
+  @ViewChild('matDialogContent') matDialogContent:
+    | ElementRef<MatDialogContent>
+    | undefined;
 
   protected videoCurrentTime: number = 0;
   protected videoDuration: number = 0;
@@ -44,6 +55,7 @@ export class ReplayCutterManualVideoCutDialog {
 
   protected chunks: VideoChunk[] = [];
   protected frameCursorDragging: boolean = false;
+  protected loading: boolean = true;
 
   //#endregion
 
@@ -51,7 +63,10 @@ export class ReplayCutterManualVideoCutDialog {
     protected readonly globalService: GlobalService,
     private readonly dialogRef: MatDialogRef<ReplayCutterManualVideoCutDialog>,
     @Inject(MAT_DIALOG_DATA) public readonly data: string
-  ) {}
+  ) {
+    // We resize the window to full screen.
+    window.electronAPI.setWindowSize(0, 0);
+  }
 
   //#region Functions
 
@@ -221,6 +236,39 @@ export class ReplayCutterManualVideoCutDialog {
         VIDEO.currentTime = this.videoCurrentTime;
       }
     }
+  }
+
+  protected resizeVideo(): void {
+    if (this.matDialogContent) {
+      const DIFFERENCE1 = this.hasScrollbar(
+        document.querySelector('.mat-mdc-dialog-surface')
+      );
+      const DIFFERENCE2 = this.hasScrollbar(
+        this.matDialogContent.nativeElement
+      );
+      if (DIFFERENCE1 > 0 || DIFFERENCE2 > 0) {
+        this.video!.nativeElement.height =
+          this.video!.nativeElement.clientHeight - 12;
+
+        setTimeout(() => {
+          this.resizeVideo();
+        });
+      } else {
+        const DIALOG = document.querySelector('.mat-mdc-dialog-surface');
+        const INNER = document.querySelector('#container');
+        if (INNER && DIALOG) {
+          const DIFFERENCE = DIALOG.clientHeight - INNER.clientHeight;
+          if (DIFFERENCE > 0) {
+            (DIALOG as any).style.height = INNER.clientHeight + 12 * 2 + 'px';
+          }
+        }
+        this.loading = false;
+      }
+    }
+  }
+
+  private hasScrollbar(element: any): number {
+    return element.scrollHeight - element.clientHeight;
   }
 
   //#endregion

@@ -70,6 +70,7 @@ export interface ElectronAPI {
     sortedOrangePlayersNames: string[],
     sortedBluePlayersNames: string[]
   ) => void;
+  manualCutVideoFile: (videoPath?: string, chunks: VideoChunk[]) => void;
 
   //#endregion
 

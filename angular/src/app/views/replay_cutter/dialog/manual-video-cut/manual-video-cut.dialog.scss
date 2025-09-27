@@ -5,6 +5,19 @@
 @use '../../../../../styles/imports/variables' as variables;
 
 mat-dialog-content {
+  overflow: hidden;
+
+  > mat-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .invisible {
+    opacity: 0;
+  }
+
   > button {
     position: absolute;
     top: variables.$margin;
@@ -13,14 +26,6 @@ mat-dialog-content {
   }
   > .d-flex {
     flex-direction: column;
-
-    > div {
-      border: 1px solid variables.$border_color;
-
-      > video {
-        width: 100%;
-      }
-    }
 
     > footer {
       margin-top: variables.$margin;

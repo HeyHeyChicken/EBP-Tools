@@ -22,7 +22,7 @@ if (require('electron-squirrel-startup')) {
 const path = require('node:path');
 const express = require('express');
 const os = require('os');
-const { exec, spawn } = require('child_process');
+const { exec, spawn, execSync } = require('child_process');
 const { default: getPort } = require('get-port');
 const { version } = require('../package.json');
 const https = require('https');
@@ -386,6 +386,51 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
+     * Resize the main window to specified dimensions or fullscreen.
+     * Automatically retries if the initial resize fails.
+     * @param {number} width Target width (0 for fullscreen width, undefined for default)
+     * @param {number} height Target height (0 for fullscreen height, undefined for default)
+     */
+    function setWindowSize(width, height) {
+        const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
+        let targetWidth = 0;
+        let targetHeight = 0;
+
+        // Reset to default size
+        if (width === undefined || height === undefined) {
+            targetWidth = Math.min(
+                PRIMARY_DISPLAY.workAreaSize.width,
+                WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0)
+            );
+            targetHeight = Math.min(
+                PRIMARY_DISPLAY.workAreaSize.height,
+                WINDOW_HEIGHT
+            );
+        }
+        // Full screen
+        else if (width == 0 && height == 0) {
+            targetWidth = PRIMARY_DISPLAY.workAreaSize.width;
+            targetHeight = PRIMARY_DISPLAY.workAreaSize.height;
+        } else {
+            targetWidth = width;
+            targetHeight = height;
+        }
+
+        mainWindow.setSize(targetWidth, targetHeight);
+        mainWindow.center();
+
+        // Verify the resize was successful and retry if needed
+        setTimeout(() => {
+            const NEW_SIZE = mainWindow.getSize();
+            const SUCCESS =
+                NEW_SIZE[0] === targetWidth && NEW_SIZE[1] === targetHeight;
+            if (!SUCCESS) {
+                setWindowSize(width, height);
+            }
+        }, 100);
+    }
+
+    /**
      * Upscales a video to 1920x1080 resolution using FFmpeg with progress tracking.
      * Sends real-time progress updates to the main window.
      * @param inputPath Path to the source video file to upscale.
@@ -629,6 +674,42 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
+     * Cut video into segments without re-encoding using FFmpeg.
+     * Extracts only the chunks that are not marked for removal and concatenates them.
+     * @param {string} input Path to the input video file
+     * @param {string} output Path for the output video file
+     * @param {Array} chunks Array of video chunks with start, end, and remove properties
+     */
+    function cutWithoutReencode(input, output, chunks) {
+        const KEEP = chunks
+            .filter((c) => !c.remove)
+            .sort((a, b) => a.start - b.start);
+        const TEMP_FILES = [];
+
+        KEEP.forEach((c, i) => {
+            const TEMP_FILE = `/tmp/part_${i}.mp4`;
+            TEMP_FILES.push(TEMP_FILE);
+            execSync(
+                `"${FFMPEG_PATH}" -i "${input}" -ss ${c.start} -to ${c.end} -c copy "${TEMP_FILE}"`
+            );
+        });
+
+        // Create concat file
+        const CONCAT_FILE = '/tmp/concat.txt';
+        const CONCAT_CONTENT = TEMP_FILES.map((f) => `file '${f}'`).join('\n');
+        fs.writeFileSync(CONCAT_FILE, CONCAT_CONTENT);
+
+        // Concatenate
+        execSync(
+            `"${FFMPEG_PATH}" -f concat -safe 0 -i "${CONCAT_FILE}" -c copy "${output}"`
+        );
+
+        // Clean
+        fs.unlinkSync(CONCAT_FILE);
+        TEMP_FILES.forEach((file) => fs.unlinkSync(file));
+    }
+
+    /**
      * This function initializes the front-end.
      */
     function createWindow() {
@@ -820,27 +901,7 @@ let projectLatestVersion /* string */ = '';
 
         // The front-end asks the server to resize the main frame;
         ipcMain.handle('set-window-size', (event, width, height) => {
-            const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
-            // Reset to default size
-            if (width === undefined || height === undefined) {
-                mainWindow.setSize(
-                    Math.min(
-                        PRIMARY_DISPLAY.workAreaSize.width,
-                        WINDOW_WIDTH + (!isProd ? WINDOW_DEV_PANEL_WIDTH : 0)
-                    ),
-                    Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT)
-                );
-            }
-            // Full screen
-            else if (width == 0 && height == 0) {
-                mainWindow.setSize(
-                    PRIMARY_DISPLAY.workAreaSize.width,
-                    PRIMARY_DISPLAY.workAreaSize.height
-                );
-            } else {
-                mainWindow.setSize(width, height);
-            }
-            mainWindow.center();
+            setWindowSize(width, height);
         });
 
         // The front-end asks the server to return the user's operating system.
@@ -1142,6 +1203,28 @@ let projectLatestVersion /* string */ = '';
                         }
                     );
                 }
+            }
+        );
+
+        // The front-end asks the server to cut a video file manualy edited.
+        ipcMain.handle(
+            'manual-cut-video-file',
+            async (event, videoPath, chunks) => {
+                const SPLIT = videoPath.split('.');
+                const FILE_EXTENSION = SPLIT[SPLIT.length - 1];
+                const OUTPUT_FILE_PATH /* string */ = path.join(
+                    getOutputPath(
+                        'videoCutterOutputPath',
+                        path.join(os.homedir(), 'Downloads')
+                    ),
+                    `temp.${FILE_EXTENSION}`
+                );
+                unlinkSync(OUTPUT_FILE_PATH);
+
+                cutWithoutReencode(videoPath, OUTPUT_FILE_PATH, chunks);
+
+                console.log(OUTPUT_FILE_PATH);
+                mainWindow.webContents.send('set-video-file', OUTPUT_FILE_PATH);
             }
         );
 

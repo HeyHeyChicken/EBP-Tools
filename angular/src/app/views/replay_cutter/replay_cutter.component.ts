@@ -150,21 +150,26 @@ export class ReplayCutterComponent implements OnInit {
             this.percent = 0;
           }
         } else {
-          const URL = encodeURIComponent(path);
-          const DIALOG_WIDTH = 'calc(100vw - 12px * 4)';
-          this.dialogService
-            .open(ReplayCutterManualVideoCutDialog, {
-              autoFocus: false,
-              data: URL,
-              width: DIALOG_WIDTH,
-              maxWidth: DIALOG_WIDTH
-            })
-            .afterClosed()
-            .subscribe((response: VideoChunk[] | undefined) => {
-              if (response) {
-                console.log(response);
-              }
-            });
+          if (path) {
+            const URL = encodeURIComponent(path);
+            const DIALOG_WIDTH = 'calc(100vw - 12px * 4)';
+            this.dialogService
+              .open(ReplayCutterManualVideoCutDialog, {
+                autoFocus: false,
+                data: URL,
+                width: DIALOG_WIDTH,
+                maxWidth: DIALOG_WIDTH
+              })
+              .afterClosed()
+              .subscribe((response: VideoChunk[] | undefined) => {
+                window.electronAPI.setWindowSize();
+                if (response) {
+                  this.training = true;
+                  this.globalService.loading = '';
+                  window.electronAPI.manualCutVideoFile(path, response);
+                }
+              });
+          }
         }
         this.miniMapPositionsByMap = {};
         this.globalService.loading = undefined;
