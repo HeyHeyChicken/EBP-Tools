@@ -61,7 +61,7 @@ export class IdentityService {
   }
 
   public get isBetaUser(): boolean {
-    return this.globalService.betaUsers.includes(this._userID);
+    return (this.globalService.betaUsers ?? []).includes(this._userID);
   }
 
   //#endregion

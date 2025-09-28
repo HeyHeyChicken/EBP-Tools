@@ -645,6 +645,11 @@ let projectLatestVersion /* string */ = '';
                                 'utf-8'
                             );
 
+                            mainWindow.webContents.send(
+                                'set-jwt-access-token',
+                                SETTINGS['jwt'].access_token
+                            );
+
                             if (callback) {
                                 callback(true);
                             }
@@ -1023,7 +1028,10 @@ let projectLatestVersion /* string */ = '';
             );
 
             if (SETTINGS['jwt']) {
-                return SETTINGS['jwt'].access_token;
+                mainWindow.webContents.send(
+                    'set-jwt-access-token',
+                    SETTINGS['jwt'].access_token
+                );
             }
 
             return undefined;
@@ -1223,7 +1231,6 @@ let projectLatestVersion /* string */ = '';
 
                 cutWithoutReencode(videoPath, OUTPUT_FILE_PATH, chunks);
 
-                console.log(OUTPUT_FILE_PATH);
                 mainWindow.webContents.send('set-video-file', OUTPUT_FILE_PATH);
             }
         );

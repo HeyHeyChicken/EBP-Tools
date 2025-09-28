@@ -97,18 +97,20 @@ export class App implements OnInit {
       });
     });
 
-    // Getting logged user informations from his JWT.
-    window.electronAPI.getJWTAccessToken().then((accessToken: string) => {
-      if (accessToken) {
+    window.electronAPI.setJWTAccessToken((accessToken: string) => {
+      this.ngZone.run(() => {
         this.identityService.set(accessToken);
 
-        this.apiRestService.getBetaUsers((betaUsers: number[]) => {
-          this.globalService.betaUsers = betaUsers;
-        });
-      } else {
-        window.location.reload();
-      }
+        if (this.globalService.betaUsers === undefined) {
+          this.apiRestService.getBetaUsers((betaUsers: number[]) => {
+            this.globalService.betaUsers = betaUsers;
+          });
+        }
+      });
     });
+
+    // Getting logged user informations from his JWT.
+    window.electronAPI.getJWTAccessToken();
 
     window.electronAPI.error((i18nPath: string, i18nVariables: object) => {
       this.ngZone.run(() => {

@@ -4,9 +4,14 @@
 
 //#region Imports
 
-import { HttpEvent, HttpHandlerFn, HttpRequest, HttpErrorResponse } from '@angular/common/http';
+import {
+  HttpEvent,
+  HttpHandlerFn,
+  HttpRequest,
+  HttpErrorResponse
+} from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Observable, catchError, throwError } from 'rxjs';
+import { Observable, catchError, throwError, retry, timer, defer } from 'rxjs';
 import { IdentityService } from './services/identity.service';
 
 //#endregion
@@ -30,13 +35,27 @@ export function APIInterceptor(
     return next(req);
   }
 
-  const NEW_REQ = req.clone({
-    setHeaders: {
-      Authorization: `Bearer ${IDENTITY_SERVICE.accessToken}`
-    }
-  });
-
-  return next(NEW_REQ).pipe(
+  return defer(() => {
+    // The token is recovered on each attempt
+    const NEW_REQ = req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${IDENTITY_SERVICE.accessToken}`
+      }
+    });
+    return next(NEW_REQ);
+  }).pipe(
+    retry({
+      count: 5,
+      delay: (error: HttpErrorResponse, retryCount: number) => {
+        if (error.status === 401) {
+          window.electronAPI?.checkJwtToken();
+          // Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s
+          return timer(Math.pow(2, retryCount - 1) * 1000);
+        }
+        // For non-401 errors, don't retry
+        return throwError(() => error);
+      }
+    }),
     catchError((error: HttpErrorResponse) => {
       if (error.status === 401) {
         window.electronAPI?.checkJwtToken();

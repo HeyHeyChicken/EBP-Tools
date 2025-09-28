@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   //#region Server -> Client
 
+  // The server send the JWT value to the font-end.
+  setJWTAccessToken: (callback) => ipcRenderer.on("set-jwt-access-token", (event, accessToken) => callback(accessToken)),
   // The server asks the font-end if the user wants upscaling before analyzing.
   replayCutterUpscale: (callback) => ipcRenderer.on("replay_cutter_upscale", (event, filePath) => callback(filePath)),
   // The server gives the path of the video file selected by the user.
