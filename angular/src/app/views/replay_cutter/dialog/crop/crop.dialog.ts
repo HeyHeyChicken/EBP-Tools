@@ -112,6 +112,9 @@ export class ReplayCutterCropDialog implements OnInit {
     },
     private readonly dialogRef: MatDialogRef<ReplayCutterCropDialog>
   ) {
+    // We resize the window to full screen.
+    window.electronAPI.setWindowSize(0, 0);
+
     if (data.initialCropperPosition) {
       this.cropper = data.initialCropperPosition;
     }
