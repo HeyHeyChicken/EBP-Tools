@@ -17,6 +17,7 @@ export class IdentityService {
 
   private _accessToken: string = '';
   private _userID: number = 0;
+  private _leaderID: number = 0;
   private _email: number = 0;
   private _supporterLevel: number = 0;
 
@@ -32,7 +33,8 @@ export class IdentityService {
     const PAYLOAD = accessToken.split('.')[1];
     const DATA = JSON.parse(atob(PAYLOAD));
 
-    this._userID = parseInt(DATA.sub);
+    this._userID = parseInt(DATA.userID);
+    this._leaderID = parseInt(DATA.sub);
 
     this._email = DATA.email;
 
@@ -50,6 +52,10 @@ export class IdentityService {
 
   public get userID(): number {
     return this._userID;
+  }
+
+  public get leaderID(): number {
+    return this._leaderID;
   }
 
   public get email(): number {
