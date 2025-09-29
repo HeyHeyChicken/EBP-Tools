@@ -28,19 +28,21 @@ export class IdentityService {
   //#region Functions
 
   public set(accessToken: string) {
-    this._accessToken = accessToken;
+    if (accessToken) {
+      this._accessToken = accessToken;
 
-    const PAYLOAD = accessToken.split('.')[1];
-    const DATA = JSON.parse(atob(PAYLOAD));
+      const PAYLOAD = accessToken.split('.')[1];
+      const DATA = JSON.parse(atob(PAYLOAD));
 
-    this._userID = parseInt(DATA.userID);
-    this._leaderID = parseInt(DATA.sub);
+      this._userID = parseInt(DATA.userID);
+      this._leaderID = parseInt(DATA.sub);
 
-    this._email = DATA.email;
+      this._email = DATA.email;
 
-    this._supporterLevel = parseInt(DATA.supporterLevel);
-    if (isNaN(this._supporterLevel)) {
-      this._supporterLevel = 0;
+      this._supporterLevel = parseInt(DATA.supporterLevel);
+      if (isNaN(this._supporterLevel)) {
+        this._supporterLevel = 0;
+      }
     }
   }
 
