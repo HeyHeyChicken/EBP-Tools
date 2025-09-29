@@ -133,7 +133,8 @@
         "replay_downloader": "Téléchargeur de replay",
         "replay_cutter": "Découpeur de replay",
         "game_history": "Historique des parties"
-      }
+      },
+      "getMoreCoins": "Obtenir plus de pièces"
     },
     "footer": {
       "version": "Version",

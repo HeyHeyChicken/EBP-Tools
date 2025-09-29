@@ -133,7 +133,8 @@
         "replay_downloader": "Downloader di replay",
         "replay_cutter": "Taglierina replay",
         "game_history": "Cronologia partite"
-      }
+      },
+      "getMoreCoins": "Ottenere più monete"
     },
     "footer": {
       "version": "Versione",

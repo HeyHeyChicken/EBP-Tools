@@ -133,7 +133,8 @@
         "replay_downloader": "Descargador de repeticiones",
         "replay_cutter": "Cortador de repetición",
         "game_history": "Historial de partidas"
-      }
+      },
+      "getMoreCoins": "Obtener más monedas"
     },
     "footer": {
       "version": "Versión",

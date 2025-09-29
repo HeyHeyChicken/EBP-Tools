@@ -35,6 +35,26 @@ See LICENSE for terms. Unauthorized use is prohibited.
 <!-- #endregion -->
 <!-- #region RIGHT -->
 <div class="right">
+  @if (identityService.isBetaUser) {
+    <div>
+      <div class="coins" (click)="showCoinsPopup = !showCoinsPopup">
+        <ebp-coin></ebp-coin>
+        {{ identityService.coins ?? '...' }}
+        @if (showCoinsPopup) {
+          <div class="shadow"></div>
+          <div class="popup">
+            <button
+              (click)="
+                openURLExternalBrowser(globalService.webSiteURL + '/coins')
+              "
+            >
+              {{ 'shared.header.getMoreCoins' | translate }}
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
   <div class="language_selector">
     <img
       alt="Language flag"

@@ -104,6 +104,10 @@ export class App implements OnInit {
         if (this.globalService.betaUsers === undefined) {
           this.apiRestService.getBetaUsers((betaUsers: number[]) => {
             this.globalService.betaUsers = betaUsers;
+
+            this.apiRestService.getCoins((nbCoins: number) => {
+              this.identityService.coins = nbCoins;
+            });
           });
         }
       });

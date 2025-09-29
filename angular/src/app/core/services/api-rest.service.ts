@@ -65,5 +65,18 @@ export class APIRestService {
       });
   }
 
+  public getCoins(callback: Function): void {
+    const PARAMS = new HttpParams().set('r', 'coins');
+
+    this.httpClient
+      .get<any>(APIRestService.serverURL, {
+        responseType: 'text' as 'json',
+        params: PARAMS
+      })
+      .subscribe((response: string) => {
+        callback(JSON.parse(response));
+      });
+  }
+
   //#endregion
 }

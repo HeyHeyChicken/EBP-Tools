@@ -14,6 +14,7 @@ import { MatSelectChange, MatSelectModule } from '@angular/material/select';
 import { IdentityService } from '../../core/services/identity.service';
 import { GlobalService } from '../../core/services/global.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { CoinComponent } from '../coin/coin.component';
 
 //#endregion
 
@@ -29,12 +30,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     MatFormFieldModule,
     MatSelectModule,
     MatTooltipModule,
-    RouterModule
+    RouterModule,
+    CoinComponent
   ]
 })
 export class HeaderComponent implements OnInit {
   //#region Attributes
 
+  protected showCoinsPopup: boolean = false;
   protected disableLogoutButton: boolean = false;
 
   protected readonly pages: string[] = [

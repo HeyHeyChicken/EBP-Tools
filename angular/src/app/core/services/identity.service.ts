@@ -6,6 +6,7 @@
 
 import { Injectable } from '@angular/core';
 import { GlobalService } from './global.service';
+import { APIRestService } from './api-rest.service';
 
 //#endregion
 
@@ -20,6 +21,8 @@ export class IdentityService {
   private _leaderID: number = 0;
   private _email: number = 0;
   private _supporterLevel: number = 0;
+
+  public coins: number | undefined;
 
   //#endregion
 

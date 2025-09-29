@@ -133,7 +133,8 @@
         "replay_downloader": "Descărcător replay-uri",
         "replay_cutter": "Tăietor replay-uri",
         "game_history": "Istoric jocuri"
-      }
+      },
+      "getMoreCoins": "Obține mai multe monede"
     },
     "footer": {
       "version": "Versiune",

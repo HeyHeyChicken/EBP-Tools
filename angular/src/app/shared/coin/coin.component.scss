@@ -1,0 +1,64 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use '../../../styles/imports/variables' as variables;
+
+:host {
+  --size: 24px;
+
+  height: var(--size);
+  width: var(--size);
+  background-color: #ecba41;
+  border-radius: 50%;
+  border: 1px solid variables.$dark_color;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+  }
+
+  &::before {
+    transform: translate(-50%, -50%) rotate(-20deg);
+    background-color: #f4e070;
+    border-radius: 40%;
+    height: 80%;
+    width: 50%;
+  }
+
+  &::after {
+    transform: translate(-50%, -50%);
+    background-color: #50191e;
+    border-radius: 50%;
+    height: calc(100% / 3 * 2);
+    width: calc(100% / 3 * 2);
+  }
+
+  > i {
+    position: absolute;
+    top: 50%;
+    left: 55%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    color: #e9b84f;
+    font-size: calc(#{var(--size)} * 0.4);
+
+    &:after {
+      content: '';
+      position: absolute;
+      top: 33%;
+      left: 22%;
+      transform: translate(-50%, -50%) rotate(50deg);
+      height: calc(#{var(--size)} * 0.08);
+      width: calc(#{var(--size)} * 0.16);
+      border-radius: 50%;
+      background-color: #fefcfd;
+    }
+  }
+}

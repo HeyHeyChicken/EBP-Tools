@@ -71,6 +71,74 @@ $paddingLeft: calc(#{variables.$margin} * 4);
       float: left;
       cursor: pointer;
       padding: variables.$margin 0;
+
+      > .coins {
+        border: 1px solid variables.$border_color;
+        height: variables.$form_height;
+        box-sizing: border-box;
+        padding: 0 variables.$margin 0 calc(#{variables.$margin} * 2);
+        position: relative;
+        line-height: calc(#{variables.$form_height} - 2px);
+        transition: all ease-in-out 0.2s;
+
+        > ebp-coin {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          transform: translate(-50%, -50%);
+        }
+
+        $goldColor: #ecba41;
+        &:hover {
+          border-color: $goldColor;
+        }
+
+        > .shadow {
+          position: fixed;
+          top: 0;
+          left: 0;
+          height: 100vh;
+          width: 100vw;
+          background-color: rgba(0, 0, 0, 0.5);
+          z-index: 2;
+        }
+
+        > .popup {
+          position: absolute;
+          top: calc(100% + #{variables.$margin});
+          left: 50%;
+          transform: translateX(-50%);
+          background-color: variables.$dark_color;
+          border: 1px solid $goldColor;
+          padding: variables.$margin;
+          z-index: 3;
+
+          &:before,
+          &:after {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            border-style: solid;
+            border-width: 0 6px 10.4px 6px;
+          }
+
+          &:before {
+            transform: translateX(-50%);
+            border-color: transparent transparent $goldColor transparent;
+          }
+
+          &:after {
+            transform: translate(-50%, 2px);
+            border-color: transparent transparent variables.$dark_color
+              transparent;
+          }
+
+          > button {
+            width: max-content;
+          }
+        }
+      }
     }
 
     > .language_selector {
@@ -97,6 +165,7 @@ $paddingLeft: calc(#{variables.$margin} * 4);
         padding: 0 variables.$margin 0 calc(#{variables.$margin} * 4);
         text-transform: uppercase;
         text-align: center;
+        transition: border-color 0.2s ease-in-out;
 
         &:focus {
           outline: none;

@@ -133,7 +133,8 @@
         "replay_downloader": "Wiederholungs-Downloader",
         "replay_cutter": "Wiederholungs-Editor",
         "game_history": "Spielverlauf"
-      }
+      },
+      "getMoreCoins": "Mehr Münzen erhalten"
     },
     "footer": {
       "version": "Version",
