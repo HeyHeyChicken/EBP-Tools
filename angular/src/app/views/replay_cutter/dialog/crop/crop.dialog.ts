@@ -65,11 +65,11 @@ export class ReplayCutterCropDialog implements OnInit {
     return 0;
   }
 
-  private static DEFAULT_CROPPER: CropperPosition = {
+  public static DEFAULT_CROPPER: CropperPosition = {
     x1: 0,
     y1: 0,
     x2: 650,
-    y2: 350
+    y2: 400
   };
 
   protected cropper: CropperPosition = ReplayCutterCropDialog.DEFAULT_CROPPER;
@@ -104,17 +104,41 @@ export class ReplayCutterCropDialog implements OnInit {
     @Inject(MAT_DIALOG_DATA)
     protected data: {
       imgBase64: string;
+      initialCropperPosition: CropperPosition | undefined;
     },
     private readonly dialogRef: MatDialogRef<ReplayCutterCropDialog>
   ) {
-    // We resize the window to full screen.
-    window.electronAPI.setWindowSize(0, 0);
+    if (data.initialCropperPosition) {
+      this.cropper = data.initialCropperPosition;
+    }
   }
 
   //#region Functions
 
   ngOnInit(): void {
-    this.currentImgBase64 = this.data.imgBase64;
+    const SELF = this;
+
+    const IMAGE = new Image();
+    IMAGE.onload = function () {
+      const CANVAS = document.createElement('canvas');
+      CANVAS.width =
+        ReplayCutterCropDialog.DEFAULT_CROPPER.x2 -
+        ReplayCutterCropDialog.DEFAULT_CROPPER.x1;
+      CANVAS.height =
+        ReplayCutterCropDialog.DEFAULT_CROPPER.y2 -
+        ReplayCutterCropDialog.DEFAULT_CROPPER.y1;
+      const CTX = CANVAS.getContext('2d');
+      if (CTX) {
+        CTX.drawImage(
+          IMAGE /* Image */,
+          ReplayCutterCropDialog.DEFAULT_CROPPER.x1 /* Image X */,
+          ReplayCutterCropDialog.DEFAULT_CROPPER.y1 /* Image Y */
+        );
+
+        SELF.currentImgBase64 = CANVAS.toDataURL('image/png');
+      }
+    };
+    IMAGE.src = this.data.imgBase64;
   }
 
   protected onCropperReady(event: Dimensions): void {

@@ -343,6 +343,114 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
+   * Automatically detects the minimap dimensions by analyzing the white borders in the upper left corner of the image.
+   * @param videoFrame The canvas containing the image to be analyzed.
+   * @returns The coordinates of the minimap (x1, y1, x2, y2) or the default values ​​if not found.
+   */
+  private detectMinimap(videoFrame: HTMLCanvasElement): CropperPosition {
+    const BACK: CropperPosition = JSON.parse(
+      JSON.stringify(ReplayCutterCropDialog.DEFAULT_CROPPER)
+    );
+
+    const CTX = videoFrame.getContext('2d');
+    if (CTX) {
+      const IMAGE_DATA = CTX.getImageData(
+        0,
+        0,
+        videoFrame.width,
+        videoFrame.height
+      ).data;
+
+      const MAX_COLOR_DIFFERENCE: number = 50;
+
+      // We are looking for x1
+      l1: for (let x = 0; x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x++) {
+        for (let y = 0; y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y++) {
+          const INDEX = (y * videoFrame.width + x) * 4;
+          const R = IMAGE_DATA[INDEX];
+          const G = IMAGE_DATA[INDEX + 1];
+          const B = IMAGE_DATA[INDEX + 2];
+
+          if (
+            this.colorSimilarity(
+              new RGB(R, G, B),
+              new RGB(255, 255, 255),
+              MAX_COLOR_DIFFERENCE
+            )
+          ) {
+            BACK.x1 = x;
+            break l1;
+          }
+        }
+      }
+
+      // We are looking for x2
+      l1: for (let x = ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x >= 0; x--) {
+        for (let y = 0; y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y++) {
+          const INDEX = (y * videoFrame.width + x) * 4;
+          const R = IMAGE_DATA[INDEX];
+          const G = IMAGE_DATA[INDEX + 1];
+          const B = IMAGE_DATA[INDEX + 2];
+
+          if (
+            this.colorSimilarity(
+              new RGB(R, G, B),
+              new RGB(255, 255, 255),
+              MAX_COLOR_DIFFERENCE
+            )
+          ) {
+            BACK.x2 = x + 1;
+            break l1;
+          }
+        }
+      }
+
+      // We are looking for y1
+      l1: for (let y = 0; y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y++) {
+        for (let x = 0; x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x++) {
+          const INDEX = (y * videoFrame.width + x) * 4;
+          const R = IMAGE_DATA[INDEX];
+          const G = IMAGE_DATA[INDEX + 1];
+          const B = IMAGE_DATA[INDEX + 2];
+
+          if (
+            this.colorSimilarity(
+              new RGB(R, G, B),
+              new RGB(255, 255, 255),
+              MAX_COLOR_DIFFERENCE
+            )
+          ) {
+            BACK.y1 = y;
+            break l1;
+          }
+        }
+      }
+
+      // We are looking for y1
+      l1: for (let y = ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y >= 0; y--) {
+        for (let x = 0; x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x++) {
+          const INDEX = (y * videoFrame.width + x) * 4;
+          const R = IMAGE_DATA[INDEX];
+          const G = IMAGE_DATA[INDEX + 1];
+          const B = IMAGE_DATA[INDEX + 2];
+
+          if (
+            this.colorSimilarity(
+              new RGB(R, G, B),
+              new RGB(255, 255, 255),
+              MAX_COLOR_DIFFERENCE
+            )
+          ) {
+            BACK.y2 = y + 1;
+            break l1;
+          }
+        }
+      }
+    }
+    return BACK;
+  }
+
+  /**
    * This function allows the user to set the game mini map position.
    * @param gameIndex Index of the game to upload.
    * @param gameFromStatistics Game infos from EBP's API.
@@ -366,7 +474,7 @@ export class ReplayCutterComponent implements OnInit {
     if (this._videoPath) {
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        Math.round((this._games[gameIndex].start + 10) * 1000),
+        Math.round((this._games[gameIndex].start + 1) * 1000),
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
@@ -374,7 +482,8 @@ export class ReplayCutterComponent implements OnInit {
             this.dialogService
               .open(ReplayCutterCropDialog, {
                 data: {
-                  imgBase64: videoFrame?.toDataURL('image/png')
+                  imgBase64: videoFrame?.toDataURL('image/png'),
+                  initialCropperPosition: this.detectMinimap(videoFrame)
                 },
                 maxWidth: DIALOG_WIDTH,
                 maxHeight: DIALOG_HEIGHT,
@@ -384,7 +493,6 @@ export class ReplayCutterComponent implements OnInit {
               })
               .afterClosed()
               .subscribe((miniMapPositions: CropperPosition) => {
-                window.electronAPI.setWindowSize();
                 if (miniMapPositions) {
                   this.miniMapPositionsByMap[MAP_NAME] = miniMapPositions;
                   this.uploadGameMiniMap(
