@@ -11,7 +11,9 @@ const {
     ipcMain,
     session,
     dialog,
-    shell
+    shell,
+    Tray,
+    Menu
 } = require('electron');
 
 // When in installation mode, close the application.
@@ -738,6 +740,44 @@ let projectLatestVersion /* string */ = '';
         });
 
         const HOME_URL = `http://localhost:${isProd ? PORT : '4200'}/`;
+
+        // When the user clicks on the close cross, we hide the application.
+        mainWindow.on('close', (event) => {
+            event.preventDefault();
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.hide();
+            }
+        });
+
+        const TRAY = new Tray(path.join(ROOT_PATH, 'assets', 'favicon.png'));
+        const CONTEXT_MENU = Menu.buildFromTemplate([
+            {
+                label: 'Open',
+                click: () => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.show();
+                    }
+                }
+            },
+            {
+                label: 'Quit',
+                click: () => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.destroy();
+                    }
+                    app.quit();
+                }
+            }
+        ]);
+
+        TRAY.setToolTip('EBP - Tools');
+        TRAY.setContextMenu(CONTEXT_MENU);
+
+        // Double-click on the icon to reopen the window.
+        TRAY.on('double-click', () => {
+            mainWindow.show();
+            mainWindow.setSkipTaskbar(false);
+        });
 
         mainWindow.webContents.on('did-navigate', async (event, url) => {
             if (url === HOME_URL) {
