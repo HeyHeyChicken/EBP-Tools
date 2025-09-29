@@ -208,12 +208,12 @@ export class ReplayCutterCropDialog implements OnInit {
         const SCALE = Math.min(SCALE_X, SCALE_Y);
         this.currentScale *= SCALE;
 
-        const canvas = document.createElement('canvas');
+        const CANVAS = document.createElement('canvas');
 
-        canvas.width = WIDTH * SCALE;
-        canvas.height = HEIGHT * SCALE;
+        CANVAS.width = WIDTH * SCALE;
+        CANVAS.height = HEIGHT * SCALE;
 
-        const CTX = canvas.getContext('2d');
+        const CTX = CANVAS.getContext('2d');
         if (CTX) {
           CTX.drawImage(
             IMG,
@@ -227,8 +227,8 @@ export class ReplayCutterCropDialog implements OnInit {
             HEIGHT * SCALE
           );
 
-          const zoomedBase64 = canvas.toDataURL('image/png');
-          this.currentImgBase64 = zoomedBase64;
+          const ZOOMED_BASE_64 = CANVAS.toDataURL('image/png');
+          this.currentImgBase64 = ZOOMED_BASE_64;
           this.cropper = {
             x1: 0,
             y1: 0,
@@ -242,7 +242,11 @@ export class ReplayCutterCropDialog implements OnInit {
 
   protected submit(): void {
     if (!this.disableSubmitButton) {
-      this.dialogRef.close(this.globalCropper);
+      if (this.cropper == this.data.initialCropperPosition) {
+        this.dialogRef.close(this.cropper);
+      } else {
+        this.dialogRef.close(this.globalCropper);
+      }
     }
   }
 
