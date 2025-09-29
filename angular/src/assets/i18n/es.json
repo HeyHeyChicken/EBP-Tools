@@ -85,7 +85,11 @@
           "addTime": "+1 segundo",
           "play": "Reproducir",
           "pause": "Pausa",
-          "cut": "Cortar"
+          "cut": "Cortar",
+          "explanations": "El cortador de repeticiones no detecta pausas de comentaristas ni pausas técnicas. Para procesar estos vídeos, puede cortarlos manualmente en este editor: muévase por la línea de tiempo, haga clic en el icono de «tijeras» para cortar y luego elimine las partes no deseadas. Después, valide para iniciar la identificación automática. Recuerde conservar el inicio y el marcador de cada partida."
+        },
+        "crop": {
+          "explanations": "Para garantizar un análisis correcto, el minimapa debe estar correctamente delimitado.<br/>Tools no siempre lo hace automáticamente. Verifique los límites y recorte si es necesario, asegurándose de incluir los bordes exteriores del mapa en el recorte (excluya los TP y otros elementos)."
         }
       },
       "inputOfficialFile": "Haga clic aquí para cortar manualmente su archivo de video oficial"

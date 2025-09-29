@@ -26,9 +26,9 @@ mat-dialog-content {
   }
   > .d-flex {
     flex-direction: column;
+    gap: calc(#{variables.$margin} * 2);
 
     > footer {
-      margin-top: variables.$margin;
       display: flex;
       gap: variables.$margin;
 

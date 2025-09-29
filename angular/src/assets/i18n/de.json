@@ -85,7 +85,11 @@
           "addTime": "+1 Sekunde",
           "play": "Abspielen",
           "pause": "Pause",
-          "cut": "Schneiden"
+          "cut": "Schneiden",
+          "explanations": "Der Replay-Cutter erkennt keine Cast-Pausen oder technischen Pausen. Um diese Videos zu bearbeiten, können Sie sie manuell in diesem Editor schneiden: Bewegen Sie sich auf der Zeitleiste, klicken Sie auf das „Scheren“-Symbol, um zu schneiden, und entfernen Sie dann die unerwünschten Teile. Bestätigen Sie anschließend, um die automatische Identifikation zu starten. Denken Sie daran, den Anfang und die Punktetafel jeder Partie beizubehalten."
+        },
+        "crop": {
+          "explanations": "Um eine korrekte Analyse zu gewährleisten, muss die Minimap korrekt abgegrenzt sein.<br/>Tools schafft dies nicht immer automatisch. Überprüfen Sie die Begrenzung und schneiden Sie sie bei Bedarf neu zu, wobei Sie darauf achten, die äußeren Kartenränder im Zuschnitt einzuschließen (TPs und andere Elemente ausschließen)."
         }
       },
       "inputOfficialFile": "Klicken Sie hier, um Ihre offizielle Videodatei manuell zu schneiden"

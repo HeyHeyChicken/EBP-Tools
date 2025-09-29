@@ -85,7 +85,11 @@
           "addTime": "+1 secondo",
           "play": "Riproduci",
           "pause": "Pausa",
-          "cut": "Taglia"
+          "cut": "Taglia",
+          "explanations": "Il cutter dei replay non rileva le pause dei caster o le pause tecniche. Per elaborare questi video, puoi tagliarli manualmente in questo editor: spostati sulla timeline, clicca sull’icona delle «forbici» per tagliare e poi elimina le parti indesiderate. Convalida poi per avviare l’identificazione automatica. Ricorda di conservare l’inizio e il tabellone di ogni partita."
+        },
+        "crop": {
+          "explanations": "Per garantire un'analisi corretta, la minimappa deve essere correttamente delimitata.<br/>Tools non sempre lo fa automaticamente. Controlla i confini e ritaglia se necessario, assicurandoti di includere i bordi esterni della mappa nel ritaglio (escludere i TP e altri elementi)."
         }
       },
       "inputOfficialFile": "Clicca qui per tagliare manualmente il tuo file video ufficiale"

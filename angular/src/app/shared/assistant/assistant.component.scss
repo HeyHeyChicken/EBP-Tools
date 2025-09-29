@@ -1,0 +1,127 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use '../../../styles/imports/variables' as variables;
+@use '../../../styles/imports/material_colors' as material_colors;
+
+$size: calc(#{variables.$margin * 4});
+:host {
+  height: variables.$form_height;
+  width: $size;
+  position: relative;
+  z-index: 1;
+
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.33);
+    }
+    80%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  &:hover {
+    > .pulse {
+      opacity: 0;
+    }
+  }
+
+  > .pulse {
+    position: relative;
+    width: calc(#{$size} * 1.75);
+    height: calc(#{$size} * 1.75);
+    box-sizing: border-box;
+    margin-left: -37.5%;
+    margin-top: -62.5%;
+    border-radius: 50%;
+    background-color: variables.$main_color;
+    animation: pulse-ring 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    opacity: 1;
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  > .border {
+    position: absolute;
+    width: $size;
+    height: $size;
+    bottom: 0;
+    right: 0;
+    background-color: variables.$dark_color;
+    border-radius: 50%;
+    background-image: url('/assets/img/users/friend.webp');
+    background-size: cover;
+    cursor: pointer;
+    &:after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      border-radius: 50%;
+      border: 1px solid variables.$border_color;
+      box-sizing: border-box;
+      transition: all 0.2s ease-in-out;
+      z-index: 10;
+    }
+
+    &:hover {
+      &:after {
+        border-color: variables.$main_color;
+        border-width: 2px;
+      }
+    }
+  }
+
+  > .shadow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 100vw;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  > .message {
+    background-color: variables.$dark_color;
+    position: absolute;
+    bottom: calc(#{variables.$margin} * 5);
+    right: calc(#{variables.$margin} * -1);
+    border: 1px solid variables.$border_color;
+    padding: calc(#{variables.$margin} * 2);
+    color: white;
+    width: max-content;
+    box-sizing: border-box;
+    max-width: calc(100vw - 12px * 6);
+    text-align: left;
+
+    &:before,
+    &:after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      right: calc(#{variables.$margin} * 3);
+      border-style: solid;
+      border-width: 10.4px 6px 0 6px;
+    }
+
+    &:before {
+      transform: translateX(50%);
+      border-color: variables.$border_color transparent transparent transparent;
+    }
+
+    &:after {
+      transform: translate(50%, -2px);
+      border-color: variables.$dark_color transparent transparent transparent;
+    }
+
+    > button {
+      position: absolute;
+      top: 0;
+      right: 0;
+      transform: translate(25%, -25%);
+    }
+  }
+}

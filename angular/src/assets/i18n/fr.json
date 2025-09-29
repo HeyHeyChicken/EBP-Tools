@@ -85,7 +85,11 @@
           "addTime": "+1 seconde",
           "play": "Lecture",
           "pause": "Pause",
-          "cut": "Couper"
+          "cut": "Couper",
+          "explanations": "Le découpeur de replays ne détecte pas les pauses de cast ou les pauses techniques. Pour traiter ces vidéos, vous pouvez les découper manuellement dans cet éditeur : déplacez-vous sur la timeline, cliquez sur l’icône « ciseaux » pour couper, puis supprimez les parties inutiles. Validez ensuite pour lancer l’identification automatique.<br/>Pensez à conserver le début et l’écran des scores de chaque partie."
+        },
+        "crop": {
+          "explanations": "Pour garantir une analyse correcte, la minimap doit être correctement délimitée.<br/>Tools ne parvient pas toujours à le faire automatiquement. Vérifiez le bornage et recadrez si besoin, en veillant à inclure les bordures extérieures de la carte dans le crop (excluez les TP et autres éléments)."
         }
       },
       "inputOfficialFile": "Cliquez ici pour découper manuellement votre fichier vidéo officiel"

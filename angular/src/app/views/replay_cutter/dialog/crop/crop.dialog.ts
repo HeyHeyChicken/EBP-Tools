@@ -23,6 +23,8 @@ import {
   CropperPosition,
   Dimensions
 } from 'ngx-image-cropper';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { AssistantComponent } from '../../../../shared/assistant/assistant.component';
 
 //#endregion
 
@@ -34,7 +36,9 @@ import {
     CommonModule,
     MatDialogModule,
     TranslateModule,
-    ImageCropperComponent
+    ImageCropperComponent,
+    MatTooltipModule,
+    AssistantComponent
   ],
   standalone: true
 })

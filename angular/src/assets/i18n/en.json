@@ -85,7 +85,11 @@
           "addTime": "+1 second",
           "play": "Play",
           "pause": "Pause",
-          "cut": "Cut"
+          "cut": "Cut",
+          "explanations": "The replay cutter does not detect caster breaks or technical pauses. To process these videos, you can cut them manually in this editor: navigate the timeline, click the \"scissors\" icon to cut, and then remove the unwanted parts. Then validate to start automatic identification. Remember to keep the beginning and the scoreboard of each game."
+        },
+        "crop": {
+          "explanations": "To ensure proper analysis, the minimap must be correctly delimited.<br/>Tools does not always do this automatically. Check the boundaries and crop if needed, making sure to include the outer map borders in the crop (exclude TPs and other elements)."
         }
       },
       "inputOfficialFile": "Click here to manually cut your official video file"

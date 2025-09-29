@@ -4,6 +4,15 @@
 
 @use '../../../../../styles/imports/variables' as variables;
 
+mat-dialog-content {
+  > button {
+    position: absolute;
+    top: variables.$margin;
+    right: variables.$margin;
+    z-index: 1;
+  }
+}
+
 image-cropper {
   padding: 0;
 }

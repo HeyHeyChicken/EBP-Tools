@@ -107,6 +107,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
       >
         <i class="fa-sharp fa-solid fa-floppy-disk"></i>
       </button>
+      <ebp-assistant
+        textWidth="500px"
+        (change)="onAssistantStateChange($event)"
+        text="{{ 'view.replay_cutter.dialog.manual-video-cut.explanations' | translate}}"
+      ></ebp-assistant>
     </footer>
   </div>
   @if(loading){

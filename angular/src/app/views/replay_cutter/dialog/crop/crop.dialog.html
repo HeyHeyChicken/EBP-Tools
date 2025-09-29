@@ -5,6 +5,13 @@ See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
 <mat-dialog-content #matDialogContent>
+  <button
+    class="squared"
+    mat-dialog-close
+    matTooltip="{{ 'common.close' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-xmark"></i>
+  </button>
   <div #imageCropperContainer>
     @if(currentImgBase64){
     <image-cropper
@@ -30,22 +37,18 @@ See LICENSE for terms. Unauthorized use is prohibited.
     <i class="fa-sharp fa-solid fa-arrow-rotate-left"></i
     >{{"common.reset"|translate}}
   </button>
-  <!-- CANCEL BUTTON -->
-  <button
-    type="button"
-    mat-dialog-close
-    attr.aria-label="{{ 'common.cancel' | translate }}"
-  >
-    <i class="fa-sharp fa-solid fa-xmark"></i>{{"common.cancel"|translate}}
-  </button>
   <!-- SUBMIT BUTTON -->
   <button
     type="button"
-    class="ml-2 green"
+    class="mr-2 green"
     [disabled]="disableSubmitButton"
     (click)="submit()"
     attr.aria-label="{{ 'common.ok' | translate }}"
   >
     <i class="fa-sharp fa-solid fa-check"></i>{{ "common.ok" | translate }}
   </button>
+  <ebp-assistant
+    textWidth="500px"
+    text="{{ 'view.replay_cutter.dialog.crop.explanations' | translate}}"
+  ></ebp-assistant>
 </mat-dialog-actions>

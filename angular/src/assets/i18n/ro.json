@@ -85,7 +85,11 @@
           "addTime": "+1 secundă",
           "play": "Redare",
           "pause": "Pauză",
-          "cut": "Tăiere"
+          "cut": "Tăiere",
+          "explanations": "Tăietorul de replay-uri nu detectează pauzele comentatorilor sau pauzele tehnice. Pentru a procesa aceste videoclipuri, le puteți tăia manual în acest editor: navigați pe timeline, faceți clic pe pictograma „foarfecă” pentru a tăia și apoi eliminați părțile nedorite. Validați apoi pentru a începe identificarea automată. Nu uitați să păstrați începutul și tabela de scor a fiecărui meci."
+        },
+        "crop": {
+          "explanations": "Pentru a asigura o analiză corectă, minimapa trebuie delimitată corect.<br/>Tools nu reușește întotdeauna să facă acest lucru automat. Verificați limitele și decupați dacă este necesar, având grijă să includeți marginile exterioare ale hărții în decupaj (excludeți TP și alte elemente)."
         }
       },
       "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"

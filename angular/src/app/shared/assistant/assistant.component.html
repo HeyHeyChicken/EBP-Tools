@@ -1,0 +1,21 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+<div class="pulse"></div>
+@if (opened) {
+  <div class="shadow"></div>
+  <div class="message" [style.width]="textWidth">
+    <button
+      class="squared"
+      (click)="opened = false"
+      matTooltip="{{ 'common.close' | translate }}"
+      matTooltipPosition="left"
+    >
+      <i class="fa-sharp fa-solid fa-xmark"></i>
+    </button>
+    <span innerHTML="{{ text }}"></span>
+  </div>
+}
+<div class="border" (click)="opened = !opened"></div>

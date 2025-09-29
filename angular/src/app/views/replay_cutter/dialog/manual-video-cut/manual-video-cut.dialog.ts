@@ -23,6 +23,7 @@ import { GlobalService } from '../../../../core/services/global.service';
 import { VideoChunk } from '../../models/video-chunk';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AssistantComponent } from '../../../../shared/assistant/assistant.component';
 
 //#endregion
 
@@ -35,7 +36,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     MatDialogModule,
     TranslateModule,
     MatTooltipModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    AssistantComponent
   ],
   standalone: true
 })
@@ -197,6 +199,17 @@ export class ReplayCutterManualVideoCutDialog {
           this.videoDuration
         );
         VIDEO.currentTime = this.videoCurrentTime;
+      }
+    }
+  }
+
+  protected onAssistantStateChange(open: boolean): void {
+    if (this.video && this.video.nativeElement) {
+      if (open) {
+        this.videoWasPlaying = this.playing;
+        this.video.nativeElement.pause();
+      } else if (this.videoWasPlaying) {
+        this.video.nativeElement.play();
       }
     }
   }
