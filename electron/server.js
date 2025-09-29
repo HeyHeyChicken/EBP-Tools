@@ -41,6 +41,12 @@ const {
 
 let isProd = process.env.NODE_ENV === 'production';
 const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
+const APP_GOT_THE_LOCK = app.requestSingleInstanceLock();
+
+if (!APP_GOT_THE_LOCK) {
+    // Another instance is already launched => we quit.
+    app.quit();
+}
 
 //#region Binaries paths
 
@@ -912,14 +918,22 @@ let projectLatestVersion /* string */ = '';
      */
     app.whenReady().then(() => {
         if (isProd) {
+            // If we are in production, we immediately create the window that will contain the HMI.
+            createWindow();
+
+            // If a second instance is launched, the first is displayed.
+            app.on('second-instance', (event, argv, workingDirectory) => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+            });
+
             app.setLoginItemSettings({
                 openAtLogin: true,
                 path: app.getPath('exe'),
                 args: ['--mode=startup']
             });
-
-            // If we are in production, we immediately create the window that will contain the HMI.
-            createWindow();
         } else {
             // If we are in dev, we wait until the Angular server is ready before creating the window that will contain the HMI.
             waitForHttp(4200).then(() => {
