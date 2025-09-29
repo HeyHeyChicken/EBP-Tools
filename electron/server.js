@@ -721,6 +721,7 @@ let projectLatestVersion /* string */ = '';
      */
     function createWindow() {
         const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
+        const APP_ARGS = process.argv;
         mainWindow = new BrowserWindow({
             width: Math.min(
                 PRIMARY_DISPLAY.workAreaSize.width,
@@ -730,6 +731,7 @@ let projectLatestVersion /* string */ = '';
                 PRIMARY_DISPLAY.workAreaSize.height,
                 WINDOW_HEIGHT
             ),
+            show: !APP_ARGS.includes('--mode=startup'),
             resizable: false,
             contextIsolation: true,
             webPreferences: {
@@ -910,6 +912,12 @@ let projectLatestVersion /* string */ = '';
      */
     app.whenReady().then(() => {
         if (isProd) {
+            app.setLoginItemSettings({
+                openAtLogin: true,
+                path: app.getPath('exe'),
+                args: ['--mode=startup']
+            });
+
             // If we are in production, we immediately create the window that will contain the HMI.
             createWindow();
         } else {
