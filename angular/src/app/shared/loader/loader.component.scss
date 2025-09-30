@@ -2,8 +2,8 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-@use "../../../styles/imports/variables" as variables;
-@use "sass:math";
+@use '../../../styles/imports/variables' as variables;
+@use 'sass:math';
 
 $size: 150px;
 .loader {
@@ -14,6 +14,17 @@ $size: 150px;
   position: relative;
   font-family: sans-serif;
   margin: 0 auto;
+
+  > i {
+    color: white;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    position: absolute;
+    z-index: 1;
+    font-size: calc(#{variables.$margin} * 4);
+    color: variables.$main_color;
+  }
 
   > span {
     position: absolute;
@@ -41,27 +52,46 @@ $size: 150px;
             translateY(calc(#{$size} * 0.5 - #{$size} * 0.08));
         }
       }
-
-      &:first-child {
-        background: variables.$main_color;
-      }
     }
   }
 
   @for $i from 0 through 100 {
     &.t#{$i} {
       > span::after {
-        content: "#{$i}";
+        content: '#{$i}';
       }
     }
   }
 
-  @for $i from 1 through 100 {
-    $active: math.floor(math.div($i, 2));
-    &.t#{$i} {
-      > div > div {
-        @for $j from 1 through $active {
-          &:nth-child(#{$j}) {
+  &:not(.infinite) {
+    @for $i from 1 through 100 {
+      $active: math.floor(math.div($i, 2));
+      &.t#{$i} {
+        > div > div {
+          @for $j from 1 through $active {
+            &:nth-child(#{$j}) {
+              background: variables.$main_color;
+            }
+          }
+        }
+      }
+    }
+
+    > div {
+      > div {
+        &:first-child {
+          background: variables.$main_color;
+        }
+      }
+    }
+  }
+
+  &.infinite {
+    @for $i from 1 through 100 {
+      &.t#{$i} {
+        > div > div {
+          $bar: math.ceil(math.div($i, 2));
+          &:nth-child(#{$bar}) {
             background: variables.$main_color;
           }
         }

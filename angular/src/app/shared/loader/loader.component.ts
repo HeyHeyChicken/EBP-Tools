@@ -4,7 +4,7 @@
 
 //#region Import
 
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 //#endregion
@@ -16,10 +16,35 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule]
 })
-export class LoaderComponent {
+export class LoaderComponent implements OnInit, OnDestroy {
   //#region Attributes
 
   @Input() public value: number = 0;
+  @Input() public infinite: boolean = false;
+  @Input() public icon: string | undefined;
+
+  private interval: NodeJS.Timeout | undefined;
+
+  //#endregion
+
+  //#region Functions
+
+  ngOnInit(): void {
+    if (this.infinite) {
+      this.interval = setInterval(() => {
+        this.value++;
+        if (this.value > 100) {
+          this.value = 0;
+        }
+      }, 10);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.interval) {
+      clearInterval(this.interval);
+    }
+  }
 
   //#endregion
 }

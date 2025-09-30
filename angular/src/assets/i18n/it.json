@@ -120,6 +120,11 @@
           "p3": "Se hai esportato un gran numero di partite, attendi 15 minuti prima di avviare una nuova esportazione."
         }
       }
+    },
+    "notification": {
+      "manual-cutting": {
+        "description": "Il tuo replay è in fase di taglio. Attendere prego..."
+      }
     }
   },
   "shared": {

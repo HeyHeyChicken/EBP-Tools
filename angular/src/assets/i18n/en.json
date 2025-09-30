@@ -120,6 +120,11 @@
           "p3": "If you have exported a large number of games, please wait 15 minutes before starting another export."
         }
       }
+    },
+    "notification": {
+      "manual-cutting": {
+        "description": "Your replay is being processed. Please wait..."
+      }
     }
   },
   "shared": {

@@ -120,6 +120,11 @@
           "p3": "Si vous avez exporté un grand nombre de games, patientez 15 minutes avant de relancer un export."
         }
       }
+    },
+    "notification": {
+      "manual-cutting": {
+        "description": "Votre replay est en cours de découpage. Veuillez patienter..."
+      }
     }
   },
   "shared": {

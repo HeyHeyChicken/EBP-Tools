@@ -120,6 +120,11 @@
           "p3": "Si ha exportado una gran cantidad de partidas, espere 15 minutos antes de iniciar otra exportación."
         }
       }
+    },
+    "notification": {
+      "manual-cutting": {
+        "description": "Su repetición se está recortando. Por favor, espere..."
+      }
     }
   },
   "shared": {

@@ -36,6 +36,8 @@ const {
     extractPublicPseudoGames,
     extractPrivatePseudoGames
 } = require('./puppeteer.js');
+const util = require('util');
+const execAsync = util.promisify(exec);
 
 //#endregion
 
@@ -693,7 +695,7 @@ let projectLatestVersion /* string */ = '';
      * @param {string} output Path for the output video file
      * @param {Array} chunks Array of video chunks with start, end, and remove properties
      */
-    function cutWithoutReencode(input, output, chunks) {
+    async function cutWithoutReencode(input, output, chunks) {
         const KEEP = chunks
             .filter((c) => !c.remove)
             .sort((a, b) => a.start - b.start);
@@ -713,7 +715,7 @@ let projectLatestVersion /* string */ = '';
         fs.writeFileSync(CONCAT_FILE, CONCAT_CONTENT);
 
         // Concatenate
-        execSync(
+        await execAsync(
             `"${FFMPEG_PATH}" -f concat -safe 0 -i "${CONCAT_FILE}" -c copy "${output}"`
         );
 
@@ -722,35 +724,45 @@ let projectLatestVersion /* string */ = '';
         TEMP_FILES.forEach((file) => fs.unlinkSync(file));
     }
 
-    function createFloatingWindow(width, height, url) {
-        if (floatingWindow) {
-            floatingWindow.close();
-            floatingWindow = undefined;
-        }
+    function createFloatingWindow(width, height, url, callback) {
         const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
         const WIDTH = Math.min(PRIMARY_DISPLAY.workAreaSize.width, width);
         const HEIGHT = Math.min(PRIMARY_DISPLAY.workAreaSize.height, height);
-        floatingWindow = new BrowserWindow({
-            width: WIDTH,
-            height: HEIGHT,
-            contextIsolation: true,
-            resizable: false,
-            webPreferences: {
-                preload: isProd
-                    ? MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY
-                    : path.join(__dirname, 'preload.js')
-            },
-            frame: false,
-            transparent: true,
-            alwaysOnTop: true
-        });
 
-        // Position at the bottom right.
+        if (!floatingWindow) {
+            floatingWindow = new BrowserWindow({
+                width: WIDTH,
+                height: HEIGHT,
+                contextIsolation: true,
+                resizable: false,
+                webPreferences: {
+                    preload: isProd
+                        ? MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY
+                        : path.join(__dirname, 'preload.js')
+                },
+                frame: false,
+                transparent: true,
+                alwaysOnTop: true
+            });
+
+            // Position at the bottom right.
+            floatingWindow.setBounds({
+                x: PRIMARY_DISPLAY.workAreaSize.width - width,
+                y: PRIMARY_DISPLAY.workAreaSize.height - height
+            });
+        }
+
         floatingWindow.setBounds({
-            x: PRIMARY_DISPLAY.workAreaSize.width - width,
-            y: PRIMARY_DISPLAY.workAreaSize.height - height,
             width: WIDTH,
             height: HEIGHT
+        });
+
+        floatingWindow.webContents.once('did-finish-load', () => {
+            if (callback) {
+                setTimeout(() => {
+                    callback();
+                }, 100);
+            }
         });
 
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
@@ -1361,20 +1373,35 @@ let projectLatestVersion /* string */ = '';
         ipcMain.handle(
             'manual-cut-video-file',
             async (event, videoPath, chunks) => {
-                const SPLIT = videoPath.split('.');
-                const FILE_EXTENSION = SPLIT[SPLIT.length - 1];
-                const OUTPUT_FILE_PATH /* string */ = path.join(
-                    getOutputPath(
-                        'videoCutterOutputPath',
-                        path.join(os.homedir(), 'Downloads')
-                    ),
-                    `temp.${FILE_EXTENSION}`
+                mainWindow.hide();
+                createFloatingWindow(
+                    450,
+                    150,
+                    'notification/manual-cutting',
+                    async () => {
+                        const SPLIT = videoPath.split('.');
+                        const FILE_EXTENSION = SPLIT[SPLIT.length - 1];
+                        const OUTPUT_FILE_PATH /* string */ = path.join(
+                            getOutputPath(
+                                'videoCutterOutputPath',
+                                path.join(os.homedir(), 'Downloads')
+                            ),
+                            `temp.${FILE_EXTENSION}`
+                        );
+                        unlinkSync(OUTPUT_FILE_PATH);
+
+                        await cutWithoutReencode(
+                            videoPath,
+                            OUTPUT_FILE_PATH,
+                            chunks
+                        );
+
+                        mainWindow.webContents.send(
+                            'set-video-file',
+                            OUTPUT_FILE_PATH
+                        );
+                    }
                 );
-                unlinkSync(OUTPUT_FILE_PATH);
-
-                cutWithoutReencode(videoPath, OUTPUT_FILE_PATH, chunks);
-
-                mainWindow.webContents.send('set-video-file', OUTPUT_FILE_PATH);
             }
         );
 
