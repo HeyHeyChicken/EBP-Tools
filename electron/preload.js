@@ -56,6 +56,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   uploadGameMiniMap: (game, cropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames) => ipcRenderer.invoke("upload-game-mini-map", game, cropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames),
   // The front-end asks the server to cut a video file manualy edited.
   manualCutVideoFile: (videoPath, chunks) => ipcRenderer.invoke("manual-cut-video-file", videoPath, chunks),
+  // The front-end asks the server to save the current language.
+  setLanguage: (language) => ipcRenderer.invoke("set-language", language),
+  // The front-end asks the server to show a notification.
+  showNotification: (hideMainWindow, width, height, url) => ipcRenderer.invoke("show-notification", hideMainWindow, width, height, url),
+  // The front-end asks the server to remove the notification.
+  removeNotification: (showMainWindow) => ipcRenderer.invoke("remove-notification", showMainWindow),
   
   //#endregion
 

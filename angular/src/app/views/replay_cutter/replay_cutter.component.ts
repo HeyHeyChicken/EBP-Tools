@@ -48,6 +48,7 @@ import { ReplayCutterReplayUploadedDialog } from './dialog/replay-uploaded/repla
 import { ReplayCutterBetaRequiredDialog } from './dialog/beta-required/beta-required.dialog';
 import { ReplayCutterManualVideoCutDialog } from './dialog/manual-video-cut/manual-video-cut.dialog';
 import { VideoChunk } from './models/video-chunk';
+import { AnalysingCommunicationService } from '../notification/analysing/services/analysing-communication.service';
 
 //#endregion
 @Component({
@@ -125,7 +126,8 @@ export class ReplayCutterComponent implements OnInit {
     private readonly translateService: TranslateService,
     private readonly openCVService: OpenCVService,
     private readonly dialogService: MatDialog,
-    private readonly apiRestService: APIRestService
+    private readonly apiRestService: APIRestService,
+    private readonly analysingCommunicationService: AnalysingCommunicationService
   ) {}
 
   //#region Functions
@@ -148,6 +150,12 @@ export class ReplayCutterComponent implements OnInit {
           if (path) {
             this._videoPath = encodeURIComponent(path);
             this.percent = 0;
+            window.electronAPI.showNotification(
+              true,
+              500,
+              150,
+              'notification/analysing'
+            );
           }
         } else {
           if (path) {
@@ -904,6 +912,10 @@ export class ReplayCutterComponent implements OnInit {
             const NOW: number = VIDEO.currentTime;
 
             this.percent = Math.ceil(100 - (NOW / VIDEO.duration) * 100);
+            this.analysingCommunicationService.sendMessage({
+              games: this._games,
+              percent: this.percent
+            });
 
             //#region Détéction d'une frame de score d'une game
 
@@ -1120,6 +1132,10 @@ export class ReplayCutterComponent implements OnInit {
                     //#endregion
 
                     this._games.unshift(GAME);
+                    this.analysingCommunicationService.sendMessage({
+                      games: this._games,
+                      percent: this.percent
+                    });
                   }
                 } else if (
                   this.lastDetectedGamePlayingFrame &&
@@ -1572,6 +1588,7 @@ export class ReplayCutterComponent implements OnInit {
    */
   private onVideoEnded(games: Game[]): void {
     this.percent = -1;
+    window.electronAPI.removeNotification(true);
     if (games.length == 0) {
       this.translateService
         .get('view.replay_cutter.toast.noGamesFoundInVideo')

@@ -1,0 +1,15 @@
+<!--
+Copyright (c) 2025, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<div class="loader">
+  <ebp-loader [value]="data.percent"></ebp-loader>
+</div>
+<ebp-message>
+  {{ 'view.replay_cutter.videoIsBeingAnalyzed' | translate }}<br />
+  {{ 'view.replay_cutter.nbGamesFound' | translate }}:<b>
+    {{ data.games.length }}</b
+  >
+</ebp-message>

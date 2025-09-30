@@ -68,18 +68,23 @@ export class HeaderComponent implements OnInit {
 
     this.translateService.setDefaultLang(HeaderComponent.DEFAULT_LANGUAGE);
 
-    const STORED_LANGUAGE = localStorage.getItem(
-      HeaderComponent.STORAGE_KEY_NAME
-    );
-    if (STORED_LANGUAGE) {
-      this.setLanguage(STORED_LANGUAGE);
+    const LANGUAGE = location.pathname.split('/').filter((x) => x != '')[0];
+    if (this.translateService.langs.includes(LANGUAGE)) {
+      this.setLanguage(LANGUAGE);
     } else {
-      const BROWSER_LANGUAGE: string = navigator.language;
-      this.setLanguage(
-        this.translateService.langs.includes(BROWSER_LANGUAGE)
-          ? BROWSER_LANGUAGE
-          : HeaderComponent.DEFAULT_LANGUAGE
+      const STORED_LANGUAGE = localStorage.getItem(
+        HeaderComponent.STORAGE_KEY_NAME
       );
+      if (STORED_LANGUAGE) {
+        this.setLanguage(STORED_LANGUAGE);
+      } else {
+        const BROWSER_LANGUAGE: string = navigator.language;
+        this.setLanguage(
+          this.translateService.langs.includes(BROWSER_LANGUAGE)
+            ? BROWSER_LANGUAGE
+            : HeaderComponent.DEFAULT_LANGUAGE
+        );
+      }
     }
   }
 
@@ -113,7 +118,9 @@ export class HeaderComponent implements OnInit {
   }
 
   protected changeTool(event: MatSelectChange): void {
-    this.router.navigate([`/${event.value}`]);
+    this.router.navigate([
+      `/${this.translateService.currentLang}/${event.value}`
+    ]);
   }
 
   /**
@@ -124,6 +131,15 @@ export class HeaderComponent implements OnInit {
     const LANGUAGE: string = language.toLowerCase();
     this.translateService.use(LANGUAGE);
     localStorage.setItem(HeaderComponent.STORAGE_KEY_NAME, LANGUAGE);
+    window.electronAPI.setLanguage(LANGUAGE);
+
+    // On change la langue dans l'URL.
+    const CURRENT_PATH = this.commonLocation.path(); // Chemin actuel
+    let newPath = CURRENT_PATH.replace(/^\/[a-z]{2}/, `/${LANGUAGE}`); // Remplace la langue dans l'URL
+    if (newPath.length == 0) {
+      newPath = `/${LANGUAGE}`;
+    }
+    this.commonLocation.replaceState(newPath);
   }
 
   //#endregion

@@ -71,6 +71,14 @@ export interface ElectronAPI {
     sortedBluePlayersNames: string[]
   ) => void;
   manualCutVideoFile: (videoPath?: string, chunks: VideoChunk[]) => void;
+  setLanguage: (language?: string) => void;
+  showNotification: (
+    hideMainWindow: boolean,
+    width: number,
+    height: number,
+    url: string
+  ) => void;
+  removeNotification: (showMainWindow: boolean) => void;
 
   //#endregion
 

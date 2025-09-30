@@ -14,19 +14,33 @@ import { ReplayDownloaderComponent } from './views/replay_downloader/replay_down
 
 export const routes: Routes = [
   {
-    path: '',
-    component: HomeComponent
-  },
-  {
-    path: 'replay_cutter',
-    component: ReplayCutterComponent
-  },
-  {
-    path: 'game_history',
-    component: GameHistoryComponent
-  },
-  {
-    path: 'replay_downloader',
-    component: ReplayDownloaderComponent
+    path: ':lang',
+    children: [
+      {
+        path: '',
+        component: HomeComponent
+      },
+      {
+        path: 'replay_cutter',
+        component: ReplayCutterComponent
+      },
+      {
+        path: 'game_history',
+        component: GameHistoryComponent
+      },
+      {
+        path: 'replay_downloader',
+        component: ReplayDownloaderComponent
+      },
+      {
+        path: 'notification',
+        loadChildren: () =>
+          import('./views/notification/notification-routing.module').then(
+            (m) => {
+              return m.NotificationRoutingModule;
+            }
+          )
+      }
+    ]
   }
 ];

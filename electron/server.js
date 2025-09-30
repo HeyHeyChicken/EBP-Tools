@@ -68,7 +68,7 @@ const SETTINGS_PATH = path.join(ROOT_PATH, 'settings.json');
 const WINDOW_WIDTH = 900;
 const WINDOW_DEV_PANEL_WIDTH = 540;
 const WINDOW_HEIGHT = 800;
-let mainWindow;
+let mainWindow, floatingWindow;
 let projectLatestVersion /* string */ = '';
 
 (async () => {
@@ -722,6 +722,44 @@ let projectLatestVersion /* string */ = '';
         TEMP_FILES.forEach((file) => fs.unlinkSync(file));
     }
 
+    function createFloatingWindow(width, height, url) {
+        if (floatingWindow) {
+            floatingWindow.close();
+            floatingWindow = undefined;
+        }
+        const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
+        const WIDTH = Math.min(PRIMARY_DISPLAY.workAreaSize.width, width);
+        const HEIGHT = Math.min(PRIMARY_DISPLAY.workAreaSize.height, height);
+        floatingWindow = new BrowserWindow({
+            width: WIDTH,
+            height: HEIGHT,
+            contextIsolation: true,
+            resizable: false,
+            webPreferences: {
+                preload: isProd
+                    ? MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY
+                    : path.join(__dirname, 'preload.js')
+            },
+            frame: false,
+            transparent: true,
+            alwaysOnTop: true
+        });
+
+        // Position at the bottom right.
+        floatingWindow.setBounds({
+            x: PRIMARY_DISPLAY.workAreaSize.width - width,
+            y: PRIMARY_DISPLAY.workAreaSize.height - height,
+            width: WIDTH,
+            height: HEIGHT
+        });
+
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+
+        const URL = `http://localhost:${isProd ? PORT : '4200'}/${SETTINGS['language'] ?? 'aa'}/${url}`;
+
+        floatingWindow.loadURL(URL);
+    }
+
     /**
      * This function initializes the front-end.
      */
@@ -747,7 +785,13 @@ let projectLatestVersion /* string */ = '';
             }
         });
 
-        const HOME_URL = `http://localhost:${isProd ? PORT : '4200'}/`;
+        const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+        let language = SETTINGS['language'];
+        if (!language) {
+            language = app.getLocale();
+        }
+
+        const HOME_URL = `http://localhost:${isProd ? PORT : '4200'}/${language}/`;
 
         // When the user clicks on the close cross, we hide the application.
         mainWindow.on('close', (event) => {
@@ -764,6 +808,7 @@ let projectLatestVersion /* string */ = '';
                 click: () => {
                     if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.show();
+                        mainWindow.focus();
                     }
                 }
             },
@@ -805,7 +850,7 @@ let projectLatestVersion /* string */ = '';
             mainWindow.loadURL(
                 isLoggedIn
                     ? HOME_URL
-                    : `https://${EBP_DOMAIN}/${app.getLocale()}/login?app=cutter&redirect_uri=${encodeURIComponent(
+                    : `https://${EBP_DOMAIN}/${language}/login?app=cutter&redirect_uri=${encodeURIComponent(
                           HOME_URL
                       )}`
             );
@@ -959,6 +1004,29 @@ let projectLatestVersion /* string */ = '';
                 Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT)
             );
             mainWindow.setResizable(false);
+        });
+
+        // The front-end asks the server to show a notification.
+        ipcMain.handle(
+            'show-notification',
+            (event, hideMainWindow, width, height, url) => {
+                createFloatingWindow(width, height, url);
+                if (hideMainWindow && mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.hide();
+                }
+            }
+        );
+
+        // The front-end asks the server to remove the notification.
+        ipcMain.handle('remove-notification', (event, showMainWindow) => {
+            if (floatingWindow) {
+                floatingWindow.close();
+                floatingWindow = undefined;
+            }
+            if (showMainWindow && mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.show();
+                mainWindow.focus();
+            }
         });
 
         // The front-end asks the server to return the developer mode state.
@@ -1275,6 +1343,19 @@ let projectLatestVersion /* string */ = '';
                 }
             }
         );
+
+        // The front-end asks the server to save the current language.
+        ipcMain.handle('set-language', async (event, language) => {
+            const SETTINGS = JSON.parse(
+                fs.readFileSync(SETTINGS_PATH, 'utf-8')
+            );
+            SETTINGS['language'] = language;
+            fs.writeFileSync(
+                SETTINGS_PATH,
+                JSON.stringify(SETTINGS, null, 2),
+                'utf-8'
+            );
+        });
 
         // The front-end asks the server to cut a video file manualy edited.
         ipcMain.handle(
