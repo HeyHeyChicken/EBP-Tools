@@ -36,6 +36,7 @@ export class IdentityService {
 
       const PAYLOAD = accessToken.split('.')[1];
       const DATA = JSON.parse(atob(PAYLOAD));
+      console.log(DATA);
 
       this._userID = parseInt(DATA.userID);
       this._leaderID = parseInt(DATA.sub);
