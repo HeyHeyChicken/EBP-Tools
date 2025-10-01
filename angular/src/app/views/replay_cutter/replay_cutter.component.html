@@ -137,7 +137,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                       <button
                         class="squared"
                         (click)="save(game)"
-                        matTooltip="{{ 'view.replay_cutter.save' | translate }}"
+                        matTooltip="{{ 'common.save' | translate }}"
                         matTooltipPosition="left"
                       >
                         <i class="fa-solid fa-floppy-disk"></i>
@@ -152,6 +152,16 @@ See LICENSE for terms. Unauthorized use is prohibited.
                       >
                         <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
                       </button>
+                      @if (isDevMode) {
+                        <button
+                          class="squared"
+                          (click)="
+                            killFeedService.scan(videoPath!, games[$index])
+                          "
+                        >
+                          <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
+                        </button>
+                      }
                     </div>
                   </td>
                 </tr>
@@ -190,6 +200,20 @@ See LICENSE for terms. Unauthorized use is prohibited.
         (loadeddata)="videoLoadedData($event)"
         (timeupdate)="videoTimeUpdate($event)"
       ></video>
+      <!-- This video is used to analyze the kills of a game in a replay -->
+      @if (killFeedService.videoPath) {
+        <video
+          muted
+          [src]="
+            'http://localhost:' +
+            globalService.serverPort +
+            '/file?path=' +
+            killFeedService.videoPath
+          "
+          (loadeddata)="killFeedService.videoTimeUpdate($event, this)"
+          (timeupdate)="killFeedService.videoTimeUpdate($event, this)"
+        ></video>
+      }
     </div>
   }
 </div>

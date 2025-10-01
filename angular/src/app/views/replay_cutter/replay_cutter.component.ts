@@ -26,7 +26,6 @@ import { RGB } from './models/rgb';
 import { GlobalService } from '../../core/services/global.service';
 import { MatInputModule } from '@angular/material/input';
 import { OpenCVService } from '../../core/services/open-cv.service';
-import { ImageDetectionResult } from '../../../models/image-detection-result';
 import { MatDialog } from '@angular/material/dialog';
 import { ReplayCutterCropDialog } from './dialog/crop/crop.dialog';
 import { CropperPosition } from 'ngx-image-cropper';
@@ -49,6 +48,8 @@ import { ReplayCutterBetaRequiredDialog } from './dialog/beta-required/beta-requ
 import { ReplayCutterManualVideoCutDialog } from './dialog/manual-video-cut/manual-video-cut.dialog';
 import { VideoChunk } from './models/video-chunk';
 import { AnalysingCommunicationService } from '../notification/analysing/services/analysing-communication.service';
+import { KillFeedService } from './services/kill-feed.service';
+import { UpscalingCommunicationService } from '../notification/upscaling/services/upscaling-communication.service';
 
 //#endregion
 @Component({
@@ -73,7 +74,7 @@ export class ReplayCutterComponent implements OnInit {
 
   @ViewChild('debug') debug?: ElementRef<HTMLDivElement>;
   protected debugMode: boolean = false;
-  protected debugPause: boolean = false;
+  public debugPause: boolean = false;
   private settings: Settings = new Settings();
 
   protected percent: number = -1;
@@ -121,13 +122,15 @@ export class ReplayCutterComponent implements OnInit {
   constructor(
     protected readonly identityService: IdentityService,
     protected readonly globalService: GlobalService,
+    protected readonly killFeedService: KillFeedService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
     private readonly translateService: TranslateService,
     private readonly openCVService: OpenCVService,
     private readonly dialogService: MatDialog,
     private readonly apiRestService: APIRestService,
-    private readonly analysingCommunicationService: AnalysingCommunicationService
+    private readonly analysingCommunicationService: AnalysingCommunicationService,
+    private readonly upscalingCommunicationService: UpscalingCommunicationService
   ) {}
 
   //#region Functions
@@ -140,6 +143,23 @@ export class ReplayCutterComponent implements OnInit {
       this.ngZone.run(() => {
         this.globalService.loading = undefined;
         this.dialogService.open(ReplayCutterReplayUploadedDialog);
+      });
+    });
+
+    // The server send the upscaling process percent to the font-end.
+    window.electronAPI.setUpscalePercent((percent: number) => {
+      this.ngZone.run(() => {
+        this.translateService
+          .get('view.replay_cutter.upscalePercent', {
+            percent: percent
+          })
+          .subscribe((translated: string) => {
+            this.globalService.loading = translated;
+          });
+
+        this.upscalingCommunicationService.sendMessage({
+          percent: percent
+        });
       });
     });
 
@@ -196,6 +216,12 @@ export class ReplayCutterComponent implements OnInit {
         .subscribe((upscale: boolean) => {
           if (upscale) {
             window.electronAPI.openVideoFile(videoPath);
+            window.electronAPI.showNotification(
+              true,
+              550,
+              150,
+              'notification/upscaling'
+            );
           } else {
             this.globalService.loading = undefined;
             this.inputFileDisabled = false;
@@ -1354,8 +1380,19 @@ export class ReplayCutterComponent implements OnInit {
 
             //#endregion
 
-            this.setVideoCurrentTime(VIDEO, NOW - DEFAULT_STEP, this._games);
+            this.setVideoCurrentTime(
+              VIDEO,
+              Math.max(0, NOW - DEFAULT_STEP),
+              this._games
+            );
+            console.log(
+              'b',
+              VIDEO.currentTime,
+              DEFAULT_STEP,
+              Math.max(0, NOW - DEFAULT_STEP)
+            );
           } else {
+            console.log('A');
             this.onVideoEnded(this._games);
 
             const DIFFERENCE = Date.now() - this.start;
@@ -1373,60 +1410,6 @@ export class ReplayCutterComponent implements OnInit {
         }
       }
     }
-  }
-
-  private detectImage(
-    sourceMat: cv.Mat,
-    templateMat: cv.Mat
-  ): ImageDetectionResult {
-    const _cv: typeof cv = this.openCVService.cv!;
-
-    const result = new _cv.Mat();
-    const mask = new _cv.Mat();
-
-    // Match du template
-    _cv.matchTemplate(
-      sourceMat,
-      templateMat,
-      result,
-      cv.TM_CCOEFF_NORMED,
-      mask
-    );
-
-    // Recherche de la meilleure correspondance
-    const minMax = _cv.minMaxLoc(result, mask);
-    const maxPoint = minMax.maxLoc;
-    const maxVal = minMax.maxVal;
-
-    // Position (point haut gauche)
-    const position = { x: maxPoint.x, y: maxPoint.y };
-
-    // Taille = taille du template
-    const size = { width: templateMat.cols, height: templateMat.rows };
-
-    // Nettoyage
-    result.delete();
-    mask.delete();
-
-    return { position, size, confidence: maxVal };
-  }
-
-  private urlToCanvas(
-    url: string,
-    callback: (canvas: HTMLCanvasElement) => void
-  ): void {
-    const CANVAS = document.createElement('canvas');
-    const IMAGE = new Image();
-    IMAGE.src = url;
-    IMAGE.onload = () => {
-      CANVAS.width = IMAGE.width;
-      CANVAS.height = IMAGE.height;
-      const CTX = CANVAS.getContext('2d');
-      if (CTX) {
-        CTX.drawImage(IMAGE, 0, 0);
-        callback(CANVAS);
-      }
-    };
   }
 
   /**
@@ -1469,7 +1452,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param maxDifference Tolerance.
    * @returns Are the colors similar?
    */
-  private colorSimilarity(
+  public colorSimilarity(
     color1: RGB,
     color2: RGB,
     maxDifference: number = 20
@@ -2004,7 +1987,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param source The image source to convert (video, image, or canvas).
    * @returns A new HTMLCanvasElement containing the rendered source.
    */
-  private videoToCanvas(source: CanvasImageSource): HTMLCanvasElement {
+  public videoToCanvas(source: CanvasImageSource): HTMLCanvasElement {
     const CANVAS = document.createElement('canvas');
     const SIZE = this.getSourceSize(source);
     CANVAS.width = SIZE.width;
@@ -2052,7 +2035,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param force Disable the first if.
    * @returns Is the current frame a playing game frame?
    */
-  private detectGamePlaying(
+  public detectGamePlaying(
     video: HTMLVideoElement,
     games: Game[],
     force: boolean = false

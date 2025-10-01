@@ -124,6 +124,9 @@
     "notification": {
       "manual-cutting": {
         "description": "Votre replay est en cours de découpage. Veuillez patienter..."
+      },
+      "upscaling": {
+        "description": "Votre replay est en cours d'adaptation de résolution. Merci de patienter...."
       }
     }
   },

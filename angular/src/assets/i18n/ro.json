@@ -124,6 +124,9 @@
     "notification": {
       "manual-cutting": {
         "description": "Redarea dvs. este în curs de tăiere. Vă rugăm să așteptați..."
+      },
+      "upscaling": {
+        "description": "Replay-ul tău este în curs de adaptare a rezoluției. Te rugăm să aștepți…"
       }
     }
   },

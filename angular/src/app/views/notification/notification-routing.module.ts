@@ -9,6 +9,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { NotificationRootComponent } from './root/root.component';
 import { NotificationAnalysingComponent } from './analysing/analysing.component';
 import { NotificationManualCuttingComponent } from './manual-cutting/manual-cutting.component';
+import { UpscalingManualCuttingComponent } from './upscaling/upscaling.component';
 
 //#endregion
 
@@ -18,7 +19,8 @@ const ROUTES: Routes = [
     component: NotificationRootComponent,
     children: [
       { path: 'analysing', component: NotificationAnalysingComponent },
-      { path: 'manual-cutting', component: NotificationManualCuttingComponent }
+      { path: 'manual-cutting', component: NotificationManualCuttingComponent },
+      { path: 'upscaling', component: UpscalingManualCuttingComponent }
     ]
   }
 ];

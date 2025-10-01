@@ -84,6 +84,7 @@ export interface ElectronAPI {
 
   //#region Server to Client
 
+  setUpscalePercent: (callback: (percent: number) => void) => void;
   setJWTAccessToken: (callback: (accessToken: string) => void) => void;
   replayCutterUpscale: (callback: (filePath: string) => void) => void;
   gameIsUploaded: (callback: () => void) => void;

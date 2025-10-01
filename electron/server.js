@@ -502,13 +502,8 @@ let projectLatestVersion /* string */ = '';
                 const CURRENT = HOURS * 3600 + MINUTES * 60 + SECONDES;
 
                 const PERCENT = Math.ceil((CURRENT / duration) * 100);
-                mainWindow.webContents.send(
-                    'global-message',
-                    'view.replay_cutter.upscalePercent',
-                    {
-                        percent: PERCENT
-                    }
-                );
+
+                mainWindow.webContents.send('set-upscale-percent', PERCENT);
             }
         });
 

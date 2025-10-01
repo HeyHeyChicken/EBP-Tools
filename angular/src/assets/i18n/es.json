@@ -124,6 +124,9 @@
     "notification": {
       "manual-cutting": {
         "description": "Su repetición se está recortando. Por favor, espere..."
+      },
+      "upscaling": {
+        "description": "Tu repetición se está ajustando a la resolución. Por favor, espera…"
       }
     }
   },

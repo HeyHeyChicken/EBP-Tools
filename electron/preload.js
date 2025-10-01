@@ -67,6 +67,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   //#region Server -> Client
 
+  // The server send the upscaling process percent to the font-end.
+  setUpscalePercent: (callback) => ipcRenderer.on("set-upscale-percent", (event, percent) => callback(percent)),
   // The server send the JWT value to the font-end.
   setJWTAccessToken: (callback) => ipcRenderer.on("set-jwt-access-token", (event, accessToken) => callback(accessToken)),
   // The server asks the font-end if the user wants upscaling before analyzing.

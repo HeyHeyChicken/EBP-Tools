@@ -4,29 +4,28 @@
 
 //#region Imports
 
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
 import { CommonModule } from '@angular/common';
 import { LoaderComponent } from '../../../shared/loader/loader.component';
 import { MessageComponent } from '../../../shared/message/message.component';
-import { AnalysingCommunicationService } from './services/analysing-communication.service';
 import { Message } from './models/message.model';
 import { Subscription } from 'rxjs';
+import { UpscalingCommunicationService } from './services/upscaling-communication.service';
 
 //#endregion
 
 @Component({
-  selector: 'view-notification-analysing',
-  templateUrl: './analysing.component.html',
-  styleUrls: ['./analysing.component.scss'],
+  selector: 'view-notification-upscaling',
+  templateUrl: './upscaling.component.html',
+  styleUrls: ['./upscaling.component.scss'],
   standalone: true,
   imports: [TranslateModule, CommonModule, LoaderComponent, MessageComponent]
 })
-export class NotificationAnalysingComponent implements OnInit, OnDestroy {
+export class UpscalingManualCuttingComponent {
   //#region Attributes
 
   protected data: Message = {
-    games: [],
     percent: 0
   };
   private subscription: Subscription | undefined;
@@ -34,7 +33,7 @@ export class NotificationAnalysingComponent implements OnInit, OnDestroy {
   //#endregion
 
   constructor(
-    private readonly communicationService: AnalysingCommunicationService
+    private readonly communicationService: UpscalingCommunicationService
   ) {}
 
   //#region Functions
