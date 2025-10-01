@@ -86,14 +86,6 @@ let projectLatestVersion /* string */ = '';
         APP.use(express.static(path.join(ROOT_PATH, 'browser')));
     }
 
-    APP.get('/', (request, response) => {
-        if (isProd) {
-            response.sendFile(path.join(ROOT_PATH, 'browser', 'index.html'));
-        } else {
-            response.redirect('http://localhost:4200');
-        }
-    });
-
     // Allows the application's front-end to access local files on the user's device.
     APP.get('/file', (req, res) => {
         const FILE_PATH = req.query.path;
@@ -101,6 +93,18 @@ let projectLatestVersion /* string */ = '';
             return res.status(400).send('Missing path');
         }
         res.sendFile(FILE_PATH);
+    });
+
+    APP.use((req, res, next) => {
+        if (!isProd) return res.redirect('http://localhost:4200');
+
+        const indexFile = path.join(ROOT_PATH, 'browser', 'index.html');
+        res.sendFile(indexFile, (err) => {
+            if (err) {
+                console.error(err);
+                res.status(500).send('Server error');
+            }
+        });
     });
 
     APP.listen(PORT, () => {
