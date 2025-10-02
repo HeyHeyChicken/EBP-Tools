@@ -19,8 +19,18 @@ import { CommonModule } from '@angular/common';
 export class LoaderComponent implements OnInit, OnDestroy {
   //#region Attributes
 
+  private _infinite = false;
+
+  @Input()
+  set infinite(value: boolean) {
+    this._infinite = value;
+    this.infiniteChange();
+  }
+  get infinite(): boolean {
+    return this._infinite;
+  }
+
   @Input() public value: number = 0;
-  @Input() public infinite: boolean = false;
   @Input() public icon: string | undefined;
 
   private interval: NodeJS.Timeout | undefined;
@@ -29,7 +39,20 @@ export class LoaderComponent implements OnInit, OnDestroy {
 
   //#region Functions
 
-  ngOnInit(): void {
+  ngOnInit(): void {}
+
+  ngOnDestroy(): void {
+    this.removeInterval();
+  }
+
+  private removeInterval(): void {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = undefined;
+    }
+  }
+
+  private infiniteChange(): void {
     if (this.infinite) {
       this.interval = setInterval(() => {
         this.value++;
@@ -37,12 +60,8 @@ export class LoaderComponent implements OnInit, OnDestroy {
           this.value = 0;
         }
       }, 10);
-    }
-  }
-
-  ngOnDestroy(): void {
-    if (this.interval) {
-      clearInterval(this.interval);
+    } else {
+      this.removeInterval();
     }
   }
 

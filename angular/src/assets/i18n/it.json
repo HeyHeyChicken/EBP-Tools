@@ -16,8 +16,8 @@
     "replay_cutter": {
       "wrongResolution": "Il tuo video deve essere in {{ expectedHeight }}p, il tuo è in {{ currentHeight }}p.",
       "inputTrainingFile": "Clicca qui per tagliare automaticamente il tuo file video di allenamento",
-      "videoIsBeingAnalyzed": "Attendere prego, il video è in fase di analisi...",
-      "nbGamesFound": "Numero di giochi trovati",
+      "videoIsBeingAnalyzed": "<b>Fase 1 / 2:</b> Il video è in fase di analisi, attendere prego...<br/>Numero di parti trovate: <b>{{games}}</b>",
+      "correctionImageGeneration": "<b>Fase 2 / 2:</b> Le immagini di correzione sono in fase di generazione, attendere prego...",
       "saveAll": "Salva giochi selezionati",
       "copyTimecodes": "Copia i timecode dei giochi selezionati",
       "map": "Mappa",
@@ -35,7 +35,6 @@
         "mapNotAICompatible": "La mappa {{map}} non è ancora compatibile con l'IA di EBP, ma lo sarà nei prossimi aggiornamenti."
       },
       "outputPath": "Percorso di output",
-      "upscalePercent": "Ingrandimento ... ({{percent}}%)",
       "detectingPlayerNicknames": "Rilevamento soprannomi giocatori...",
       "detectingOrangeInfoZone": "Rilevamento zona informazioni arancione...",
       "detectingBlueInfoZone": "Rilevamento zona informazioni blu...",
@@ -93,6 +92,12 @@
         },
         "edit-map": {
           "title": "Modifier la carte de la game"
+        },
+        "attach-game": {
+          "title": "Associer le replay à une game",
+          "tags": "Tag",
+          "players": "Giocatori",
+          "date": "Data"
         }
       },
       "inputOfficialFile": "Clicca qui per tagliare manualmente il tuo file video ufficiale"

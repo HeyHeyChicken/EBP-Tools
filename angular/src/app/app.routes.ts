@@ -9,6 +9,7 @@ import { HomeComponent } from './views/home/home.component';
 import { ReplayCutterComponent } from './views/replay_cutter/replay_cutter.component';
 import { GameHistoryComponent } from './views/game_history/game_history.component';
 import { ReplayDownloaderComponent } from './views/replay_downloader/replay_downloader.component';
+import { NotificationComponent } from './views/notification/notification.component';
 
 //#endregion
 
@@ -34,12 +35,7 @@ export const routes: Routes = [
       },
       {
         path: 'notification',
-        loadChildren: () =>
-          import('./views/notification/notification-routing.module').then(
-            (m) => {
-              return m.NotificationRoutingModule;
-            }
-          )
+        component: NotificationComponent
       }
     ]
   }

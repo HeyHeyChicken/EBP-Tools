@@ -2,11 +2,39 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-@use '../../../../styles/imports/variables' as variables;
+@use '../../../styles/imports/variables' as variables;
+
+//#region Hide root elements
+
+::ng-deep * {
+  -webkit-app-region: drag;
+
+  &:not(ebp-message) {
+    overflow: hidden !important;
+  }
+}
+
+::ng-deep body {
+  background-color: transparent !important;
+
+  ebp-header,
+  ebp-footer {
+    display: none !important;
+  }
+
+  main {
+    background-image: none !important;
+  }
+}
+
+//#endregion
 
 $height: calc(150px - 12px * 4);
 :host {
+  margin: variables.$margin;
+  height: calc(100vh - #{variables.$margin} * 2);
   display: flex;
+  box-sizing: border-box;
   background-color: variables.$dark_color;
   border: 1px solid variables.$border_color;
   box-sizing: border-box;

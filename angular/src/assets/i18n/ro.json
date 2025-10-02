@@ -16,8 +16,8 @@
     "replay_cutter": {
       "wrongResolution": "Videoclipul dvs. trebuie să fie în {{ expectedHeight }}p, al dvs. este în {{ currentHeight }}p.",
       "inputTrainingFile": "Faceți clic aici pentru a tăia automat fișierul video de antrenament",
-      "videoIsBeingAnalyzed": "Te rugăm să aștepți, videoclipul este analizat...",
-      "nbGamesFound": "Număr de jocuri găsite",
+      "videoIsBeingAnalyzed": "<b>Pasul 1 / 2:</b> Videoclipul este în curs de analiză, vă rugăm să așteptați...<br/>Numărul de părți găsite: <b>{{games}}</b>",
+      "correctionImageGeneration": "<b>Pasul 2 / 2:</b> Imaginile de corecție sunt în curs de generare, vă rugăm să așteptați...",
       "saveAll": "Salvează jocurile selectate",
       "copyTimecodes": "Copiază codurile de timp ale jocurilor selectate",
       "map": "Hartă",
@@ -35,7 +35,6 @@
         "mapNotAICompatible": "Harta {{map}} nu este încă compatibilă cu AI-ul EBP, dar va fi în actualizările viitoare."
       },
       "outputPath": "Cale fișier ieșire",
-      "upscalePercent": "Mărire ... ({{percent}}%)",
       "detectingPlayerNicknames": "Detectarea pseudonimelor jucătorilor...",
       "detectingOrangeInfoZone": "Detectarea zonei de informații portocalii...",
       "detectingBlueInfoZone": "Detectarea zonei de informații albastre...",
@@ -93,6 +92,12 @@
         },
         "edit-map": {
           "title": "Modifier la carte de la game"
+        },
+        "attach-game": {
+          "title": "Associer le replay à une game",
+          "tags": "Etichete",
+          "players": "Jucători",
+          "date": "Data"
         }
       },
       "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"

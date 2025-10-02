@@ -131,7 +131,7 @@ export class HeaderComponent implements OnInit {
     const LANGUAGE: string = language.toLowerCase();
     this.translateService.use(LANGUAGE);
     localStorage.setItem(HeaderComponent.STORAGE_KEY_NAME, LANGUAGE);
-    window.electronAPI.setLanguage(LANGUAGE);
+    window.electronAPI?.setLanguage(LANGUAGE);
 
     // On change la langue dans l'URL.
     const CURRENT_PATH = this.commonLocation.path(); // Chemin actuel

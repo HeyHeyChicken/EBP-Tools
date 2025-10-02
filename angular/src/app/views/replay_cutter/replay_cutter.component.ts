@@ -47,10 +47,9 @@ import { ReplayCutterReplayUploadedDialog } from './dialog/replay-uploaded/repla
 import { ReplayCutterBetaRequiredDialog } from './dialog/beta-required/beta-required.dialog';
 import { ReplayCutterManualVideoCutDialog } from './dialog/manual-video-cut/manual-video-cut.dialog';
 import { VideoChunk } from './models/video-chunk';
-import { AnalysingCommunicationService } from '../notification/analysing/services/analysing-communication.service';
 import { KillFeedService } from './services/kill-feed.service';
-import { UpscalingCommunicationService } from '../notification/upscaling/services/upscaling-communication.service';
 import { ReplayCutterEditMapDialog } from './dialog/edit-map/edit-map.dialog';
+import { NotificationService } from '../notification/services/notification.service';
 
 //#endregion
 @Component({
@@ -130,8 +129,7 @@ export class ReplayCutterComponent implements OnInit {
     private readonly openCVService: OpenCVService,
     private readonly dialogService: MatDialog,
     private readonly apiRestService: APIRestService,
-    private readonly analysingCommunicationService: AnalysingCommunicationService,
-    private readonly upscalingCommunicationService: UpscalingCommunicationService
+    private readonly notificationService: NotificationService
   ) {}
 
   //#region Functions
@@ -150,17 +148,18 @@ export class ReplayCutterComponent implements OnInit {
     // The server send the upscaling process percent to the font-end.
     window.electronAPI.setUpscalePercent((percent: number) => {
       this.ngZone.run(() => {
-        this.translateService
-          .get('view.replay_cutter.upscalePercent', {
-            percent: percent
-          })
-          .subscribe((translated: string) => {
-            this.globalService.loading = translated;
-          });
+        this.globalService.loading = '';
 
-        this.upscalingCommunicationService.sendMessage({
-          percent: percent
-        });
+        this.translateService
+          .get('view.notification.upscaling.description')
+          .subscribe((translated: string) => {
+            this.notificationService.sendMessage({
+              percent: percent,
+              infinite: false,
+              icon: undefined,
+              text: translated
+            });
+          });
       });
     });
 
@@ -169,14 +168,26 @@ export class ReplayCutterComponent implements OnInit {
       this.ngZone.run(() => {
         if (this.training) {
           if (path) {
-            this._videoPath = encodeURIComponent(path);
             this.percent = 0;
-            window.electronAPI.showNotification(
-              true,
-              500,
-              150,
-              'notification/analysing'
-            );
+
+            this.translateService
+              .get('view.replay_cutter.videoIsBeingAnalyzed', {
+                games: this._games.length
+              })
+              .subscribe((translated: string) => {
+                window.electronAPI.showNotification(
+                  true,
+                  500,
+                  150,
+                  JSON.stringify({
+                    percent: this.percent,
+                    infinite: false,
+                    icon: undefined,
+                    text: translated
+                  })
+                );
+                this._videoPath = encodeURIComponent(path);
+              });
           }
         } else {
           if (path) {
@@ -195,7 +206,23 @@ export class ReplayCutterComponent implements OnInit {
                 window.electronAPI.setWindowSize();
                 if (response) {
                   this.globalService.loading = '';
-                  window.electronAPI.manualCutVideoFile(path, response);
+
+                  setTimeout(() => {
+                    this.translateService
+                      .get('view.notification.manual-cutting.description')
+                      .subscribe((translated: string) => {
+                        window.electronAPI.manualCutVideoFile(
+                          path,
+                          response,
+                          JSON.stringify({
+                            percent: 0,
+                            infinite: true,
+                            icon: 'fa-sharp fa-solid fa-scissors',
+                            text: translated
+                          })
+                        );
+                      });
+                  }, 1000);
                 }
               });
           }
@@ -217,12 +244,22 @@ export class ReplayCutterComponent implements OnInit {
         .subscribe((upscale: boolean) => {
           if (upscale) {
             window.electronAPI.openVideoFile(videoPath);
-            window.electronAPI.showNotification(
-              true,
-              550,
-              150,
-              'notification/upscaling'
-            );
+
+            this.translateService
+              .get('view.notification.upscaling.description')
+              .subscribe((translated: string) => {
+                window.electronAPI.showNotification(
+                  true,
+                  550,
+                  150,
+                  JSON.stringify({
+                    percent: 0,
+                    infinite: false,
+                    icon: undefined,
+                    text: translated
+                  })
+                );
+              });
           } else {
             this.globalService.loading = undefined;
             this.inputFileDisabled = false;
@@ -321,26 +358,34 @@ export class ReplayCutterComponent implements OnInit {
           .subscribe({
             next: (games: RestGame[]) => {
               if (games && games.length > 0) {
-                if (games.length == 1) {
-                  this.cropGameMinimap(gameIndex, games[0]);
-                } else {
-                  this.dialogService
-                    .open(ReplayCutterAttachGameDialog, {
-                      data: {
-                        games: games
-                      },
-                      autoFocus: false
-                    })
-                    .afterClosed()
-                    .subscribe((gameID: number | undefined) => {
-                      if (gameID) {
-                        this.cropGameMinimap(
-                          gameIndex,
-                          games.find((game) => game.ID == gameID)!
-                        );
-                      }
-                    });
-                }
+                this.videoURLToCanvas(
+                  `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+                  Math.round((this._games[gameIndex].end - 1) * 1000),
+                  (videoFrame?: HTMLCanvasElement) => {
+                    if (videoFrame) {
+                      const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
+                      this.dialogService
+                        .open(ReplayCutterAttachGameDialog, {
+                          data: {
+                            games: games,
+                            image: videoFrame.toDataURL()
+                          },
+                          autoFocus: false,
+                          width: DIALOG_WIDTH,
+                          maxWidth: DIALOG_WIDTH
+                        })
+                        .afterClosed()
+                        .subscribe((gameID: number | undefined) => {
+                          if (gameID) {
+                            this.cropGameMinimap(
+                              gameIndex,
+                              games.find((game) => game.ID == gameID)!
+                            );
+                          }
+                        });
+                    }
+                  }
+                );
               } else {
                 this.translateService
                   .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
@@ -937,12 +982,20 @@ export class ReplayCutterComponent implements OnInit {
           const DEFAULT_STEP: number = 1;
           if (VIDEO.currentTime > 0) {
             const NOW: number = VIDEO.currentTime;
-
             this.percent = Math.ceil(100 - (NOW / VIDEO.duration) * 100);
-            this.analysingCommunicationService.sendMessage({
-              games: this._games,
-              percent: this.percent
-            });
+
+            this.translateService
+              .get('view.replay_cutter.videoIsBeingAnalyzed', {
+                games: this._games.length
+              })
+              .subscribe((translated: string) => {
+                this.notificationService.sendMessage({
+                  percent: this.percent,
+                  infinite: false,
+                  icon: undefined,
+                  text: translated
+                });
+              });
 
             //#region Détéction d'une frame de score d'une game
 
@@ -1159,10 +1212,19 @@ export class ReplayCutterComponent implements OnInit {
                     //#endregion
 
                     this._games.unshift(GAME);
-                    this.analysingCommunicationService.sendMessage({
-                      games: this._games,
-                      percent: this.percent
-                    });
+
+                    this.translateService
+                      .get('view.replay_cutter.videoIsBeingAnalyzed', {
+                        games: this._games.length
+                      })
+                      .subscribe((translated: string) => {
+                        this.notificationService.sendMessage({
+                          percent: this.percent,
+                          infinite: false,
+                          icon: undefined,
+                          text: translated
+                        });
+                      });
                   }
                 } else if (
                   this.lastDetectedGamePlayingFrame &&
@@ -1570,8 +1632,6 @@ export class ReplayCutterComponent implements OnInit {
    * @param games List of detected games.
    */
   private onVideoEnded(games: Game[]): void {
-    this.percent = -1;
-    window.electronAPI.removeNotification(true);
     if (games.length == 0) {
       this.translateService
         .get('view.replay_cutter.toast.noGamesFoundInVideo')
@@ -1581,56 +1641,81 @@ export class ReplayCutterComponent implements OnInit {
           });
         });
     }
-    games.forEach((game) => {
-      this.getGameCroppedFrame(
-        (game.start + 5) * 1000,
-        MODES[game.mode].gameFrame.map[0].x,
-        MODES[game.mode].gameFrame.map[0].y,
-        MODES[game.mode].gameFrame.map[1].x,
-        MODES[game.mode].gameFrame.map[1].y
-      ).then((image) => {
-        game.mapImage = image;
+    this.getGamesDebugImages(games, () => {
+      this.percent = -1;
+      window.electronAPI.removeNotification(true);
+    });
+  }
+
+  private getGamesDebugImages(
+    games: Game[],
+    callback: Function,
+    index: number = 0
+  ): void {
+    this.translateService
+      .get('view.replay_cutter.correctionImageGeneration')
+      .subscribe((translated: string) => {
+        this.notificationService.sendMessage({
+          percent: (index / games.length) * 100,
+          infinite: false,
+          icon: undefined,
+          text: translated
+        });
       });
 
-      this.getGameCroppedFrame(
-        (game.end - 1) * 1000,
-        MODES[game.mode].scoreFrame.orangeScore[0].x,
-        MODES[game.mode].scoreFrame.orangeScore[0].y,
-        MODES[game.mode].scoreFrame.orangeScore[1].x,
-        MODES[game.mode].scoreFrame.orangeScore[1].y
-      ).then((image) => {
-        game.orangeTeam.scoreImage = image;
-      });
+    this.getGameCroppedFrame(
+      (games[index].start + 5) * 1000,
+      MODES[games[index].mode].gameFrame.map[0].x,
+      MODES[games[index].mode].gameFrame.map[0].y,
+      MODES[games[index].mode].gameFrame.map[1].x,
+      MODES[games[index].mode].gameFrame.map[1].y
+    ).then((image) => {
+      games[index].mapImage = image;
 
-      this.getGameCroppedFrame(
-        (game.end - 1) * 1000,
-        MODES[game.mode].scoreFrame.orangeName[0].x,
-        MODES[game.mode].scoreFrame.orangeName[0].y,
-        MODES[game.mode].scoreFrame.orangeName[1].x,
-        MODES[game.mode].scoreFrame.orangeName[1].y
-      ).then((image) => {
-        game.orangeTeam.nameImage = image;
-      });
+      this.videoURLToCanvas(
+        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+        (games[index].end - 1) * 1000,
+        (videoFrame?: HTMLCanvasElement) => {
+          if (videoFrame) {
+            games[index].orangeTeam.scoreImage = this.cropImage(
+              videoFrame,
+              MODES[games[index].mode].scoreFrame.orangeScore[0].x,
+              MODES[games[index].mode].scoreFrame.orangeScore[0].y,
+              MODES[games[index].mode].scoreFrame.orangeScore[1].x,
+              MODES[games[index].mode].scoreFrame.orangeScore[1].y
+            )?.toDataURL();
 
-      this.getGameCroppedFrame(
-        (game.end - 1) * 1000,
-        MODES[game.mode].scoreFrame.blueScore[0].x,
-        MODES[game.mode].scoreFrame.blueScore[0].y,
-        MODES[game.mode].scoreFrame.blueScore[1].x,
-        MODES[game.mode].scoreFrame.blueScore[1].y
-      ).then((image) => {
-        game.blueTeam.scoreImage = image;
-      });
+            games[index].orangeTeam.nameImage = this.cropImage(
+              videoFrame,
+              MODES[games[index].mode].scoreFrame.orangeName[0].x,
+              MODES[games[index].mode].scoreFrame.orangeName[0].y,
+              MODES[games[index].mode].scoreFrame.orangeName[1].x,
+              MODES[games[index].mode].scoreFrame.orangeName[1].y
+            )?.toDataURL();
 
-      this.getGameCroppedFrame(
-        (game.end - 1) * 1000,
-        MODES[game.mode].scoreFrame.blueName[0].x,
-        MODES[game.mode].scoreFrame.blueName[0].y,
-        MODES[game.mode].scoreFrame.blueName[1].x,
-        MODES[game.mode].scoreFrame.blueName[1].y
-      ).then((image) => {
-        game.blueTeam.nameImage = image;
-      });
+            games[index].blueTeam.scoreImage = this.cropImage(
+              videoFrame,
+              MODES[games[index].mode].scoreFrame.blueScore[0].x,
+              MODES[games[index].mode].scoreFrame.blueScore[0].y,
+              MODES[games[index].mode].scoreFrame.blueScore[1].x,
+              MODES[games[index].mode].scoreFrame.blueScore[1].y
+            )?.toDataURL();
+
+            games[index].blueTeam.nameImage = this.cropImage(
+              videoFrame,
+              MODES[games[index].mode].scoreFrame.blueName[0].x,
+              MODES[games[index].mode].scoreFrame.blueName[0].y,
+              MODES[games[index].mode].scoreFrame.blueName[1].x,
+              MODES[games[index].mode].scoreFrame.blueName[1].y
+            )?.toDataURL();
+          }
+          if (index < games.length - 1) {
+            this.getGamesDebugImages(games, callback, index + 1);
+          } else {
+            callback();
+          }
+        }
+      );
     });
   }
 

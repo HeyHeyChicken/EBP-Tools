@@ -16,8 +16,8 @@
     "replay_cutter": {
       "wrongResolution": "Your video must be in {{ expectedHeight }}p, yours is in {{ currentHeight }}p",
       "inputTrainingFile": "Click here to auto cut your training video file",
-      "videoIsBeingAnalyzed": "Please wait, the video is being analyzed...",
-      "nbGamesFound": "Number of games found",
+      "videoIsBeingAnalyzed": "<b>Step 1 / 2:</b> The video is being analyzed, please wait...<br/>Number of parts found: <b>{{games}}</b>",
+      "correctionImageGeneration": "<b>Step 2 / 2:</b> Correction images are being generated, please wait...",
       "saveAll": "Save selected games",
       "copyTimecodes": "Copy selected games timecodes",
       "map": "Map",
@@ -35,7 +35,6 @@
         "mapNotAICompatible": "The map {{map}} is not yet compatible with EBP's AI, but will be in upcoming updates."
       },
       "outputPath": "Output path",
-      "upscalePercent": "Upscaling ... ({{percent}}%)",
       "detectingPlayerNicknames": "Detecting player nicknames...",
       "detectingOrangeInfoZone": "Detecting orange info zone...",
       "detectingBlueInfoZone": "Detecting blue info zone...",
@@ -93,6 +92,12 @@
         },
         "edit-map": {
           "title": "Modifier la carte de la game"
+        },
+        "attach-game": {
+          "title": "Associer le replay à une game",
+          "tags": "Tags",
+          "players": "Players",
+          "date": "Date"
         }
       },
       "inputOfficialFile": "Click here to manually cut your official video file"

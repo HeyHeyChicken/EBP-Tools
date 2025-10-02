@@ -70,13 +70,17 @@ export interface ElectronAPI {
     sortedOrangePlayersNames: string[],
     sortedBluePlayersNames: string[]
   ) => void;
-  manualCutVideoFile: (videoPath?: string, chunks: VideoChunk[]) => void;
+  manualCutVideoFile: (
+    videoPath?: string,
+    chunks: VideoChunk[],
+    notificationData: string
+  ) => void;
   setLanguage: (language?: string) => void;
   showNotification: (
     hideMainWindow: boolean,
     width: number,
     height: number,
-    url: string
+    notificationData: string
   ) => void;
   removeNotification: (showMainWindow: boolean) => void;
 

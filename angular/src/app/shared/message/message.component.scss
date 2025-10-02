@@ -2,7 +2,7 @@
 // This file is part of a source-visible project.
 // See LICENSE for terms. Unauthorized use is prohibited.
 
-@use "../../../styles/imports/variables" as variables;
+@use '../../../styles/imports/variables' as variables;
 
 :host {
   margin: 0 auto;
@@ -25,19 +25,19 @@
       left: 100%;
     }
 
-    > div {
+    > .circle {
       left: calc(100% + #{variables.$margin});
-      background-image: url("/assets/img/users/heyheychicken/picture.webp");
+      background-image: url('/assets/img/users/heyheychicken/picture.webp');
 
       &::after {
-        content: "";
+        content: '';
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         height: 120%;
         width: 120%;
-        background-image: url("/assets/img/users/heyheychicken/hover.gif");
+        background-image: url('/assets/img/users/heyheychicken/hover.gif');
         background-size: cover;
         background-position: center center;
       }
@@ -54,14 +54,14 @@
       right: 100%;
     }
 
-    > div {
+    > .circle {
       right: calc(100% + #{variables.$margin});
-      background-image: url("/assets/img/friend.webp");
+      background-image: url('/assets/img/friend.webp');
     }
   }
 
   &:before {
-    content: "";
+    content: '';
     position: absolute;
     width: 0px;
     height: 0px;
@@ -69,7 +69,7 @@
     bottom: 0;
   }
 
-  > div {
+  > .circle {
     position: absolute;
     width: calc(#{variables.$margin} * 4);
     height: calc(#{variables.$margin} * 4);

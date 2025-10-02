@@ -4,6 +4,10 @@
 
 @use '../../../../../styles/imports/variables' as variables;
 
+img {
+  width: 100%;
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
@@ -17,6 +21,22 @@ table {
   > tbody {
     > tr {
       > td {
+        &.orange {
+          background-color: rgba(variables.$orange_color, 0.1);
+          color: variables.$orange_color;
+        }
+
+        &.blue {
+          background-color: rgba(variables.$blue_color, 0.1);
+          color: variables.$blue_color;
+        }
+
+        > ul {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+        }
+
         > .tags {
           display: flex;
           gap: calc(#{variables.$margin} / 2);

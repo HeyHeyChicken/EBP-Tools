@@ -10,6 +10,7 @@ import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { RestGame } from '../../models/rest-game';
 import { GridModule } from '../../../../shared/grid/grid.module';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 //#endregion
 
@@ -17,7 +18,13 @@ import { GridModule } from '../../../../shared/grid/grid.module';
   selector: 'replay-cutter-dialog-attach-game',
   templateUrl: './attach-game.dialog.html',
   styleUrls: ['./attach-game.dialog.scss'],
-  imports: [CommonModule, MatDialogModule, TranslateModule, GridModule],
+  imports: [
+    CommonModule,
+    MatDialogModule,
+    TranslateModule,
+    GridModule,
+    MatTooltipModule
+  ],
   standalone: true
 })
 export class ReplayCutterAttachGameDialog {
@@ -25,6 +32,7 @@ export class ReplayCutterAttachGameDialog {
     @Inject(MAT_DIALOG_DATA)
     protected data: {
       games: RestGame[];
+      image: string;
     }
   ) {}
 }

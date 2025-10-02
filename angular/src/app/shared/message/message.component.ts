@@ -20,7 +20,8 @@ import { FormsModule } from '@angular/forms';
 export class MessageComponent implements OnInit {
   //#region Attributes
 
-  @Input() protected friend: boolean = false;
+  @Input() public friend: boolean = false;
+  @Input() public html: string | undefined;
   @HostBinding('class.friend') addFriendClass: boolean = false;
 
   //#endregion

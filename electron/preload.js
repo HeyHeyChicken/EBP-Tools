@@ -55,11 +55,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to crop, cut and upload a video to the EBP's S3 server.
   uploadGameMiniMap: (game, cropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames) => ipcRenderer.invoke("upload-game-mini-map", game, cropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames),
   // The front-end asks the server to cut a video file manualy edited.
-  manualCutVideoFile: (videoPath, chunks) => ipcRenderer.invoke("manual-cut-video-file", videoPath, chunks),
+  manualCutVideoFile: (videoPath, chunks, notificationData) => ipcRenderer.invoke("manual-cut-video-file", videoPath, chunks, notificationData),
   // The front-end asks the server to save the current language.
   setLanguage: (language) => ipcRenderer.invoke("set-language", language),
   // The front-end asks the server to show a notification.
-  showNotification: (hideMainWindow, width, height, url) => ipcRenderer.invoke("show-notification", hideMainWindow, width, height, url),
+  showNotification: (hideMainWindow, width, height, notificationData) => ipcRenderer.invoke("show-notification", hideMainWindow, width, height, notificationData),
   // The front-end asks the server to remove the notification.
   removeNotification: (showMainWindow) => ipcRenderer.invoke("remove-notification", showMainWindow),
   

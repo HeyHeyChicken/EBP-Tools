@@ -4,4 +4,7 @@ This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
 <ng-content></ng-content>
-<div></div>
+@if (html) {
+  <div [innerHTML]="html">aaa</div>
+}
+<div class="circle"></div>

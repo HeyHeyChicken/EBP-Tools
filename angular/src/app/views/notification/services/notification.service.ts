@@ -11,10 +11,10 @@ import { Message } from '../models/message.model';
 //#endregion
 
 @Injectable({ providedIn: 'root' })
-export class AnalysingCommunicationService {
+export class NotificationService {
   //#region Attributes
 
-  private _channel = new BroadcastChannel('ebp_tools_notification_analysing');
+  private _channel = new BroadcastChannel('ebp_tools_notification');
   private _messages$ = new Subject<Message>();
   messages$ = this._messages$.asObservable();
 

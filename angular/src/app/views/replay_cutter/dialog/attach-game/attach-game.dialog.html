@@ -4,15 +4,34 @@ This file is part of a source-visible project.
 See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
+<h2 mat-dialog-title>
+  {{ 'view.replay_cutter.dialog.attach-game.title' | translate }}
+  <button
+    class="squared"
+    mat-dialog-close
+    matTooltip="{{ 'common.close' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-xmark"></i>
+  </button>
+</h2>
 <mat-dialog-content>
   <ebp-row>
-    <ebp-column [xs]="12"> Veuillez séléctionner une game... </ebp-column>
+    <ebp-column [xs]="12">
+      <img src="{{data.image}}" />
+    </ebp-column>
     <ebp-column [xs]="12">
       <table>
         <thead>
           <tr>
-            <th>Tags</th>
-            <th>Date</th>
+            <th>
+              {{ 'view.replay_cutter.dialog.attach-game.tags' | translate }}
+            </th>
+            <th colspan="2">
+              {{ 'view.replay_cutter.dialog.attach-game.players' | translate }}
+            </th>
+            <th>
+              {{ 'view.replay_cutter.dialog.attach-game.date' | translate }}
+            </th>
             <th></th>
           </tr>
         </thead>
@@ -25,6 +44,20 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 <div class="tag">{{tag}}</div>
                 }
               </div>
+            </td>
+            <td class="orange">
+              <ul>
+                @for (player of game.orangePlayers; track player) {
+                <li>{{player}}</li>
+                }
+              </ul>
+            </td>
+            <td class="blue">
+              <ul>
+                @for (player of game.bluePlayers; track player) {
+                <li>{{player}}</li>
+                }
+              </ul>
             </td>
             <td>{{ game.date }}</td>
             <td>
@@ -39,12 +72,3 @@ See LICENSE for terms. Unauthorized use is prohibited.
     </ebp-column>
   </ebp-row>
 </mat-dialog-content>
-<mat-dialog-actions align="end">
-  <button
-    type="button"
-    mat-dialog-close
-    attr.aria-label="{{ 'common.cancel' | translate }}"
-  >
-    <i class="fa-sharp fa-solid fa-xmark"></i>{{"common.cancel"|translate}}
-  </button>
-</mat-dialog-actions>

@@ -5,8 +5,10 @@ See LICENSE for terms. Unauthorized use is prohibited.
 -->
 
 <div class="loader">
-  <ebp-loader [value]="data.percent"></ebp-loader>
+  <ebp-loader
+    [value]="data.percent"
+    [infinite]="data.infinite"
+    [icon]="data.icon"
+  ></ebp-loader>
 </div>
-<ebp-message>
-  {{ 'view.notification.upscaling.description' | translate }}
-</ebp-message>
+<ebp-message [html]="data.text"> </ebp-message>

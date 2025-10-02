@@ -723,7 +723,7 @@ let projectLatestVersion /* string */ = '';
         TEMP_FILES.forEach((file) => fs.unlinkSync(file));
     }
 
-    function createFloatingWindow(width, height, url, callback) {
+    function createFloatingWindow(width, height, callback, data) {
         const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
         const WIDTH = Math.min(PRIMARY_DISPLAY.workAreaSize.width, width);
         const HEIGHT = Math.min(PRIMARY_DISPLAY.workAreaSize.height, height);
@@ -766,7 +766,8 @@ let projectLatestVersion /* string */ = '';
 
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
 
-        const URL = `http://localhost:${isProd ? PORT : '4200'}/${SETTINGS['language'] ?? 'aa'}/${url}`;
+        const URL = `http://localhost:${isProd ? PORT : '4200'}/${SETTINGS['language'] ?? 'aa'}/notification?data=${encodeURIComponent(data)}`;
+        console.log(URL);
 
         floatingWindow.loadURL(URL);
     }
@@ -1020,8 +1021,13 @@ let projectLatestVersion /* string */ = '';
         // The front-end asks the server to show a notification.
         ipcMain.handle(
             'show-notification',
-            (event, hideMainWindow, width, height, url) => {
-                createFloatingWindow(width, height, url);
+            (event, hideMainWindow, width, height, notificationData) => {
+                createFloatingWindow(
+                    width,
+                    height,
+                    undefined,
+                    notificationData
+                );
                 if (hideMainWindow && mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.hide();
                 }
@@ -1371,12 +1377,11 @@ let projectLatestVersion /* string */ = '';
         // The front-end asks the server to cut a video file manualy edited.
         ipcMain.handle(
             'manual-cut-video-file',
-            async (event, videoPath, chunks) => {
+            async (event, videoPath, chunks, notificationData) => {
                 mainWindow.hide();
                 createFloatingWindow(
                     450,
                     150,
-                    'notification/manual-cutting',
                     async () => {
                         const SPLIT = videoPath.split('.');
                         const FILE_EXTENSION = SPLIT[SPLIT.length - 1];
@@ -1399,7 +1404,8 @@ let projectLatestVersion /* string */ = '';
                             'set-video-file',
                             OUTPUT_FILE_PATH
                         );
-                    }
+                    },
+                    notificationData
                 );
             }
         );

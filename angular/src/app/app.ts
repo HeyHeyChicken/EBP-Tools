@@ -71,33 +71,33 @@ export class App implements OnInit {
     });
 
     // Getting the user's operating system.
-    window.electronAPI.getOS().then((os: NodeJS.Platform) => {
+    window.electronAPI?.getOS().then((os: NodeJS.Platform) => {
       this.ngZone.run(() => {
         this.globalService.os = os;
       });
     });
 
-    window.electronAPI.isDevMode().then((devMode: boolean) => {
+    window.electronAPI?.isDevMode().then((devMode: boolean) => {
       this.ngZone.run(() => {
         this.globalService.devMode = devMode;
       });
     });
 
     // Getting the project version.
-    window.electronAPI.getVersion().then((versions: Versions) => {
+    window.electronAPI?.getVersion().then((versions: Versions) => {
       this.ngZone.run(() => {
         this.versions = new Versions(versions.current, versions.last);
       });
     });
 
     // Getting the web server port.
-    window.electronAPI.getExpressPort().then((serverPort: number) => {
+    window.electronAPI?.getExpressPort().then((serverPort: number) => {
       this.ngZone.run(() => {
         this.globalService.serverPort = serverPort;
       });
     });
 
-    window.electronAPI.setJWTAccessToken((accessToken: string) => {
+    window.electronAPI?.setJWTAccessToken((accessToken: string) => {
       this.ngZone.run(() => {
         this.identityService.set(accessToken);
 
@@ -114,9 +114,9 @@ export class App implements OnInit {
     });
 
     // Getting logged user informations from his JWT.
-    window.electronAPI.getJWTAccessToken();
+    window.electronAPI?.getJWTAccessToken();
 
-    window.electronAPI.error((i18nPath: string, i18nVariables: object) => {
+    window.electronAPI?.error((i18nPath: string, i18nVariables: object) => {
       this.ngZone.run(() => {
         this.globalService.loading = undefined;
 
@@ -128,7 +128,7 @@ export class App implements OnInit {
       });
     });
 
-    window.electronAPI.globalMessage(
+    window.electronAPI?.globalMessage(
       (i18nPath: string, i18nVariables: object) => {
         this.ngZone.run(() => {
           this.translateService
@@ -152,11 +152,11 @@ export class App implements OnInit {
    * This function enables/disables debug mode.
    */
   debugMode(): void {
-    window.electronAPI.debugMode();
+    window.electronAPI?.debugMode();
   }
 
   protected onNewUpdateLinkClick(): void {
-    window.electronAPI.openURL(
+    window.electronAPI?.openURL(
       'https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/releases/latest'
     );
   }
