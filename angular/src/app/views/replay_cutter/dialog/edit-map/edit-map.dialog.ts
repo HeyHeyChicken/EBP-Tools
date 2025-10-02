@@ -49,7 +49,7 @@ export class ReplayCutterEditMapDialog {
     @Inject(MAT_DIALOG_DATA)
     public readonly data: {
       map: string;
-      maps: Map[];
+      maps: string[];
     }
   ) {
     this.value = data.map;
