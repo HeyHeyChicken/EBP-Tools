@@ -90,6 +90,9 @@
         },
         "crop": {
           "explanations": "Um eine korrekte Analyse zu gewährleisten, muss die Minimap korrekt abgegrenzt sein.<br/>Tools schafft dies nicht immer automatisch. Überprüfen Sie die Begrenzung und schneiden Sie sie bei Bedarf neu zu, wobei Sie darauf achten, die äußeren Kartenränder im Zuschnitt einzuschließen (TPs und andere Elemente ausschließen)."
+        },
+        "edit-map": {
+          "title": "Modifier la carte de la game"
         }
       },
       "inputOfficialFile": "Klicken Sie hier, um Ihre offizielle Videodatei manuell zu schneiden"

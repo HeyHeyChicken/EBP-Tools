@@ -110,7 +110,14 @@ See LICENSE for terms. Unauthorized use is prohibited.
                       '_EBP-300x169.webp)'
                     "
                   >
-                    {{ game.map }}
+                    <span (click)="editGameMap(game)"
+                      >{{ game.map }}
+                      @if (game.mapImage) {
+                        <div class="popup">
+                          <img [src]="game.mapImage" />
+                        </div>
+                      }
+                    </span>
                   </th>
                   <td class="infos">
                     <p class="orange">

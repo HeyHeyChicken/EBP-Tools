@@ -90,6 +90,9 @@
         },
         "crop": {
           "explanations": "Per garantire un'analisi corretta, la minimappa deve essere correttamente delimitata.<br/>Tools non sempre lo fa automaticamente. Controlla i confini e ritaglia se necessario, assicurandoti di includere i bordi esterni della mappa nel ritaglio (escludere i TP e altri elementi)."
+        },
+        "edit-map": {
+          "title": "Modifier la carte de la game"
         }
       },
       "inputOfficialFile": "Clicca qui per tagliare manualmente il tuo file video ufficiale"

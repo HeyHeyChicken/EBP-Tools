@@ -46,6 +46,8 @@ export class Game {
   //#endregion
 
   public map: string = '';
+  public mapImage: string | undefined;
+
   public splitted: boolean = false;
 
   public orangeTeam: Team = new Team();

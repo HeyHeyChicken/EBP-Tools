@@ -90,6 +90,9 @@
         },
         "crop": {
           "explanations": "Pour garantir une analyse correcte, la minimap doit être correctement délimitée.<br/>Tools ne parvient pas toujours à le faire automatiquement. Vérifiez le bornage et recadrez si besoin, en veillant à inclure les bordures extérieures de la carte dans le crop (excluez les TP et autres éléments)."
+        },
+        "edit-map": {
+          "title": "Modifier la carte de la game"
         }
       },
       "inputOfficialFile": "Cliquez ici pour découper manuellement votre fichier vidéo officiel"

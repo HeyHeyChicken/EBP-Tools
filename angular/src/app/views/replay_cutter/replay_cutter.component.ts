@@ -50,6 +50,7 @@ import { VideoChunk } from './models/video-chunk';
 import { AnalysingCommunicationService } from '../notification/analysing/services/analysing-communication.service';
 import { KillFeedService } from './services/kill-feed.service';
 import { UpscalingCommunicationService } from '../notification/upscaling/services/upscaling-communication.service';
+import { ReplayCutterEditMapDialog } from './dialog/edit-map/edit-map.dialog';
 
 //#endregion
 @Component({
@@ -1582,6 +1583,16 @@ export class ReplayCutterComponent implements OnInit {
     }
     games.forEach((game) => {
       this.getGameCroppedFrame(
+        (game.start + 5) * 1000,
+        MODES[game.mode].gameFrame.map[0].x,
+        MODES[game.mode].gameFrame.map[0].y,
+        MODES[game.mode].gameFrame.map[1].x,
+        MODES[game.mode].gameFrame.map[1].y
+      ).then((image) => {
+        game.mapImage = image;
+      });
+
+      this.getGameCroppedFrame(
         (game.end - 1) * 1000,
         MODES[game.mode].scoreFrame.orangeScore[0].x,
         MODES[game.mode].scoreFrame.orangeScore[0].y,
@@ -2471,6 +2482,23 @@ export class ReplayCutterComponent implements OnInit {
       }
     }
     return Promise.resolve('');
+  }
+
+  protected editGameMap(game: Game): void {
+    this.dialogService
+      .open(ReplayCutterEditMapDialog, {
+        data: {
+          map: game.map,
+          maps: this.maps.map((x) => x.name)
+        },
+        width: '400px'
+      })
+      .afterClosed()
+      .subscribe((newMap: string | undefined) => {
+        if (newMap) {
+          game.map = newMap;
+        }
+      });
   }
 
   /**
