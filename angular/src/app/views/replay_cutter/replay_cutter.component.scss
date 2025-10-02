@@ -223,9 +223,50 @@ table {
 
         span {
           cursor: pointer;
+          position: relative;
 
           &:hover {
             text-decoration: underline;
+          }
+
+          > .popup {
+            position: absolute;
+            bottom: calc(100% + #{variables.$margin});
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: variables.$dark_color;
+            border: 1px solid variables.$border_color;
+            padding: variables.$margin;
+            z-index: 1;
+
+            &::before,
+            &::after {
+              content: '';
+              position: absolute;
+              top: 100%;
+              left: 50%;
+              transform: translateX(-50%);
+              border-style: solid;
+              border-width: 10.4px 6px 0 6px;
+            }
+
+            &::before {
+              border-color: variables.$border_color transparent transparent
+                transparent;
+              transform: translateX(-50%);
+            }
+
+            &::after {
+              border-color: variables.$dark_color transparent transparent
+                transparent;
+              transform: translate(-50%, -2px);
+            }
+          }
+
+          &:not(:hover) {
+            > .popup {
+              display: none;
+            }
           }
         }
       }

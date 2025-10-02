@@ -15,5 +15,8 @@ export class Team {
   public score: number = 0;
   public players: Player[] = [];
 
+  public nameImage: string | undefined;
+  public scoreImage: string | undefined;
+
   //#endregion
 }

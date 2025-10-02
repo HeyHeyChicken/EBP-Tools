@@ -1392,7 +1392,6 @@ export class ReplayCutterComponent implements OnInit {
               Math.max(0, NOW - DEFAULT_STEP)
             );
           } else {
-            console.log('A');
             this.onVideoEnded(this._games);
 
             const DIFFERENCE = Date.now() - this.start;
@@ -1581,6 +1580,47 @@ export class ReplayCutterComponent implements OnInit {
           });
         });
     }
+    games.forEach((game) => {
+      this.getGameCroppedFrame(
+        (game.end - 1) * 1000,
+        MODES[game.mode].scoreFrame.orangeScore[0].x,
+        MODES[game.mode].scoreFrame.orangeScore[0].y,
+        MODES[game.mode].scoreFrame.orangeScore[1].x,
+        MODES[game.mode].scoreFrame.orangeScore[1].y
+      ).then((image) => {
+        game.orangeTeam.scoreImage = image;
+      });
+
+      this.getGameCroppedFrame(
+        (game.end - 1) * 1000,
+        MODES[game.mode].scoreFrame.orangeName[0].x,
+        MODES[game.mode].scoreFrame.orangeName[0].y,
+        MODES[game.mode].scoreFrame.orangeName[1].x,
+        MODES[game.mode].scoreFrame.orangeName[1].y
+      ).then((image) => {
+        game.orangeTeam.nameImage = image;
+      });
+
+      this.getGameCroppedFrame(
+        (game.end - 1) * 1000,
+        MODES[game.mode].scoreFrame.blueScore[0].x,
+        MODES[game.mode].scoreFrame.blueScore[0].y,
+        MODES[game.mode].scoreFrame.blueScore[1].x,
+        MODES[game.mode].scoreFrame.blueScore[1].y
+      ).then((image) => {
+        game.blueTeam.scoreImage = image;
+      });
+
+      this.getGameCroppedFrame(
+        (game.end - 1) * 1000,
+        MODES[game.mode].scoreFrame.blueName[0].x,
+        MODES[game.mode].scoreFrame.blueName[0].y,
+        MODES[game.mode].scoreFrame.blueName[1].x,
+        MODES[game.mode].scoreFrame.blueName[1].y
+      ).then((image) => {
+        game.blueTeam.nameImage = image;
+      });
+    });
   }
 
   /**
@@ -2228,6 +2268,49 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
+   * Crops a rectangular region from a given image or canvas and returns it as a new canvas.
+   * @param source The source image or canvas to crop from.
+   * @param x1 The starting X coordinate of the crop area.
+   * @param y1 The starting Y coordinate of the crop area.
+   * @param x2 The ending X coordinate of the crop area.
+   * @param y2 The ending Y coordinate of the crop area.
+   * @returns A new canvas containing the cropped image, or undefined if the context could not be created.
+   */
+  private cropImage(
+    source: CanvasImageSource,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number
+  ): HTMLCanvasElement | undefined {
+    const CANVAS: HTMLCanvasElement = document.createElement('canvas');
+    const WIDTH: number = x2 - x1;
+    const HEIGHT: number = y2 - y1;
+
+    CANVAS.width = WIDTH;
+    CANVAS.height = HEIGHT;
+
+    const CTX = CANVAS.getContext('2d');
+    if (CTX) {
+      CTX.drawImage(
+        source /* Image */,
+        x1 /* Image X */,
+        y1 /* Image Y */,
+        WIDTH /* Image width */,
+        HEIGHT /* Image height */,
+        0 /* Canvas X */,
+        0 /* Canvas Y */,
+        WIDTH /* Canvas width */,
+        HEIGHT /* Canvas height */
+      );
+
+      return CANVAS;
+    }
+
+    return undefined;
+  }
+
+  /**
    * This function attempts to find text present in a canvas at specific coordinates.
    * @param source HTML DOM of the video element to be analyzed.
    * @param tesseractWorker Tesseract instance.
@@ -2255,26 +2338,10 @@ export class ReplayCutterComponent implements OnInit {
     disableInitialScan: boolean = false,
     checker?: Function
   ): Promise<string> {
-    if (source) {
-      const CANVAS = document.createElement('canvas');
-      const WIDTH /* number */ = x2 - x1;
-      const HEIGHT /* number */ = y2 - y1;
-      CANVAS.width = WIDTH;
-      CANVAS.height = HEIGHT;
+    const CANVAS = this.cropImage(source, x1, y1, x2, y2);
+    if (CANVAS) {
       const CTX = CANVAS.getContext('2d');
       if (CTX) {
-        CTX.drawImage(
-          source /* Image */,
-          x1 /* Image X */,
-          y1 /* Image Y */,
-          WIDTH /* Image width */,
-          HEIGHT /* Image height */,
-          0 /* Canvas X */,
-          0 /* Canvas Y */,
-          WIDTH /* Canvas width */,
-          HEIGHT /* Canvas height */
-        );
-
         const IMG = CANVAS.toDataURL('image/png');
         // DEBUG
         this.debug?.nativeElement.append(CANVAS);
@@ -2430,6 +2497,26 @@ export class ReplayCutterComponent implements OnInit {
           }
         }
       });
+  }
+
+  protected async getGameCroppedFrame(
+    gameTimeMs: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number
+  ): Promise<string | undefined> {
+    return new Promise((resolve) => {
+      this.videoURLToCanvas(
+        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+        gameTimeMs,
+        (videoFrame?: HTMLCanvasElement) => {
+          if (videoFrame) {
+            resolve(this.cropImage(videoFrame, x1, y1, x2, y2)?.toDataURL());
+          }
+        }
+      );
+    });
   }
 
   /**

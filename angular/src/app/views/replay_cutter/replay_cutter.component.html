@@ -114,22 +114,39 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   </th>
                   <td class="infos">
                     <p class="orange">
-                      <span (click)="editTeamName(game, 'orange')">{{
-                        game.orangeTeam.name
-                      }}</span>
-                      (<span (click)="editTeamScore(game, 'orange')">{{
-                        game.orangeTeam.score
-                      }}</span
-                      >)
+                      <span (click)="editTeamName(game, 'orange')"
+                        >{{ game.orangeTeam.name }}
+                        @if (game.orangeTeam.nameImage) {
+                          <div class="popup">
+                            <img [src]="game.orangeTeam.nameImage" />
+                          </div>
+                        }</span
+                      ><span (click)="editTeamScore(game, 'orange')">
+                        @if (game.orangeTeam.scoreImage) {
+                          <div class="popup">
+                            <img [src]="game.orangeTeam.scoreImage" />
+                          </div>
+                        }
+                        ({{ game.orangeTeam.score }})</span
+                      >
                     </p>
                     <p class="blue">
-                      <span (click)="editTeamName(game, 'blue')">{{
-                        game.blueTeam.name
-                      }}</span>
-                      (<span (click)="editTeamScore(game, 'blue')">{{
-                        game.blueTeam.score
-                      }}</span
-                      >)
+                      <span (click)="editTeamName(game, 'blue')"
+                        >{{ game.blueTeam.name }}
+                        @if (game.blueTeam.nameImage) {
+                          <div class="popup">
+                            <img [src]="game.blueTeam.nameImage" />
+                          </div>
+                        }
+                      </span>
+                      <span (click)="editTeamScore(game, 'blue')">
+                        @if (game.blueTeam.scoreImage) {
+                          <div class="popup">
+                            <img [src]="game.blueTeam.scoreImage" />
+                          </div>
+                        }
+                        ({{ game.blueTeam.score }})</span
+                      >
                     </p>
                   </td>
                   <td class="buttons">
