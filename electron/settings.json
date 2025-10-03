@@ -1,9 +1,1 @@
-{
-  "language": "fr",
-  "jwt": {
-    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V2YWJhdHRsZXBsYW4uY29tIiwic3ViIjoxNTcsInVzZXJJRCI6MTU3LCJpYXQiOjE3NTk0OTA1MzUsImV4cCI6MTc1OTQ5NDEzNSwic3VwcG9ydGVyTGV2ZWwiOiIxMCIsImVtYWlsIjoiYW50b2luZUBjdWZmZWwuZnIifQ.TLvU8ra5Ro-7fGH8sAN0bZBKoUz5fBgDiOs1uI0grJE",
-    "access_expires_in": 1759494135243,
-    "refresh_token": "ae3693b200b949ccff6ba0c0e43382ad862f7c4ed2d0911abdf80b61c94e1a28",
-    "refresh_expires_in": 1762082535243
-  }
-}
+{}
