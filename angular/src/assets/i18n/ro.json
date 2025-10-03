@@ -144,6 +144,7 @@
       "changeTool": "Schimbă unealta",
       "accessDiscordServer": "Accesează serverul Discord EBP",
       "logout": "Deconectează-te",
+      "chooseATeam": "Alege o echipă",
       "home": "Acasă",
       "tools": {
         "replay_downloader": "Descărcător replay-uri",

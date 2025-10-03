@@ -5,8 +5,8 @@
 //#region Imports
 
 import { Injectable } from '@angular/core';
-import { GlobalService } from './global.service';
-import { APIRestService } from './api-rest.service';
+import { GlobalService } from '../global.service';
+import { Team } from './model/team.model';
 
 //#endregion
 
@@ -21,6 +21,9 @@ export class IdentityService {
   private _leaderID: number = 0;
   private _email: number = 0;
   private _supporterLevel: number = 0;
+
+  public teams: Team[] = [];
+  public selectedTeamsIndex: number = 0;
 
   public coins: number | undefined;
 

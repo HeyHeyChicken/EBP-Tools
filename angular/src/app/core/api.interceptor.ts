@@ -12,7 +12,7 @@ import {
 } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Observable, catchError, throwError, retry, timer, defer } from 'rxjs';
-import { IdentityService } from './services/identity.service';
+import { IdentityService } from './services/identity/identity.service';
 
 //#endregion
 

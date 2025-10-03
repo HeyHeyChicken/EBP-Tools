@@ -17,7 +17,6 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { GridModule } from '../../shared/grid/grid.module';
 import { LoaderComponent } from '../../shared/loader/loader.component';
-import { MessageComponent } from '../../shared/message/message.component';
 import Tesseract, { createWorker, PSM } from 'tesseract.js';
 import { ToastrService } from 'ngx-toastr';
 import { Map } from './models/map';
@@ -31,7 +30,7 @@ import { ReplayCutterCropDialog } from './dialog/crop/crop.dialog';
 import { CropperPosition } from 'ngx-image-cropper';
 import { APIRestService } from '../../core/services/api-rest.service';
 import { RestGame } from './models/rest-game';
-import { IdentityService } from '../../core/services/identity.service';
+import { IdentityService } from '../../core/services/identity/identity.service';
 import { ReplayCutterSettingsDialog } from './dialog/settings/settings.dialog';
 import { Settings } from './models/settings';
 import { ReplayCutterUpscaleConfirmationDialog } from './dialog/upscale-confirmation/upscale-confirmation.dialog';
@@ -63,7 +62,6 @@ import { NotificationService } from '../notification/services/notification.servi
     CommonModule,
     TranslateModule,
     LoaderComponent,
-    MessageComponent,
     MatInputModule,
     MatCheckboxModule,
     FormsModule
@@ -91,6 +89,8 @@ export class ReplayCutterComponent implements OnInit {
     return this._games;
   }
 
+  private justJumped: boolean = false;
+  private videoOldTime: number | undefined = undefined;
   private start: number = 0;
 
   private tesseractWorker_basic: Tesseract.Worker | undefined;
@@ -169,6 +169,7 @@ export class ReplayCutterComponent implements OnInit {
         if (this.training) {
           if (path) {
             this.percent = 0;
+            this.globalService.loading = '';
 
             this.translateService
               .get('view.replay_cutter.videoIsBeingAnalyzed', {
@@ -180,7 +181,7 @@ export class ReplayCutterComponent implements OnInit {
                   500,
                   150,
                   JSON.stringify({
-                    percent: this.percent,
+                    percent: 0,
                     infinite: false,
                     icon: undefined,
                     text: translated
@@ -223,12 +224,16 @@ export class ReplayCutterComponent implements OnInit {
                         );
                       });
                   }, 1000);
+                } else {
+                  this.globalService.loading = undefined;
                 }
               });
           }
         }
+        if (!path) {
+          this.globalService.loading = undefined;
+        }
         this.miniMapPositionsByMap = {};
-        this.globalService.loading = undefined;
         this.inputFileDisabled = false;
       });
     });
@@ -1005,6 +1010,7 @@ export class ReplayCutterComponent implements OnInit {
                 found = true;
                 if (this._games.length == 0 || this._games[0].start != -1) {
                   if (MODE >= 0) {
+                    this.justJumped = false;
                     const GAME: Game = new Game(MODE);
                     GAME.end = NOW;
                     //#region Orange team
@@ -1147,9 +1153,7 @@ export class ReplayCutterComponent implements OnInit {
                       );
                     console.log(' ----------------- ', GAME.mode);
                     // DEBUG
-                    this.debug?.nativeElement.append(
-                      this.videoToCanvas(VIDEO)!
-                    );
+                    this.debug?.nativeElement.append(this.videoToCanvas(VIDEO));
                     if (BLUE_TEAM_SCORE) {
                       const INT_VALUE = parseInt(BLUE_TEAM_SCORE);
                       if (INT_VALUE <= 100) {
@@ -1249,6 +1253,7 @@ export class ReplayCutterComponent implements OnInit {
                 found = true;
 
                 if (this._games.length == 0 || this._games[0].start != -1) {
+                  this.justJumped = false;
                   const GAME: Game = new Game(1);
                   GAME.end = NOW;
 
@@ -1400,41 +1405,54 @@ export class ReplayCutterComponent implements OnInit {
                   this._games[0].map
                 ) {
                   if (!this._games[0].__debug__jumped) {
-                    const TEXT /* string */ = await this.getTextFromImage(
-                      VIDEO,
-                      this.tesseractWorker_time!,
-                      MODES[this._games[0].mode].gameFrame.timer[0].x,
-                      MODES[this._games[0].mode].gameFrame.timer[0].y,
-                      MODES[this._games[0].mode].gameFrame.timer[1].x,
-                      MODES[this._games[0].mode].gameFrame.timer[1].y,
-                      7
-                    );
-                    if (TEXT) {
-                      found = true;
-                      const SPLITTED /* string[] */ = TEXT.split(':');
-                      if (SPLITTED.length == 2) {
-                        const MINUTES = parseInt(SPLITTED[0]);
-                        const SECONDES = parseInt(SPLITTED[1]);
-                        const DIFFERENCE =
-                          (this.settings.maxTimePerGame - MINUTES) * 60 -
-                          SECONDES;
-                        if (MINUTES <= 9) {
-                          if (!this._games[0].__debug__jumped) {
-                            this._games[0].__debug__jumped = true;
-                            console.log(
-                              `Jumping to the game's start ! (${MINUTES}:${SECONDES}) (${NOW - DIFFERENCE})`
-                            );
-                            this.lastDetectedGamePlayingFrame =
-                              NOW - DIFFERENCE;
-                            this.setVideoCurrentTime(
-                              VIDEO,
-                              NOW - DIFFERENCE,
-                              this._games
-                            );
-                            return;
+                    if (!this.justJumped) {
+                      const TEXT /* string */ = await this.getTextFromImage(
+                        VIDEO,
+                        this.tesseractWorker_time!,
+                        MODES[this._games[0].mode].gameFrame.timer[0].x,
+                        MODES[this._games[0].mode].gameFrame.timer[0].y,
+                        MODES[this._games[0].mode].gameFrame.timer[1].x,
+                        MODES[this._games[0].mode].gameFrame.timer[1].y,
+                        7
+                      );
+                      if (TEXT) {
+                        found = true;
+                        const SPLITTED /* string[] */ = TEXT.split(':');
+                        if (SPLITTED.length == 2) {
+                          const MINUTES = parseInt(SPLITTED[0]);
+                          const SECONDES = parseInt(SPLITTED[1]);
+
+                          if (!isNaN(MINUTES) && !isNaN(SECONDES)) {
+                            if (MINUTES <= 9) {
+                              const DIFFERENCE = Math.max(
+                                (this.settings.maxTimePerGame - MINUTES) * 60 -
+                                  SECONDES -
+                                  5
+                              );
+                              if (!this._games[0].__debug__jumped) {
+                                this._games[0].__debug__jumped = true;
+                                console.log('Z', TEXT);
+                                console.log('A', MINUTES, 'B', SECONDES);
+                                console.log('C', NOW, 'D', DIFFERENCE);
+                                console.log(
+                                  `Jumping to the game's start ! (${MINUTES}:${SECONDES}) (${NOW - DIFFERENCE})`
+                                );
+                                this.lastDetectedGamePlayingFrame =
+                                  NOW - DIFFERENCE;
+                                this.justJumped = true;
+                                this.setVideoCurrentTime(
+                                  VIDEO,
+                                  NOW - DIFFERENCE,
+                                  this._games
+                                );
+                                return;
+                              }
+                            }
                           }
                         }
                       }
+                    } else {
+                      console.log('Jump is disabled');
                     }
                   }
                 }
@@ -1447,12 +1465,6 @@ export class ReplayCutterComponent implements OnInit {
               VIDEO,
               Math.max(0, NOW - DEFAULT_STEP),
               this._games
-            );
-            console.log(
-              'b',
-              VIDEO.currentTime,
-              DEFAULT_STEP,
-              Math.max(0, NOW - DEFAULT_STEP)
             );
           } else {
             this.onVideoEnded(this._games);
@@ -1620,7 +1632,15 @@ export class ReplayCutterComponent implements OnInit {
   ): void {
     if (video) {
       if (time < video.duration) {
-        video.currentTime = time;
+        if (this.videoOldTime == time) {
+          console.warn(
+            'The "setVideoCurrentTime" function seems to fail to change the video time. The analysis is considered finished.'
+          );
+          this.onVideoEnded(games);
+        } else {
+          video.currentTime = time;
+          this.videoOldTime = time;
+        }
       } else {
         this.onVideoEnded(games);
       }
@@ -1643,7 +1663,10 @@ export class ReplayCutterComponent implements OnInit {
     }
     this.getGamesDebugImages(games, () => {
       this.percent = -1;
+      console.log(this._games);
+      this.videoOldTime = undefined;
       window.electronAPI.removeNotification(true);
+      this.globalService.loading = undefined;
     });
   }
 
@@ -2558,7 +2581,6 @@ export class ReplayCutterComponent implements OnInit {
           }
         }
 
-        console.log(TESSERACT_VALUES);
         const RESULT = this.arrayMostFrequent(
           TESSERACT_VALUES.filter((x) => x != '')
         );

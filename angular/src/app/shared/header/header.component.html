@@ -86,13 +86,43 @@ See LICENSE for terms. Unauthorized use is prohibited.
   </div>
   <div>
     <a
-      class="btn squared red"
-      (click)="logout()"
+      class="btn squared"
+      (click)="showMyAccountBox = true"
       [class.disabled]="disableLogoutButton"
-      matTooltip="{{ 'shared.header.logout' | translate }}"
     >
       <i class="fa-sharp fa-solid fa-user"></i>
     </a>
+
+    @if (showMyAccountBox) {
+      <div class="shadow" (click)="showMyAccountBox = false"></div>
+      <div class="box">
+        <button class="btn w-100 red" (click)="logout()">
+          {{ 'shared.header.logout' | translate }}
+        </button>
+        <mat-form-field class="mt-2">
+          <mat-label>{{ 'shared.header.chooseATeam' | translate }}</mat-label>
+          <mat-select
+            [(ngModel)]="identityService.selectedTeamsIndex"
+            (selectionChange)="showMyAccountBox = false"
+            [disabled]="identityService.teams.length == 1"
+          >
+            <mat-select-trigger>
+              {{
+                this.identityService.teams[
+                  this.identityService.selectedTeamsIndex
+                ].name
+              }}
+            </mat-select-trigger>
+            <mat-option
+              *ngFor="let team of identityService.teams; index as i"
+              [value]="i"
+            >
+              {{ team.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    }
   </div>
 </div>
 <!-- #endregion -->

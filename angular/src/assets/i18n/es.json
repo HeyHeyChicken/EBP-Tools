@@ -144,6 +144,7 @@
       "changeTool": "Cambiar de herramienta",
       "accessDiscordServer": "Accede al Discord de EBP",
       "logout": "Cerrar sesión",
+      "chooseATeam": "Elige un equipo",
       "home": "Inicio",
       "tools": {
         "replay_downloader": "Descargador de repeticiones",

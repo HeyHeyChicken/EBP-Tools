@@ -20,9 +20,10 @@ import { CommonModule } from '@angular/common';
 import { GlobalService } from './core/services/global.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Versions } from '../models/versions';
-import { IdentityService } from './core/services/identity.service';
+import { IdentityService } from './core/services/identity/identity.service';
 import { APIRestService } from './core/services/api-rest.service';
 import { ToastrService } from 'ngx-toastr';
+import { Team } from './core/services/identity/model/team.model';
 
 //#endregion
 @Component({
@@ -102,13 +103,19 @@ export class App implements OnInit {
         this.identityService.set(accessToken);
 
         if (this.globalService.betaUsers === undefined) {
-          this.apiRestService.getBetaUsers((betaUsers: number[]) => {
-            this.globalService.betaUsers = betaUsers;
+          this.apiRestService
+            .getBetaUsers()
+            .subscribe((betaUsers: number[]) => {
+              this.globalService.betaUsers = betaUsers;
 
-            this.apiRestService.getCoins((nbCoins: number) => {
-              this.identityService.coins = nbCoins;
+              this.apiRestService.getMyCoins().subscribe((coins: number) => {
+                this.identityService.coins = coins;
+              });
+
+              this.apiRestService.getMyTeams().subscribe((teams: Team[]) => {
+                this.identityService.teams = teams;
+              });
             });
-          });
         }
       });
     });

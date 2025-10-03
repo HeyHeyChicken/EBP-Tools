@@ -767,7 +767,6 @@ let projectLatestVersion /* string */ = '';
         const SETTINGS = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
 
         const URL = `http://localhost:${isProd ? PORT : '4200'}/${SETTINGS['language'] ?? 'aa'}/notification?data=${encodeURIComponent(data)}`;
-        console.log(URL);
 
         floatingWindow.loadURL(URL);
     }
@@ -808,7 +807,7 @@ let projectLatestVersion /* string */ = '';
         // When the user clicks on the close cross, we hide the application.
         mainWindow.on('close', (event) => {
             event.preventDefault();
-            if (mainWindow && !mainWindow.isDestroyed()) {
+            if (mainWindow && !mainWindow.isDestroyed() && isProd) {
                 mainWindow.hide();
             }
         });
@@ -1028,7 +1027,12 @@ let projectLatestVersion /* string */ = '';
                     undefined,
                     notificationData
                 );
-                if (hideMainWindow && mainWindow && !mainWindow.isDestroyed()) {
+                if (
+                    hideMainWindow &&
+                    mainWindow &&
+                    !mainWindow.isDestroyed() &&
+                    isProd
+                ) {
                     mainWindow.hide();
                 }
             }
@@ -1378,7 +1382,9 @@ let projectLatestVersion /* string */ = '';
         ipcMain.handle(
             'manual-cut-video-file',
             async (event, videoPath, chunks, notificationData) => {
-                mainWindow.hide();
+                if (mainWindow && !mainWindow.isDestroyed() && isProd) {
+                    mainWindow.hide();
+                }
                 createFloatingWindow(
                     450,
                     150,

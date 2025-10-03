@@ -10,7 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../../../shared/grid/grid.module';
-import { IdentityService } from '../../../../core/services/identity.service';
+import { IdentityService } from '../../../../core/services/identity/identity.service';
 
 //#endregion
 

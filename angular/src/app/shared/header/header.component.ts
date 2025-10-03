@@ -11,7 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectChange, MatSelectModule } from '@angular/material/select';
-import { IdentityService } from '../../core/services/identity.service';
+import { IdentityService } from '../../core/services/identity/identity.service';
 import { GlobalService } from '../../core/services/global.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { CoinComponent } from '../coin/coin.component';
@@ -39,6 +39,7 @@ export class HeaderComponent implements OnInit {
 
   protected showCoinsPopup: boolean = false;
   protected disableLogoutButton: boolean = false;
+  protected showMyAccountBox: boolean = false;
 
   protected readonly pages: string[] = [
     'replay_downloader',

@@ -144,6 +144,7 @@
       "changeTool": "Changer d'outil",
       "accessDiscordServer": "Accéder au Discord d'EBP",
       "logout": "Se déconnecter",
+      "chooseATeam": "Choisissez une équipe",
       "home": "Accueil",
       "tools": {
         "replay_downloader": "Téléchargeur de replay",

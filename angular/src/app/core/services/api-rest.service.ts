@@ -8,6 +8,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { RestGame } from '../../views/replay_cutter/models/rest-game';
 import { Observable } from 'rxjs';
+import { Team } from './identity/model/team.model';
 
 //#endregion
 
@@ -27,7 +28,7 @@ export class APIRestService {
   //#region Functions
 
   /**
-   * This function returns the player's filtered EVA games.
+   * Retrieves the player's filtered EVA games.
    * @param mapName Name of the card.
    * @param orangeScore Orange team score.
    * @param blueScore Blue team score.
@@ -49,33 +50,36 @@ export class APIRestService {
   }
 
   /**
-   * This function returns the list of users who have access to BETA features.
-   * @param callback Callback fonction.
+   * Retrieves the list of user IDs who have access to the beta program.
+   * @returns An Observable emitting an array of user IDs.
    */
-  public getBetaUsers(callback: Function): void {
+  public getBetaUsers(): Observable<number[]> {
     const PARAMS = new HttpParams().set('r', 'betaUsers');
-
-    this.httpClient
-      .get<any>(APIRestService.serverURL, {
-        responseType: 'text' as 'json',
-        params: PARAMS
-      })
-      .subscribe((response: string) => {
-        callback(JSON.parse(response));
-      });
+    return this.httpClient.get<number[]>(APIRestService.serverURL, {
+      params: PARAMS
+    });
   }
 
-  public getCoins(callback: Function): void {
+  /**
+   * Retrieves the number of tokens available in the current user's account.
+   * @returns An Observable emitting the token count as a number.
+   */
+  public getMyCoins(): Observable<number> {
     const PARAMS = new HttpParams().set('r', 'coins');
+    return this.httpClient.get<number>(APIRestService.serverURL, {
+      params: PARAMS
+    });
+  }
 
-    this.httpClient
-      .get<any>(APIRestService.serverURL, {
-        responseType: 'text' as 'json',
-        params: PARAMS
-      })
-      .subscribe((response: string) => {
-        callback(JSON.parse(response));
-      });
+  /**
+   * Fetches the list of teams managed by the current user.
+   * @returns An Observable emitting an array of Team objects.
+   */
+  public getMyTeams(): Observable<Team[]> {
+    const PARAMS = new HttpParams().set('r', 'teams');
+    return this.httpClient.get<Team[]>(APIRestService.serverURL, {
+      params: PARAMS
+    });
   }
 
   //#endregion
