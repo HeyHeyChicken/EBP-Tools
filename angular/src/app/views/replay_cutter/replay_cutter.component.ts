@@ -350,73 +350,75 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
     if (this.identityService.isBetaUser) {
-      if (
-        isDevMode() ||
-        this.getMapByName(this._games[gameIndex].map)?.isAICompatible
-      ) {
-        this.apiRestService
-          .getGames(
-            this._games[gameIndex].map,
-            this._games[gameIndex].orangeTeam.score,
-            this._games[gameIndex].blueTeam.score
-          )
-          .subscribe({
-            next: (games: RestGame[]) => {
-              if (games && games.length > 0) {
-                this.videoURLToCanvas(
-                  `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-                  Math.round((this._games[gameIndex].end - 1) * 1000),
-                  (videoFrame?: HTMLCanvasElement) => {
-                    if (videoFrame) {
-                      const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
-                      this.dialogService
-                        .open(ReplayCutterAttachGameDialog, {
-                          data: {
-                            games: games,
-                            image: videoFrame.toDataURL()
-                          },
-                          autoFocus: false,
-                          width: DIALOG_WIDTH,
-                          maxWidth: DIALOG_WIDTH
-                        })
-                        .afterClosed()
-                        .subscribe((gameID: number | undefined) => {
-                          if (gameID) {
-                            this.cropGameMinimap(
-                              gameIndex,
-                              games.find((game) => game.ID == gameID)!
+      this.getGamePlayingBounds(this.games[gameIndex]).then((game) => {
+        if (game) {
+          if (isDevMode() || this.getMapByName(game.map)?.isAICompatible) {
+            this.apiRestService
+              .getGames(game.map, game.orangeTeam.score, game.blueTeam.score)
+              .subscribe({
+                next: (games: RestGame[]) => {
+                  if (games && games.length > 0) {
+                    this.videoURLToCanvas(
+                      `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+                      Math.round((game.end - 1) * 1000),
+                      (videoFrame?: HTMLCanvasElement) => {
+                        if (videoFrame) {
+                          const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
+                          this.dialogService
+                            .open(ReplayCutterAttachGameDialog, {
+                              data: {
+                                games: games,
+                                image: videoFrame.toDataURL()
+                              },
+                              autoFocus: false,
+                              width: DIALOG_WIDTH,
+                              maxWidth: DIALOG_WIDTH
+                            })
+                            .afterClosed()
+                            .subscribe((gameID: number | undefined) => {
+                              if (gameID) {
+                                this.cropGameMinimap(
+                                  gameIndex,
+                                  games.find((game) => game.ID == gameID)!
+                                );
+                              }
+                            });
+                        }
+                      }
+                    );
+                  } else {
+                    this.translateService
+                      .get(
+                        'view.replay_cutter.toast.noGamesFoundInStatistics',
+                        {
+                          map: game.map,
+                          orangeScore: game.orangeTeam.score,
+                          blueScore: game.blueTeam.score
+                        }
+                      )
+                      .subscribe((translated: string) => {
+                        this.toastrService
+                          .error(translated)
+                          .onTap.subscribe(() => {
+                            window.electronAPI.openURL(
+                              this.globalService.discordServerURL
                             );
-                          }
-                        });
-                    }
+                          });
+                      });
                   }
-                );
-              } else {
-                this.translateService
-                  .get('view.replay_cutter.toast.noGamesFoundInStatistics', {
-                    map: this._games[gameIndex].map,
-                    orangeScore: this._games[gameIndex].orangeTeam.score,
-                    blueScore: this._games[gameIndex].blueTeam.score
-                  })
-                  .subscribe((translated: string) => {
-                    this.toastrService.error(translated).onTap.subscribe(() => {
-                      window.electronAPI.openURL(
-                        this.globalService.discordServerURL
-                      );
-                    });
-                  });
-              }
-            }
-          });
-      } else {
-        this.translateService
-          .get('view.replay_cutter.toast.mapNotAICompatible', {
-            map: this._games[gameIndex].map
-          })
-          .subscribe((translated: string) => {
-            this.toastrService.error(translated);
-          });
-      }
+                }
+              });
+          } else {
+            this.translateService
+              .get('view.replay_cutter.toast.mapNotAICompatible', {
+                map: game.map
+              })
+              .subscribe((translated: string) => {
+                this.toastrService.error(translated);
+              });
+          }
+        }
+      });
     } else {
       this.dialogService.open(ReplayCutterBetaRequiredDialog, {
         width: '700px',
@@ -928,6 +930,89 @@ export class ReplayCutterComponent implements OnInit {
         }
       );
     }
+  }
+
+  /**
+   * Determines the actual start and end times when a game is playing within a video.
+   * It checks both the start and end bounds by analyzing the video frames.
+   * @param game The game object containing initial start and end times.
+   * @returns A promise resolving to the updated game with corrected bounds, or null if not found.
+   */
+  private getGamePlayingBounds(game: Game): Promise<Game | null> {
+    return new Promise((resolve) => {
+      const GAME = new Game(game.mode);
+      const URL: string = `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`;
+
+      this.getGamePlayingBound(URL, GAME, game.start, 1).then((start) => {
+        if (start !== null) {
+          game.start = start;
+
+          this.getGamePlayingBound(URL, GAME, game.end, -1).then((end) => {
+            if (end !== null) {
+              game.end = end;
+              resolve(game);
+            } else {
+              resolve(null);
+            }
+          });
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  /**
+   * Finds the nearest timestamp in a video where the game starts or ends.
+   * It seeks through the video frame by frame and uses detectGamePlaying to check.
+   * @param url The URL of the video.
+   * @param game The game object to check against.
+   * @param start Initial timestamp to start searching from.
+   * @param jump Time increment per seek (positive for forward, negative for backward).
+   * @returns A promise resolving to the timestamp where the game is detected, or null if not found.
+   */
+  private getGamePlayingBound(
+    url: string,
+    game: Game,
+    start: number,
+    jump: number
+  ): Promise<number | null> {
+    const VIDEO = document.createElement('video');
+
+    return new Promise((resolve) => {
+      const ON_SEEKED = () => {
+        if (this.detectGamePlaying(VIDEO, [game], true)) {
+          resolve(VIDEO.currentTime);
+          CLEAN();
+        } else if (VIDEO.currentTime < VIDEO.duration) {
+          VIDEO.currentTime += jump;
+        } else {
+          CLEAN();
+          resolve(null);
+        }
+      };
+
+      const CLEAN = () => {
+        VIDEO.removeEventListener('seeked', ON_SEEKED);
+        VIDEO.removeEventListener('error', ON_ERROR);
+        VIDEO.pause();
+        VIDEO.src = '';
+      };
+
+      const ON_ERROR = () => {
+        console.error('Erreur chargement vidéo');
+        CLEAN();
+        resolve(null);
+      };
+
+      VIDEO.addEventListener('loadeddata', () => {
+        VIDEO.currentTime = start;
+      });
+      VIDEO.addEventListener('error', ON_ERROR);
+      VIDEO.addEventListener('seeked', ON_SEEKED);
+
+      VIDEO.src = url;
+    });
   }
 
   /**
