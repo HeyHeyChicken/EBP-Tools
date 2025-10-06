@@ -67,6 +67,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   //#region Server -> Client
 
+  // The server send the manual cut process percent to the font-end.
+  setManualCutPercent: (callback) => ipcRenderer.on("set-manual-cut-percent", (event, percent) => callback(percent)),
   // The server send the upscaling process percent to the font-end.
   setUpscalePercent: (callback) => ipcRenderer.on("set-upscale-percent", (event, percent) => callback(percent)),
   // The server send the JWT value to the font-end.

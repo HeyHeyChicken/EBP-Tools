@@ -6,6 +6,6 @@ export class Map {
   constructor(
     public name: string,
     public dictionnary: string[],
-    public isAICompatible: boolean = false
+    public mapMargins?: [number, number, number, number]
   ) {}
 }

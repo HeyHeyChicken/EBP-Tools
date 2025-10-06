@@ -103,18 +103,18 @@ export class ReplayCutterComponent implements OnInit {
   private miniMapPositionsByMap: { [mapName: string]: CropperPosition } = {};
 
   protected maps: Map[] = [
-    new Map('Artefact', ['artefact'], true),
-    new Map('Atlantis', ['atlantis'], true),
-    new Map('Ceres', ['ceres'], true),
-    new Map('Engine', ['engine'], true),
+    new Map('Artefact', ['artefact'], [4, 3, 4, 3]),
+    new Map('Atlantis', ['atlantis'], [3, 2, 3, 2]), // v
+    new Map('Ceres', ['ceres'], [3, 3, 3, 3]), // v
+    new Map('Engine', ['engine'], [3, 3, 3, 3]),
     new Map('Helios Station', ['helios', 'station']),
     new Map('Lunar Outpost', ['lunar', 'outpost']),
     new Map('Outlaw', ['outlaw', 'qutlaw']),
-    new Map('Polaris', ['polaris'], true),
-    new Map('Silva', ['silva'], true),
-    new Map('The Cliff', ['cliff'], true),
-    new Map('The Rock', ['rock'], true),
-    new Map('Horizon', ['horizon'], true)
+    new Map('Polaris', ['polaris']),
+    new Map('Silva', ['silva']),
+    new Map('The Cliff', ['cliff']),
+    new Map('The Rock', ['rock']),
+    new Map('Horizon', ['horizon'])
   ];
 
   //#endregion
@@ -157,6 +157,25 @@ export class ReplayCutterComponent implements OnInit {
               percent: percent,
               infinite: false,
               icon: undefined,
+              text: translated
+            });
+          });
+      });
+    });
+
+    // The server send the manual cut process percent to the font-end.
+    window.electronAPI.setManualCutPercent((percent: number) => {
+      this.ngZone.run(() => {
+        this.globalService.loading = '';
+
+        this.translateService
+          .get('view.notification.manual-cutting.description')
+          .subscribe((translated: string) => {
+            this.notificationService.sendMessage({
+              percent: percent,
+              infinite: percent == 100,
+              icon:
+                percent == 100 ? 'fa-sharp fa-solid fa-scissors' : undefined,
               text: translated
             });
           });
@@ -276,7 +295,7 @@ export class ReplayCutterComponent implements OnInit {
   protected disableUploadButton(mapName: string): boolean {
     return (
       !this._videoPath ||
-      (!this.getMapByName(mapName)?.isAICompatible &&
+      (!this.getMapByName(mapName)?.mapMargins &&
         this.identityService.isBetaUser)
     );
   }
@@ -352,7 +371,7 @@ export class ReplayCutterComponent implements OnInit {
     if (this.identityService.isBetaUser) {
       this.getGamePlayingBounds(this.games[gameIndex]).then((game) => {
         if (game) {
-          if (isDevMode() || this.getMapByName(game.map)?.isAICompatible) {
+          if (isDevMode() || this.getMapByName(game.map)?.mapMargins) {
             this.apiRestService
               .getGames(game.map, game.orangeTeam.score, game.blueTeam.score)
               .subscribe({
@@ -579,15 +598,56 @@ export class ReplayCutterComponent implements OnInit {
                 autoFocus: false
               })
               .afterClosed()
-              .subscribe((miniMapPositions: CropperPosition) => {
+              .subscribe((miniMapPositions: CropperPosition | undefined) => {
                 window.electronAPI.setWindowSize();
                 if (miniMapPositions) {
-                  this.miniMapPositionsByMap[MAP_NAME] = miniMapPositions;
-                  this.uploadGameMiniMap(
-                    gameIndex,
-                    miniMapPositions,
-                    gameFromStatistics
+                  const MAP = this.maps.find(
+                    (x) => x.name == this.games[gameIndex].map
                   );
+
+                  if (MAP) {
+                    if (MAP.mapMargins) {
+                      const HEIGHT = miniMapPositions.y2 - miniMapPositions.y1;
+                      const WIDTH = miniMapPositions.x2 - miniMapPositions.x1;
+
+                      const MARGED_MINI_MAP_POSITIONS = {
+                        x1: Math.max(
+                          0,
+                          miniMapPositions.x1 -
+                            (WIDTH * MAP.mapMargins[3]) / 100
+                        ),
+                        x2:
+                          miniMapPositions.x2 +
+                          (WIDTH * MAP.mapMargins[1]) / 100,
+                        y1: Math.max(
+                          0,
+                          miniMapPositions.y1 -
+                            (HEIGHT * MAP.mapMargins[0]) / 100
+                        ),
+                        y2:
+                          miniMapPositions.y2 +
+                          (HEIGHT * MAP.mapMargins[2]) / 100
+                      };
+
+                      //console.log(miniMapPositions, MARGED_MINI_MAP_POSITIONS);
+
+                      miniMapPositions = MARGED_MINI_MAP_POSITIONS;
+                    }
+
+                    miniMapPositions = {
+                      x1: Math.round(miniMapPositions.x1),
+                      x2: Math.round(miniMapPositions.x2),
+                      y1: Math.round(miniMapPositions.y1),
+                      y2: Math.round(miniMapPositions.y2)
+                    };
+
+                    this.miniMapPositionsByMap[MAP_NAME] = miniMapPositions;
+                    this.uploadGameMiniMap(
+                      gameIndex,
+                      miniMapPositions,
+                      gameFromStatistics
+                    );
+                  }
                 }
               });
           }

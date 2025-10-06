@@ -88,6 +88,7 @@ export interface ElectronAPI {
 
   //#region Server to Client
 
+  setManualCutPercent: (callback: (percent: number) => void) => void;
   setUpscalePercent: (callback: (percent: number) => void) => void;
   setJWTAccessToken: (callback: (accessToken: string) => void) => void;
   replayCutterUpscale: (callback: (filePath: string) => void) => void;

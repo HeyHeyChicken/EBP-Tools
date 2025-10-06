@@ -24,7 +24,7 @@ if (require('electron-squirrel-startup')) {
 const path = require('node:path');
 const express = require('express');
 const os = require('os');
-const { exec, spawn, execSync } = require('child_process');
+const { exec, spawn } = require('child_process');
 const { default: getPort } = require('get-port');
 const { version } = require('../package.json');
 const https = require('https');
@@ -113,13 +113,13 @@ let projectLatestVersion /* string */ = '';
 
     //#endregion
 
-    //#region Puppeteer
-
-    getProjectLatestVersion((version) => {
-        projectLatestVersion = version;
-    });
-
-    //#endregion
+    getProjectLatestVersion();
+    setInterval(
+        () => {
+            getProjectLatestVersion();
+        },
+        1000 * 60 * 60
+    );
 
     /**
      * This function returns the value of a path in the settings.
@@ -514,9 +514,9 @@ let projectLatestVersion /* string */ = '';
 
     /**
      * This function retrieves the number of the latest published version of the project.
-     * @param {Function} callback Callback function.
      */
-    function getProjectLatestVersion(callback) {
+    function getProjectLatestVersion() {
+        console.log('tick');
         const OPTIONS = {
             hostname: 'api.github.com',
             path: '/repos/heyheychicken/EBP-EVA-Battle-Plan-Tools/releases/latest',
@@ -531,12 +531,12 @@ let projectLatestVersion /* string */ = '';
             res.on('end', () => {
                 try {
                     const DATA = JSON.parse(data);
-                    callback(DATA.tag_name);
+                    projectLatestVersion = DATA.tag_name;
                 } catch (err) {}
             });
         });
 
-        REQUEST.on('error', (err) => callback(err));
+        REQUEST.on('error', (err) => console.error(err));
         REQUEST.end();
     }
 
@@ -688,6 +688,16 @@ let projectLatestVersion /* string */ = '';
     }
 
     /**
+     * Converts a time string in HH:MM:SS format to total seconds.
+     * @param {string} hms - Time string in format "HH:MM:SS".
+     * @returns {number} Total number of seconds.
+     */
+    function hmsToSec(time) {
+        const [HOURS, MINUTES, SECONDS] = time.split(':').map(Number);
+        return HOURS * 3600 + MINUTES * 60 + SECONDS;
+    }
+
+    /**
      * Cut video into segments without re-encoding using FFmpeg.
      * Extracts only the chunks that are not marked for removal and concatenates them.
      * @param {string} input Path to the input video file
@@ -700,27 +710,68 @@ let projectLatestVersion /* string */ = '';
             .sort((a, b) => a.start - b.start);
         const TEMP_FILES = [];
 
-        KEEP.forEach((c, i) => {
+        for (let i = 0; i < KEEP.length; i++) {
             const TEMP_FILE = `/tmp/part_${i}.mp4`;
             TEMP_FILES.push(TEMP_FILE);
-            execSync(
-                `"${FFMPEG_PATH}" -i "${input}" -ss ${c.start} -to ${c.end} -c copy "${TEMP_FILE}"`
-            );
-        });
 
-        // Create concat file
+            await new Promise((resolve, reject) => {
+                const ARGS = [
+                    '-y',
+                    '-i',
+                    input,
+                    '-ss',
+                    KEEP[i].start.toString(),
+                    '-to',
+                    KEEP[i].end.toString(),
+                    '-c',
+                    'copy',
+                    TEMP_FILE
+                ];
+                const COMMAND = spawn(FFMPEG_PATH, ARGS);
+
+                COMMAND.stderr.on('data', (data) => {
+                    const STR = data.toString();
+                    const TIME_MATCH = STR.match(/time=(\d+:\d+:\d+\.\d+)/);
+                    if (TIME_MATCH) {
+                        const currentSec = hmsToSec(TIME_MATCH[1]);
+                        const PART_PERCENT = Math.max(
+                            0,
+                            Math.min(
+                                100,
+                                (currentSec - KEEP[i].start) /
+                                    (KEEP[i].end - KEEP[i].start)
+                            )
+                        );
+                        const PERCENT_PORTION = 100 / KEEP.length;
+                        const GLOBAL_PERCENT = Math.round(
+                            PERCENT_PORTION * i + PERCENT_PORTION * PART_PERCENT
+                        );
+                        mainWindow.webContents.send(
+                            'set-manual-cut-percent',
+                            GLOBAL_PERCENT
+                        );
+                    }
+                });
+
+                COMMAND.on('close', (code) => {
+                    console.log('');
+                    code === 0 ? resolve() : reject(new Error('FFMPEG error'));
+                });
+            });
+        }
+
         const CONCAT_FILE = '/tmp/concat.txt';
-        const CONCAT_CONTENT = TEMP_FILES.map((f) => `file '${f}'`).join('\n');
-        fs.writeFileSync(CONCAT_FILE, CONCAT_CONTENT);
+        fs.writeFileSync(
+            CONCAT_FILE,
+            TEMP_FILES.map((f) => `file '${f}'`).join('\n')
+        );
 
-        // Concatenate
         await execAsync(
             `"${FFMPEG_PATH}" -f concat -safe 0 -i "${CONCAT_FILE}" -c copy "${output}"`
         );
 
-        // Clean
         fs.unlinkSync(CONCAT_FILE);
-        TEMP_FILES.forEach((file) => fs.unlinkSync(file));
+        TEMP_FILES.forEach((f) => fs.unlinkSync(f));
     }
 
     function createFloatingWindow(width, height, callback, data) {
