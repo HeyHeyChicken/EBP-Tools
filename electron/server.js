@@ -711,7 +711,13 @@ let projectLatestVersion /* string */ = '';
         const TEMP_FILES = [];
 
         for (let i = 0; i < KEEP.length; i++) {
-            const TEMP_FILE = `/tmp/part_${i}.mp4`;
+            const TEMP_FILE = path.join(
+                getOutputPath(
+                    'videoCutterOutputPath',
+                    path.join(os.homedir(), 'Downloads')
+                ),
+                `ebp_temp_part_${i}.mp4`
+            );
             TEMP_FILES.push(TEMP_FILE);
 
             await new Promise((resolve, reject) => {
@@ -729,8 +735,11 @@ let projectLatestVersion /* string */ = '';
                 ];
                 const COMMAND = spawn(FFMPEG_PATH, ARGS);
 
+                let result = '';
                 COMMAND.stderr.on('data', (data) => {
                     const STR = data.toString();
+                    result += STR;
+
                     const TIME_MATCH = STR.match(/time=(\d+:\d+:\d+\.\d+)/);
                     if (TIME_MATCH) {
                         const currentSec = hmsToSec(TIME_MATCH[1]);
@@ -754,13 +763,19 @@ let projectLatestVersion /* string */ = '';
                 });
 
                 COMMAND.on('close', (code) => {
-                    console.log('');
+                    console.log(result);
                     code === 0 ? resolve() : reject(new Error('FFMPEG error'));
                 });
             });
         }
 
-        const CONCAT_FILE = '/tmp/concat.txt';
+        const CONCAT_FILE = path.join(
+            getOutputPath(
+                'videoCutterOutputPath',
+                path.join(os.homedir(), 'Downloads')
+            ),
+            `ebp_temp_concat.txt`
+        );
         fs.writeFileSync(
             CONCAT_FILE,
             TEMP_FILES.map((f) => `file '${f}'`).join('\n')
