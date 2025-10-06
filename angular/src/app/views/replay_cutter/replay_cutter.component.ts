@@ -104,17 +104,17 @@ export class ReplayCutterComponent implements OnInit {
 
   protected maps: Map[] = [
     new Map('Artefact', ['artefact'], [4, 3, 4, 3]),
-    new Map('Atlantis', ['atlantis'], [3, 2, 3, 2]), // v
-    new Map('Ceres', ['ceres'], [3, 3, 3, 3]), // v
-    new Map('Engine', ['engine'], [3, 3, 3, 3]),
-    new Map('Helios Station', ['helios', 'station']),
-    new Map('Lunar Outpost', ['lunar', 'outpost']),
-    new Map('Outlaw', ['outlaw', 'qutlaw']),
-    new Map('Polaris', ['polaris']),
-    new Map('Silva', ['silva']),
-    new Map('The Cliff', ['cliff']),
-    new Map('The Rock', ['rock']),
-    new Map('Horizon', ['horizon'])
+    new Map('Atlantis', ['atlantis'], [3, 2, 3, 2]),
+    new Map('Ceres', ['ceres'], [3, 2, 3, 2]),
+    new Map('Engine', ['engine'], [3, 2, 3, 2]),
+    new Map('Helios Station', ['helios', 'station'], [3, 2, 3, 2]),
+    new Map('Lunar Outpost', ['lunar', 'outpost'], [3, 2, 3, 2]),
+    new Map('Outlaw', ['outlaw', 'qutlaw'], [3, 5, 5, 3]),
+    new Map('Polaris', ['polaris'], [3, 2, 3, 2]),
+    new Map('Silva', ['silva'], [3, 2, 3, 2]),
+    new Map('The Cliff', ['cliff'], [3, 3, 3, 3]),
+    new Map('The Rock', ['rock'], [3, 2, 3, 2]),
+    new Map('Horizon', ['horizon'], [3, 2, 3, 2])
   ];
 
   //#endregion
@@ -609,27 +609,29 @@ export class ReplayCutterComponent implements OnInit {
                     if (MAP.mapMargins) {
                       const HEIGHT = miniMapPositions.y2 - miniMapPositions.y1;
                       const WIDTH = miniMapPositions.x2 - miniMapPositions.x1;
+                      const X = Math.min(
+                        miniMapPositions.x1,
+                        (WIDTH * MAP.mapMargins[3]) / 100
+                      );
+                      const Y = Math.min(
+                        miniMapPositions.y1,
+                        (HEIGHT * MAP.mapMargins[0]) / 100
+                      );
 
                       const MARGED_MINI_MAP_POSITIONS = {
-                        x1: Math.max(
-                          0,
-                          miniMapPositions.x1 -
-                            (WIDTH * MAP.mapMargins[3]) / 100
-                        ),
+                        x1: miniMapPositions.x1 - X,
                         x2:
                           miniMapPositions.x2 +
-                          (WIDTH * MAP.mapMargins[1]) / 100,
-                        y1: Math.max(
-                          0,
-                          miniMapPositions.y1 -
-                            (HEIGHT * MAP.mapMargins[0]) / 100
-                        ),
+                          (MAP.mapMargins[1] == MAP.mapMargins[3]
+                            ? X
+                            : (WIDTH * MAP.mapMargins[1]) / 100),
+                        y1: miniMapPositions.y1 - Y,
                         y2:
                           miniMapPositions.y2 +
-                          (HEIGHT * MAP.mapMargins[2]) / 100
+                          (MAP.mapMargins[0] == MAP.mapMargins[2]
+                            ? Y
+                            : (HEIGHT * MAP.mapMargins[2]) / 100)
                       };
-
-                      //console.log(miniMapPositions, MARGED_MINI_MAP_POSITIONS);
 
                       miniMapPositions = MARGED_MINI_MAP_POSITIONS;
                     }

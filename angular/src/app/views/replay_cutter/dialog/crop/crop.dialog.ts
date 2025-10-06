@@ -127,13 +127,44 @@ export class ReplayCutterCropDialog implements OnInit {
 
     const IMAGE = new Image();
     IMAGE.onload = function () {
-      const CANVAS = document.createElement('canvas');
-      CANVAS.width =
+      let matDialogContentWidth: number = 0;
+      let matDialogContentHeight: number = 0;
+      if (SELF.matDialogContent?.nativeElement) {
+        const STYLE = window.getComputedStyle(
+          SELF.matDialogContent?.nativeElement
+        );
+        const PADDING_LEFT = parseFloat(STYLE.paddingLeft);
+        const PADDING_RIGHT = parseFloat(STYLE.paddingRight);
+        const PADDING_TOP = parseFloat(STYLE.paddingTop);
+        const PADDING_BOTTOM = parseFloat(STYLE.paddingBottom);
+
+        matDialogContentWidth =
+          SELF.matDialogContent?.nativeElement.clientWidth -
+          PADDING_LEFT -
+          PADDING_RIGHT;
+
+        matDialogContentHeight =
+          SELF.matDialogContent?.nativeElement.clientHeight -
+          PADDING_TOP -
+          PADDING_BOTTOM;
+      }
+
+      const CANVAS_WIDTH =
         ReplayCutterCropDialog.DEFAULT_CROPPER.x2 -
         ReplayCutterCropDialog.DEFAULT_CROPPER.x1;
-      CANVAS.height =
+      const CANVAS_HEIGHT =
         ReplayCutterCropDialog.DEFAULT_CROPPER.y2 -
         ReplayCutterCropDialog.DEFAULT_CROPPER.y1;
+
+      const RATIO = Math.min(
+        matDialogContentWidth / CANVAS_WIDTH,
+        matDialogContentHeight / CANVAS_HEIGHT
+      );
+
+      const CANVAS = document.createElement('canvas');
+      CANVAS.width = matDialogContentWidth;
+      CANVAS.height = matDialogContentHeight;
+
       const CTX = CANVAS.getContext('2d');
       if (CTX) {
         CTX.drawImage(
