@@ -103,7 +103,7 @@ export class ReplayCutterComponent implements OnInit {
   private miniMapPositionsByMap: { [mapName: string]: CropperPosition } = {};
 
   protected maps: Map[] = [
-    new Map('Artefact', ['artefact'], [4, 3, 4, 3]),
+    new Map('Artefact', ['artefact'], [4, 1, 4, 1]),
     new Map('Atlantis', ['atlantis'], [3, 2, 3, 2]),
     new Map('Ceres', ['ceres'], [3, 2, 3, 2]),
     new Map('Engine', ['engine'], [3, 2, 3, 2]),

@@ -125,58 +125,48 @@ export class ReplayCutterCropDialog implements OnInit {
   ngOnInit(): void {
     const SELF = this;
 
-    const IMAGE = new Image();
-    IMAGE.onload = function () {
-      let matDialogContentWidth: number = 0;
-      let matDialogContentHeight: number = 0;
-      if (SELF.matDialogContent?.nativeElement) {
-        const STYLE = window.getComputedStyle(
-          SELF.matDialogContent?.nativeElement
-        );
-        const PADDING_LEFT = parseFloat(STYLE.paddingLeft);
-        const PADDING_RIGHT = parseFloat(STYLE.paddingRight);
-        const PADDING_TOP = parseFloat(STYLE.paddingTop);
-        const PADDING_BOTTOM = parseFloat(STYLE.paddingBottom);
+    setTimeout(() => {
+      const IMAGE = new Image();
+      IMAGE.onload = function () {
+        let matDialogContentWidth: number = 0;
+        let matDialogContentHeight: number = 0;
+        if (SELF.matDialogContent?.nativeElement) {
+          const STYLE = window.getComputedStyle(
+            SELF.matDialogContent?.nativeElement
+          );
+          const PADDING_LEFT = parseFloat(STYLE.paddingLeft);
+          const PADDING_RIGHT = parseFloat(STYLE.paddingRight);
+          const PADDING_TOP = parseFloat(STYLE.paddingTop);
+          const PADDING_BOTTOM = parseFloat(STYLE.paddingBottom);
 
-        matDialogContentWidth =
-          SELF.matDialogContent?.nativeElement.clientWidth -
-          PADDING_LEFT -
-          PADDING_RIGHT;
+          matDialogContentWidth =
+            SELF.matDialogContent?.nativeElement.clientWidth -
+            PADDING_LEFT -
+            PADDING_RIGHT;
 
-        matDialogContentHeight =
-          SELF.matDialogContent?.nativeElement.clientHeight -
-          PADDING_TOP -
-          PADDING_BOTTOM;
-      }
+          matDialogContentHeight =
+            SELF.matDialogContent?.nativeElement.clientHeight -
+            PADDING_TOP -
+            PADDING_BOTTOM;
+        }
 
-      const CANVAS_WIDTH =
-        ReplayCutterCropDialog.DEFAULT_CROPPER.x2 -
-        ReplayCutterCropDialog.DEFAULT_CROPPER.x1;
-      const CANVAS_HEIGHT =
-        ReplayCutterCropDialog.DEFAULT_CROPPER.y2 -
-        ReplayCutterCropDialog.DEFAULT_CROPPER.y1;
+        const CANVAS = document.createElement('canvas');
+        CANVAS.width = matDialogContentWidth;
+        CANVAS.height = matDialogContentHeight;
 
-      const RATIO = Math.min(
-        matDialogContentWidth / CANVAS_WIDTH,
-        matDialogContentHeight / CANVAS_HEIGHT
-      );
+        const CTX = CANVAS.getContext('2d');
+        if (CTX) {
+          CTX.drawImage(
+            IMAGE /* Image */,
+            ReplayCutterCropDialog.DEFAULT_CROPPER.x1 /* Image X */,
+            ReplayCutterCropDialog.DEFAULT_CROPPER.y1 /* Image Y */
+          );
 
-      const CANVAS = document.createElement('canvas');
-      CANVAS.width = matDialogContentWidth;
-      CANVAS.height = matDialogContentHeight;
-
-      const CTX = CANVAS.getContext('2d');
-      if (CTX) {
-        CTX.drawImage(
-          IMAGE /* Image */,
-          ReplayCutterCropDialog.DEFAULT_CROPPER.x1 /* Image X */,
-          ReplayCutterCropDialog.DEFAULT_CROPPER.y1 /* Image Y */
-        );
-
-        SELF.currentImgBase64 = CANVAS.toDataURL('image/png');
-      }
-    };
-    IMAGE.src = this.data.imgBase64;
+          SELF.currentImgBase64 = CANVAS.toDataURL('image/png');
+        }
+      };
+      IMAGE.src = this.data.imgBase64;
+    }, 200);
   }
 
   protected onCropperReady(event: Dimensions): void {
