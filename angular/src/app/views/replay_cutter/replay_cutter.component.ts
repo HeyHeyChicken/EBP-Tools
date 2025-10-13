@@ -103,18 +103,18 @@ export class ReplayCutterComponent implements OnInit {
   private miniMapPositionsByMap: { [mapName: string]: CropperPosition } = {};
 
   protected maps: Map[] = [
-    new Map('Artefact', ['artefact'], [4, 1, 4, 1]),
-    new Map('Atlantis', ['atlantis'], [3, 2, 3, 2]),
-    new Map('Ceres', ['ceres'], [3, 2, 3, 2]),
-    new Map('Engine', ['engine'], [3, 2, 3, 2]),
+    new Map('Artefact', ['artefact'], [4, 1, 6, 1]), // v
+    new Map('Atlantis', ['atlantis'], [3, 2, 3, 2]), // v
+    new Map('Ceres', ['ceres'], [3, 2, 3, 2]), // v
+    new Map('Engine', ['engine'], [3, 2, 3, 2]), // v
     new Map('Helios Station', ['helios', 'station'], [3, 2, 3, 2]),
     new Map('Lunar Outpost', ['lunar', 'outpost'], [3, 2, 3, 2]),
     new Map('Outlaw', ['outlaw', 'qutlaw'], [3, 5, 5, 3]),
-    new Map('Polaris', ['polaris'], [3, 2, 3, 2]),
-    new Map('Silva', ['silva'], [3, 2, 3, 2]),
-    new Map('The Cliff', ['cliff'], [3, 3, 3, 3]),
+    new Map('Polaris', ['polaris'], [3, 2, 3, 2]), // v
+    new Map('Silva', ['silva'], [3, 2, 3, 2]), // v
+    new Map('The Cliff', ['cliff'], [3, 3, 3, 3]), // v
     new Map('The Rock', ['rock'], [3, 2, 3, 2]),
-    new Map('Horizon', ['horizon'], [3, 2, 3, 2])
+    new Map('Horizon', ['horizon'], [3, 2, 3, 2]) // v
   ];
 
   //#endregion
