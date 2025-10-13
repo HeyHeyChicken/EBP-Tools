@@ -368,6 +368,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param gameIndex Index of the game to attach.
    */
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
+    this.globalService.loading = '';
     if (this.identityService.isBetaUser) {
       this.getGamePlayingBounds(this.games[gameIndex]).then((game) => {
         if (game) {
@@ -395,6 +396,7 @@ export class ReplayCutterComponent implements OnInit {
                             })
                             .afterClosed()
                             .subscribe((gameID: number | undefined) => {
+                              this.globalService.loading = '';
                               if (gameID) {
                                 this.cropGameMinimap(
                                   gameIndex,
@@ -406,24 +408,57 @@ export class ReplayCutterComponent implements OnInit {
                       }
                     );
                   } else {
-                    this.translateService
-                      .get(
-                        'view.replay_cutter.toast.noGamesFoundInStatistics',
-                        {
-                          map: game.map,
-                          orangeScore: game.orangeTeam.score,
-                          blueScore: game.blueTeam.score
-                        }
-                      )
-                      .subscribe((translated: string) => {
-                        this.toastrService
-                          .error(translated)
-                          .onTap.subscribe(() => {
-                            window.electronAPI.openURL(
-                              this.globalService.discordServerURL
-                            );
+                    this.sortPlayersFromGameFrame(
+                      gameIndex,
+                      {
+                        ID: 0,
+                        tags: [],
+                        date: new Date(),
+                        orangePlayers: [],
+                        bluePlayers: []
+                      },
+                      (
+                        orangePlayersNames: string[],
+                        bluePlayersNames: string[]
+                      ) => {
+                        this.translateService
+                          .get(
+                            'view.replay_cutter.toast.noGamesFoundInStatistics',
+                            {
+                              map: game.map,
+                              orangeScore: game.orangeTeam.score,
+                              blueScore: game.blueTeam.score
+                            }
+                          )
+                          .subscribe((translated: string) => {
+                            this.globalService.loading = undefined;
+                            this.toastrService
+                              .error(translated, undefined, {
+                                enableHtml: true
+                              })
+                              .onTap.subscribe(() => {
+                                const DATA = {
+                                  map: this.games[gameIndex].map,
+                                  date: new Date().getTime(),
+                                  orange: {
+                                    name: this.games[gameIndex].orangeTeam.name,
+                                    score:
+                                      this.games[gameIndex].orangeTeam.score,
+                                    players: orangePlayersNames
+                                  },
+                                  blue: {
+                                    name: this.games[gameIndex].blueTeam.name,
+                                    score: this.games[gameIndex].blueTeam.score,
+                                    players: bluePlayersNames
+                                  }
+                                };
+                                window.electronAPI.openURL(
+                                  `${this.globalService.webSiteURL}/tools/statistics?new=${encodeURIComponent(JSON.stringify(DATA))}`
+                                );
+                              });
                           });
-                      });
+                      }
+                    );
                   }
                 }
               });

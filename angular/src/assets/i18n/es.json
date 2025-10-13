@@ -30,7 +30,7 @@
         "videosCutHere": "Tus videos han sido cortados aquí: {{filePath}}",
         "videoCutHere": "Tu video ha sido cortado aquí: {{filePath}}",
         "videoFileNotFound": "Archivo de video no encontrado.",
-        "noGamesFoundInStatistics": "No se encontraron juegos en {{map}} con estas puntuaciones ({{orangeScore}} vs {{blueScore}}). Si crees que es un error, házmelo saber.",
+        "noGamesFoundInStatistics": "No se encontró ningún partido en {{map}} con estos resultados ({{orangeScore}} vs {{blueScore}}). ¿Desea crear uno? <span class='btn'>Sí</span>",
         "noGamesFoundInVideo": "No se encontraron juegos en tu video. Si crees que es un error, házmelo saber.",
         "mapNotAICompatible": "El mapa {{map}} aún no es compatible con la IA de EBP, pero lo será en próximas actualizaciones."
       },
