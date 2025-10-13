@@ -268,7 +268,8 @@ let projectLatestVersion /* string */ = '';
 
         const URL_PARAMS = new URLSearchParams({
             r: 's3_uploaded',
-            gameID: gameID
+            gameID: gameID,
+            dev: isProd ? '0' : '1'
         });
 
         const OPTIONS = {
@@ -289,9 +290,13 @@ let projectLatestVersion /* string */ = '';
         });
 
         const REQUEST = https.request(OPTIONS, (res) => {
+            let data = '';
+
             // This line This line is essential.
             // Without it, 'end' will never fire.
-            res.on('data', () => {});
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
 
             res.on('end', () => {
                 callback();
@@ -516,7 +521,6 @@ let projectLatestVersion /* string */ = '';
      * This function retrieves the number of the latest published version of the project.
      */
     function getProjectLatestVersion() {
-        console.log('tick');
         const OPTIONS = {
             hostname: 'api.github.com',
             path: '/repos/heyheychicken/EBP-EVA-Battle-Plan-Tools/releases/latest',
