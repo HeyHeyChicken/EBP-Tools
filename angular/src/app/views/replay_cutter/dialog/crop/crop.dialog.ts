@@ -25,6 +25,8 @@ import {
 } from 'ngx-image-cropper';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AssistantComponent } from '../../../../shared/assistant/assistant.component';
+import { ReplayCutterComponent } from '../../replay_cutter.component';
+import { GlobalService } from '../../../../core/services/global.service';
 
 //#endregion
 
@@ -109,8 +111,11 @@ export class ReplayCutterCropDialog implements OnInit {
     protected data: {
       imgBase64: string;
       initialCropperPosition: CropperPosition | undefined;
+      component: ReplayCutterComponent;
+      gameIndex: number;
     },
-    private readonly dialogRef: MatDialogRef<ReplayCutterCropDialog>
+    private readonly dialogRef: MatDialogRef<ReplayCutterCropDialog>,
+    private readonly globalService: GlobalService
   ) {
     // We resize the window to full screen.
     window.electronAPI.setWindowSize(0, 0);
@@ -137,7 +142,7 @@ export class ReplayCutterCropDialog implements OnInit {
           const PADDING_LEFT = parseFloat(STYLE.paddingLeft);
           const PADDING_RIGHT = parseFloat(STYLE.paddingRight);
           const PADDING_TOP = parseFloat(STYLE.paddingTop);
-          const PADDING_BOTTOM = parseFloat(STYLE.paddingBottom);
+          const PADDING_BOTTOM = parseFloat(STYLE.paddingBottom) + 16;
 
           matDialogContentWidth =
             SELF.matDialogContent?.nativeElement.clientWidth -
@@ -169,6 +174,24 @@ export class ReplayCutterCropDialog implements OnInit {
     }, 200);
   }
 
+  protected getNewImage(): void {
+    const MIN = this.data.component.games[this.data.gameIndex].start;
+    const MAX = this.data.component.games[this.data.gameIndex].end;
+    const RANDOM = Math.floor(Math.random() * (MAX - MIN + 1)) + MIN;
+    this.data.component.videoURLToCanvas(
+      `http://localhost:${this.globalService.serverPort}/file?path=${this.data.component.videoPath}`,
+      Math.round(RANDOM * 1000),
+      (videoFrame?: HTMLCanvasElement) => {
+        if (videoFrame) {
+          this.reset();
+          this.currentImgBase64 = videoFrame.toDataURL('image/png');
+          this.data.initialCropperPosition =
+            this.data.component.detectMinimap(videoFrame);
+        }
+      }
+    );
+  }
+
   protected onCropperReady(event: Dimensions): void {
     this.currentImgDimensions = event;
 
@@ -188,6 +211,9 @@ export class ReplayCutterCropDialog implements OnInit {
     this.cropper = ReplayCutterCropDialog.DEFAULT_CROPPER;
     this.globalCropper = ReplayCutterCropDialog.DEFAULT_CROPPER;
     this.currentScale = 1;
+    if (this.data.initialCropperPosition) {
+      this.cropper = this.data.initialCropperPosition;
+    }
   }
 
   private reinjectZoomedCrop(position: CropperPosition) {

@@ -97,7 +97,8 @@
           "title": "Associer le replay à une game",
           "tags": "Tags",
           "players": "Joueurs",
-          "date": "Date"
+          "date": "Date",
+          "changeFrame": "Changer l’image"
         }
       },
       "inputOfficialFile": "Cliquez ici pour découper manuellement votre fichier vidéo officiel"

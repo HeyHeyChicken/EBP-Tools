@@ -34,5 +34,7 @@ export class ReplayCutterAttachGameDialog {
       games: RestGame[];
       image: string;
     }
-  ) {}
+  ) {
+    window.electronAPI.setWindowSize();
+  }
 }

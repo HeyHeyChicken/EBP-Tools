@@ -97,7 +97,8 @@
           "title": "Associer le replay à une game",
           "tags": "Etichete",
           "players": "Jucători",
-          "date": "Data"
+          "date": "Data",
+          "changeFrame": "Schimbă imaginea"
         }
       },
       "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"

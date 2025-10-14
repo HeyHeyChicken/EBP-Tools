@@ -30,12 +30,22 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <!-- RESET BUTTON -->
   <button
     type="button"
-    class="mr-auto"
+    class="mr-2"
     (click)="reset()"
     attr.aria-label="{{ 'common.reset' | translate }}"
   >
     <i class="fa-sharp fa-solid fa-arrow-rotate-left"></i
     >{{"common.reset"|translate}}
+  </button>
+  <!-- NEW IMAGE BUTTON -->
+  <button
+    type="button"
+    class="mr-auto"
+    (click)="getNewImage()"
+    attr.aria-label="{{ 'common.reset' | translate }}"
+  >
+    <i class="fa-sharp fa-solid fa-image"></i>
+    {{"view.replay_cutter.dialog.attach-game.changeFrame"|translate}}
   </button>
   <!-- SUBMIT BUTTON -->
   <button

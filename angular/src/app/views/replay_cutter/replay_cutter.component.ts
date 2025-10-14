@@ -488,7 +488,7 @@ export class ReplayCutterComponent implements OnInit {
    * @param videoFrame The canvas containing the image to be analyzed.
    * @returns The coordinates of the minimap (x1, y1, x2, y2) or the default values ​​if not found.
    */
-  private detectMinimap(videoFrame: HTMLCanvasElement): CropperPosition {
+  public detectMinimap(videoFrame: HTMLCanvasElement): CropperPosition {
     const BACK: CropperPosition = JSON.parse(
       JSON.stringify(ReplayCutterCropDialog.DEFAULT_CROPPER)
     );
@@ -623,8 +623,10 @@ export class ReplayCutterComponent implements OnInit {
             this.dialogService
               .open(ReplayCutterCropDialog, {
                 data: {
-                  imgBase64: videoFrame?.toDataURL('image/png'),
-                  initialCropperPosition: this.detectMinimap(videoFrame)
+                  imgBase64: videoFrame.toDataURL('image/png'),
+                  initialCropperPosition: this.detectMinimap(videoFrame),
+                  component: this,
+                  gameIndex: gameIndex
                 },
                 maxWidth: DIALOG_WIDTH,
                 maxHeight: DIALOG_HEIGHT,
@@ -635,6 +637,7 @@ export class ReplayCutterComponent implements OnInit {
               .afterClosed()
               .subscribe((miniMapPositions: CropperPosition | undefined) => {
                 window.electronAPI.setWindowSize();
+                this.globalService.loading = undefined;
                 if (miniMapPositions) {
                   const MAP = this.maps.find(
                     (x) => x.name == this.games[gameIndex].map
