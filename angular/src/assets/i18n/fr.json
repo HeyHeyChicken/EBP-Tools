@@ -14,7 +14,6 @@
       "thanksToTheContributors": "Merci aux contributeurs"
     },
     "replay_cutter": {
-      "wrongResolution": "Votre vidéo doit être en {{ expectedHeight }}p, la vôtre est en {{ currentHeight }}p.",
       "inputTrainingFile": "Cliquez ici pour découper automatiquement votre fichier vidéo d’entraînement",
       "videoIsBeingAnalyzed": "<b>Étape 1 / 2 :</b> La vidéo est en cours d'analyse, veuillez patienter ...<br/>Nombre de parties trouvés: <b>{{games}}</b>",
       "correctionImageGeneration": "<b>Étape 2 / 2 :</b> Les images de correction sont en cours de génération, veuillez patienter ...",
@@ -57,7 +56,7 @@
         },
         "upscale": {
           "title": "Agrandissement",
-          "description": "Votre vidéo est en 720p, mais Tools ne prend en charge que le 1080p.<br/>Voulez-vous l'upscaler avant analyse ?<br/>Attention, cela peut être long…"
+          "description": "Votre vidéo est en {{height}}p, mais Tools ne prend en charge que le 1080p.<br/>Voulez-vous que Tools adapte la résolution avant l’analyse ?<br/>Attention, cela peut être long…"
         },
         "edit-score": {
           "title": "Modifier le score",

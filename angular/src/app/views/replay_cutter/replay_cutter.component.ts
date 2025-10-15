@@ -258,38 +258,41 @@ export class ReplayCutterComponent implements OnInit {
     });
 
     // The server asks the font-end if the user wants upscaling before analyzing.
-    window.electronAPI.replayCutterUpscale((videoPath: string) => {
-      this.dialogService
-        .open(ReplayCutterUpscaleConfirmationDialog, {
-          autoFocus: false,
-          disableClose: true
-        })
-        .afterClosed()
-        .subscribe((upscale: boolean) => {
-          if (upscale) {
-            window.electronAPI.openVideoFile(videoPath);
+    window.electronAPI.replayCutterUpscale(
+      (videoPath: string, height: number) => {
+        this.dialogService
+          .open(ReplayCutterUpscaleConfirmationDialog, {
+            autoFocus: false,
+            disableClose: true,
+            data: height
+          })
+          .afterClosed()
+          .subscribe((upscale: boolean) => {
+            if (upscale) {
+              window.electronAPI.openVideoFile(videoPath);
 
-            this.translateService
-              .get('view.notification.upscaling.description')
-              .subscribe((translated: string) => {
-                window.electronAPI.showNotification(
-                  true,
-                  550,
-                  150,
-                  JSON.stringify({
-                    percent: 0,
-                    infinite: false,
-                    icon: undefined,
-                    text: translated
-                  })
-                );
-              });
-          } else {
-            this.globalService.loading = undefined;
-            this.inputFileDisabled = false;
-          }
-        });
-    });
+              this.translateService
+                .get('view.notification.upscaling.description')
+                .subscribe((translated: string) => {
+                  window.electronAPI.showNotification(
+                    true,
+                    550,
+                    150,
+                    JSON.stringify({
+                      percent: 0,
+                      infinite: false,
+                      icon: undefined,
+                      text: translated
+                    })
+                  );
+                });
+            } else {
+              this.globalService.loading = undefined;
+              this.inputFileDisabled = false;
+            }
+          });
+      }
+    );
   }
 
   protected disableUploadButton(mapName: string): boolean {

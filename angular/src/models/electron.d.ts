@@ -91,7 +91,9 @@ export interface ElectronAPI {
   setManualCutPercent: (callback: (percent: number) => void) => void;
   setUpscalePercent: (callback: (percent: number) => void) => void;
   setJWTAccessToken: (callback: (accessToken: string) => void) => void;
-  replayCutterUpscale: (callback: (filePath: string) => void) => void;
+  replayCutterUpscale: (
+    callback: (filePath: string, height: number) => void
+  ) => void;
   gameIsUploaded: (callback: () => void) => void;
   gamesAreExported: (callback: (filePath: string | undefined) => void) => void;
   replayDownloaderError: (callback: (error: string) => void) => void;

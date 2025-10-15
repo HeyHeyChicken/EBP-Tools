@@ -14,7 +14,6 @@
       "thanksToTheContributors": "Thanks to the contributors"
     },
     "replay_cutter": {
-      "wrongResolution": "Your video must be in {{ expectedHeight }}p, yours is in {{ currentHeight }}p",
       "inputTrainingFile": "Click here to auto cut your training video file",
       "videoIsBeingAnalyzed": "<b>Step 1 / 2:</b> The video is being analyzed, please wait...<br/>Number of parts found: <b>{{games}}</b>",
       "correctionImageGeneration": "<b>Step 2 / 2:</b> Correction images are being generated, please wait...",
@@ -57,7 +56,7 @@
         },
         "upscale": {
           "title": "Upscaling",
-          "description": "Your video is in 720p, but Tools only supports 1080p.<br/>Do you want to upscale it before analysis?<br/>Be aware, this may take some time…"
+          "description": "Your video is {{height}}p, but Tools only supports 1080p.<br/>Do you want Tools to adjust the resolution before analysis?<br/>Warning, this may take a while…"
         },
         "edit-score": {
           "title": "Edit score",

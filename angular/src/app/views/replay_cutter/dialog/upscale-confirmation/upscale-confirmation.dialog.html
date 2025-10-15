@@ -10,7 +10,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <ebp-row>
     <ebp-column
       [xs]="12"
-      innerHTML="{{ 'view.replay_cutter.dialog.upscale.description' | translate}}"
+      [innerHTML]="'view.replay_cutter.dialog.upscale.description' | translate : { height: data }"
     ></ebp-column>
   </ebp-row>
 </mat-dialog-content>

@@ -1525,24 +1525,12 @@ let projectLatestVersion /* string */ = '';
                                     'set-video-file',
                                     filePaths[0]
                                 );
-                            } else if (height == 720) {
+                            }
+                            {
                                 mainWindow.webContents.send(
                                     'replay_cutter_upscale',
-                                    filePaths[0]
-                                );
-                            } else {
-                                mainWindow.webContents.send(
-                                    'error',
-                                    'view.replay_cutter.wrongResolution',
-                                    {
-                                        expectedHeight: EXPECTED_HEIGHT,
-                                        currentWidth: width,
-                                        currentHeight: height
-                                    }
-                                );
-                                mainWindow.webContents.send(
-                                    'set-video-file',
-                                    ''
+                                    filePaths[0],
+                                    height
                                 );
                             }
                         }

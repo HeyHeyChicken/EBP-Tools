@@ -14,7 +14,6 @@
       "thanksToTheContributors": "Mulțumiri contributorilor"
     },
     "replay_cutter": {
-      "wrongResolution": "Videoclipul dvs. trebuie să fie în {{ expectedHeight }}p, al dvs. este în {{ currentHeight }}p.",
       "inputTrainingFile": "Faceți clic aici pentru a tăia automat fișierul video de antrenament",
       "videoIsBeingAnalyzed": "<b>Pasul 1 / 2:</b> Videoclipul este în curs de analiză, vă rugăm să așteptați...<br/>Numărul de părți găsite: <b>{{games}}</b>",
       "correctionImageGeneration": "<b>Pasul 2 / 2:</b> Imaginile de corecție sunt în curs de generare, vă rugăm să așteptați...",
@@ -57,7 +56,7 @@
         },
         "upscale": {
           "title": "Mărire",
-          "description": "Videoclipul dumneavoastră este în 720p, dar Tools acceptă doar 1080p.<br/>Doriți să îl upscalați înainte de analiză?<br/>Atenție, acest proces poate dura ceva timp…"
+          "description": "Videoclipul tău este în {{height}}p, dar Tools suportă doar 1080p.<br/>Doriți ca Tools să ajusteze rezoluția înainte de analiză?<br/>Atenție, acest proces poate dura…"
         },
         "edit-score": {
           "title": "Editează scorul",

@@ -14,7 +14,6 @@
       "thanksToTheContributors": "Gracias a los colaboradores"
     },
     "replay_cutter": {
-      "wrongResolution": "Su vídeo debe estar en {{ expectedHeight }}p, el suyo está en {{ currentHeight }}p.",
       "inputTrainingFile": "Haga clic aquí para cortar automáticamente su archivo de video de entrenamiento",
       "videoIsBeingAnalyzed": "<b>Paso 1 / 2:</b> El vídeo se está analizando, por favor espere...<br/>Número de partes encontradas: <b>{{games}}</b>",
       "correctionImageGeneration": "<b>Paso 2 / 2:</b> Se están generando las imágenes de corrección, por favor espere...",
@@ -57,7 +56,7 @@
         },
         "upscale": {
           "title": "Ampliando",
-          "description": "Su video está en 720p, pero Tools solo admite 1080p.<br/>¿Desea escalarlo antes del análisis?<br/>Atención, esto puede tardar un poco…"
+          "description": "Tu video está en {{height}}p, pero Tools solo admite 1080p.<br/>¿Quieres que Tools ajuste la resolución antes del análisis?<br/>Atención, esto puede tardar…"
         },
         "edit-score": {
           "title": "Editar puntuación",

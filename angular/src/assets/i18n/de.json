@@ -14,7 +14,6 @@
       "thanksToTheContributors": "Danke an die Mitwirkenden"
     },
     "replay_cutter": {
-      "wrongResolution": "Ihr Video muss in {{ expectedHeight }}p sein, Ihres ist in {{ currentHeight }}p.",
       "inputTrainingFile": "Klicken Sie hier, um Ihre Trainingsvideodatei automatisch zu schneiden",
       "videoIsBeingAnalyzed": "<b>Schritt 1 / 2:</b> Das Video wird analysiert, bitte warten...<br/>Anzahl gefundener Teile: <b>{{games}}</b>",
       "correctionImageGeneration": "<b>Schritt 2 / 2:</b> Korrekturbilder werden erstellt, bitte warten...",
@@ -57,7 +56,7 @@
         },
         "upscale": {
           "title": "Hochskalieren",
-          "description": "Ihr Video ist in 720p, aber Tools unterstützt nur 1080p.<br/>Möchten Sie es vor der Analyse hochskalieren?<br/>Achtung, das könnte einige Zeit dauern…"
+          "description": "Ihre Videoauflösung beträgt {{height}}p, aber Tools unterstützt nur 1080p.<br/>Möchten Sie, dass Tools die Auflösung vor der Analyse anpasst?<br/>Achtung, dies kann lange dauern…"
         },
         "edit-score": {
           "title": "Punkte bearbeiten",

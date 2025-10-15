@@ -4,9 +4,9 @@
 
 //#region Imports
 
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatDialogModule } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../../../shared/grid/grid.module';
 
@@ -18,4 +18,9 @@ import { GridModule } from '../../../../shared/grid/grid.module';
   imports: [CommonModule, MatDialogModule, TranslateModule, GridModule],
   standalone: true
 })
-export class ReplayCutterUpscaleConfirmationDialog {}
+export class ReplayCutterUpscaleConfirmationDialog {
+  constructor(
+    @Inject(MAT_DIALOG_DATA)
+    protected data: number
+  ) {}
+}
