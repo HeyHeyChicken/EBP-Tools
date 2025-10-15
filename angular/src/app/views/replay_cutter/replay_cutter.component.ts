@@ -613,6 +613,11 @@ export class ReplayCutterComponent implements OnInit {
     }
 
     if (this._videoPath) {
+      console.log(
+        'START',
+        Math.round((this._games[gameIndex].start + 1) * 1000),
+        this._games[gameIndex].readableStart
+      );
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
         Math.round((this._games[gameIndex].start + 1) * 1000),
