@@ -246,11 +246,16 @@ export class ReplayCutterCropDialog implements OnInit {
           this.globalCropper.x1 + Math.round(X1 / this.currentScale);
         const GLOBAL_CROPPER_Y1 =
           this.globalCropper.y1 + Math.round(Y1 / this.currentScale);
+
         this.globalCropper = {
           x1: GLOBAL_CROPPER_X1,
-          x2: Math.round(X2 / this.currentScale) + GLOBAL_CROPPER_X1,
+          x2:
+            Math.round(X2 / this.currentScale) +
+            (this.currentScale == 1 ? 0 : GLOBAL_CROPPER_X1),
           y1: GLOBAL_CROPPER_Y1,
-          y2: Math.round(Y2 / this.currentScale) + GLOBAL_CROPPER_Y1
+          y2:
+            Math.round(Y2 / this.currentScale) +
+            (this.currentScale == 1 ? 0 : GLOBAL_CROPPER_Y1)
         };
 
         const SCALE_X = targetDisplayWidth / WIDTH;
