@@ -1525,8 +1525,7 @@ let projectLatestVersion /* string */ = '';
                                     'set-video-file',
                                     filePaths[0]
                                 );
-                            }
-                            {
+                            } else {
                                 mainWindow.webContents.send(
                                     'replay_cutter_upscale',
                                     filePaths[0],
