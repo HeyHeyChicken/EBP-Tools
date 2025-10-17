@@ -85,8 +85,7 @@ export class ReplayCutterCheckPlayersOrderDialog implements AfterViewInit {
     this.data.replayCutterComponent.videoURLToCanvas(
       `http://localhost:${this.globalService.serverPort}/file?path=${this.data.replayCutterComponent.videoPath}`,
       Math.round(
-        (this.data.replayCutterComponent.games[this.data.gameIndex].start +
-          10) *
+        (this.data.replayCutterComponent.games[this.data.gameIndex].start + 1) *
           1000
       ),
       (videoFrame?: HTMLCanvasElement) => {
@@ -125,7 +124,7 @@ export class ReplayCutterCheckPlayersOrderDialog implements AfterViewInit {
     target: HTMLCanvasElement | undefined,
     cropFromTheLeft: boolean
   ): void {
-    if (frame && target) {
+    if (target) {
       const X1 = cropFromTheLeft
         ? (position.x2 - position.x1) * 0.24 + position.x1
         : position.x1;
@@ -160,6 +159,8 @@ export class ReplayCutterCheckPlayersOrderDialog implements AfterViewInit {
           );
         }
       }
+    } else {
+      console.error('Error: drawVideoFrame');
     }
   }
 

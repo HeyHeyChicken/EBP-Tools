@@ -753,7 +753,7 @@ export class ReplayCutterComponent implements OnInit {
       const TEAM_IS_ORANGE = color.r > 255 / 2;
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        (this._games[gameIndex].start + 10) * 1000,
+        (this._games[gameIndex].start + 1) * 1000,
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             let step = 0;
@@ -2379,7 +2379,42 @@ export class ReplayCutterComponent implements OnInit {
     });
 
     VIDEO.addEventListener('seeked', () => {
-      callback(this.videoToCanvas(VIDEO));
+      const CANVAS = document.createElement('canvas');
+      CANVAS.width = VIDEO.videoWidth;
+      CANVAS.height = VIDEO.videoHeight;
+      const CTX = CANVAS.getContext('2d');
+
+      if (CTX) {
+        CTX.drawImage(VIDEO, 0, 0, CANVAS.width, CANVAS.height);
+        const IMAGE_DATA = CTX.getImageData(
+          0,
+          0,
+          CANVAS.width,
+          CANVAS.height
+        ).data;
+
+        let red = 0,
+          green = 0,
+          blue = 0;
+        const pixelCount = CANVAS.width * CANVAS.height;
+
+        for (let i = 0; i < IMAGE_DATA.length; i += 4) {
+          red += IMAGE_DATA[i];
+          green += IMAGE_DATA[i + 1];
+          blue += IMAGE_DATA[i + 2];
+        }
+
+        red = Math.round(red / pixelCount);
+        green = Math.round(green / pixelCount);
+        blue = Math.round(blue / pixelCount);
+
+        console.log(red, green, blue);
+
+        // DEBUG
+        this.debug?.nativeElement.append(CANVAS);
+
+        callback(this.videoToCanvas(VIDEO));
+      }
     });
 
     VIDEO.addEventListener('error', () => {
