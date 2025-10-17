@@ -2408,12 +2408,17 @@ export class ReplayCutterComponent implements OnInit {
         green = Math.round(green / pixelCount);
         blue = Math.round(blue / pixelCount);
 
-        console.log(red, green, blue);
+        console.log(red, green, blue, CANVAS.width, CANVAS.height);
 
         // DEBUG
         this.debug?.nativeElement.append(CANVAS);
 
-        callback(this.videoToCanvas(VIDEO));
+        if (red < 20 && green < 20 && blue < 20) {
+          console.error('Black frame, retrying...');
+          this.videoURLToCanvas(url, timeMs + 1000, callback);
+        } else {
+          callback(this.videoToCanvas(VIDEO));
+        }
       }
     });
 
