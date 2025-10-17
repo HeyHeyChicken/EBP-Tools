@@ -15,6 +15,7 @@ import { IdentityService } from '../../core/services/identity/identity.service';
 import { GlobalService } from '../../core/services/global.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { CoinComponent } from '../coin/coin.component';
+import { HeaderService } from './services/header.service';
 
 //#endregion
 
@@ -37,7 +38,6 @@ import { CoinComponent } from '../coin/coin.component';
 export class HeaderComponent implements OnInit {
   //#region Attributes
 
-  protected showCoinsPopup: boolean = false;
   protected disableLogoutButton: boolean = false;
   protected showMyAccountBox: boolean = false;
 
@@ -58,7 +58,8 @@ export class HeaderComponent implements OnInit {
     protected readonly router: Router,
     protected readonly translateService: TranslateService,
     protected readonly identityService: IdentityService,
-    protected readonly globalService: GlobalService
+    protected readonly globalService: GlobalService,
+    protected readonly headerService: HeaderService
   ) {}
 
   //#region Functions

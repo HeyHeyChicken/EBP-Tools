@@ -49,6 +49,7 @@ import { VideoChunk } from './models/video-chunk';
 import { KillFeedService } from './services/kill-feed.service';
 import { ReplayCutterEditMapDialog } from './dialog/edit-map/edit-map.dialog';
 import { NotificationService } from '../notification/services/notification.service';
+import { HeaderService } from '../../shared/header/services/header.service';
 
 //#endregion
 @Component({
@@ -129,7 +130,8 @@ export class ReplayCutterComponent implements OnInit {
     private readonly openCVService: OpenCVService,
     private readonly dialogService: MatDialog,
     private readonly apiRestService: APIRestService,
-    private readonly notificationService: NotificationService
+    private readonly notificationService: NotificationService,
+    private readonly headerService: HeaderService
   ) {}
 
   //#region Functions
@@ -142,6 +144,9 @@ export class ReplayCutterComponent implements OnInit {
       this.ngZone.run(() => {
         this.globalService.loading = undefined;
         this.dialogService.open(ReplayCutterReplayUploadedDialog);
+        this.apiRestService.getMyCoins().subscribe((coins: number) => {
+          this.identityService.coins = coins;
+        });
       });
     });
 
@@ -371,111 +376,118 @@ export class ReplayCutterComponent implements OnInit {
    * @param gameIndex Index of the game to attach.
    */
   protected selectWhichGameToAttachMinimap(gameIndex: number): void {
-    this.globalService.loading = '';
     if (this.identityService.isBetaUser) {
-      this.getGamePlayingBounds(this.games[gameIndex]).then((game) => {
-        if (game) {
-          if (isDevMode() || this.getMapByName(game.map)?.mapMargins) {
-            this.apiRestService
-              .getGames(game.map, game.orangeTeam.score, game.blueTeam.score)
-              .subscribe({
-                next: (games: RestGame[]) => {
-                  if (games && games.length > 0) {
-                    this.videoURLToCanvas(
-                      `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-                      Math.round((game.end - 1) * 1000),
-                      (videoFrame?: HTMLCanvasElement) => {
-                        if (videoFrame) {
-                          const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
-                          this.dialogService
-                            .open(ReplayCutterAttachGameDialog, {
-                              data: {
-                                games: games,
-                                image: videoFrame.toDataURL()
-                              },
-                              autoFocus: false,
-                              width: DIALOG_WIDTH,
-                              maxWidth: DIALOG_WIDTH
-                            })
-                            .afterClosed()
-                            .subscribe((gameID: number | undefined) => {
-                              this.globalService.loading = '';
-                              if (gameID) {
-                                this.cropGameMinimap(
-                                  gameIndex,
-                                  games.find((game) => game.ID == gameID)!
-                                );
+      if (this.identityService.coins && this.identityService.coins > 0) {
+        this.globalService.loading = '';
+        this.getGamePlayingBounds(this.games[gameIndex]).then((game) => {
+          if (game) {
+            if (isDevMode() || this.getMapByName(game.map)?.mapMargins) {
+              this.apiRestService
+                .getGames(game.map, game.orangeTeam.score, game.blueTeam.score)
+                .subscribe({
+                  next: (games: RestGame[]) => {
+                    if (games && games.length > 0) {
+                      this.videoURLToCanvas(
+                        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+                        Math.round((game.end - 1) * 1000),
+                        (videoFrame?: HTMLCanvasElement) => {
+                          if (videoFrame) {
+                            const DIALOG_WIDTH: string =
+                              'calc(100vw - 12px * 4)';
+                            this.dialogService
+                              .open(ReplayCutterAttachGameDialog, {
+                                data: {
+                                  games: games,
+                                  image: videoFrame.toDataURL()
+                                },
+                                autoFocus: false,
+                                width: DIALOG_WIDTH,
+                                maxWidth: DIALOG_WIDTH
+                              })
+                              .afterClosed()
+                              .subscribe((gameID: number | undefined) => {
+                                this.globalService.loading = '';
+                                if (gameID) {
+                                  this.cropGameMinimap(
+                                    gameIndex,
+                                    games.find((game) => game.ID == gameID)!
+                                  );
+                                }
+                              });
+                          }
+                        }
+                      );
+                    } else {
+                      this.sortPlayersFromGameFrame(
+                        gameIndex,
+                        {
+                          ID: 0,
+                          tags: [],
+                          date: new Date(),
+                          orangePlayers: [],
+                          bluePlayers: []
+                        },
+                        (
+                          orangePlayersNames: string[],
+                          bluePlayersNames: string[]
+                        ) => {
+                          this.translateService
+                            .get(
+                              'view.replay_cutter.toast.noGamesFoundInStatistics',
+                              {
+                                map: game.map,
+                                orangeScore: game.orangeTeam.score,
+                                blueScore: game.blueTeam.score
                               }
+                            )
+                            .subscribe((translated: string) => {
+                              this.globalService.loading = undefined;
+                              this.toastrService
+                                .error(translated, undefined, {
+                                  enableHtml: true
+                                })
+                                .onTap.subscribe(() => {
+                                  const DATA = {
+                                    map: this.games[gameIndex].map,
+                                    date: new Date().getTime(),
+                                    orange: {
+                                      name: this.games[gameIndex].orangeTeam
+                                        .name,
+                                      score:
+                                        this.games[gameIndex].orangeTeam.score,
+                                      players: orangePlayersNames
+                                    },
+                                    blue: {
+                                      name: this.games[gameIndex].blueTeam.name,
+                                      score:
+                                        this.games[gameIndex].blueTeam.score,
+                                      players: bluePlayersNames
+                                    }
+                                  };
+                                  window.electronAPI.openURL(
+                                    `${this.globalService.webSiteURL}/tools/statistics?new=${encodeURIComponent(JSON.stringify(DATA))}`
+                                  );
+                                });
                             });
                         }
-                      }
-                    );
-                  } else {
-                    this.sortPlayersFromGameFrame(
-                      gameIndex,
-                      {
-                        ID: 0,
-                        tags: [],
-                        date: new Date(),
-                        orangePlayers: [],
-                        bluePlayers: []
-                      },
-                      (
-                        orangePlayersNames: string[],
-                        bluePlayersNames: string[]
-                      ) => {
-                        this.translateService
-                          .get(
-                            'view.replay_cutter.toast.noGamesFoundInStatistics',
-                            {
-                              map: game.map,
-                              orangeScore: game.orangeTeam.score,
-                              blueScore: game.blueTeam.score
-                            }
-                          )
-                          .subscribe((translated: string) => {
-                            this.globalService.loading = undefined;
-                            this.toastrService
-                              .error(translated, undefined, {
-                                enableHtml: true
-                              })
-                              .onTap.subscribe(() => {
-                                const DATA = {
-                                  map: this.games[gameIndex].map,
-                                  date: new Date().getTime(),
-                                  orange: {
-                                    name: this.games[gameIndex].orangeTeam.name,
-                                    score:
-                                      this.games[gameIndex].orangeTeam.score,
-                                    players: orangePlayersNames
-                                  },
-                                  blue: {
-                                    name: this.games[gameIndex].blueTeam.name,
-                                    score: this.games[gameIndex].blueTeam.score,
-                                    players: bluePlayersNames
-                                  }
-                                };
-                                window.electronAPI.openURL(
-                                  `${this.globalService.webSiteURL}/tools/statistics?new=${encodeURIComponent(JSON.stringify(DATA))}`
-                                );
-                              });
-                          });
-                      }
-                    );
+                      );
+                    }
                   }
-                }
-              });
-          } else {
-            this.translateService
-              .get('view.replay_cutter.toast.mapNotAICompatible', {
-                map: game.map
-              })
-              .subscribe((translated: string) => {
-                this.toastrService.error(translated);
-              });
+                });
+            } else {
+              this.translateService
+                .get('view.replay_cutter.toast.mapNotAICompatible', {
+                  map: game.map
+                })
+                .subscribe((translated: string) => {
+                  this.toastrService.error(translated);
+                });
+            }
           }
-        }
-      });
+        });
+      } else {
+        this.headerService.showCoinsPopup = true;
+      }
     } else {
       this.dialogService.open(ReplayCutterBetaRequiredDialog, {
         width: '700px',
@@ -618,7 +630,7 @@ export class ReplayCutterComponent implements OnInit {
     if (this._videoPath) {
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        Math.round((this._games[gameIndex].start + 1) * 1000),
+        Math.round((this._games[gameIndex].start + 10) * 1000),
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
@@ -741,7 +753,7 @@ export class ReplayCutterComponent implements OnInit {
       const TEAM_IS_ORANGE = color.r > 255 / 2;
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        this._games[gameIndex].start * 1000,
+        (this._games[gameIndex].start + 10) * 1000,
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             let step = 0;
@@ -886,7 +898,7 @@ export class ReplayCutterComponent implements OnInit {
     if (this._videoPath) {
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        this._games[gameIndex].start * 1000,
+        (this._games[gameIndex].start + 10) * 1000,
         async (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
             const ORANGE_PLAYERS_NAMES: string[] = [];
@@ -1875,7 +1887,7 @@ export class ReplayCutterComponent implements OnInit {
       });
 
     this.getGameCroppedFrame(
-      (games[index].start + 5) * 1000,
+      (games[index].start + 10) * 1000,
       MODES[games[index].mode].gameFrame.map[0].x,
       MODES[games[index].mode].gameFrame.map[0].y,
       MODES[games[index].mode].gameFrame.map[1].x,
@@ -2367,9 +2379,7 @@ export class ReplayCutterComponent implements OnInit {
     });
 
     VIDEO.addEventListener('seeked', () => {
-      requestAnimationFrame(() => {
-        callback(this.videoToCanvas(VIDEO));
-      });
+      callback(this.videoToCanvas(VIDEO));
     });
 
     VIDEO.addEventListener('error', () => {

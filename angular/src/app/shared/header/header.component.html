@@ -37,10 +37,13 @@ See LICENSE for terms. Unauthorized use is prohibited.
 <div class="right">
   @if (identityService.isBetaUser) {
     <div>
-      <div class="coins" (click)="showCoinsPopup = !showCoinsPopup">
+      <div
+        class="coins"
+        (click)="headerService.showCoinsPopup = !headerService.showCoinsPopup"
+      >
         <ebp-coin></ebp-coin>
         {{ identityService.coins ?? '...' }}
-        @if (showCoinsPopup) {
+        @if (headerService.showCoinsPopup) {
           <div class="shadow"></div>
           <div class="popup">
             <button
