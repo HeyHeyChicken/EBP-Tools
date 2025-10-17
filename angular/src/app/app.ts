@@ -108,13 +108,21 @@ export class App implements OnInit {
             .subscribe((betaUsers: number[]) => {
               this.globalService.betaUsers = betaUsers;
 
+              this.apiRestService.getMyTeams().subscribe((teams: Team[]) => {
+                this.identityService.teams = teams;
+              });
+
+              // Get account coins
+
               this.apiRestService.getMyCoins().subscribe((coins: number) => {
                 this.identityService.coins = coins;
               });
 
-              this.apiRestService.getMyTeams().subscribe((teams: Team[]) => {
-                this.identityService.teams = teams;
-              });
+              setInterval(() => {
+                this.apiRestService.getMyCoins().subscribe((coins: number) => {
+                  this.identityService.coins = coins;
+                });
+              }, 60 * 1000);
             });
         }
       });
@@ -152,6 +160,11 @@ export class App implements OnInit {
   handleKeyboardEvent(event: KeyboardEvent) {
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'd') {
       this.debugMode();
+      window.electronAPI?.isDevMode().then((devMode: boolean) => {
+        this.ngZone.run(() => {
+          this.globalService.devMode = devMode;
+        });
+      });
     }
   }
 

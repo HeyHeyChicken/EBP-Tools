@@ -125,6 +125,11 @@ export class HeaderComponent implements OnInit {
     ]);
   }
 
+  protected getMoreCoins(): void {
+    this.headerService.coinsCheckerLoop();
+    this.openURLExternalBrowser(this.globalService.webSiteURL + '/tokens');
+  }
+
   /**
    * Cette fonction permet de changer la langue du site web.
    * @param language Langue à appliquer.

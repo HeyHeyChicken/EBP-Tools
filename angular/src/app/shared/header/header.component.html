@@ -46,11 +46,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
         @if (headerService.showCoinsPopup) {
           <div class="shadow"></div>
           <div class="popup">
-            <button
-              (click)="
-                openURLExternalBrowser(globalService.webSiteURL + '/tokens')
-              "
-            >
+            <button (click)="getMoreCoins()">
               {{ 'shared.header.getMoreCoins' | translate }}
             </button>
           </div>
