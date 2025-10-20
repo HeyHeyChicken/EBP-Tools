@@ -345,6 +345,9 @@ export class ReplayCutterComponent implements OnInit {
     return isDevMode();
   }
 
+  /**
+   * Toggles the debug mode between play and pause states during gameplay analysis.
+   */
   protected playPauseDebug(): void {
     this.debugPause = !this.debugPause;
   }
@@ -363,6 +366,9 @@ export class ReplayCutterComponent implements OnInit {
     });
   }
 
+  /**
+   * Opens the settings dialog with the current settings.
+   */
   protected openSettings(): void {
     this.dialogService.open(ReplayCutterSettingsDialog, {
       data: this.settings,
@@ -840,45 +846,13 @@ export class ReplayCutterComponent implements OnInit {
     }
   }
 
-  private getPlayersNamesAsImage(
-    nbPlayers: number,
-    frame: CanvasImageSource,
-    orange: boolean
-  ): HTMLCanvasElement {
-    const SOURCE_SIZE = this.getSourceSize(frame);
-    const CANVAS = document.createElement('canvas');
-    const X1 = 0 + (orange ? SOURCE_SIZE.width * 0.24 : 0);
-    const X2 = SOURCE_SIZE.width - (!orange ? SOURCE_SIZE.width * 0.24 : 0);
-    const WIDTH = X2 - X1;
-    const SLICE_HEIGHT = (SOURCE_SIZE.height / nbPlayers) * 0.3; // The banner containing the player's nickname is 30% of its height.
-    const SLICE_SPACING = (SOURCE_SIZE.height / nbPlayers) * 0.7;
-    const CANVAS_HEIGHT = nbPlayers * SLICE_HEIGHT;
-
-    CANVAS.width = WIDTH;
-    CANVAS.height = CANVAS_HEIGHT;
-    const CTX = CANVAS.getContext('2d');
-
-    if (CTX) {
-      for (let i = 0; i < nbPlayers; i++) {
-        const SOURCE_Y = 0 + i * (SLICE_SPACING + SLICE_HEIGHT);
-        const TARGET_Y = i * SLICE_HEIGHT;
-
-        CTX.drawImage(
-          frame,
-          X1,
-          SOURCE_Y,
-          WIDTH,
-          SLICE_HEIGHT,
-          0,
-          TARGET_Y,
-          WIDTH,
-          SLICE_HEIGHT
-        );
-      }
-    }
-    return CANVAS;
-  }
-
+  /**
+   * Determines the bounding box of a team's information area in a frame based on its color.
+   * The function scans the frame vertically to find the top and bottom edges, then horizontally to find the left and right edges of the team info.
+   * @param color The RGB color representing the team
+   * @param frame The source image or video frame
+   * @param callback A function called with the calculated bounding box { x1, y1, x2, y2, frame }
+   */
   private getTeamInfosPosition_Step2(
     color: RGB,
     frame: CanvasImageSource,
@@ -961,6 +935,52 @@ export class ReplayCutterComponent implements OnInit {
       y2: bottom,
       frame: frame
     });
+  }
+
+  /**
+   * Generates a canvas containing the players' name banners extracted from a given frame. Each banner represents a portion of the frame corresponding to a player's nickname.
+   * @param nbPlayers Number of players in the frame.
+   * @param frame Source image or video frame.
+   * @param orange Flag to adjust horizontal cropping for team color.
+   * @returns A canvas element with the extracted player name images stacked vertically.
+   */
+  private getPlayersNamesAsImage(
+    nbPlayers: number,
+    frame: CanvasImageSource,
+    orange: boolean
+  ): HTMLCanvasElement {
+    const SOURCE_SIZE = this.getSourceSize(frame);
+    const CANVAS = document.createElement('canvas');
+    const X1 = 0 + (orange ? SOURCE_SIZE.width * 0.24 : 0);
+    const X2 = SOURCE_SIZE.width - (!orange ? SOURCE_SIZE.width * 0.24 : 0);
+    const WIDTH = X2 - X1;
+    const SLICE_HEIGHT = (SOURCE_SIZE.height / nbPlayers) * 0.3; // The banner containing the player's nickname is 30% of its height.
+    const SLICE_SPACING = (SOURCE_SIZE.height / nbPlayers) * 0.7;
+    const CANVAS_HEIGHT = nbPlayers * SLICE_HEIGHT;
+
+    CANVAS.width = WIDTH;
+    CANVAS.height = CANVAS_HEIGHT;
+    const CTX = CANVAS.getContext('2d');
+
+    if (CTX) {
+      for (let i = 0; i < nbPlayers; i++) {
+        const SOURCE_Y = 0 + i * (SLICE_SPACING + SLICE_HEIGHT);
+        const TARGET_Y = i * SLICE_HEIGHT;
+
+        CTX.drawImage(
+          frame,
+          X1,
+          SOURCE_Y,
+          WIDTH,
+          SLICE_HEIGHT,
+          0,
+          TARGET_Y,
+          WIDTH,
+          SLICE_HEIGHT
+        );
+      }
+    }
+    return CANVAS;
   }
 
   /**
@@ -1240,7 +1260,9 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
-   * This function is triggered when the user clicks on the "input" to select a replay.
+   * Handles the user's click on the file input to select a replay video.
+   * Initializes the state for a new replay selection and opens the file dialog.
+   * @param training Indicates whether the replay is for training mode.
    */
   protected onInputFileClick(training: boolean): void {
     if (!this.inputFileDisabled) {
@@ -1255,8 +1277,8 @@ export class ReplayCutterComponent implements OnInit {
   }
 
   /**
-   * This function initializes the position of a video's playhead when it is loaded.
-   * @param event
+   * Sets the video's playhead to the end once the video has loaded.
+   * @param event The loaded data event from the video element.
    */
   protected videoLoadedData(event: Event): void {
     if (event.target) {
@@ -1280,6 +1302,13 @@ export class ReplayCutterComponent implements OnInit {
     return '0';
   }
 
+  /**
+   * Handles updates to the video's current time during playback for analysis purposes.
+   * This function analyzes each frame to detect game start, end, score frames, team names, and map names.
+   * It updates the progress percentage, extracts relevant images and text using OCR, and manages game states.
+   * Supports debug pause mode, automatic time jumps to game start, and notifications of analysis progress.
+   * @param event The time update event from the video element.
+   */
   protected async videoTimeUpdate(event: Event): Promise<void> {
     if (this.debugPause) {
       setTimeout(() => {
@@ -1809,6 +1838,12 @@ export class ReplayCutterComponent implements OnInit {
     return undefined;
   }
 
+  /**
+   * Detects whether the current video frame corresponds to the end of a game.
+   * Checks specific pixel colors in the frame to identify the presence of team logos indicating game conclusion.
+   * @param video The video element to analyze.
+   * @returns True if the end-of-game frame is detected, otherwise false.
+   */
   private detectGameEndFrame(video: HTMLVideoElement): boolean {
     if (
       /* Orange logo */
@@ -2336,6 +2371,13 @@ export class ReplayCutterComponent implements OnInit {
     return CANVAS;
   }
 
+  /**
+   * Captures a frame from a video URL at a specified time and converts it to a canvas element.
+   * Performs a basic check to avoid black frames by retrying if the average color is too dark.
+   * @param url The URL of the video.
+   * @param timeMs The time in milliseconds at which to capture the frame.
+   * @param callback Function called with the resulting canvas or undefined if capture fails.
+   */
   public videoURLToCanvas(
     url: string,
     timeMs: number,
@@ -2809,6 +2851,10 @@ export class ReplayCutterComponent implements OnInit {
     return Promise.resolve('');
   }
 
+  /**
+   * Opens a dialog to edit the map of a given game and updates the game with the selected map.
+   * @param game The game object whose map is being edited
+   */
   protected editGameMap(game: Game): void {
     this.dialogService
       .open(ReplayCutterEditMapDialog, {
@@ -2852,6 +2898,16 @@ export class ReplayCutterComponent implements OnInit {
       });
   }
 
+  /**
+   * Captures a specific frame from the video at a given game time and crops it to the specified rectangle.
+   * Returns the cropped frame as a data URL.
+   * @param gameTimeMs The time in milliseconds of the frame to capture.
+   * @param x1 The left coordinate of the crop.
+   * @param y1 The top coordinate of the crop.
+   * @param x2 The right coordinate of the crop.
+   * @param y2 The bottom coordinate of the crop.
+   * @returns A promise resolving to the cropped frame as a data URL, or undefined if capture fails.
+   */
   protected async getGameCroppedFrame(
     gameTimeMs: number,
     x1: number,
