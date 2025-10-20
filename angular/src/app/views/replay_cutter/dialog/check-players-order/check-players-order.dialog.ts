@@ -53,8 +53,6 @@ export class ReplayCutterCheckPlayersOrderDialog {
   protected value: {
     orangePlayersNames: string[];
     bluePlayersNames: string[];
-    orangeNamesAsImage: string;
-    blueNamesAsImage: string;
   };
 
   @ViewChild('canvasOrangeRef') canvasOrangeRef?: ElementRef<HTMLCanvasElement>;

@@ -1125,8 +1125,6 @@ export class ReplayCutterComponent implements OnInit {
               (newData: {
                 orangePlayersNames: string[];
                 bluePlayersNames: string[];
-                orangeTeamInfosPosition: CropperPosition;
-                blueTeamInfosPosition: CropperPosition;
               }) => {
                 if (newData) {
                   const TOP_INFOS_WIDTH: number = 556;
@@ -1142,8 +1140,8 @@ export class ReplayCutterComponent implements OnInit {
                     miniMapPositions,
                     decodeURIComponent(this._videoPath!),
                     gameFromStatistics.ID,
-                    newData.orangeTeamInfosPosition,
-                    newData.blueTeamInfosPosition,
+                    orangeTeamInfosPosition,
+                    blueTeamInfosPosition,
                     TOP_INFOS_POSITION,
                     newData.orangePlayersNames,
                     newData.bluePlayersNames
@@ -1601,7 +1599,7 @@ export class ReplayCutterComponent implements OnInit {
 
                       const FRAME = this.videoToCanvas(VIDEO);
                       if (FRAME) {
-                        this._games[0].orangeTeam.scoreImage = this.cropImage(
+                        this._games[0].mapImage = this.cropImage(
                           FRAME,
                           MODES[this._games[0].mode].gameFrame.map[0].x,
                           MODES[this._games[0].mode].gameFrame.map[0].y,
