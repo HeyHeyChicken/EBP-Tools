@@ -96,7 +96,8 @@
           "tags": "Etichete",
           "players": "Jucători",
           "date": "Data",
-          "changeFrame": "Schimbă imaginea"
+          "changeFrame": "Schimbă imaginea",
+          "description": "Asociați reluarea la un joc prezent pe pagina <a>statistici EBP</a>.<br />Dacă acesta nu există, vă rugăm să <b>îl creați</b>."
         }
       },
       "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"

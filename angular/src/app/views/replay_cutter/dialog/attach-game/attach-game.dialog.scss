@@ -3,9 +3,33 @@
 // See LICENSE for terms. Unauthorized use is prohibited.
 
 @use '../../../../../styles/imports/variables' as variables;
+@use '../../../../../styles/imports//material_colors' as material_colors;
+
+.description {
+  ::ng-deep > a,
+  ::ng-deep > b {
+    color: variables.$main_color;
+    cursor: pointer;
+    font-weight: normal;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  ::ng-deep > a {
+    color: variables.$main_color;
+  }
+
+  ::ng-deep > b {
+    color: material_colors.$material_green_500;
+  }
+}
 
 img {
-  width: 100%;
+  height: 100px;
+  pointer-events: none;
+  user-select: none;
 }
 
 table {

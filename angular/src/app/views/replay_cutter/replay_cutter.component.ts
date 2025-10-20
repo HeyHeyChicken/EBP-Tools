@@ -386,51 +386,114 @@ export class ReplayCutterComponent implements OnInit {
                 .getGames(game.map, game.orangeTeam.score, game.blueTeam.score)
                 .subscribe({
                   next: (games: RestGame[]) => {
-                    if (games && games.length > 0) {
-                      this.videoURLToCanvas(
-                        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-                        Math.round((game.end - 1) * 1000),
-                        (videoFrame?: HTMLCanvasElement) => {
-                          if (videoFrame) {
-                            const DIALOG_WIDTH: string =
-                              'calc(100vw - 12px * 4)';
-                            this.dialogService
-                              .open(ReplayCutterAttachGameDialog, {
-                                data: {
-                                  games: games,
-                                  image: videoFrame.toDataURL()
-                                },
-                                autoFocus: false,
-                                width: DIALOG_WIDTH,
-                                maxWidth: DIALOG_WIDTH
-                              })
-                              .afterClosed()
-                              .subscribe((gameID: number | undefined) => {
-                                this.globalService.loading = '';
-                                if (gameID) {
-                                  this.cropGameMinimap(
-                                    gameIndex,
-                                    games.find((game) => game.ID == gameID)!
+                    this.sortPlayersFromGameFrame(
+                      gameIndex,
+                      {
+                        ID: 0,
+                        tags: [],
+                        date: new Date().toString(),
+                        orangePlayers: [],
+                        bluePlayers: []
+                      },
+                      (
+                        orangePlayersNames: string[],
+                        bluePlayersNames: string[]
+                      ) => {
+                        if (games && games.length > 0) {
+                          // We get the coordinates of the orange team's information.
+                          this.globalService.loading =
+                            this.translateService.instant(
+                              'view.replay_cutter.detectingOrangeInfoZone'
+                            );
+                          this.getTeamInfosPosition(
+                            gameIndex,
+                            new RGB(235, 121, 0),
+                            (orangeTeamInfosPosition: CropperPosition) => {
+                              // We get the coordinates of the blue team's information.
+                              this.globalService.loading =
+                                this.translateService.instant(
+                                  'view.replay_cutter.detectingBlueInfoZone'
+                                );
+                              this.getTeamInfosPosition(
+                                gameIndex,
+                                new RGB(29, 127, 255),
+                                (blueTeamInfosPosition: CropperPosition) => {
+                                  const ORANGE_BLOC_IMAGE = this.cropImage(
+                                    orangeTeamInfosPosition.frame!,
+                                    orangeTeamInfosPosition.x1,
+                                    orangeTeamInfosPosition.y1,
+                                    orangeTeamInfosPosition.x2,
+                                    orangeTeamInfosPosition.y2
                                   );
-                                }
-                              });
-                          }
-                        }
-                      );
-                    } else {
-                      this.sortPlayersFromGameFrame(
-                        gameIndex,
-                        {
-                          ID: 0,
-                          tags: [],
-                          date: new Date(),
-                          orangePlayers: [],
-                          bluePlayers: []
-                        },
-                        (
-                          orangePlayersNames: string[],
-                          bluePlayersNames: string[]
-                        ) => {
+
+                                  const BLUE_BLOC_IMAGE = this.cropImage(
+                                    blueTeamInfosPosition.frame!,
+                                    blueTeamInfosPosition.x1,
+                                    blueTeamInfosPosition.y1,
+                                    blueTeamInfosPosition.x2,
+                                    blueTeamInfosPosition.y2
+                                  );
+
+                                  if (ORANGE_BLOC_IMAGE && BLUE_BLOC_IMAGE) {
+                                    const ORANGE_NAMES_IMAGE =
+                                      this.getPlayersNamesAsImage(
+                                        4,
+                                        ORANGE_BLOC_IMAGE,
+                                        true
+                                      ).toDataURL();
+                                    const BLUE_NAMES_IMAGE =
+                                      this.getPlayersNamesAsImage(
+                                        4,
+                                        BLUE_BLOC_IMAGE,
+                                        false
+                                      ).toDataURL();
+
+                                    const DIALOG_WIDTH: string =
+                                      'calc(100vw - 12px * 4)';
+                                    this.dialogService
+                                      .open(ReplayCutterAttachGameDialog, {
+                                        data: {
+                                          game: this.games[gameIndex],
+                                          games: games,
+                                          images: [
+                                            ORANGE_NAMES_IMAGE,
+                                            BLUE_NAMES_IMAGE
+                                          ],
+
+                                          orangePlayersNames:
+                                            orangePlayersNames,
+                                          bluePlayersNames: bluePlayersNames
+                                        },
+                                        autoFocus: false,
+                                        width: DIALOG_WIDTH,
+                                        maxWidth: '922px'
+                                      })
+                                      .afterClosed()
+                                      .subscribe(
+                                        (gameID: number | undefined) => {
+                                          this.globalService.loading =
+                                            undefined;
+                                          if (gameID) {
+                                            this.cropGameMinimap(
+                                              gameIndex,
+                                              games.find(
+                                                (game) => game.ID == gameID
+                                              )!,
+                                              orangeTeamInfosPosition,
+                                              blueTeamInfosPosition,
+                                              ORANGE_NAMES_IMAGE,
+                                              BLUE_NAMES_IMAGE
+                                            );
+                                          }
+                                        }
+                                      );
+                                  }
+                                },
+                                orangeTeamInfosPosition.frame
+                              );
+                            }
+                          );
+                        } else {
                           this.translateService
                             .get(
                               'view.replay_cutter.toast.noGamesFoundInStatistics',
@@ -470,8 +533,8 @@ export class ReplayCutterComponent implements OnInit {
                                 });
                             });
                         }
-                      );
-                    }
+                      }
+                    );
                   }
                 });
             } else {
@@ -613,7 +676,11 @@ export class ReplayCutterComponent implements OnInit {
    */
   protected cropGameMinimap(
     gameIndex: number,
-    gameFromStatistics: RestGame
+    gameFromStatistics: RestGame,
+    orangeTeamInfosPosition: CropperPosition,
+    blueTeamInfosPosition: CropperPosition,
+    orangeNamesAsImage: string,
+    blueNamesAsImage: string
   ): void {
     const MAP_NAME = this._games[gameIndex].map;
 
@@ -622,7 +689,11 @@ export class ReplayCutterComponent implements OnInit {
       this.uploadGameMiniMap(
         gameIndex,
         this.miniMapPositionsByMap[MAP_NAME],
-        gameFromStatistics
+        gameFromStatistics,
+        orangeTeamInfosPosition,
+        blueTeamInfosPosition,
+        orangeNamesAsImage,
+        blueNamesAsImage
       );
       return;
     }
@@ -700,7 +771,11 @@ export class ReplayCutterComponent implements OnInit {
                     this.uploadGameMiniMap(
                       gameIndex,
                       miniMapPositions,
-                      gameFromStatistics
+                      gameFromStatistics,
+                      orangeTeamInfosPosition,
+                      blueTeamInfosPosition,
+                      orangeNamesAsImage,
+                      blueNamesAsImage
                     );
                   }
                 }
@@ -747,93 +822,145 @@ export class ReplayCutterComponent implements OnInit {
   private getTeamInfosPosition(
     gameIndex: number,
     color: RGB,
-    callback: Function
+    callback: Function,
+    frame?: CanvasImageSource
   ): void {
-    if (this._videoPath) {
-      const TEAM_IS_ORANGE = color.r > 255 / 2;
+    if (frame) {
+      this.getTeamInfosPosition_Step2(color, frame, callback);
+    } else if (this._videoPath) {
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
         (this._games[gameIndex].start + 1) * 1000,
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
-            let step = 0;
-
-            let top = 0;
-            let right = 0;
-            let bottom = 0;
-            let left = 0;
-
-            // We are looking for the bottom and the top.
-            const X: number = TEAM_IS_ORANGE ? 125 : 1806;
-            for (let y = videoFrame.height; y >= 0; y--) {
-              const IS_PRIMARY_COLOR = this.colorSimilarity(
-                this.getPixelColor(videoFrame, X, y),
-                color
-              );
-
-              if (IS_PRIMARY_COLOR && bottom == 0) {
-                bottom = Math.floor(y + videoFrame.height * 0.058);
-                step = 1;
-                continue;
-              }
-
-              if (
-                (!IS_PRIMARY_COLOR && step == 1) ||
-                (IS_PRIMARY_COLOR && step == 2) ||
-                (!IS_PRIMARY_COLOR && step == 3) ||
-                (IS_PRIMARY_COLOR && step == 4) ||
-                (!IS_PRIMARY_COLOR && step == 5) ||
-                (IS_PRIMARY_COLOR && step == 6) ||
-                (!IS_PRIMARY_COLOR && step == 7)
-              ) {
-                step++;
-                continue;
-              }
-
-              if (!IS_PRIMARY_COLOR && step == 8) {
-                top = y;
-                break;
-              }
-            }
-
-            // We are looking for the left and the right.
-            const Y = Math.floor(top + videoFrame.height * 0.005);
-            for (let x = 0; x < videoFrame.width / 4; x++) {
-              const IS_PRIMARY_COLOR = this.colorSimilarity(
-                this.getPixelColor(
-                  videoFrame,
-                  TEAM_IS_ORANGE ? x : videoFrame.width - x,
-                  Y
-                ),
-                color,
-                30
-              );
-
-              if (IS_PRIMARY_COLOR) {
-                if (TEAM_IS_ORANGE) {
-                  if (left == 0) {
-                    left = x;
-                  }
-                  right = x;
-                } else {
-                  if (right == 0) {
-                    right = videoFrame.width - x;
-                  }
-                  left = videoFrame.width - x;
-                }
-              }
-            }
-
-            callback({
-              x1: left,
-              y1: top,
-              x2: right,
-              y2: bottom
-            });
+            this.getTeamInfosPosition_Step2(color, videoFrame, callback);
           }
         }
       );
     }
+  }
+
+  private getPlayersNamesAsImage(
+    nbPlayers: number,
+    frame: CanvasImageSource,
+    orange: boolean
+  ): HTMLCanvasElement {
+    const SOURCE_SIZE = this.getSourceSize(frame);
+    const CANVAS = document.createElement('canvas');
+    const X1 = 0 + (orange ? SOURCE_SIZE.width * 0.24 : 0);
+    const X2 = SOURCE_SIZE.width - (!orange ? SOURCE_SIZE.width * 0.24 : 0);
+    const WIDTH = X2 - X1;
+    const SLICE_HEIGHT = (SOURCE_SIZE.height / nbPlayers) * 0.3; // The banner containing the player's nickname is 30% of its height.
+    const SLICE_SPACING = (SOURCE_SIZE.height / nbPlayers) * 0.7;
+    const CANVAS_HEIGHT = nbPlayers * SLICE_HEIGHT;
+
+    CANVAS.width = WIDTH;
+    CANVAS.height = CANVAS_HEIGHT;
+    const CTX = CANVAS.getContext('2d');
+
+    if (CTX) {
+      for (let i = 0; i < nbPlayers; i++) {
+        const SOURCE_Y = 0 + i * (SLICE_SPACING + SLICE_HEIGHT);
+        const TARGET_Y = i * SLICE_HEIGHT;
+
+        CTX.drawImage(
+          frame,
+          X1,
+          SOURCE_Y,
+          WIDTH,
+          SLICE_HEIGHT,
+          0,
+          TARGET_Y,
+          WIDTH,
+          SLICE_HEIGHT
+        );
+      }
+    }
+    return CANVAS;
+  }
+
+  private getTeamInfosPosition_Step2(
+    color: RGB,
+    frame: CanvasImageSource,
+    callback: Function
+  ): void {
+    let step = 0;
+
+    let top = 0;
+    let right = 0;
+    let bottom = 0;
+    let left = 0;
+
+    const TEAM_IS_ORANGE = color.r > 255 / 2;
+
+    // We are looking for the bottom and the top.
+    const X: number = TEAM_IS_ORANGE ? 125 : 1806;
+    for (let y = this.getSourceSize(frame).height; y >= 0; y--) {
+      const IS_PRIMARY_COLOR = this.colorSimilarity(
+        this.getPixelColor(frame, X, y),
+        color
+      );
+
+      if (IS_PRIMARY_COLOR && bottom == 0) {
+        bottom = Math.floor(y + this.getSourceSize(frame).height * 0.058);
+        step = 1;
+        continue;
+      }
+
+      if (
+        (!IS_PRIMARY_COLOR && step == 1) ||
+        (IS_PRIMARY_COLOR && step == 2) ||
+        (!IS_PRIMARY_COLOR && step == 3) ||
+        (IS_PRIMARY_COLOR && step == 4) ||
+        (!IS_PRIMARY_COLOR && step == 5) ||
+        (IS_PRIMARY_COLOR && step == 6) ||
+        (!IS_PRIMARY_COLOR && step == 7)
+      ) {
+        step++;
+        continue;
+      }
+
+      if (!IS_PRIMARY_COLOR && step == 8) {
+        top = y;
+        break;
+      }
+    }
+
+    // We are looking for the left and the right.
+    const Y = Math.floor(top + this.getSourceSize(frame).height * 0.005);
+    for (let x = 0; x < this.getSourceSize(frame).width / 4; x++) {
+      const IS_PRIMARY_COLOR = this.colorSimilarity(
+        this.getPixelColor(
+          frame,
+          TEAM_IS_ORANGE ? x : this.getSourceSize(frame).width - x,
+          Y
+        ),
+        color,
+        30
+      );
+
+      if (IS_PRIMARY_COLOR) {
+        if (TEAM_IS_ORANGE) {
+          if (left == 0) {
+            left = x;
+          }
+          right = x;
+        } else {
+          if (right == 0) {
+            right = this.getSourceSize(frame).width - x;
+          }
+          left = this.getSourceSize(frame).width - x;
+        }
+      }
+    }
+
+    callback({
+      x1: left,
+      y1: top,
+      x2: right,
+      y2: bottom,
+      frame: frame
+    });
   }
 
   /**
@@ -962,7 +1089,11 @@ export class ReplayCutterComponent implements OnInit {
   private uploadGameMiniMap(
     gameIndex: number,
     miniMapPositions: CropperPosition,
-    gameFromStatistics: RestGame
+    gameFromStatistics: RestGame,
+    orangeTeamInfosPosition: CropperPosition,
+    blueTeamInfosPosition: CropperPosition,
+    orangeNamesAsImage: string,
+    blueNamesAsImage: string
   ): void {
     if (this._videoPath) {
       // We sort the list of players in the correct order.
@@ -976,72 +1107,52 @@ export class ReplayCutterComponent implements OnInit {
           sortedOrangePlayersNames: string[],
           sortedBluePlayersNames: string[]
         ) => {
-          // We get the coordinates of the orange team's information.
-          this.globalService.loading = this.translateService.instant(
-            'view.replay_cutter.detectingOrangeInfoZone'
-          );
-          this.getTeamInfosPosition(
-            gameIndex,
-            new RGB(235, 121, 0),
-            (orangeTeamInfosPosition: CropperPosition) => {
-              // We get the coordinates of the blue team's information.
-              this.globalService.loading = this.translateService.instant(
-                'view.replay_cutter.detectingBlueInfoZone'
-              );
-              this.getTeamInfosPosition(
-                gameIndex,
-                new RGB(29, 127, 255),
-                (blueTeamInfosPosition: CropperPosition) => {
-                  this.dialogService
-                    .open(ReplayCutterCheckPlayersOrderDialog, {
-                      data: {
-                        orangePlayersNames: sortedOrangePlayersNames,
-                        bluePlayersNames: sortedBluePlayersNames,
-                        orangeTeamInfosPosition: orangeTeamInfosPosition,
-                        blueTeamInfosPosition: blueTeamInfosPosition,
-                        replayCutterComponent: this,
-                        gameIndex: gameIndex
-                      },
-                      autoFocus: false,
-                      width: '500px'
-                    })
-                    .afterClosed()
-                    .subscribe(
-                      (newData: {
-                        orangePlayersNames: string[];
-                        bluePlayersNames: string[];
-                        orangeTeamInfosPosition: CropperPosition;
-                        blueTeamInfosPosition: CropperPosition;
-                      }) => {
-                        if (newData) {
-                          const TOP_INFOS_WIDTH: number = 556;
-                          const TOP_INFOS_HEIGHT: number = 78;
-                          const TOP_INFOS_POSITION: CropperPosition = {
-                            x1: (1920 - TOP_INFOS_WIDTH) / 2,
-                            y1: 0,
-                            x2: (1920 + TOP_INFOS_WIDTH) / 2,
-                            y2: TOP_INFOS_HEIGHT
-                          };
-                          window.electronAPI.uploadGameMiniMap(
-                            this._games[gameIndex],
-                            miniMapPositions,
-                            decodeURIComponent(this._videoPath!),
-                            gameFromStatistics.ID,
-                            newData.orangeTeamInfosPosition,
-                            newData.blueTeamInfosPosition,
-                            TOP_INFOS_POSITION,
-                            newData.orangePlayersNames,
-                            newData.bluePlayersNames
-                          );
-                        } else {
-                          this.globalService.loading = undefined;
-                        }
-                      }
-                    );
+          this.dialogService
+            .open(ReplayCutterCheckPlayersOrderDialog, {
+              data: {
+                orangePlayersNames: sortedOrangePlayersNames,
+                bluePlayersNames: sortedBluePlayersNames,
+                orangeNamesAsImage: orangeNamesAsImage,
+                blueNamesAsImage: blueNamesAsImage,
+                replayCutterComponent: this,
+                gameIndex: gameIndex
+              },
+              autoFocus: false,
+              width: '500px'
+            })
+            .afterClosed()
+            .subscribe(
+              (newData: {
+                orangePlayersNames: string[];
+                bluePlayersNames: string[];
+                orangeTeamInfosPosition: CropperPosition;
+                blueTeamInfosPosition: CropperPosition;
+              }) => {
+                if (newData) {
+                  const TOP_INFOS_WIDTH: number = 556;
+                  const TOP_INFOS_HEIGHT: number = 78;
+                  const TOP_INFOS_POSITION: CropperPosition = {
+                    x1: (1920 - TOP_INFOS_WIDTH) / 2,
+                    y1: 0,
+                    x2: (1920 + TOP_INFOS_WIDTH) / 2,
+                    y2: TOP_INFOS_HEIGHT
+                  };
+                  window.electronAPI.uploadGameMiniMap(
+                    this._games[gameIndex],
+                    miniMapPositions,
+                    decodeURIComponent(this._videoPath!),
+                    gameFromStatistics.ID,
+                    newData.orangeTeamInfosPosition,
+                    newData.blueTeamInfosPosition,
+                    TOP_INFOS_POSITION,
+                    newData.orangePlayersNames,
+                    newData.bluePlayersNames
+                  );
+                } else {
+                  this.globalService.loading = undefined;
                 }
-              );
-            }
-          );
+              }
+            );
         }
       );
     }

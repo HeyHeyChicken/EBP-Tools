@@ -96,7 +96,8 @@
           "tags": "Tags",
           "players": "Players",
           "date": "Date",
-          "changeFrame": "Change the image"
+          "changeFrame": "Change the image",
+          "description": "Please link the replay to a game listed on the <a>EBP statistics</a> page.<br />If it doesn’t exist, please <b>create it</b>."
         }
       },
       "inputOfficialFile": "Click here to manually cut your official video file"

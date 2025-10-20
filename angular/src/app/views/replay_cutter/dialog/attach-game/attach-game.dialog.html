@@ -16,8 +16,17 @@ See LICENSE for terms. Unauthorized use is prohibited.
 </h2>
 <mat-dialog-content>
   <ebp-row>
-    <ebp-column [xs]="12">
-      <img src="{{data.image}}" />
+    <ebp-column
+      [xs]="12"
+      class="description"
+      (click)="clickOnDescription($event)"
+      innerHTML="{{ 'view.replay_cutter.dialog.attach-game.description' | translate }}"
+    ></ebp-column>
+    <ebp-column [xs]="6">
+      <img class="ml-auto d-block" src="{{data.images[0]}}" />
+    </ebp-column>
+    <ebp-column [xs]="6">
+      <img src="{{data.images[1]}}" />
     </ebp-column>
     <ebp-column [xs]="12">
       <table>

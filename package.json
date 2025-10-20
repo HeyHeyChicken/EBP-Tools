@@ -1,6 +1,6 @@
 {
     "name": "ebp-tools",
-    "version": "1.6.34",
+    "version": "1.6.35",
     "description": "",
     "main": ".webpack/main",
     "scripts": {

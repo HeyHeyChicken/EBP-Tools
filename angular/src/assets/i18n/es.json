@@ -96,7 +96,8 @@
           "tags": "Etiquetas",
           "players": "Jugadores",
           "date": "Fecha",
-          "changeFrame": "Cambiar la imagen"
+          "changeFrame": "Cambiar la imagen",
+          "description": "Asocie la repetición a una partida presente en la página de <a>estadísticas de EBP</a>.<br />Si no existe, por favor <b>créela</b>."
         }
       },
       "inputOfficialFile": "Haga clic aquí para cortar manualmente su archivo de video oficial"

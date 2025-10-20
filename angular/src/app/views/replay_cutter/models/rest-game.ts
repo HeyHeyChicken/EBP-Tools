@@ -7,7 +7,7 @@ export interface RestGame {
 
   ID: number;
   tags: string[];
-  date: Date;
+  date: string;
   orangePlayers: string[];
   bluePlayers: string[];
 
