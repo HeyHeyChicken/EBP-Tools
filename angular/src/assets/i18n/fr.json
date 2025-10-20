@@ -15,8 +15,7 @@
     },
     "replay_cutter": {
       "inputTrainingFile": "Cliquez ici pour découper automatiquement votre fichier vidéo d’entraînement",
-      "videoIsBeingAnalyzed": "<b>Étape 1 / 2 :</b> La vidéo est en cours d'analyse, veuillez patienter ...<br/>Nombre de parties trouvés: <b>{{games}}</b>",
-      "correctionImageGeneration": "<b>Étape 2 / 2 :</b> Les images de correction sont en cours de génération, veuillez patienter ...",
+      "videoIsBeingAnalyzed": "La vidéo est en cours d'analyse, veuillez patienter ...<br/>Nombre de parties trouvés: <b>{{games}}</b>",
       "saveAll": "Enregistrer les games sélectionnées",
       "copyTimecodes": "Copier les timecodes des games sélectionnées",
       "map": "Carte",

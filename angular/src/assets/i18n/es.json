@@ -15,8 +15,7 @@
     },
     "replay_cutter": {
       "inputTrainingFile": "Haga clic aquí para cortar automáticamente su archivo de video de entrenamiento",
-      "videoIsBeingAnalyzed": "<b>Paso 1 / 2:</b> El vídeo se está analizando, por favor espere...<br/>Número de partes encontradas: <b>{{games}}</b>",
-      "correctionImageGeneration": "<b>Paso 2 / 2:</b> Se están generando las imágenes de corrección, por favor espere...",
+      "videoIsBeingAnalyzed": "El vídeo se está analizando, por favor espere...<br/>Número de partes encontradas: <b>{{games}}</b>",
       "saveAll": "Guardar juegos seleccionados",
       "copyTimecodes": "Copiar códigos de tiempo de juegos seleccionados",
       "map": "Mapa",

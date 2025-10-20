@@ -15,8 +15,7 @@
     },
     "replay_cutter": {
       "inputTrainingFile": "Klicken Sie hier, um Ihre Trainingsvideodatei automatisch zu schneiden",
-      "videoIsBeingAnalyzed": "<b>Schritt 1 / 2:</b> Das Video wird analysiert, bitte warten...<br/>Anzahl gefundener Teile: <b>{{games}}</b>",
-      "correctionImageGeneration": "<b>Schritt 2 / 2:</b> Korrekturbilder werden erstellt, bitte warten...",
+      "videoIsBeingAnalyzed": "Das Video wird analysiert, bitte warten...<br/>Anzahl gefundener Teile: <b>{{games}}</b>",
       "saveAll": "Ausgewählte Spiele speichern",
       "copyTimecodes": "Zeitstempel der ausgewählten Spiele kopieren",
       "map": "Karte",

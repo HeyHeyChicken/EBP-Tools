@@ -15,8 +15,7 @@
     },
     "replay_cutter": {
       "inputTrainingFile": "Faceți clic aici pentru a tăia automat fișierul video de antrenament",
-      "videoIsBeingAnalyzed": "<b>Pasul 1 / 2:</b> Videoclipul este în curs de analiză, vă rugăm să așteptați...<br/>Numărul de părți găsite: <b>{{games}}</b>",
-      "correctionImageGeneration": "<b>Pasul 2 / 2:</b> Imaginile de corecție sunt în curs de generare, vă rugăm să așteptați...",
+      "videoIsBeingAnalyzed": "Videoclipul este în curs de analiză, vă rugăm să așteptați...<br/>Numărul de părți găsite: <b>{{games}}</b>",
       "saveAll": "Salvează jocurile selectate",
       "copyTimecodes": "Copiază codurile de timp ale jocurilor selectate",
       "map": "Hartă",

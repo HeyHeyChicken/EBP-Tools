@@ -1259,58 +1259,6 @@ export class ReplayCutterComponent implements OnInit {
                       }
                     }
 
-                    // const ORANGE_PLAYER_1 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   259,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   282,
-                    //   7
-                    // );
-                    // if (ORANGE_PLAYER_1) {
-                    //   GAME.orangeTeam.players.push(new Player(1, ORANGE_PLAYER_1));
-                    // }
-
-                    // const ORANGE_PLAYER_2 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   312,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   335,
-                    //   7
-                    // );
-                    // if (ORANGE_PLAYER_2) {
-                    //   GAME.orangeTeam.players.push(new Player(2, ORANGE_PLAYER_2));
-                    // }
-
-                    // const ORANGE_PLAYER_3 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   365,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   388,
-                    //   7
-                    // );
-                    // if (ORANGE_PLAYER_3) {
-                    //   GAME.orangeTeam.players.push(new Player(3, ORANGE_PLAYER_3));
-                    // }
-
-                    // const ORANGE_PLAYER_4 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   418,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   441,
-                    //   7
-                    // );
-                    // if (ORANGE_PLAYER_4) {
-                    //   GAME.orangeTeam.players.push(new Player(4, ORANGE_PLAYER_4));
-                    // }
-
                     //#endregion
 
                     //#region Blue team
@@ -1361,59 +1309,42 @@ export class ReplayCutterComponent implements OnInit {
                       }
                     }
 
-                    // const BLUE_PLAYER_1 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   712,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   735,
-                    //   7
-                    // );
-                    // if (BLUE_PLAYER_1) {
-                    //   GAME.blueTeam.players.push(new Player(6, BLUE_PLAYER_1));
-                    // }
-
-                    // const BLUE_PLAYER_2 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   765,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   788,
-                    //   7
-                    // );
-                    // if (BLUE_PLAYER_2) {
-                    //   GAME.blueTeam.players.push(new Player(7, BLUE_PLAYER_2));
-                    // }
-
-                    // const BLUE_PLAYER_3 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   818,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   841,
-                    //   7
-                    // );
-                    // if (BLUE_PLAYER_3) {
-                    //   GAME.blueTeam.players.push(new Player(8, BLUE_PLAYER_3));
-                    // }
-
-                    // const BLUE_PLAYER_4 /* string */ = await getTextFromImage(
-                    //   VIDEO,
-                    //   document.tesseractWorker,
-                    //   PLAYER_NAME_X,
-                    //   871,
-                    //   PLAYER_NAME_X + PLAYER_NAME_MAX_WIDTH,
-                    //   894,
-                    //   7
-                    // );
-                    // if (BLUE_PLAYER_4) {
-                    //   GAME.blueTeam.players.push(new Player(9, BLUE_PLAYER_4));
-                    // }
-
                     //#endregion
+
+                    const FRAME = this.videoToCanvas(VIDEO);
+                    if (FRAME) {
+                      GAME.orangeTeam.scoreImage = this.cropImage(
+                        FRAME,
+                        MODES[MODE].scoreFrame.orangeScore[0].x,
+                        MODES[MODE].scoreFrame.orangeScore[0].y,
+                        MODES[MODE].scoreFrame.orangeScore[1].x,
+                        MODES[MODE].scoreFrame.orangeScore[1].y
+                      )?.toDataURL();
+
+                      GAME.orangeTeam.nameImage = this.cropImage(
+                        FRAME,
+                        MODES[MODE].scoreFrame.orangeName[0].x,
+                        MODES[MODE].scoreFrame.orangeName[0].y,
+                        MODES[MODE].scoreFrame.orangeName[1].x,
+                        MODES[MODE].scoreFrame.orangeName[1].y
+                      )?.toDataURL();
+
+                      GAME.blueTeam.scoreImage = this.cropImage(
+                        FRAME,
+                        MODES[MODE].scoreFrame.blueScore[0].x,
+                        MODES[MODE].scoreFrame.blueScore[0].y,
+                        MODES[MODE].scoreFrame.blueScore[1].x,
+                        MODES[MODE].scoreFrame.blueScore[1].y
+                      )?.toDataURL();
+
+                      GAME.blueTeam.nameImage = this.cropImage(
+                        FRAME,
+                        MODES[MODE].scoreFrame.blueName[0].x,
+                        MODES[MODE].scoreFrame.blueName[0].y,
+                        MODES[MODE].scoreFrame.blueName[1].x,
+                        MODES[MODE].scoreFrame.blueName[1].y
+                      )?.toDataURL();
+                    }
 
                     this._games.unshift(GAME);
 
@@ -1556,6 +1487,18 @@ export class ReplayCutterComponent implements OnInit {
                       const MAP_NAME /* string */ =
                         this.getMapByName(TEXT)?.name ?? '';
                       this._games[0].map = MAP_NAME;
+
+                      const FRAME = this.videoToCanvas(VIDEO);
+                      if (FRAME) {
+                        this._games[0].orangeTeam.scoreImage = this.cropImage(
+                          FRAME,
+                          MODES[this._games[0].mode].gameFrame.map[0].x,
+                          MODES[this._games[0].mode].gameFrame.map[0].y,
+                          MODES[this._games[0].mode].gameFrame.map[1].x,
+                          MODES[this._games[0].mode].gameFrame.map[1].y
+                        )?.toDataURL();
+                      }
+
                       console.log('----- ', this._games[0].map);
                     }
                   }
@@ -1861,85 +1804,11 @@ export class ReplayCutterComponent implements OnInit {
           });
         });
     }
-    this.getGamesDebugImages(games, () => {
-      this.percent = -1;
-      console.log(this._games);
-      this.videoOldTime = undefined;
-      window.electronAPI.removeNotification(true);
-      this.globalService.loading = undefined;
-    });
-  }
-
-  private getGamesDebugImages(
-    games: Game[],
-    callback: Function,
-    index: number = 0
-  ): void {
-    this.translateService
-      .get('view.replay_cutter.correctionImageGeneration')
-      .subscribe((translated: string) => {
-        this.notificationService.sendMessage({
-          percent: (index / games.length) * 100,
-          infinite: false,
-          icon: undefined,
-          text: translated
-        });
-      });
-
-    this.getGameCroppedFrame(
-      (games[index].start + 10) * 1000,
-      MODES[games[index].mode].gameFrame.map[0].x,
-      MODES[games[index].mode].gameFrame.map[0].y,
-      MODES[games[index].mode].gameFrame.map[1].x,
-      MODES[games[index].mode].gameFrame.map[1].y
-    ).then((image) => {
-      games[index].mapImage = image;
-
-      this.videoURLToCanvas(
-        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        (games[index].end - 1) * 1000,
-        (videoFrame?: HTMLCanvasElement) => {
-          if (videoFrame) {
-            games[index].orangeTeam.scoreImage = this.cropImage(
-              videoFrame,
-              MODES[games[index].mode].scoreFrame.orangeScore[0].x,
-              MODES[games[index].mode].scoreFrame.orangeScore[0].y,
-              MODES[games[index].mode].scoreFrame.orangeScore[1].x,
-              MODES[games[index].mode].scoreFrame.orangeScore[1].y
-            )?.toDataURL();
-
-            games[index].orangeTeam.nameImage = this.cropImage(
-              videoFrame,
-              MODES[games[index].mode].scoreFrame.orangeName[0].x,
-              MODES[games[index].mode].scoreFrame.orangeName[0].y,
-              MODES[games[index].mode].scoreFrame.orangeName[1].x,
-              MODES[games[index].mode].scoreFrame.orangeName[1].y
-            )?.toDataURL();
-
-            games[index].blueTeam.scoreImage = this.cropImage(
-              videoFrame,
-              MODES[games[index].mode].scoreFrame.blueScore[0].x,
-              MODES[games[index].mode].scoreFrame.blueScore[0].y,
-              MODES[games[index].mode].scoreFrame.blueScore[1].x,
-              MODES[games[index].mode].scoreFrame.blueScore[1].y
-            )?.toDataURL();
-
-            games[index].blueTeam.nameImage = this.cropImage(
-              videoFrame,
-              MODES[games[index].mode].scoreFrame.blueName[0].x,
-              MODES[games[index].mode].scoreFrame.blueName[0].y,
-              MODES[games[index].mode].scoreFrame.blueName[1].x,
-              MODES[games[index].mode].scoreFrame.blueName[1].y
-            )?.toDataURL();
-          }
-          if (index < games.length - 1) {
-            this.getGamesDebugImages(games, callback, index + 1);
-          } else {
-            callback();
-          }
-        }
-      );
-    });
+    this.percent = -1;
+    console.log(this._games);
+    this.videoOldTime = undefined;
+    window.electronAPI.removeNotification(true);
+    this.globalService.loading = undefined;
   }
 
   /**

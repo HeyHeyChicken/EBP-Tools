@@ -194,6 +194,50 @@ export const MODES = [
       new Position(1037, 653),
       new Position(958, 610)
     )
+  ),
+
+  //#endregion
+
+  //#region Mode 4
+
+  new Mode(
+    new ScoreFrame(
+      new Position(314, 157), // orangeLogo
+      new Position(299, 621), // blueLogo
+      [new Position(390, 187), new Position(620, 217)], // orangeName
+      [new Position(390, 637), new Position(620, 667)], // blueName
+      [new Position(530, 89), new Position(620, 127)], // orangeScore
+      [new Position(1285, 89), new Position(1384, 127)] // blueScore
+    ),
+    new EndFrame(
+      [new Position(636, 545), new Position(903, 648)], // orangeScore
+      [new Position(996, 545), new Position(1257, 648)] // blueScore
+    ),
+    new GameFrame(
+      [118, 1801], // playersX
+      [new Position(825, 79), new Position(1093, 99)], // map
+      [new Position(686, 22), new Position(833, 68)], // orangeName
+      [new Position(1087, 22), new Position(1226, 68)], // blueName
+      [new Position(935, 0), new Position(985, 28)], // timer
+      [127, 384], // orangePlayersX
+      [1541, 1799], // bluePlayersX
+      [
+        [732, 755],
+        [814, 838],
+        [898, 921],
+        [980, 1004]
+      ] // playersY
+    ),
+    new LoadingFrame(
+      new Position(958, 427),
+      new Position(857, 653),
+      new Position(1060, 653),
+      new Position(958, 642),
+      new Position(958, 463),
+      new Position(880, 653),
+      new Position(1037, 653),
+      new Position(958, 610)
+    )
   )
 
   //#endregion
