@@ -50,6 +50,7 @@ import { KillFeedService } from './services/kill-feed.service';
 import { ReplayCutterEditMapDialog } from './dialog/edit-map/edit-map.dialog';
 import { NotificationService } from '../notification/services/notification.service';
 import { HeaderService } from '../../shared/header/services/header.service';
+import { CropperPositionAndFrame } from './models/CropperPosition';
 
 //#endregion
 @Component({
@@ -414,7 +415,9 @@ export class ReplayCutterComponent implements OnInit {
                           this.getTeamInfosPosition(
                             gameIndex,
                             new RGB(235, 121, 0),
-                            (orangeTeamInfosPosition: CropperPosition) => {
+                            (
+                              orangeTeamInfosPosition: CropperPositionAndFrame
+                            ) => {
                               // We get the coordinates of the blue team's information.
                               this.globalService.loading =
                                 this.translateService.instant(
@@ -423,7 +426,9 @@ export class ReplayCutterComponent implements OnInit {
                               this.getTeamInfosPosition(
                                 gameIndex,
                                 new RGB(29, 127, 255),
-                                (blueTeamInfosPosition: CropperPosition) => {
+                                (
+                                  blueTeamInfosPosition: CropperPositionAndFrame
+                                ) => {
                                   const ORANGE_BLOC_IMAGE = this.cropImage(
                                     orangeTeamInfosPosition.frame!,
                                     orangeTeamInfosPosition.x1,
