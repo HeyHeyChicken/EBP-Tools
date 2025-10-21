@@ -19,18 +19,23 @@ module.exports = {
             './binaries/yt-dlp/'
         ],
         icon: 'electron/assets/icon',
-        name: 'EBP - EVA Battle Plan - Tools',
-        osxSign: {
-            identity: 'Developer ID Application: Antoine Duval (5DQ59NSHNB)',
-            hardenedRuntime: true,
-            entitlements: 'build/entitlements.plist',
-            'entitlements-inherit': 'build/entitlements.plist'
-        },
-        osxNotarize: {
-            appleId: process.env.APPLE_ID,
-            appleIdPassword: process.env.APPLE_PASSWORD,
-            teamId: process.env.APPLE_TEAM_ID
-        }
+        name: 'EBP - Tools',
+        osxSign: process.env.SKIP_NOTARIZATION
+            ? false
+            : {
+                  identity:
+                      'Developer ID Application: Antoine Duval (5DQ59NSHNB)',
+                  hardenedRuntime: true,
+                  entitlements: 'build/entitlements.plist',
+                  'entitlements-inherit': 'build/entitlements.plist'
+              },
+        osxNotarize: process.env.SKIP_NOTARIZATION
+            ? false
+            : {
+                  appleId: process.env.APPLE_ID,
+                  appleIdPassword: process.env.APPLE_PASSWORD,
+                  teamId: process.env.APPLE_TEAM_ID
+              }
     },
     rebuildConfig: {},
     makers: [
@@ -39,7 +44,7 @@ module.exports = {
             name: '@electron-forge/maker-squirrel',
             config: {
                 setupIcon: './electron/assets/icon.ico',
-                description: 'EBP - EVA Battle Plan - Tools'
+                description: 'EBP - Tools'
             }
         },
         {
@@ -68,7 +73,7 @@ module.exports = {
                 window: {
                     size: {
                         width: 660,
-                        height: 400
+                        height: 500
                     }
                 }
             }
