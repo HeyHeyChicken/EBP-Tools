@@ -3,148 +3,160 @@
 # See LICENSE for terms. Unauthorized use is prohibited.
 
 permissions:
-  contents: write
+    contents: write
 
-name: Build the Windows binary
+name: Build Windows and macOS binaries
 
 # The CICD will be launched for each tag created.
 on:
-  push:
-    tags:
-      - "*"
+    push:
+        tags:
+            - '*'
 
 jobs:
-  # Run Jest tests.
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      # Clone the repository.
-      - uses: actions/checkout@v3
-      # Install Node.js.
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      # Install NPM dependencies.
-      - name: Install Node dependencies
-        run: npm run install_npm
-      # Run Jest tests.
-      - name: Run tests
-        run: npm test
+    # Run Jest tests.
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            # Clone the repository.
+            - uses: actions/checkout@v3
+            # Install Node.js.
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+            # Install NPM dependencies.
+            - name: Install Node dependencies
+              run: npm run install_npm
+            # Run Jest tests.
+            - name: Run tests
+              run: npm test
 
-  # Create the MacOS version of the application.
-  #build-macos:
-  #  runs-on: self-hosted
-  #  needs: [test]
-  #  env:
-  #    APPLE_ID: ${{ secrets.APPLE_ID }}
-  #    APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-  #    APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-  #  steps:
-  #    # Clone the repository.
-  #    - uses: actions/checkout@v3
-  #    # Install Node.js.
-  #    - name: Setup Node.js
-  #      uses: actions/setup-node@v4
-  #      with:
-  #        node-version: "20"
-  #    # Install NPM dependencies.
-  #    - name: Install Node dependencies
-  #      run: npm run install_npm
-  #    # Building Angular and making the Electron application.
-  #    - name: Build Electron app
-  #      run: npm run make
-  #    # Rename the created binary.
-  #    - name: Rename .dmg
-  #      run: |
-  #        file=$(find out/make -type f -name "*.dmg" | head -n 1)
-  #        mv "$file" out/make/macos.dmg
-  #    # Upload the created binary.
-  #    - name: Upload artifact
-  #      uses: actions/upload-artifact@v4
-  #      with:
-  #        name: macos
-  #        path: out/make/*.dmg
-
-  # Create the Windows version of the application.
-  build-windows:
-    runs-on: windows-latest
-    needs: [test]
-    steps:
-      # Clone the repository.
-      - uses: actions/checkout@v3
-      # Install Node.js.
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      # Install NPM dependencies.
-      - name: Install Node dependencies
-        run: npm run install_npm
-      # Building Angular and making the Electron application.
-      - name: Build Electron app
-        run: npm run make
-      # Rename the created binary.
-      - name: Rename .exe
-        run: |
-          $file = Get-ChildItem -Path "out/make/squirrel.windows/x64/" -Filter *.exe | Select-Object -First 1
-          Rename-Item -Path $file.FullName -NewName "windows.exe"
-      # Upload the created binary.
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: out/make/squirrel.windows/x64/*.exe
-
-  # Deploy the new version.
-  deploy-builds:
-    runs-on: ubuntu-latest
-    needs: [build-windows]
-    steps:
-      # Retrieve the version number of the application.
-      - name: Get version
-        id: get_version
-        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-      # Download the MacOS binary created from the latest job.
-      #- name: Download macos artifact
-      #  uses: actions/download-artifact@v4
-      #  with:
-      #    name: macos
-      #    path: ./release
-      # Download the Windows binary created from the latest job.
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: windows
-          path: ./release
-      # Create a GitHub release.
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
+    # Create the MacOS version of the application.
+    build-macos:
+        runs-on: macos-latest
+        needs: [test]
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
-          draft: false
-          prerelease: false
-      # Add the MacOS binary to the GitHub release.
-      #- name: Upload MacOS asset
-      #  uses: actions/upload-release-asset@v1
-      #  env:
-      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #  with:
-      #    upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #    asset_path: ./release/macos.dmg
-      #    asset_name: MacOS-EBP-Tools-Installer.dmg
-      #    asset_content_type: application/octet-stream
-      # Add the Windows binary to the GitHub release.
-      - name: Upload Windows asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/windows.exe
-          asset_name: Windows-EBP-Tools-Installer.exe
-          asset_content_type: application/octet-stream
+            APPLE_ID: ${{ secrets.APPLE_ID }}
+            APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+            APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        steps:
+            # Clone the repository.
+            - uses: actions/checkout@v3
+
+            # Import Apple certificate
+            - name: Import Code-Signing Certificates
+              uses: Apple-Actions/import-codesign-certs@v1
+              with:
+                  p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
+                  p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+            # Install Node.js.
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+
+            # Install NPM dependencies.
+            - name: Install Node dependencies
+              run: npm run install_npm
+
+            # Building Angular and making the Electron application.
+            - name: Build Electron app
+              run: npm run make
+
+            # Rename the created binary.
+            - name: Rename .dmg
+              run: |
+                  file=$(find out/make -type f -name "*.dmg" | head -n 1)
+                  mv "$file" out/make/macos.dmg
+
+            # Upload the created binary.
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: macos
+                  path: out/make/*.dmg
+
+    # Create the Windows version of the application.
+    build-windows:
+        runs-on: windows-latest
+        needs: [test]
+        steps:
+            # Clone the repository.
+            - uses: actions/checkout@v3
+            # Install Node.js.
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+            # Install NPM dependencies.
+            - name: Install Node dependencies
+              run: npm run install_npm
+            # Building Angular and making the Electron application.
+            - name: Build Electron app
+              run: npm run make
+            # Rename the created binary.
+            - name: Rename .exe
+              run: |
+                  $file = Get-ChildItem -Path "out/make/squirrel.windows/x64/" -Filter *.exe | Select-Object -First 1
+                  Rename-Item -Path $file.FullName -NewName "windows.exe"
+            # Upload the created binary.
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: windows
+                  path: out/make/squirrel.windows/x64/*.exe
+
+    # Deploy the new version.
+    deploy-builds:
+        runs-on: ubuntu-latest
+        needs: [build-windows, build-macos]
+        steps:
+            # Retrieve the version number of the application.
+            - name: Get version
+              id: get_version
+              run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            # Download the MacOS binary created from the latest job.
+            - name: Download macos artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: macos
+                  path: ./release
+            # Download the Windows binary created from the latest job.
+            - name: Download Windows artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: windows
+                  path: ./release
+            # Create a GitHub release.
+            - name: Create GitHub Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ steps.get_version.outputs.version }}
+                  release_name: Release ${{ steps.get_version.outputs.version }}
+                  draft: false
+                  prerelease: false
+            # Add the MacOS binary to the GitHub release.
+            - name: Upload MacOS asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./release/macos.dmg
+                  asset_name: MacOS-EBP-Tools-Installer.dmg
+                  asset_content_type: application/octet-stream
+            # Add the Windows binary to the GitHub release.
+            - name: Upload Windows asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./release/windows.exe
+                  asset_name: Windows-EBP-Tools-Installer.exe
+                  asset_content_type: application/octet-stream
