@@ -136,6 +136,10 @@
       },
       "upscaling": {
         "description": "Il tuo replay è in fase di adattamento alla risoluzione. Attendere prego…"
+      },
+      "replay_downloader": {
+        "fetching": "Le informazioni del video sono in fase di recupero…",
+        "downloading": "Il video è in fase di download..."
       }
     },
     "replay_downloader": {

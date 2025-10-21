@@ -136,6 +136,10 @@
       },
       "upscaling": {
         "description": "Votre replay est en cours d'adaptation de résolution. Merci de patienter...."
+      },
+      "replay_downloader": {
+        "fetching": "Les informations de la vidéo sont en cours de récupération...",
+        "downloading": "La vidéo est en cours de téléchargement..."
       }
     },
     "replay_downloader": {

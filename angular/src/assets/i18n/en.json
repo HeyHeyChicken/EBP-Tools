@@ -136,6 +136,10 @@
       },
       "upscaling": {
         "description": "Your replay is being adjusted for resolution. Please wait…"
+      },
+      "replay_downloader": {
+        "fetching": "Video information is being retrieved…",
+        "downloading": "The video is downloading..."
       }
     },
     "replay_downloader": {

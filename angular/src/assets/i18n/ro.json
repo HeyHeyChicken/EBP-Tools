@@ -136,6 +136,10 @@
       },
       "upscaling": {
         "description": "Replay-ul tău este în curs de adaptare a rezoluției. Te rugăm să aștepți…"
+      },
+      "replay_downloader": {
+        "fetching": "Informațiile videoclipului sunt în curs de preluare…",
+        "downloading": "Videoclipul se descarcă..."
       }
     },
     "replay_downloader": {

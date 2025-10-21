@@ -136,6 +136,10 @@
       },
       "upscaling": {
         "description": "Tu repetición se está ajustando a la resolución. Por favor, espera…"
+      },
+      "replay_downloader": {
+        "fetching": "La información del video se está recuperando…",
+        "downloading": "El video se está descargando..."
       }
     },
     "replay_downloader": {

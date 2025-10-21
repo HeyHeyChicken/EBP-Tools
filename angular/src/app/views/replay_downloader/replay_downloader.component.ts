@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component, NgZone, OnInit } from '@angular/core';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { GridModule } from '../../shared/grid/grid.module';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
@@ -15,6 +15,7 @@ import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
 import { VideoPlatform } from '../../../models/video-platform.enum';
 import { MessageComponent } from '../../shared/message/message.component';
+import { NotificationService } from '../notification/services/notification.service';
 
 //#endregion
 
@@ -36,7 +37,7 @@ import { MessageComponent } from '../../shared/message/message.component';
 export class ReplayDownloaderComponent implements OnInit {
   //#region Attributes
 
-  protected youTubeURL?: string;
+  protected youTubeURL?: string; // https://www.youtube.com/watch?v=UKVDSvhIRM8
   protected twitchURL?: string;
   protected outputPath: string | undefined;
   protected percent?: number;
@@ -46,7 +47,9 @@ export class ReplayDownloaderComponent implements OnInit {
   constructor(
     protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
-    private readonly ngZone: NgZone
+    private readonly ngZone: NgZone,
+    private readonly translateService: TranslateService,
+    private readonly notificationService: NotificationService
   ) {}
 
   //#region Functions
@@ -62,7 +65,9 @@ export class ReplayDownloaderComponent implements OnInit {
       this.ngZone.run(() => {
         this.percent = undefined;
         if (error) {
+          this.globalService.loading = undefined;
           this.toastrService.error(error);
+          window.electronAPI.removeNotification(true);
         }
       });
     });
@@ -71,9 +76,11 @@ export class ReplayDownloaderComponent implements OnInit {
       this.ngZone.run(() => {
         this.percent = undefined;
         if (videoPath) {
+          this.globalService.loading = undefined;
           this.toastrService.success(videoPath).onTap.subscribe(() => {
             window.electronAPI.openFile(videoPath);
           });
+          window.electronAPI.removeNotification(true);
         }
       });
     });
@@ -81,6 +88,22 @@ export class ReplayDownloaderComponent implements OnInit {
     window.electronAPI.replayDownloaderPercent((percent: number) => {
       this.ngZone.run(() => {
         this.percent = percent;
+
+        this.globalService.loading = '';
+
+        this.translateService
+          .get('view.notification.replay_downloader.downloading')
+          .subscribe((translated: string) => {
+            this.notificationService.sendMessage({
+              percent: percent,
+              infinite: percent == 100,
+              icon:
+                percent == 100
+                  ? 'fa-sharp fa-solid fa-clapperboard-play'
+                  : undefined,
+              text: translated
+            });
+          });
       });
     });
   }
@@ -102,22 +125,13 @@ export class ReplayDownloaderComponent implements OnInit {
       });
   }
 
-  private cleanYouTubeURL(url: string): string {
-    const URL_OBJ = new URL(url);
-    const VIDEO_ID = URL_OBJ.searchParams.get('v');
-    if (VIDEO_ID) {
-      return `https://www.youtube.com/watch?v=${VIDEO_ID}`;
-    }
-    return url;
-  }
-
   protected onDownloadYouTube(): void {
     if (this.youTubeURL) {
       if (this.isYouTubeUrl(this.youTubeURL)) {
         this.percent = 0;
         const cleanUrl = this.cleanYouTubeURL(this.youTubeURL);
         window.electronAPI.downloadReplay(cleanUrl, VideoPlatform.YOUTUBE);
-        this.youTubeURL = undefined;
+        this.showNotification();
       }
     }
   }
@@ -127,9 +141,41 @@ export class ReplayDownloaderComponent implements OnInit {
       if (this.isTwitchUrl(this.twitchURL)) {
         this.percent = 0;
         window.electronAPI.downloadReplay(this.twitchURL, VideoPlatform.TWITCH);
-        this.twitchURL = undefined;
+        this.showNotification();
       }
     }
+  }
+
+  private cleanYouTubeURL(url: string): string {
+    const URL_OBJ = new URL(url);
+    const VIDEO_ID = URL_OBJ.searchParams.get('v');
+    if (VIDEO_ID) {
+      return `https://www.youtube.com/watch?v=${VIDEO_ID}`;
+    }
+    return url;
+  }
+
+  private showNotification() {
+    this.youTubeURL = undefined;
+    this.twitchURL = undefined;
+
+    this.globalService.loading = '';
+
+    this.translateService
+      .get('view.notification.replay_downloader.fetching')
+      .subscribe((translated: string) => {
+        window.electronAPI.showNotification(
+          true,
+          500,
+          150,
+          JSON.stringify({
+            percent: 0,
+            infinite: true,
+            icon: 'fa-sharp fa-solid fa-clapperboard-play',
+            text: translated
+          })
+        );
+      });
   }
 
   private isYouTubeUrl(url: string): boolean {
