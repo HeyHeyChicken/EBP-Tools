@@ -103,7 +103,6 @@
       "inputOfficialFile": "Cliquez ici pour découper manuellement votre fichier vidéo officiel"
     },
     "game_history": {
-      "title": "Exportez l'historique de vos parties",
       "step": "Étape",
       "pages": "Pages",
       "pagesExplanations": "Nombre de pages à exporter",
@@ -127,7 +126,9 @@
           "li3": "Redémarrez \"Tools\".",
           "p3": "Si vous avez exporté un grand nombre de games, patientez 15 minutes avant de relancer un export."
         }
-      }
+      },
+      "intro": "Exportez l'historique de vos parties au format Excel depuis EVA.",
+      "loginAndexport": "Connexion & export"
     },
     "notification": {
       "manual-cutting": {
@@ -136,6 +137,9 @@
       "upscaling": {
         "description": "Votre replay est en cours d'adaptation de résolution. Merci de patienter...."
       }
+    },
+    "replay_downloader": {
+      "intro": "Téléchargez ici vos replays depuis YouTube ou Twitch."
     }
   },
   "shared": {

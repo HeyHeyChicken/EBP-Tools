@@ -16,6 +16,7 @@ import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
 import { MatDialog } from '@angular/material/dialog';
 import { ConfirmationDialog } from './dialog/confirmation/confirmation.dialog';
+import { MessageComponent } from '../../shared/message/message.component';
 
 //#endregion
 
@@ -32,7 +33,8 @@ import { ConfirmationDialog } from './dialog/confirmation/confirmation.dialog';
     MatInputModule,
     FormsModule,
     MatTooltipModule,
-    MatSelectModule
+    MatSelectModule,
+    MessageComponent
   ]
 })
 export class GameHistoryComponent implements OnInit {

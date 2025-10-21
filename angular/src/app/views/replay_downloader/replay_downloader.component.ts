@@ -14,6 +14,7 @@ import { CommonModule } from '@angular/common';
 import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
 import { VideoPlatform } from '../../../models/video-platform.enum';
+import { MessageComponent } from '../../shared/message/message.component';
 
 //#endregion
 
@@ -28,7 +29,8 @@ import { VideoPlatform } from '../../../models/video-platform.enum';
     MatInputModule,
     FormsModule,
     LoaderComponent,
-    CommonModule
+    CommonModule,
+    MessageComponent
   ]
 })
 export class ReplayDownloaderComponent implements OnInit {

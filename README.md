@@ -4,7 +4,7 @@
 
 ## 👋 Introduction
 
-**EBP - EVA Battle Plan - Tools** is a source-visible toolbox for [EVA](//www.eva.gg) players.<br/>
+**EBP - Tools** is a source-visible toolbox for [EVA](//www.eva.gg) players.<br/>
 
 💼 Features:
 
@@ -24,7 +24,7 @@ Feel free to take a look at the [developer wiki](//github.com/HeyHeyChicken/EBP-
 
 ## 💻 Compatibility
 
-EBP - EVA Battle Plan - Tools has only been officially tested on Windows and Mac.
+EBP - Tools has only been officially tested on Windows and Mac.
 
 <br>
 <br>

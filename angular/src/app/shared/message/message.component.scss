@@ -13,11 +13,11 @@
   padding: variables.$margin;
   position: relative;
   text-align: left;
-  max-width: calc(100% - #{variables.$margin} * 8);
+  max-width: calc(100% - #{variables.$margin} * 7);
 
   &:not(.friend) {
     background: variables.$main_color;
-    transform: translateX(calc(#{variables.$margin} * -3));
+    transform: translateX(-30px);
 
     &:before {
       border-width: variables.$margin 0 0 variables.$margin;

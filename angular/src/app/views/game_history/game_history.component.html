@@ -8,8 +8,10 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <ebp-row>
     <ebp-column></ebp-column>
     <ebp-column [xs]="7">
+      <ebp-message class="mb-2">
+        {{ 'view.game_history.intro' | translate }}
+      </ebp-message>
       <div class="box">
-        <h3 class="m-0 mb-1">{{ 'view.game_history.title' | translate }}</h3>
         <div class="d-flex">
           <p>{{ 'view.game_history.step' | translate }} 1</p>
           <!-- SETTINGS -->
@@ -138,7 +140,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
             class="w-100 eva"
             (click)="onPrivatePseudoExport()"
           >
-            login & export
+            {{ 'view.game_history.loginAndexport' | translate }}
           </button>
         </form>
       </div>

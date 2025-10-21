@@ -11,6 +11,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
       @if (percent != undefined) {
         <ebp-loader [value]="percent"></ebp-loader>
       } @else {
+        <ebp-message class="mb-2">
+          {{ 'view.replay_downloader.intro' | translate }}
+        </ebp-message>
         <div class="box">
           <!-- STEP 1 -->
           <p>{{ 'view.game_history.step' | translate }} 1</p>
@@ -30,7 +33,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
           </mat-form-field>
           <!-- STEP 2 -->
           <p>{{ 'view.game_history.step' | translate }} 2</p>
-          <form style="margin-top: -12px" (submit)="onDownloadYouTube()">
+          <form (submit)="onDownloadYouTube()">
             <mat-form-field>
               <mat-label>YouTube</mat-label>
               <input

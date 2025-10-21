@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EBP - EVA Battle Plan - Tools is an Electron application with an Angular frontend that provides tooling for EVA (eva.gg) players. The application offers:
+EBP - Tools is an Electron application with an Angular frontend that provides tooling for EVA (eva.gg) players. The application offers:
 
 1. Auto-cutting game replays
 2. YouTube timecode generation for replays
@@ -30,27 +30,32 @@ This is a hybrid Electron + Angular application with the following structure:
 ## Development Commands
 
 ### Initial Setup
+
 ```bash
 npm run install_npm  # Install dependencies for both root and Angular
 ```
 
 ### Development
+
 ```bash
 npm start  # Start development server (Angular dev server + Electron)
 ```
 
 ### Building
+
 ```bash
 npm run make  # Build Angular app and create Electron distribution
 ```
 
 ### Code Quality
+
 ```bash
 npm run lint        # Run ESLint on Angular TypeScript files
 npm run lint:fix    # Fix ESLint issues and format with Prettier
 ```
 
 ### Testing
+
 ```bash
 npm test  # Run Jest tests (in angular/ directory)
 ```
@@ -66,6 +71,7 @@ npm test  # Run Jest tests (in angular/ directory)
 - **Constants**: All `const` declarations must use SCREAMING_SNAKE_CASE (e.g., `const UN_MOT` instead of `const unMot`)
 
 ### Angular-Specific
+
 - Uses Angular 20 with standalone components
 - Material Design components via Angular Material
 - Internationalization with ngx-translate
@@ -73,6 +79,7 @@ npm test  # Run Jest tests (in angular/ directory)
 - Image processing with ngx-image-cropper and Tesseract.js for OCR
 
 ### Electron-Specific
+
 - Express server on random port for frontend communication
 - Puppeteer for web scraping functionality
 - ExcelJS for spreadsheet generation

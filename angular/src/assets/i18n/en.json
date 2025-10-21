@@ -103,7 +103,6 @@
       "inputOfficialFile": "Click here to manually cut your official video file"
     },
     "game_history": {
-      "title": "Export your game history",
       "step": "Step",
       "pages": "Pages",
       "pagesExplanations": "Number of pages to export",
@@ -127,7 +126,9 @@
           "li3": "Restart \"Tools\".",
           "p3": "If you have exported a large number of games, please wait 15 minutes before starting another export."
         }
-      }
+      },
+      "intro": "Export your game history in Excel format from EVA.",
+      "loginAndexport": "Login & export"
     },
     "notification": {
       "manual-cutting": {
@@ -136,6 +137,9 @@
       "upscaling": {
         "description": "Your replay is being adjusted for resolution. Please wait…"
       }
+    },
+    "replay_downloader": {
+      "intro": "Download your replays from YouTube or Twitch here."
     }
   },
   "shared": {

@@ -56,6 +56,7 @@ mat-form-field {
             transform: translateX(variables.$margin);
             cursor: pointer;
             color: material_colors.$white;
+            background-color: variables.$dark_color;
 
             &:before,
             &:after {

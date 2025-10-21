@@ -103,7 +103,6 @@
       "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"
     },
     "game_history": {
-      "title": "Exportă istoricul jocurilor",
       "step": "Pas",
       "pages": "Pagini",
       "pagesExplanations": "Numărul de pagini de exportat",
@@ -111,7 +110,7 @@
       "seasonExplanations": "Sezonul de exportat",
       "firstOption": "Dacă jucătorul are un tag public, introdu-l aici...",
       "playerTag": "Tag-ul jucătorului",
-      "export": "Exportă",
+      "export": "Export",
       "secondOption": "Altfel, click aici pentru a te conecta la contul EVA.",
       "timeBetweenPages": "Timp între pagini (s)",
       "timeBetweenPagesExplanations": "Timpul în secunde de așteptat între pagini. Cu cât exportezi mai multe pagini, cu atât e posibil să trebuiască să mărești acest timp.",
@@ -127,7 +126,9 @@
           "li3": "Repornește „Tools”.",
           "p3": "Dacă ai exportat un număr mare de jocuri, așteaptă 15 minute înainte de un alt export."
         }
-      }
+      },
+      "intro": "Exportă istoricul jocurilor tale în format Excel din EVA.",
+      "loginAndexport": "Autentificare & export"
     },
     "notification": {
       "manual-cutting": {
@@ -136,6 +137,9 @@
       "upscaling": {
         "description": "Replay-ul tău este în curs de adaptare a rezoluției. Te rugăm să aștepți…"
       }
+    },
+    "replay_downloader": {
+      "intro": "Descarcă aici replay-urile tale de pe YouTube sau Twitch."
     }
   },
   "shared": {
