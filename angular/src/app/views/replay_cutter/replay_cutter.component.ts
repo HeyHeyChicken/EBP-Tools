@@ -105,18 +105,28 @@ export class ReplayCutterComponent implements OnInit {
   private miniMapPositionsByMap: { [mapName: string]: CropperPosition } = {};
 
   protected maps: Map[] = [
-    new Map('Artefact', ['artefact'], [4, 1, 6, 1]), // v
-    new Map('Atlantis', ['atlantis'], [3, 2, 3, 2]), // v
-    new Map('Ceres', ['ceres'], [3, 2, 3, 2]), // v
-    new Map('Engine', ['engine'], [3, 2, 3, 2]), // v
-    new Map('Helios Station', ['helios', 'station'], [3, 2, 3, 2]),
-    new Map('Lunar Outpost', ['lunar', 'outpost'], [3, 2, 3, 2]),
-    new Map('Outlaw', ['outlaw', 'qutlaw'], [3, 5, 5, 3]),
-    new Map('Polaris', ['polaris'], [3, 2, 3, 2]), // v
-    new Map('Silva', ['silva'], [3, 2, 3, 2]), // v
+    new Map('Artefact', ['artefact'], [4, 1, 6, 1], [38, 18, 390, 223]), // v
+    new Map('Atlantis', ['atlantis'], [3, 2, 3, 2], [13, 21, 433, 228]), // v
+    new Map('Ceres', ['ceres'], [3, 2, 3, 2], [20, 25, 420, 212]), // v
+    new Map('Engine', ['engine'], [3, 2, 3, 2], [6, 12, 442, 225]), // v
+    new Map(
+      'Helios Station',
+      ['helios', 'station'],
+      [3, 2, 3, 2],
+      [14, 23, 432, 217]
+    ),
+    new Map(
+      'Lunar Outpost',
+      ['lunar', 'outpost'],
+      [3, 2, 3, 2],
+      [18, 38, 593, 301]
+    ),
+    new Map('Outlaw', ['outlaw', 'qutlaw'], [3, 5, 5, 3], [4, 5, 269, 270]),
+    new Map('Polaris', ['polaris'], [3, 2, 3, 2], [16, 18, 428, 237]), // v
+    new Map('Silva', ['silva'], [3, 2, 3, 2], [29, 18, 310, 237]), // v
     new Map('The Cliff', ['cliff'], [3, 3, 3, 3]), // v
-    new Map('The Rock', ['rock'], [3, 2, 3, 2]),
-    new Map('Horizon', ['horizon'], [3, 2, 3, 2]) // v
+    new Map('The Rock', ['rock'], [3, 2, 3, 2], [14, 22, 432, 217]),
+    new Map('Horizon', ['horizon'], [3, 2, 3, 2], [19, 29, 327, 209]) // v
   ];
 
   //#endregion
@@ -577,107 +587,189 @@ export class ReplayCutterComponent implements OnInit {
    * @param videoFrame The canvas containing the image to be analyzed.
    * @returns The coordinates of the minimap (x1, y1, x2, y2) or the default values ​​if not found.
    */
-  public detectMinimap(videoFrame: HTMLCanvasElement): CropperPosition {
-    const BACK: CropperPosition = JSON.parse(
-      JSON.stringify(ReplayCutterCropDialog.DEFAULT_CROPPER)
-    );
+  public detectMinimap(
+    game: Game,
+    callback: Function,
+    index: number = 0
+  ): void {
+    if (this._videoPath) {
+      let retry: boolean = false;
 
-    const CTX = videoFrame.getContext('2d');
-    if (CTX) {
-      const IMAGE_DATA = CTX.getImageData(
-        0,
-        0,
-        videoFrame.width,
-        videoFrame.height
-      ).data;
+      const BACK: CropperPosition = JSON.parse(
+        JSON.stringify(ReplayCutterCropDialog.DEFAULT_CROPPER)
+      );
 
-      const MAX_COLOR_DIFFERENCE: number = 50;
+      this.videoURLToCanvas(
+        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
+        Math.round((game.start + index) * 1000),
+        (videoFrame?: HTMLCanvasElement) => {
+          if (videoFrame) {
+            const CTX = videoFrame.getContext('2d');
+            if (CTX) {
+              const IMAGE_DATA = CTX.getImageData(
+                0,
+                0,
+                videoFrame.width,
+                videoFrame.height
+              ).data;
 
-      // We are looking for x1
-      l1: for (let x = 0; x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x++) {
-        for (let y = 0; y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y++) {
-          const INDEX = (y * videoFrame.width + x) * 4;
-          const R = IMAGE_DATA[INDEX];
-          const G = IMAGE_DATA[INDEX + 1];
-          const B = IMAGE_DATA[INDEX + 2];
+              const MAX_COLOR_DIFFERENCE: number = 50;
 
-          if (
-            this.colorSimilarity(
-              new RGB(R, G, B),
-              new RGB(255, 255, 255),
-              MAX_COLOR_DIFFERENCE
-            )
-          ) {
-            BACK.x1 = x;
-            break l1;
+              // We are looking for x1
+              l1: for (
+                let x = 0;
+                x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2;
+                x++
+              ) {
+                for (
+                  let y = 0;
+                  y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2;
+                  y++
+                ) {
+                  const INDEX = (y * videoFrame.width + x) * 4;
+                  const R = IMAGE_DATA[INDEX];
+                  const G = IMAGE_DATA[INDEX + 1];
+                  const B = IMAGE_DATA[INDEX + 2];
+
+                  if (
+                    this.colorSimilarity(
+                      new RGB(R, G, B),
+                      new RGB(255, 255, 255),
+                      MAX_COLOR_DIFFERENCE
+                    )
+                  ) {
+                    BACK.x1 = x;
+                    break l1;
+                  }
+                }
+              }
+
+              // We are looking for x2
+              l1: for (
+                let x = ReplayCutterCropDialog.DEFAULT_CROPPER.x2;
+                x >= 0;
+                x--
+              ) {
+                for (
+                  let y = 0;
+                  y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2;
+                  y++
+                ) {
+                  const INDEX = (y * videoFrame.width + x) * 4;
+                  const R = IMAGE_DATA[INDEX];
+                  const G = IMAGE_DATA[INDEX + 1];
+                  const B = IMAGE_DATA[INDEX + 2];
+
+                  if (
+                    this.colorSimilarity(
+                      new RGB(R, G, B),
+                      new RGB(255, 255, 255),
+                      MAX_COLOR_DIFFERENCE
+                    )
+                  ) {
+                    BACK.x2 = x + 1;
+                    break l1;
+                  }
+                }
+              }
+
+              // We are looking for y1
+              l1: for (
+                let y = 0;
+                y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2;
+                y++
+              ) {
+                for (
+                  let x = 0;
+                  x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2;
+                  x++
+                ) {
+                  const INDEX = (y * videoFrame.width + x) * 4;
+                  const R = IMAGE_DATA[INDEX];
+                  const G = IMAGE_DATA[INDEX + 1];
+                  const B = IMAGE_DATA[INDEX + 2];
+
+                  if (
+                    this.colorSimilarity(
+                      new RGB(R, G, B),
+                      new RGB(255, 255, 255),
+                      MAX_COLOR_DIFFERENCE
+                    )
+                  ) {
+                    BACK.y1 = y;
+                    break l1;
+                  }
+                }
+              }
+
+              // We are looking for y1
+              l1: for (
+                let y = ReplayCutterCropDialog.DEFAULT_CROPPER.y2;
+                y >= 0;
+                y--
+              ) {
+                for (
+                  let x = 0;
+                  x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2;
+                  x++
+                ) {
+                  const INDEX = (y * videoFrame.width + x) * 4;
+                  const R = IMAGE_DATA[INDEX];
+                  const G = IMAGE_DATA[INDEX + 1];
+                  const B = IMAGE_DATA[INDEX + 2];
+
+                  if (
+                    this.colorSimilarity(
+                      new RGB(R, G, B),
+                      new RGB(255, 255, 255),
+                      MAX_COLOR_DIFFERENCE
+                    )
+                  ) {
+                    BACK.y2 = y + 1;
+                    break l1;
+                  }
+                }
+              }
+            }
+
+            // Map bound check
+
+            const GAME_MAP = this.getMapByName(game.map);
+            if (GAME_MAP && GAME_MAP.mapBound) {
+              const TOLERANCE: number = videoFrame.width * 0.005;
+
+              if (
+                // X
+                BACK.x1 < GAME_MAP.mapBound[0] - TOLERANCE ||
+                BACK.x1 > GAME_MAP.mapBound[0] + TOLERANCE ||
+                // Y
+                BACK.y1 < GAME_MAP.mapBound[1] - TOLERANCE ||
+                BACK.y1 > GAME_MAP.mapBound[1] + TOLERANCE ||
+                // Width
+                BACK.x2 <
+                  GAME_MAP.mapBound[0] + GAME_MAP.mapBound[2] - TOLERANCE ||
+                BACK.x2 >
+                  GAME_MAP.mapBound[0] + GAME_MAP.mapBound[2] + TOLERANCE ||
+                // Height
+                BACK.y2 <
+                  GAME_MAP.mapBound[1] + GAME_MAP.mapBound[3] - TOLERANCE ||
+                BACK.y2 >
+                  GAME_MAP.mapBound[1] + GAME_MAP.mapBound[3] + TOLERANCE
+              ) {
+                retry = true;
+                this.detectMinimap(game, callback, index + 1);
+              }
+            }
+
+            if (!retry) {
+              callback(BACK, videoFrame);
+            }
           }
         }
-      }
-
-      // We are looking for x2
-      l1: for (let x = ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x >= 0; x--) {
-        for (let y = 0; y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y++) {
-          const INDEX = (y * videoFrame.width + x) * 4;
-          const R = IMAGE_DATA[INDEX];
-          const G = IMAGE_DATA[INDEX + 1];
-          const B = IMAGE_DATA[INDEX + 2];
-
-          if (
-            this.colorSimilarity(
-              new RGB(R, G, B),
-              new RGB(255, 255, 255),
-              MAX_COLOR_DIFFERENCE
-            )
-          ) {
-            BACK.x2 = x + 1;
-            break l1;
-          }
-        }
-      }
-
-      // We are looking for y1
-      l1: for (let y = 0; y < ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y++) {
-        for (let x = 0; x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x++) {
-          const INDEX = (y * videoFrame.width + x) * 4;
-          const R = IMAGE_DATA[INDEX];
-          const G = IMAGE_DATA[INDEX + 1];
-          const B = IMAGE_DATA[INDEX + 2];
-
-          if (
-            this.colorSimilarity(
-              new RGB(R, G, B),
-              new RGB(255, 255, 255),
-              MAX_COLOR_DIFFERENCE
-            )
-          ) {
-            BACK.y1 = y;
-            break l1;
-          }
-        }
-      }
-
-      // We are looking for y1
-      l1: for (let y = ReplayCutterCropDialog.DEFAULT_CROPPER.y2; y >= 0; y--) {
-        for (let x = 0; x < ReplayCutterCropDialog.DEFAULT_CROPPER.x2; x++) {
-          const INDEX = (y * videoFrame.width + x) * 4;
-          const R = IMAGE_DATA[INDEX];
-          const G = IMAGE_DATA[INDEX + 1];
-          const B = IMAGE_DATA[INDEX + 2];
-
-          if (
-            this.colorSimilarity(
-              new RGB(R, G, B),
-              new RGB(255, 255, 255),
-              MAX_COLOR_DIFFERENCE
-            )
-          ) {
-            BACK.y2 = y + 1;
-            break l1;
-          }
-        }
-      }
+      );
+    } else {
+      console.error('Error: "detectMinimap", this._videoPath is undefined.');
     }
-    return BACK;
   }
 
   /**
@@ -709,92 +801,87 @@ export class ReplayCutterComponent implements OnInit {
       return;
     }
 
-    if (this._videoPath) {
-      this.videoURLToCanvas(
-        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        Math.round((this._games[gameIndex].start + 10) * 1000),
-        (videoFrame?: HTMLCanvasElement) => {
-          if (videoFrame) {
-            const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
-            const DIALOG_HEIGHT: string = 'calc(100vh - 12px * 4)';
-            this.dialogService
-              .open(ReplayCutterCropDialog, {
-                data: {
-                  imgBase64: videoFrame.toDataURL('image/png'),
-                  initialCropperPosition: this.detectMinimap(videoFrame),
-                  component: this,
-                  gameIndex: gameIndex
-                },
-                maxWidth: DIALOG_WIDTH,
-                maxHeight: DIALOG_HEIGHT,
-                width: DIALOG_WIDTH,
-                height: DIALOG_HEIGHT,
-                autoFocus: false
-              })
-              .afterClosed()
-              .subscribe((miniMapPositions: CropperPosition | undefined) => {
-                window.electronAPI.setWindowSize();
-                this.globalService.loading = undefined;
-                if (miniMapPositions) {
-                  const MAP = this.maps.find(
-                    (x) => x.name == this.games[gameIndex].map
+    this.detectMinimap(
+      this._games[gameIndex],
+      (position: CropperPosition, videoFrame: HTMLCanvasElement) => {
+        const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
+        const DIALOG_HEIGHT: string = 'calc(100vh - 12px * 4)';
+        this.dialogService
+          .open(ReplayCutterCropDialog, {
+            data: {
+              imgBase64: videoFrame.toDataURL('image/png'),
+              initialCropperPosition: position,
+              component: this,
+              gameIndex: gameIndex
+            },
+            maxWidth: DIALOG_WIDTH,
+            maxHeight: DIALOG_HEIGHT,
+            width: DIALOG_WIDTH,
+            height: DIALOG_HEIGHT,
+            autoFocus: false
+          })
+          .afterClosed()
+          .subscribe((miniMapPositions: CropperPosition | undefined) => {
+            window.electronAPI.setWindowSize();
+            this.globalService.loading = undefined;
+            if (miniMapPositions) {
+              const MAP = this.maps.find(
+                (x) => x.name == this.games[gameIndex].map
+              );
+
+              if (MAP) {
+                if (MAP.mapMargins) {
+                  const HEIGHT = miniMapPositions.y2 - miniMapPositions.y1;
+                  const WIDTH = miniMapPositions.x2 - miniMapPositions.x1;
+                  const X = Math.min(
+                    miniMapPositions.x1,
+                    (WIDTH * MAP.mapMargins[3]) / 100
+                  );
+                  const Y = Math.min(
+                    miniMapPositions.y1,
+                    (HEIGHT * MAP.mapMargins[0]) / 100
                   );
 
-                  if (MAP) {
-                    if (MAP.mapMargins) {
-                      const HEIGHT = miniMapPositions.y2 - miniMapPositions.y1;
-                      const WIDTH = miniMapPositions.x2 - miniMapPositions.x1;
-                      const X = Math.min(
-                        miniMapPositions.x1,
-                        (WIDTH * MAP.mapMargins[3]) / 100
-                      );
-                      const Y = Math.min(
-                        miniMapPositions.y1,
-                        (HEIGHT * MAP.mapMargins[0]) / 100
-                      );
+                  const MARGED_MINI_MAP_POSITIONS = {
+                    x1: miniMapPositions.x1 - X,
+                    x2:
+                      miniMapPositions.x2 +
+                      (MAP.mapMargins[1] == MAP.mapMargins[3]
+                        ? X
+                        : (WIDTH * MAP.mapMargins[1]) / 100),
+                    y1: miniMapPositions.y1 - Y,
+                    y2:
+                      miniMapPositions.y2 +
+                      (MAP.mapMargins[0] == MAP.mapMargins[2]
+                        ? Y
+                        : (HEIGHT * MAP.mapMargins[2]) / 100)
+                  };
 
-                      const MARGED_MINI_MAP_POSITIONS = {
-                        x1: miniMapPositions.x1 - X,
-                        x2:
-                          miniMapPositions.x2 +
-                          (MAP.mapMargins[1] == MAP.mapMargins[3]
-                            ? X
-                            : (WIDTH * MAP.mapMargins[1]) / 100),
-                        y1: miniMapPositions.y1 - Y,
-                        y2:
-                          miniMapPositions.y2 +
-                          (MAP.mapMargins[0] == MAP.mapMargins[2]
-                            ? Y
-                            : (HEIGHT * MAP.mapMargins[2]) / 100)
-                      };
-
-                      miniMapPositions = MARGED_MINI_MAP_POSITIONS;
-                    }
-
-                    miniMapPositions = {
-                      x1: Math.round(miniMapPositions.x1),
-                      x2: Math.round(miniMapPositions.x2),
-                      y1: Math.round(miniMapPositions.y1),
-                      y2: Math.round(miniMapPositions.y2)
-                    };
-
-                    this.miniMapPositionsByMap[MAP_NAME] = miniMapPositions;
-                    this.uploadGameMiniMap(
-                      gameIndex,
-                      miniMapPositions,
-                      gameFromStatistics,
-                      orangeTeamInfosPosition,
-                      blueTeamInfosPosition,
-                      orangeNamesAsImage,
-                      blueNamesAsImage
-                    );
-                  }
+                  miniMapPositions = MARGED_MINI_MAP_POSITIONS;
                 }
-              });
-          }
-        }
-      );
-    }
+
+                miniMapPositions = {
+                  x1: Math.round(miniMapPositions.x1),
+                  x2: Math.round(miniMapPositions.x2),
+                  y1: Math.round(miniMapPositions.y1),
+                  y2: Math.round(miniMapPositions.y2)
+                };
+
+                this.miniMapPositionsByMap[MAP_NAME] = miniMapPositions;
+                this.uploadGameMiniMap(
+                  gameIndex,
+                  miniMapPositions,
+                  gameFromStatistics,
+                  orangeTeamInfosPosition,
+                  blueTeamInfosPosition,
+                  orangeNamesAsImage,
+                  blueNamesAsImage
+                );
+              }
+            }
+          });
+      }
+    );
   }
 
   /**

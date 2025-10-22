@@ -178,17 +178,15 @@ export class ReplayCutterCropDialog implements OnInit {
     const MIN = this.data.component.games[this.data.gameIndex].start;
     const MAX = this.data.component.games[this.data.gameIndex].end;
     const RANDOM = Math.floor(Math.random() * (MAX - MIN + 1)) + MIN;
-    this.data.component.videoURLToCanvas(
-      `http://localhost:${this.globalService.serverPort}/file?path=${this.data.component.videoPath}`,
-      Math.round(RANDOM * 1000),
-      (videoFrame?: HTMLCanvasElement) => {
-        if (videoFrame) {
-          this.reset();
-          this.currentImgBase64 = videoFrame.toDataURL('image/png');
-          this.data.initialCropperPosition =
-            this.data.component.detectMinimap(videoFrame);
-        }
-      }
+
+    this.data.component.detectMinimap(
+      this.data.component.games[this.data.gameIndex],
+      (position: CropperPosition, videoFrame: HTMLCanvasElement) => {
+        this.reset();
+        this.currentImgBase64 = videoFrame.toDataURL('image/png');
+        this.data.initialCropperPosition = position;
+      },
+      RANDOM
     );
   }
 

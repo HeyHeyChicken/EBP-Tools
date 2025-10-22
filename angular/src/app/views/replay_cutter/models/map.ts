@@ -6,6 +6,12 @@ export class Map {
   constructor(
     public name: string,
     public dictionnary: string[],
-    public mapMargins?: [number, number, number, number]
+    public mapMargins?: [number, number, number, number],
+    public mapBound?: [
+      number /* X */,
+      number /* Y */,
+      number /* Width */,
+      number /* Height */
+    ]
   ) {}
 }
