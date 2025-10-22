@@ -10,8 +10,7 @@ import {
   ViewChild,
   ViewChildren,
   QueryList,
-  ElementRef,
-  AfterViewInit
+  ElementRef
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -21,13 +20,11 @@ import {
   MatDialogRef,
   MAT_DIALOG_DATA
 } from '@angular/material/dialog';
-import { CropperPosition } from 'ngx-image-cropper';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../../../shared/grid/grid.module';
 import { ReplayCutterComponent } from '../../replay_cutter.component';
-import { GlobalService } from '../../../../core/services/global.service';
 
 //#endregion
 
@@ -73,8 +70,7 @@ export class ReplayCutterCheckPlayersOrderDialog {
       blueNamesAsImage: string;
       replayCutterComponent: ReplayCutterComponent;
       gameIndex: number;
-    },
-    private readonly globalService: GlobalService
+    }
   ) {
     this.value = data;
   }

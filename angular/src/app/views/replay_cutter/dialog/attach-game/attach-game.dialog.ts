@@ -46,6 +46,12 @@ export class ReplayCutterAttachGameDialog {
 
   //#region Functions
 
+  /**
+   * Handles click events on the description text to open external URLs based on the clicked element.
+   * If an anchor tag (A) is clicked, opens the general statistics page.
+   * If a bold tag (B) is clicked, opens the statistics page with pre-created game data including teams, scores, and players.
+   * @param event The mouse click event containing the target element information.
+   */
   protected clickOnDescription(event: MouseEvent): void {
     if (event.target instanceof HTMLElement) {
       if (event.target.tagName === 'A') {

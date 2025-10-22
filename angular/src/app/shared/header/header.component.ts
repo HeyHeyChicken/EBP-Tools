@@ -109,8 +109,8 @@ export class HeaderComponent implements OnInit {
   }
 
   /**
-   * Cette fonction s'exécute lorsque l'utilisateur change la langue du site web.
-   * @param event Evenement "onchange".
+   * This function runs when the user changes the language of the website.
+   * @param event “onchange” event.
    */
   protected languageSelectChanged(event: Event): void {
     if (event.target) {
@@ -119,20 +119,27 @@ export class HeaderComponent implements OnInit {
     }
   }
 
+  /**
+   * Handles tool selection changes by navigating to the route corresponding to the selected tool and the current language.
+   * @param event Selection change event from a MatSelect component.
+   */
   protected changeTool(event: MatSelectChange): void {
     this.router.navigate([
       `/${this.translateService.getCurrentLang()}/${event.value}`
     ]);
   }
 
+  /**
+   * Initiates a coins checking loop and opens the external website page for acquiring more coins.
+   */
   protected getMoreCoins(): void {
     this.headerService.coinsCheckerLoop();
     this.openURLExternalBrowser(this.globalService.webSiteURL + '/tokens');
   }
 
   /**
-   * Cette fonction permet de changer la langue du site web.
-   * @param language Langue à appliquer.
+   * This function allows you to change the language of the website.
+   * @param language Language to apply.
    */
   private setLanguage(language: string): void {
     const LANGUAGE: string = language.toLowerCase();
@@ -140,9 +147,9 @@ export class HeaderComponent implements OnInit {
     localStorage.setItem(HeaderComponent.STORAGE_KEY_NAME, LANGUAGE);
     window.electronAPI?.setLanguage(LANGUAGE);
 
-    // On change la langue dans l'URL.
-    const CURRENT_PATH = this.commonLocation.path(); // Chemin actuel
-    let newPath = CURRENT_PATH.replace(/^\/[a-z]{2}/, `/${LANGUAGE}`); // Remplace la langue dans l'URL
+    // We change the language in the URL.
+    const CURRENT_PATH = this.commonLocation.path(); // Current path
+    let newPath = CURRENT_PATH.replace(/^\/[a-z]{2}/, `/${LANGUAGE}`); // Replace language in URL
     if (newPath.length == 0) {
       newPath = `/${LANGUAGE}`;
     }

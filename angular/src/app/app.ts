@@ -62,7 +62,7 @@ export class App implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
-    // On scroll vers le haut à chaque fois que l'utilisateur change de page.
+    // We scroll up each time the user changes pages.
     this.router.events.subscribe((event) => {
       if (this.main) {
         if (event instanceof NavigationEnd) {
@@ -156,6 +156,11 @@ export class App implements OnInit {
     );
   }
 
+  /**
+   * Handles keyboard events to trigger debug mode when the user presses Ctrl+Shift+D.
+   * When the key combination is detected, toggles debug mode and updates the global service with the current development mode state from the Electron API.
+   * @param event The keyboard event containing key press information.
+   */
   @HostListener('document:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'd') {
@@ -175,10 +180,15 @@ export class App implements OnInit {
     window.electronAPI?.debugMode();
   }
 
+  /**
+   * Opens the GitHub releases page in the user's default browser to download the latest application update.
+   * This method is called when the user clicks on a new update notification link.
+   */
   protected onNewUpdateLinkClick(): void {
     window.electronAPI?.openURL(
       'https://github.com/HeyHeyChicken/EBP-EVA-Battle-Plan-Tools/releases/latest'
     );
   }
+
   //#endregion
 }

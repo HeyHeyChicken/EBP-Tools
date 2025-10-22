@@ -125,6 +125,10 @@ export class ReplayDownloaderComponent implements OnInit {
       });
   }
 
+  /**
+   * Initiates the download process for a YouTube replay video.
+   * Validates the YouTube URL format, cleans it, resets the progress indicator, and triggers the download through the Electron API. Shows a notification to inform the user that the download has started.
+   */
   protected onDownloadYouTube(): void {
     if (this.youTubeURL) {
       if (this.isYouTubeUrl(this.youTubeURL)) {
@@ -136,6 +140,10 @@ export class ReplayDownloaderComponent implements OnInit {
     }
   }
 
+  /**
+   * Initiates the download process for a Twitch replay video.
+   * Validates the Twitch URL format, resets the progress indicator, and triggers the download through the Electron API. Shows a notification to inform the user that the download has started.
+   */
   protected onDownloadTwitch(): void {
     if (this.twitchURL) {
       if (this.isTwitchUrl(this.twitchURL)) {
@@ -146,6 +154,12 @@ export class ReplayDownloaderComponent implements OnInit {
     }
   }
 
+  /**
+   * Cleans a YouTube URL by extracting the video ID and creating a standardized YouTube watch URL.
+   * This removes any additional parameters and ensures a consistent URL format for download processing.
+   * @param url The original YouTube URL that may contain additional parameters.
+   * @returns A clean YouTube watch URL with only the video ID parameter, or the original URL if no video ID is found.
+   */
   private cleanYouTubeURL(url: string): string {
     const URL_OBJ = new URL(url);
     const VIDEO_ID = URL_OBJ.searchParams.get('v');
@@ -155,6 +169,10 @@ export class ReplayDownloaderComponent implements OnInit {
     return url;
   }
 
+  /**
+   * Displays a notification at the bottom right corner of the screen to inform the user that the download process has started.
+   * Clears the URL input fields, sets the global loading state, and shows a notification window with an infinite progress indicator and a localized "fetching" message.
+   */
   private showNotification() {
     this.youTubeURL = undefined;
     this.twitchURL = undefined;
@@ -178,12 +196,24 @@ export class ReplayDownloaderComponent implements OnInit {
       });
   }
 
+  /**
+   * Validates whether a given URL is a valid YouTube URL.
+   * Supports various YouTube URL formats including standard watch URLs, shortened youtu.be links, and live stream URLs.
+   * @param url The URL string to validate.
+   * @returns True if the URL matches a valid YouTube URL pattern, false otherwise.
+   */
   private isYouTubeUrl(url: string): boolean {
     const regex =
       /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)[\w-]{11}(&\S*)?$/;
     return regex.test(url);
   }
 
+  /**
+   * Validates whether a given URL is a valid Twitch URL.
+   * Supports Twitch video URLs and clip URLs with their respective URL patterns.
+   * @param url The URL string to validate.
+   * @returns True if the URL matches a valid Twitch URL pattern, false otherwise.
+   */
   private isTwitchUrl(url: string): boolean {
     const regex =
       /^(https?:\/\/)?(www\.)?twitch\.tv\/(videos\/\d+|[a-zA-Z0-9_]+\/clip\/[a-zA-Z0-9_-]+)$/;

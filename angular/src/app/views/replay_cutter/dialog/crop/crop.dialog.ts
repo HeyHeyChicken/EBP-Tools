@@ -26,7 +26,6 @@ import {
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AssistantComponent } from '../../../../shared/assistant/assistant.component';
 import { ReplayCutterComponent } from '../../replay_cutter.component';
-import { GlobalService } from '../../../../core/services/global.service';
 
 //#endregion
 
@@ -48,28 +47,6 @@ export class ReplayCutterCropDialog implements OnInit {
   //#region Attributes
 
   @ViewChild('matDialogContent') matDialogContent?: ElementRef<HTMLDivElement>;
-
-  protected get matDialogContentWidth(): number {
-    if (this.matDialogContent?.nativeElement) {
-      const STYLE = getComputedStyle(this.matDialogContent?.nativeElement);
-      return (
-        this.matDialogContent?.nativeElement.clientWidth -
-        parseInt(STYLE.paddingLeft) -
-        parseInt(STYLE.paddingRight)
-      );
-    }
-    return 0;
-  }
-  protected get matDialogContentHeight(): number {
-    if (this.matDialogContent?.nativeElement) {
-      const STYLE = getComputedStyle(this.matDialogContent?.nativeElement);
-      return (
-        this.matDialogContent?.nativeElement.clientHeight -
-        parseInt(STYLE.paddingTop)
-      );
-    }
-    return 0;
-  }
 
   public static DEFAULT_CROPPER: CropperPosition = {
     x1: 0,
@@ -114,8 +91,7 @@ export class ReplayCutterCropDialog implements OnInit {
       component: ReplayCutterComponent;
       gameIndex: number;
     },
-    private readonly dialogRef: MatDialogRef<ReplayCutterCropDialog>,
-    private readonly globalService: GlobalService
+    private readonly dialogRef: MatDialogRef<ReplayCutterCropDialog>
   ) {
     // We resize the window to full screen.
     window.electronAPI.setWindowSize(0, 0);
@@ -174,6 +150,10 @@ export class ReplayCutterCropDialog implements OnInit {
     }, 200);
   }
 
+  /**
+   * Generates a new image by selecting a random frame from the current game's time range and detecting the minimap.
+   * This method calculates a random timestamp within the game's start and end times, then uses the parent component's minimap detection to extract a frame and cropper position, which are then applied to reset the dialog state.
+   */
   protected getNewImage(): void {
     const MIN = this.data.component.games[this.data.gameIndex].start;
     const MAX = this.data.component.games[this.data.gameIndex].end;
@@ -190,6 +170,11 @@ export class ReplayCutterCropDialog implements OnInit {
     );
   }
 
+  /**
+   * Handles the cropper ready event by storing the image dimensions and enabling cropper functionality.
+   * Uses a setTimeout to ensure the cropper is fully initialized before allowing interactions.
+   * @param event The dimensions of the loaded image containing width and height information.
+   */
   protected onCropperReady(event: Dimensions): void {
     this.currentImgDimensions = event;
 
@@ -198,12 +183,22 @@ export class ReplayCutterCropDialog implements OnInit {
     });
   }
 
+  /**
+   * Handles cropper position change events by updating the zoomed crop view.
+   * Only processes the change if the cropper is in a ready state to prevent issues during initialization.
+   * @param event The new cropper position data containing the selected crop area coordinates.
+   */
   protected onCropperChange(event: CropperPosition): void {
     if (this.cropperReady) {
       this.reinjectZoomedCrop(event);
     }
   }
 
+  /**
+   * Resets the crop dialog to its initial state by restoring the original image and cropper settings.
+   * This includes resetting the image data, cropper positions, and scale factor to their default values.
+   * If an initial cropper position was provided, it will be applied instead of the default position.
+   */
   protected reset(): void {
     this.currentImgBase64 = this.data.imgBase64;
     this.cropper = ReplayCutterCropDialog.DEFAULT_CROPPER;
@@ -214,6 +209,64 @@ export class ReplayCutterCropDialog implements OnInit {
     }
   }
 
+  /**
+   * Submits the crop dialog by closing it with the appropriate cropper position data.
+   * If the cropper position hasn't changed from the initial state, returns the original cropper.
+   * Otherwise, returns the updated global cropper position.
+   */
+  protected submit(): void {
+    if (!this.disableSubmitButton) {
+      if (this.cropper == this.data.initialCropperPosition) {
+        this.dialogRef.close(this.cropper);
+      } else {
+        this.dialogRef.close(this.globalCropper);
+      }
+    }
+  }
+
+  /**
+   * Calculates the effective content width of the Material Dialog by subtracting padding from the total client width.
+   * This provides the actual usable width for content positioning within the dialog.
+   * @returns The content width in pixels, or 0 if the dialog element is not available.
+   */
+  protected get matDialogContentWidth(): number {
+    if (this.matDialogContent?.nativeElement) {
+      const STYLE = getComputedStyle(this.matDialogContent?.nativeElement);
+      return (
+        this.matDialogContent?.nativeElement.clientWidth -
+        parseInt(STYLE.paddingLeft) -
+        parseInt(STYLE.paddingRight)
+      );
+    }
+    return 0;
+  }
+
+  /**
+   * Calculates the effective content height of the Material Dialog by subtracting top padding from the total client height.
+   * This provides the actual usable height for content positioning within the dialog.
+   * @returns The content height in pixels, or 0 if the dialog element is not available.
+   */
+  protected get matDialogContentHeight(): number {
+    if (this.matDialogContent?.nativeElement) {
+      const STYLE = getComputedStyle(this.matDialogContent?.nativeElement);
+      return (
+        this.matDialogContent?.nativeElement.clientHeight -
+        parseInt(STYLE.paddingTop)
+      );
+    }
+    return 0;
+  }
+
+  /**
+   * Reinjects a zoomed crop by extracting the selected area from the current image and updating the cropper display.
+   * This method performs several operations:
+   * 1. Calculates the actual pixel coordinates based on the current image scale.
+   * 2. Updates the global cropper position to track the cumulative crop area.
+   * 3. Extracts the selected region from the image using canvas manipulation.
+   * 4. Scales the extracted region to fit the display container.
+   * 5. Updates the image cropper with the new zoomed image data.
+   * @param position The cropper position defining the area to zoom into.
+   */
   private reinjectZoomedCrop(position: CropperPosition) {
     if (
       this.currentImgBase64 &&
@@ -290,16 +343,6 @@ export class ReplayCutterCropDialog implements OnInit {
           };
         }
       };
-    }
-  }
-
-  protected submit(): void {
-    if (!this.disableSubmitButton) {
-      if (this.cropper == this.data.initialCropperPosition) {
-        this.dialogRef.close(this.cropper);
-      } else {
-        this.dialogRef.close(this.globalCropper);
-      }
     }
   }
 

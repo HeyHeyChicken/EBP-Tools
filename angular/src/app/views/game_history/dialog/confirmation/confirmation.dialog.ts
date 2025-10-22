@@ -25,8 +25,6 @@ export class ConfirmationDialog implements OnInit {
 
   //#endregion
 
-  constructor() {}
-
   //#region Functions
 
   ngOnInit(): void {

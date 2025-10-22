@@ -22,8 +22,8 @@ export class HeaderService {
   //#endregion
 
   constructor(
-    private identityService: IdentityService,
-    private apiRestService: APIRestService
+    private readonly identityService: IdentityService,
+    private readonly apiRestService: APIRestService
   ) {}
 
   //#region Functions

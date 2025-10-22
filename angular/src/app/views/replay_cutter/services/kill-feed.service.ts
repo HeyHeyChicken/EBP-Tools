@@ -82,7 +82,7 @@ export class KillFeedService {
       );
       const DATA = CTX.getImageData(0, 0, WIDTH, HEIGHT);
 
-      // On détecte le nombre de pixels orange, bleu ou rouge de chaque ligne.
+      // We detect the number of orange, blue or red pixels in each line.
       const LINES: {
         orange: number;
         blue: number;

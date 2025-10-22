@@ -40,6 +40,10 @@ export class HomeComponent implements OnInit {
     this.arrayShuffle(this.developpers);
   }
 
+  /**
+   * Opens the specified URL in the user's default external browser.
+   * @param url The URL to open in the external browser.
+   */
   protected openURL(url: string): void {
     window.electronAPI.openURL(url);
   }

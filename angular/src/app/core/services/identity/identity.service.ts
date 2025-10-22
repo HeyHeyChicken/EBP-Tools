@@ -33,6 +33,11 @@ export class IdentityService {
 
   //#region Functions
 
+  /**
+   * Sets the access token and extracts user information from its payload.
+   * Updates user ID, leader ID, email, and supporter level based on the token data.
+   * @param accessToken JWT access token containing user information.
+   */
   public set(accessToken: string) {
     if (accessToken) {
       this._accessToken = accessToken;
@@ -55,26 +60,45 @@ export class IdentityService {
 
   //#region Getters
 
+  /**
+   * Returns the currently stored access token.
+   */
   public get accessToken(): string {
     return this._accessToken;
   }
 
+  /**
+   * Returns the user ID extracted from the access token.
+   */
   public get userID(): number {
     return this._userID;
   }
 
+  /**
+   * Returns the leader ID extracted from the access token.
+   */
   public get leaderID(): number {
     return this._leaderID;
   }
 
+  /**
+   * Returns the email associated with the current user.
+   */
   public get email(): number {
     return this._email;
   }
 
+  /**
+   * Returns the supporter level of the current user, as extracted from the access token.
+   */
   public get supporterLevel(): number {
     return this._supporterLevel;
   }
 
+  /**
+   * Checks if the current user is part of the beta program.
+   * @returns True if the user ID is in the beta users list, false otherwise.
+   */
   public get isBetaUser(): boolean {
     return (this.globalService.betaUsers ?? []).includes(this._userID);
   }

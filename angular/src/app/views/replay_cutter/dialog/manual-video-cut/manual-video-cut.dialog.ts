@@ -203,6 +203,12 @@ export class ReplayCutterManualVideoCutDialog {
     }
   }
 
+  /**
+   * Handles video playback state when the assistant dialog opens or closes.
+   * When the assistant opens, pauses the video and remembers its previous playing state.
+   * When the assistant closes, resumes video playback only if it was playing before the assistant opened.
+   * @param open True if the assistant dialog is opening, false if closing.
+   */
   protected onAssistantStateChange(open: boolean): void {
     if (this.video && this.video.nativeElement) {
       if (open) {
@@ -251,6 +257,10 @@ export class ReplayCutterManualVideoCutDialog {
     }
   }
 
+  /**
+   * Dynamically resizes the video element and dialog to fit properly without causing scrollbars.
+   * This method recursively adjusts the video height by reducing it in small increments until no scrollbars are present in either the dialog surface or content area. Once properly sized, it adjusts the dialog height to match the content and completes the loading process.
+   */
   protected resizeVideo(): void {
     if (this.matDialogContent) {
       const DIFFERENCE1 = this.hasScrollbar(
@@ -280,6 +290,11 @@ export class ReplayCutterManualVideoCutDialog {
     }
   }
 
+  /**
+   * Determines if an element has a scrollbar by calculating the difference between scroll height and client height.
+   * @param element The DOM element to check for scrollbar presence.
+   * @returns The height difference in pixels. A value greater than 0 indicates a scrollbar is present.
+   */
   private hasScrollbar(element: any): number {
     return element.scrollHeight - element.clientHeight;
   }

@@ -20,7 +20,7 @@ export class NotificationService {
 
   //#endregion
 
-  constructor(private zone: NgZone) {
+  constructor(private readonly zone: NgZone) {
     this._channel.onmessage = (event) => {
       this.zone.run(() => this._messages$.next(event.data));
     };
@@ -28,6 +28,10 @@ export class NotificationService {
 
   //#region Functions
 
+  /**
+   * Sends a message through the broadcast channel to communicate with the notification HMI on the bottom right of the screen.
+   * @param data The message data to send through the channel.
+   */
   sendMessage(data: Message) {
     this._channel.postMessage(data);
   }

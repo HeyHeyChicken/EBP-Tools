@@ -311,6 +311,12 @@ export class ReplayCutterComponent implements OnInit {
     );
   }
 
+  /**
+   * Determines whether the upload button should be disabled based on video path and map configuration.
+   * The button is disabled if no video is loaded or if the map has no configured margins and the user is a beta user.
+   * @param mapName The name of the map to check for margin configuration.
+   * @returns True if the upload button should be disabled, false otherwise.
+   */
   protected disableUploadButton(mapName: string): boolean {
     return (
       !this._videoPath ||
@@ -363,6 +369,11 @@ export class ReplayCutterComponent implements OnInit {
     this.debugPause = !this.debugPause;
   }
 
+  /**
+   * Initializes the required services for the replay cutter component.
+   * This includes initializing Tesseract for OCR functionality and setting up OpenCV with proper error handling.
+   * Once OpenCV is successfully loaded, enables the file input for video processing.
+   */
   private async initServices(): Promise<void> {
     await this.initTesseract();
 
@@ -790,7 +801,7 @@ export class ReplayCutterComponent implements OnInit {
   ): void {
     const MAP_NAME = this._games[gameIndex].map;
 
-    // Si les positions sont déjà définies pour cette map, les utiliser directement.
+    // If the positions are already defined for this map, use them directly.
     if (this.miniMapPositionsByMap[MAP_NAME]) {
       this.uploadGameMiniMap(
         gameIndex,
@@ -1475,7 +1486,7 @@ export class ReplayCutterComponent implements OnInit {
                 });
               });
 
-            //#region Détéction d'une frame de score d'une game
+            //#region Detection of a game score frame
 
             if (!found) {
               const MODE = this.detectGameScoreFrame(VIDEO);
@@ -1650,7 +1661,7 @@ export class ReplayCutterComponent implements OnInit {
 
             //#endregion
 
-            //#region Détéction de la fin d'une game
+            //#region Detection of the end of a game
 
             if (!found) {
               if (this.detectGameEndFrame(VIDEO)) {
@@ -1712,7 +1723,7 @@ export class ReplayCutterComponent implements OnInit {
 
             //#endregion
 
-            //#region Détéction du début d'une game
+            //#region Detection of the start of a game
 
             if (!found) {
               if (this.detectGameLoadingFrame(VIDEO, this._games)) {
@@ -2753,7 +2764,6 @@ export class ReplayCutterComponent implements OnInit {
     CANVAS.height = ctx.canvas.height;
     const CTX = CANVAS.getContext('2d');
     if (CTX) {
-      // Après drawImage(...)
       const IMAGE_DATA = ctx.getImageData(
         0,
         0,
@@ -2767,15 +2777,15 @@ export class ReplayCutterComponent implements OnInit {
         const GREEN = DATA[i + 1];
         const BLUE = DATA[i + 2];
 
-        // Luminance simple
+        // Simple luminance
         const PIXEL_LUMINANCE = 0.299 * RED + 0.587 * GREEN + 0.114 * BLUE;
 
-        // Seuil à ajuster (200 = clair, donc blanc ; le reste devient noir)
+        // Threshold to adjust (200 = light, therefore white; the rest becomes black)
         const VALUE = PIXEL_LUMINANCE > luminance ? 255 : 0;
 
-        DATA[i] = VALUE; // R
-        DATA[i + 1] = VALUE; // G
-        DATA[i + 2] = VALUE; // B
+        DATA[i] = VALUE; // Red
+        DATA[i + 1] = VALUE; // Green
+        DATA[i + 2] = VALUE; // Blue
       }
 
       CTX.putImageData(IMAGE_DATA, 0, 0);
@@ -2877,7 +2887,7 @@ export class ReplayCutterComponent implements OnInit {
           );
         }
 
-        // On scan avec luminence s'il est activé.
+        // We scan with luminence if it is activated.
         if (luminance) {
           const CORRECTED_CANVAS = this.setCanvasBlackAndWhite(CTX, luminance);
           // DEBUG
@@ -2891,7 +2901,7 @@ export class ReplayCutterComponent implements OnInit {
           );
         }
 
-        // On scan avec filtre s'il est activé.
+        // We scan with filter if it is activated.
         if (filter) {
           const FILTER1_CANVAS = document.createElement('canvas');
           FILTER1_CANVAS.width = CANVAS.width;

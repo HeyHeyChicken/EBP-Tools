@@ -63,6 +63,10 @@ export class WizzComponent {
     this.wizz();
   }
 
+  /**
+   * Triggers a visual "wizz" effect by temporarily adding a CSS class to the document body.
+   * The effect lasts for 750 milliseconds before being automatically removed.
+   */
   public wizz(): void {
     const CLASS: string = 'wizz';
     document.body.classList.add(CLASS);

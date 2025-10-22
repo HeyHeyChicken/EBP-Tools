@@ -41,6 +41,7 @@ export class GameHistoryComponent implements OnInit {
   //#region Attributes
 
   protected publicPseudo?: string = undefined;
+
   protected outputPath: string | undefined;
 
   protected nbPages: number = 1;
@@ -50,6 +51,7 @@ export class GameHistoryComponent implements OnInit {
   protected timeToWait: number = 1;
 
   protected seasonIndex: number = this.seasons.length;
+
   protected readonly tagPlaceholder: string = 'HeyHeyChicken#37457';
 
   //#endregion
@@ -88,14 +90,24 @@ export class GameHistoryComponent implements OnInit {
     });
   }
 
+  /**
+   * Returns the list of EVA available seasons as strings.
+   */
   protected get seasons(): string[] {
     return ['1', '2', '3', '1 reloaded', '4', '5', '6'];
   }
 
+  /**
+   * Returns an array of numbers from 1 to 20 representing the maximum selectable pages.
+   */
   protected get maxPages(): number[] {
     return Array.from({ length: 20 }, (_, i) => i + 1);
   }
 
+  /**
+   * Determines whether the public pseudo export button should be disabled.
+   * The button is disabled if the public pseudo is empty or does not match the required format (alphanumeric text followed by '#' and digits).
+   */
   protected get disablePublicPseudoExportButton(): boolean {
     if (!this.publicPseudo) {
       return true;
@@ -121,6 +133,11 @@ export class GameHistoryComponent implements OnInit {
       });
   }
 
+  /**
+   * Handles the paste event for the public pseudo input.
+   * If the pasted text contains a '/' character, it extracts the last segment containing a '#' symbol and sets it as the new public pseudo.
+   * @param event Clipboard paste event.
+   */
   protected onPublicPseudoPaste(event: ClipboardEvent): void {
     setTimeout(() => {
       if (event.target && this.publicPseudo) {
@@ -137,6 +154,10 @@ export class GameHistoryComponent implements OnInit {
     });
   }
 
+  /**
+   * Opens a confirmation dialog before exporting games linked to the current public pseudo.
+   * If the user confirms, triggers the Electron API to extract the games using the specified pagination and timing parameters.
+   */
   protected onPublicPseudoExport(): void {
     if (this.publicPseudo) {
       this.dialogService
@@ -156,6 +177,10 @@ export class GameHistoryComponent implements OnInit {
     }
   }
 
+  /**
+   * Opens a confirmation dialog before exporting games linked to the private pseudo.
+   * If the user confirms, triggers the Electron API to extract private games using the specified pagination and timing parameters.
+   */
   protected onPrivatePseudoExport(): void {
     this.dialogService
       .open(ConfirmationDialog)
