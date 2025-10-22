@@ -757,6 +757,9 @@ export class ReplayCutterComponent implements OnInit {
                   GAME_MAP.mapBound[1] + GAME_MAP.mapBound[3] + TOLERANCE
               ) {
                 retry = true;
+                console.warn(
+                  'Error: "detectMinimap", the dimensions of the minimap do not match the expected, retrying...'
+                );
                 this.detectMinimap(game, callback, index + 1);
               }
             }
@@ -921,17 +924,33 @@ export class ReplayCutterComponent implements OnInit {
     gameIndex: number,
     color: RGB,
     callback: Function,
-    frame?: CanvasImageSource
+    frame?: CanvasImageSource,
+    index: number = 1,
+    nbPlayers: number = 4
   ): void {
     if (frame) {
-      this.getTeamInfosPosition_Step2(color, frame, callback);
+      this.getTeamInfosPosition_Step2(
+        gameIndex,
+        color,
+        callback,
+        frame,
+        index,
+        nbPlayers
+      );
     } else if (this._videoPath) {
       this.videoURLToCanvas(
         `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        (this._games[gameIndex].start + 1) * 1000,
+        (this._games[gameIndex].start + index) * 1000,
         (videoFrame?: HTMLCanvasElement) => {
           if (videoFrame) {
-            this.getTeamInfosPosition_Step2(color, videoFrame, callback);
+            this.getTeamInfosPosition_Step2(
+              gameIndex,
+              color,
+              callback,
+              videoFrame,
+              index,
+              nbPlayers
+            );
           }
         }
       );
@@ -946,10 +965,16 @@ export class ReplayCutterComponent implements OnInit {
    * @param callback A function called with the calculated bounding box { x1, y1, x2, y2, frame }
    */
   private getTeamInfosPosition_Step2(
+    gameIndex: number,
     color: RGB,
+    callback: Function,
     frame: CanvasImageSource,
-    callback: Function
+    index: number,
+    nbPlayers: number
   ): void {
+    const EXPECTED_HEIGHT: number = 83;
+    const TOLERANCE: number = 0.1;
+
     let step = 0;
 
     let top = 0;
@@ -1020,13 +1045,31 @@ export class ReplayCutterComponent implements OnInit {
       }
     }
 
-    callback({
-      x1: left,
-      y1: top,
-      x2: right,
-      y2: bottom,
-      frame: frame
-    });
+    const HEIGHT = bottom - top;
+    if (
+      HEIGHT < EXPECTED_HEIGHT * nbPlayers * (1 - TOLERANCE) ||
+      HEIGHT > EXPECTED_HEIGHT * nbPlayers * (1 + TOLERANCE)
+    ) {
+      console.warn(
+        'Error: "getTeamInfosPosition_Step2", the image height seems wrong, retrying...'
+      );
+      this.getTeamInfosPosition(
+        gameIndex,
+        color,
+        callback,
+        undefined,
+        index + 1,
+        nbPlayers
+      );
+    } else {
+      callback({
+        x1: left,
+        y1: top,
+        x2: right,
+        y2: bottom,
+        frame: frame
+      });
+    }
   }
 
   /**
@@ -2526,7 +2569,9 @@ export class ReplayCutterComponent implements OnInit {
         this.debug?.nativeElement.append(CANVAS);
 
         if (red < 20 && green < 20 && blue < 20) {
-          console.error('Black frame, retrying...');
+          console.warn(
+            'Error "videoURLToCanvas", the image is too dark, retrying...'
+          );
           this.videoURLToCanvas(url, timeMs + 1000, callback);
         } else {
           callback(this.videoToCanvas(VIDEO));
