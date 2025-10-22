@@ -1,3 +1,7 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
 /* eslint-disable no-var */
 // Minimal OpenCV type definitions for global cv object
 // Extend as needed for your project
@@ -36,10 +40,7 @@ declare namespace cv {
     method: number,
     mask?: Mat
   ): void;
-  function minMaxLoc(
-    src: Mat,
-    mask?: Mat
-  ): MinMaxLocResult;
+  function minMaxLoc(src: Mat, mask?: Mat): MinMaxLocResult;
 
   // Constants
   const TM_CCOEFF_NORMED: number;

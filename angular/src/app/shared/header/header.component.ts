@@ -66,12 +66,12 @@ export class HeaderComponent implements OnInit {
 
   ngOnInit(): void {
     // List of languages supported by the application.
-    this.translateService.langs = ['fr', 'de', 'en', 'es', 'it', 'ro'].sort();
+    this.translateService.addLangs(['fr', 'de', 'en', 'es', 'it', 'ro'].sort());
 
-    this.translateService.setDefaultLang(HeaderComponent.DEFAULT_LANGUAGE);
+    this.translateService.setFallbackLang(HeaderComponent.DEFAULT_LANGUAGE);
 
     const LANGUAGE = location.pathname.split('/').filter((x) => x != '')[0];
-    if (this.translateService.langs.includes(LANGUAGE)) {
+    if (this.translateService.getLangs().includes(LANGUAGE)) {
       this.setLanguage(LANGUAGE);
     } else {
       const STORED_LANGUAGE = localStorage.getItem(
@@ -82,7 +82,7 @@ export class HeaderComponent implements OnInit {
       } else {
         const BROWSER_LANGUAGE: string = navigator.language;
         this.setLanguage(
-          this.translateService.langs.includes(BROWSER_LANGUAGE)
+          this.translateService.getLangs().includes(BROWSER_LANGUAGE)
             ? BROWSER_LANGUAGE
             : HeaderComponent.DEFAULT_LANGUAGE
         );
@@ -121,7 +121,7 @@ export class HeaderComponent implements OnInit {
 
   protected changeTool(event: MatSelectChange): void {
     this.router.navigate([
-      `/${this.translateService.currentLang}/${event.value}`
+      `/${this.translateService.getCurrentLang()}/${event.value}`
     ]);
   }
 
