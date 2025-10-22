@@ -22,6 +22,7 @@
 $height: 400px;
 .console {
   position: fixed;
+  box-sizing: border-box;
   bottom: calc(#{$height} * -1);
   left: calc(#{variables.$margin} * 2);
   height: $height;
