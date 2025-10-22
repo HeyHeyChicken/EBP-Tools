@@ -24,6 +24,7 @@ import { IdentityService } from './core/services/identity/identity.service';
 import { APIRestService } from './core/services/api-rest.service';
 import { ToastrService } from 'ngx-toastr';
 import { Team } from './core/services/identity/model/team.model';
+import { ConsoleComponent } from './shared/console/console.component';
 
 //#endregion
 @Component({
@@ -34,7 +35,8 @@ import { Team } from './core/services/identity/model/team.model';
     WizzComponent,
     FooterComponent,
     CommonModule,
-    TranslateModule
+    TranslateModule,
+    ConsoleComponent
   ],
   templateUrl: './app.html',
   styleUrls: ['./app.scss']

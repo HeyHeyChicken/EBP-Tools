@@ -1,0 +1,60 @@
+<div
+  class="shadow"
+  [class.invisible]="!isVisible"
+  (click)="closeConsole()"
+></div>
+<div class="console" [class.visible]="isVisible">
+  <header>
+    <h1>
+      <i class="fa-sharp fa-regular fa-square-terminal"></i>
+      <span>{{ 'shared.console.console' | translate }}</span>
+      <span class="shortcut">(Ctrl + Shift + C)</span>
+    </h1>
+    <div class="right">
+      <mat-form-field>
+        <mat-select [(value)]="selectedLogLevel">
+          @for (level of logLevels; track level) {
+            <mat-option [value]="level.value">
+              {{ level.label }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button
+        matTooltip="{{ 'shared.console.downloadLogs' | translate }}"
+        (click)="downloadLogs()"
+        class="squared"
+      >
+        <i class="fa-solid fa-file-arrow-down"></i>
+      </button>
+      <button
+        matTooltip="{{ 'shared.console.clearLogs' | translate }}"
+        (click)="clearLogs()"
+        class="squared"
+      >
+        <i class="fa-sharp fa-solid fa-broom-wide"></i>
+      </button>
+      <button
+        matTooltip="{{ 'common.close' | translate }}"
+        (click)="closeConsole()"
+        class="squared"
+      >
+        <i class="fa-sharp fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  </header>
+  <main class="console-content">
+    <table>
+      <tbody>
+        @for (log of getFilteredLogs((logs$ | async) || []); track $index) {
+          <tr [ngClass]="getLogClass(log.level)">
+            <td class="timestamp">{{ formatTime(log.timestamp) }}</td>
+            <td class="level">[{{ log.level.toUpperCase() }}]</td>
+            <td class="source">[{{ log.source }}]</td>
+            <td class="message">{{ log.message }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </main>
+</div>

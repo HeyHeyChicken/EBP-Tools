@@ -36,7 +36,7 @@ export class KillFeedService {
 
   private onScanEnded(): void {
     this.videoPath = undefined;
-    console.log('end');
+    console.log('onScanEnded');
   }
 
   private setVideoCurrentTime(video: HTMLVideoElement, time: number): void {

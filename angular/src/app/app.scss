@@ -12,7 +12,7 @@
   width: 100vw;
   background-color: rgba(0, 0, 0, 0.5);
   cursor: wait;
-  z-index: 997;
+  z-index: 996;
 
   $spinnerSize: calc(#{variables.$margin} * 4);
   > div {

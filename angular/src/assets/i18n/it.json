@@ -29,8 +29,7 @@
         "videoCutHere": "Il tuo video è stato tagliato qui: {{filePath}}",
         "videoFileNotFound": "File video non trovato.",
         "noGamesFoundInStatistics": "Nessuna partita è stata trovata su {{map}} con questi punteggi ({{orangeScore}} vs {{blueScore}}). Vuoi crearne una? <span class='btn'>Sì</span>",
-        "noGamesFoundInVideo": "Non sono stati trovati giochi nel tuo video. Se pensi che sia un errore, fammelo sapere.",
-        "mapNotAICompatible": "La mappa {{map}} non è ancora compatibile con l'IA di EBP, ma lo sarà nei prossimi aggiornamenti."
+        "noGamesFoundInVideo": "Non sono stati trovati giochi nel tuo video. Se pensi che sia un errore, fammelo sapere."
       },
       "outputPath": "Percorso di output",
       "detectingPlayerNicknames": "Rilevamento soprannomi giocatori...",
@@ -165,6 +164,12 @@
       "version": "Versione",
       "newUpdate": "È disponibile un nuovo aggiornamento, scaricalo cliccando qui.",
       "beta": "Stai usando una versione beta dell'app, ti preghiamo di non condividerla."
+    },
+    "console": {
+      "console": "Console",
+      "downloadLogs": "Scarica i registri",
+      "clearLogs": "Cancellare i registri",
+      "logsExported": "Log esportati con successo in: {{path}}"
     }
   }
 }

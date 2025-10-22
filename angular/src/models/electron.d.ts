@@ -83,6 +83,7 @@ export interface ElectronAPI {
     notificationData: string
   ) => void;
   removeNotification: (showMainWindow: boolean) => void;
+  saveConsoleLogs: (logs: ElectronLogData[]) => Promise<string>;
 
   //#endregion
 
@@ -103,6 +104,7 @@ export interface ElectronAPI {
   globalMessage: (
     callback: (i18nPath: string, i18nVariables: object) => void
   ) => void;
+  onConsoleLog: (callback: (logData: ElectronLogData) => void) => void;
 
   //#endregion
 }

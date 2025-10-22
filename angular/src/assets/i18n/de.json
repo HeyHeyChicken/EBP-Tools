@@ -29,8 +29,7 @@
         "videoCutHere": "Ihr Video wurde hier geschnitten: {{filePath}}",
         "videoFileNotFound": "Videodatei nicht gefunden.",
         "noGamesFoundInStatistics": "Auf {{map}} wurde kein Spiel mit diesen Punktzahlen ({{orangeScore}} gegen {{blueScore}}) gefunden. Möchten Sie eines erstellen? <span class='btn'>Ja</span>",
-        "noGamesFoundInVideo": "Es wurden keine Spiele in Ihrem Video gefunden. Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen.",
-        "mapNotAICompatible": "Die Karte {{map}} ist noch nicht mit EBPs KI kompatibel, wird aber in kommenden Updates verfügbar sein."
+        "noGamesFoundInVideo": "Es wurden keine Spiele in Ihrem Video gefunden. Wenn Sie glauben, dass dies ein Fehler ist, lassen Sie es mich wissen."
       },
       "outputPath": "Ausgabepfad",
       "detectingPlayerNicknames": "Erkennung von Spieler-Nicknames...",
@@ -165,6 +164,12 @@
       "version": "Version",
       "newUpdate": "Ein neues Update ist verfügbar. Klicken Sie hier, um es herunterzuladen.",
       "beta": "Sie verwenden eine Beta-Version der App, bitte teilen Sie sie nicht."
+    },
+    "console": {
+      "console": "Konsole",
+      "downloadLogs": "Protokolle herunterladen",
+      "clearLogs": "Protokolle löschen",
+      "logsExported": "Protokolle erfolgreich exportiert nach: {{path}}"
     }
   }
 }

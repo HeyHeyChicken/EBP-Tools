@@ -41,6 +41,103 @@ const execAsync = util.promisify(exec);
 
 //#endregion
 
+//#region Console Log Redirection
+
+/**
+ * Setup console log redirection to send Electron console output to the frontend.
+ */
+function setupConsoleRedirection() {
+    // Store original console methods
+    const originalConsole = {
+        log: console.log,
+        error: console.error,
+        warn: console.warn,
+        info: console.info,
+        debug: console.debug
+    };
+
+    // Helper function to sanitize objects by replacing data:image/ URLs with "..."
+    const sanitizeImageData = (obj) => {
+        if (obj === null || obj === undefined) {
+            return obj;
+        }
+
+        if (typeof obj === 'string') {
+            return obj.startsWith('data:image/') ? '...' : obj;
+        }
+
+        if (Array.isArray(obj)) {
+            return obj.map((item) => sanitizeImageData(item));
+        }
+
+        if (typeof obj === 'object') {
+            const sanitized = {};
+            for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    sanitized[key] = sanitizeImageData(obj[key]);
+                }
+            }
+            return sanitized;
+        }
+
+        return obj;
+    };
+
+    // Function to send log to frontend
+    const sendLogToFrontend = (level, ...args) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            const sanitizeArg = (arg) => {
+                if (typeof arg === 'object' && arg !== null) {
+                    const sanitized = sanitizeImageData(arg);
+                    return JSON.stringify(sanitized, null, 2);
+                }
+                return String(arg);
+            };
+
+            const logData = {
+                level: level,
+                message: args.map(sanitizeArg).join(' '),
+                timestamp: new Date().toISOString(),
+                source: 'electron'
+            };
+
+            try {
+                mainWindow.webContents.send('console-log', logData);
+            } catch (error) {
+                // Silently ignore if window is not ready
+            }
+        }
+    };
+
+    // Override console methods
+    console.log = (...args) => {
+        originalConsole.log(...args);
+        sendLogToFrontend('log', ...args);
+    };
+
+    console.error = (...args) => {
+        originalConsole.error(...args);
+        sendLogToFrontend('error', ...args);
+    };
+
+    console.warn = (...args) => {
+        originalConsole.warn(...args);
+        sendLogToFrontend('warn', ...args);
+    };
+
+    console.info = (...args) => {
+        originalConsole.info(...args);
+        sendLogToFrontend('info', ...args);
+    };
+
+    console.debug = (...args) => {
+        originalConsole.debug(...args);
+        sendLogToFrontend('debug', ...args);
+    };
+}
+
+//#endregion
+
 let isProd = process.env.NODE_ENV === 'production';
 const ROOT_PATH = isProd ? process.resourcesPath : __dirname;
 const APP_GOT_THE_LOCK = app.requestSingleInstanceLock();
@@ -210,9 +307,28 @@ let projectLatestVersion /* string */ = '';
             game._end - game._start
         } -c copy "${OUTPUT_FILE_PATH}"`;
 
+        console.log(`[FFMPEG] Cut Game - Executing: ${COMMAND}`);
+
         return new Promise((resolve, reject) => {
             exec(COMMAND, (error, stdout, stderr) => {
-                if (error) return reject(error);
+                if (error) {
+                    console.error(
+                        `[FFMPEG] Cut Game - Error: ${error.message}`
+                    );
+                    return reject(error);
+                }
+
+                if (stderr) {
+                    console.log(`[[FFMPEG] Cut Game - Output: ${stderr}`);
+                }
+
+                if (stdout) {
+                    console.log(`[[FFMPEG] Cut Game - Stdout: ${stdout}`);
+                }
+
+                console.log(
+                    `[[FFMPEG] Cut Game - Completed successfully: ${OUTPUT_FILE_PATH}`
+                );
                 resolve(OUTPUT_FILE_PATH);
             });
         });
@@ -396,9 +512,26 @@ let projectLatestVersion /* string */ = '';
 
         const COMMAND /* string */ = `"${FFMPEG_PATH}" -i "${videoPath}" -filter:v "crop=${cropPosition.x2 - cropPosition.x1}:${cropPosition.y2 - cropPosition.y1}:${cropPosition.x1}:${cropPosition.y1}" -r 10 -an "${OUTPUT_FILE_PATH}"`;
 
+        console.log(`[FFMPEG] Crop - Executing: ${COMMAND}`);
+
         return new Promise((resolve, reject) => {
             exec(COMMAND, (error, stdout, stderr) => {
-                if (error) return reject(error);
+                if (error) {
+                    console.error(`[FFMPEG] Crop - Error: ${error.message}`);
+                    return reject(error);
+                }
+
+                if (stderr) {
+                    console.log(`[FFMPEG] Crop - Output: ${stderr}`);
+                }
+
+                if (stdout) {
+                    console.log(`[FFMPEG] Crop - Stdout: ${stdout}`);
+                }
+
+                console.log(
+                    `[FFMPEG] Crop - Completed successfully: ${OUTPUT_FILE_PATH}`
+                );
                 resolve(OUTPUT_FILE_PATH);
             });
         });
@@ -465,7 +598,7 @@ let projectLatestVersion /* string */ = '';
             fs.unlinkSync(outputPath);
         }
 
-        const FFMPEG = spawn(FFMPEG_PATH, [
+        const FFMPEG_ARGS = [
             '-i',
             inputPath,
             '-vf',
@@ -479,13 +612,22 @@ let projectLatestVersion /* string */ = '';
             '-c:a',
             'copy',
             outputPath
-        ]);
+        ];
+
+        console.log(
+            `[FFMPEG] Upscale - Executing: ${FFMPEG_PATH} ${FFMPEG_ARGS.join(' ')}`
+        );
+
+        const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
 
         let duration = 0;
 
         // Retrieving duration + progress information
         FFMPEG.stderr.on('data', (data) => {
             const DATA = data.toString();
+
+            // Log all ffmpeg output for debugging
+            console.log(`[FFMPEG] Upscale - ${DATA.trim()}`);
 
             // Total duration
             const DURATION_MATCH = DATA.match(
@@ -551,15 +693,26 @@ let projectLatestVersion /* string */ = '';
      */
     function getVideoResolution(videoPath, callback) {
         const COMMAND = `${FFMPEG_PATH} -i "${videoPath}" 2>&1`;
+        console.log(
+            `[FFMPEG] Get video resolution - Executing command: ${COMMAND}`
+        );
+
         exec(COMMAND, (err, stdout, stderr) => {
             const OUTPUT = stderr || stdout;
+
+            // Log the raw ffmpeg output
+            if (OUTPUT) {
+                console.log(`[FFMPEG] Get video resolution - ${OUTPUT}`);
+            }
+
             const RESOLUTION = OUTPUT.match(/, (\d+)x(\d+)[ ,]/);
             if (!RESOLUTION) {
-                console.error('Info not found');
+                console.error('[FFMPEG] Resolution info not found in output.');
                 callback(0, 0);
             } else {
                 const WIDTH = +RESOLUTION[1];
                 const HEIGHT = +RESOLUTION[2];
+                console.log(`[FFMPEG] Detected resolution: ${WIDTH}x${HEIGHT}`);
                 callback(WIDTH, HEIGHT);
             }
         });
@@ -737,12 +890,22 @@ let projectLatestVersion /* string */ = '';
                     'copy',
                     TEMP_FILE
                 ];
+
+                console.log(
+                    `[FFMPEG] Cut without reencode - ${i + 1}/${KEEP.length} - Executing: ${FFMPEG_PATH} ${ARGS.join(' ')}`
+                );
+
                 const COMMAND = spawn(FFMPEG_PATH, ARGS);
 
                 let result = '';
                 COMMAND.stderr.on('data', (data) => {
                     const STR = data.toString();
                     result += STR;
+
+                    // Log ffmpeg output
+                    console.log(
+                        `[FFMPEG] Cut without reencode - ${i + 1}/${KEEP.length} - ${STR.trim()}`
+                    );
 
                     const TIME_MATCH = STR.match(/time=(\d+:\d+:\d+\.\d+)/);
                     if (TIME_MATCH) {
@@ -785,9 +948,24 @@ let projectLatestVersion /* string */ = '';
             TEMP_FILES.map((f) => `file '${f}'`).join('\n')
         );
 
-        await execAsync(
-            `"${FFMPEG_PATH}" -f concat -safe 0 -i "${CONCAT_FILE}" -c copy "${output}"`
-        );
+        const CONCAT_COMMAND = `"${FFMPEG_PATH}" -f concat -safe 0 -i "${CONCAT_FILE}" -c copy "${output}"`;
+        console.log(`[FFMPEG] - Concat - Executing: ${CONCAT_COMMAND}`);
+
+        try {
+            const result = await execAsync(CONCAT_COMMAND);
+            console.log(
+                `[[FFMPEG] - Concat - Completed successfully: ${output}`
+            );
+            if (result.stdout) {
+                console.log(`[[FFMPEG] - Concat - Stdout: ${result.stdout}`);
+            }
+            if (result.stderr) {
+                console.log(`[[FFMPEG] - Concat - Stderr: ${result.stderr}`);
+            }
+        } catch (error) {
+            console.error(`[[FFMPEG] - Concat - Error: ${error.message}`);
+            throw error;
+        }
 
         fs.unlinkSync(CONCAT_FILE);
         TEMP_FILES.forEach((f) => fs.unlinkSync(f));
@@ -925,6 +1103,9 @@ let projectLatestVersion /* string */ = '';
         if (!isProd) {
             mainWindow.webContents.openDevTools();
         }
+
+        // Setup console log redirection to frontend
+        setupConsoleRedirection();
 
         checkJwtToken((isLoggedIn) => {
             // Loads the application's index.html.
@@ -1234,6 +1415,9 @@ let projectLatestVersion /* string */ = '';
 
         // The front-end asks the server to open an url in the default browser.
         ipcMain.handle('open-url', (event, url) => {
+            console.log(
+                `Opening the URL in the user's default browser: ${url}`
+            );
             shell.openExternal(url);
         });
 
@@ -1741,6 +1925,42 @@ let projectLatestVersion /* string */ = '';
                 });
             }
         );
+
+        // The front-end asks the server to save console logs to a text file.
+        ipcMain.handle('save-console-logs', async (event, logs) => {
+            try {
+                const FOLDER_PATH = getOutputPath(
+                    'videoCutterOutputPath',
+                    path.join(os.homedir(), 'Downloads')
+                );
+                const FILE_PATH = path.join(
+                    FOLDER_PATH,
+                    `EBP - Console Logs - ${new Date().getTime()}.txt`
+                );
+
+                let content = `EBP - EVA Battle Plan Tools - Console Logs Export\n`;
+                content += `Generated: ${new Date().toISOString()}\n`;
+                content += `Total logs: ${logs.length}\n`;
+                content += `${'='.repeat(80)}\n\n`;
+
+                logs.forEach((log, index) => {
+                    const timestamp = new Date(log.timestamp).toLocaleString();
+                    content += `[${index + 1}] ${timestamp} [${log.level.toUpperCase()}] [${log.source}]\n`;
+                    content += `${log.message}\n`;
+                    content += `${'-'.repeat(40)}\n`;
+                });
+
+                fs.writeFileSync(FILE_PATH, content, 'utf-8');
+
+                console.log(`[LOGS] Console logs saved to: ${FILE_PATH}`);
+                return FOLDER_PATH;
+            } catch (error) {
+                console.error(
+                    `[LOGS] Error saving console logs: ${error.message}`
+                );
+                throw error;
+            }
+        });
 
         app.on('activate', function () {
             // On macOS it's common to re-create a window in the app when the dock icon is clicked and there are no other windows open.

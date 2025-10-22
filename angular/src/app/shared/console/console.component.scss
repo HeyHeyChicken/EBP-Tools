@@ -1,0 +1,185 @@
+// Copyright (c) 2025, Antoine Duval
+// This file is part of a source-visible project.
+// See LICENSE for terms. Unauthorized use is prohibited.
+
+@use '../../../styles/imports/variables' as variables;
+@use '../../../styles/imports/material_colors' as material_colors;
+
+.shadow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+
+  &.invisible {
+    display: none;
+  }
+}
+
+$height: 400px;
+.console {
+  position: fixed;
+  bottom: calc(#{$height} * -1);
+  left: calc(#{variables.$margin} * 2);
+  height: $height;
+  border-color: variables.$border_color;
+  border-width: 1px 1px 0 1px;
+  border-style: solid;
+  z-index: 999;
+  transition: bottom 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  width: calc(100vw - #{variables.$margin} * 4);
+  font-size: variables.$margin;
+
+  &.visible {
+    bottom: 0;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    padding: calc(#{variables.$margin} / 2) calc(#{variables.$margin} / 2)
+      calc(#{variables.$margin} / 2) variables.$margin;
+    background: variables.$dark_color;
+    border-bottom: 1px solid variables.$border_color;
+
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: variables.$margin;
+      margin: 0;
+      font-size: variables.$margin;
+      font-weight: normal;
+
+      > i {
+        font-size: calc(#{variables.$margin} * 1.5);
+      }
+
+      > span {
+        &:not(.shortcut) {
+          font-weight: bold;
+        }
+
+        &.shortcut {
+          opacity: 0.5;
+        }
+      }
+    }
+
+    .right {
+      display: flex;
+      gap: calc(#{variables.$margin} / 2);
+
+      > mat-form-field {
+        width: calc(#{variables.$margin} * 12);
+      }
+    }
+  }
+
+  > main {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: variables.$margin;
+    background: variables.$dark_color;
+    position: relative;
+
+    > table {
+      border-collapse: collapse;
+
+      > tbody {
+        > tr {
+          gap: variables.$margin;
+          white-space: pre-wrap;
+          word-break: break-word;
+
+          &:not(:last-child) {
+            > td {
+              padding-bottom: calc(#{variables.$margin} / 2);
+              border-bottom: 1px solid variables.$border_color;
+            }
+          }
+
+          &:not(:first-child) {
+            > td {
+              padding-top: calc(#{variables.$margin} / 2);
+            }
+          }
+
+          > td {
+            &:not(:last-child) {
+              white-space: nowrap;
+              padding-right: variables.$margin;
+            }
+
+            &:last-child {
+              width: 100%;
+            }
+
+            &.timestamp {
+              opacity: 0.5;
+              flex-shrink: 0;
+            }
+
+            &.level {
+              font-weight: bold;
+              flex-shrink: 0;
+            }
+
+            &.source {
+              opacity: 0.5;
+              flex-shrink: 0;
+            }
+
+            &.message {
+              flex: 1;
+              line-height: 1.4;
+            }
+          }
+          &.log-error {
+            > .level,
+            > .message {
+              color: material_colors.$material_red_500;
+            }
+          }
+
+          &.log-warn {
+            > .level,
+            > .message {
+              color: material_colors.$material_orange_500;
+            }
+          }
+
+          &.log-info {
+            > .level,
+            > .message {
+              color: material_colors.$material_blue_500;
+            }
+          }
+
+          &.log-debug {
+            > .level,
+            > .message {
+              color: material_colors.$material_purple_500;
+            }
+          }
+        }
+
+        .no-logs {
+          opacity: 0.5;
+          font-style: italic;
+          text-align: center;
+          position: absolute;
+          top: 50%;
+          width: 100%;
+          left: 0;
+          transform: translateY(-50%);
+        }
+      }
+    }
+  }
+}

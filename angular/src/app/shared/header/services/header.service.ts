@@ -34,7 +34,6 @@ export class HeaderService {
   ): void {
     const OLD_COINS_VALUE = this.identityService.coins;
     this.apiRestService.getMyCoins().subscribe((coins: number) => {
-      console.log(coins);
       this.identityService.coins = coins;
       if (OLD_COINS_VALUE == coins) {
         if (loopIndex < maxLoop) {

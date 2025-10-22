@@ -62,7 +62,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showNotification: (hideMainWindow, width, height, notificationData) => ipcRenderer.invoke("show-notification", hideMainWindow, width, height, notificationData),
   // The front-end asks the server to remove the notification.
   removeNotification: (showMainWindow) => ipcRenderer.invoke("remove-notification", showMainWindow),
-  
+  // The front-end asks the server to save console logs to a text file.
+  saveConsoleLogs: (logs) => ipcRenderer.invoke("save-console-logs", logs),
+
   //#endregion
 
   //#region Server -> Client
@@ -91,6 +93,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   replayDownloaderPercent: (callback) => ipcRenderer.on("replay-downloader-percent", (event, percent) => callback(percent)),
   // The server asks the font-end to display a global message.
   globalMessage: (callback) => ipcRenderer.on("global-message", (event, i18nPath, i18nVariables) => callback(i18nPath, i18nVariables)),
+  // The server sends console logs to the front-end.
+  onConsoleLog: (callback) => ipcRenderer.on("console-log", (event, logData) => callback(logData)),
 
   //#endregion
 });

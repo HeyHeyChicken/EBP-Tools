@@ -29,8 +29,7 @@
         "videoCutHere": "Votre vidéo a été découpée ici : {{filePath}}",
         "videoFileNotFound": "Fichier vidéo introuvable.",
         "noGamesFoundInStatistics": "Aucune partie n'a été trouvée sur {{map}} avec ces scores ({{orangeScore}} vs {{blueScore}}). Souhaitez vous la créer ? <span class='btn'>Oui</span>",
-        "noGamesFoundInVideo": "Aucune partie n'a été trouvée dans votre vidéo. Si vous pensez que c'est une erreur, faites-le moi savoir.",
-        "mapNotAICompatible": "La carte {{map}} n'est pas encore compatible avec l'IA d'EBP, mais le sera dans les prochaines mises à jour."
+        "noGamesFoundInVideo": "Aucune partie n'a été trouvée dans votre vidéo. Si vous pensez que c'est une erreur, faites-le moi savoir."
       },
       "outputPath": "Dossier de sortie",
       "detectingPlayerNicknames": "Détection des pseudos des joueurs...",
@@ -165,6 +164,12 @@
       "version": "Version",
       "newUpdate": "Une nouvelle mise à jour est disponible, téléchargez-la en cliquant ici.",
       "beta": "Vous utilisez une version beta de l'application, merci de ne pas la partager."
+    },
+    "console": {
+      "console": "Console",
+      "downloadLogs": "Télécharger les logs",
+      "clearLogs": "Effacer les logs",
+      "logsExported": "Journaux exportés avec succès vers : {{path}}"
     }
   }
 }
