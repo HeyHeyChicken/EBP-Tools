@@ -13,6 +13,7 @@ import { NotificationService } from './services/notification.service';
 import { Message } from './models/message.model';
 import { Subscription } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
+import { ConsoleService } from '../../shared/console/services/console.service';
 
 //#endregion
 
@@ -38,8 +39,11 @@ export class NotificationComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly notificationService: NotificationService,
-    private readonly route: ActivatedRoute
-  ) {}
+    private readonly route: ActivatedRoute,
+    private readonly consoleService: ConsoleService
+  ) {
+    this.consoleService.disabled = true;
+  }
 
   //#region Functions
 

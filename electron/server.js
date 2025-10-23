@@ -692,7 +692,7 @@ let projectLatestVersion /* string */ = '';
      * @param {Function} callback Callback function with width and height information.
      */
     function getVideoResolution(videoPath, callback) {
-        const COMMAND = `${FFMPEG_PATH} -i "${videoPath}" 2>&1`;
+        const COMMAND = `"${FFMPEG_PATH}" -i "${videoPath}" 2>&1`;
         console.log(
             `[FFMPEG] Get video resolution - Executing command: ${COMMAND}`
         );
@@ -1321,7 +1321,7 @@ let projectLatestVersion /* string */ = '';
             let percent = 0;
             // We get the title of the video.
             exec(
-                `${YTDLP_PATH} --ffmpeg-location ${FFMPEG_PATH} --get-title ${url}`,
+                `"${YTDLP_PATH}" --ffmpeg-location "${FFMPEG_PATH}" --get-title ${url}`,
                 (error, stdout, stderr) => {
                     if (error) {
                         console.error(error.message);

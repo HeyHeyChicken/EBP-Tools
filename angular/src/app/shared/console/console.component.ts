@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
 import { Observable, Subscription } from 'rxjs';
-import { ElectronConsoleService } from '../../core/services/electron-console.service';
+import { ConsoleService } from './services/console.service';
 import { LogData } from '../../../models/log-data';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ToastrService } from 'ngx-toastr';
@@ -54,11 +54,11 @@ export class ConsoleComponent implements OnInit, OnDestroy {
   //#endregion
 
   constructor(
-    private electronConsoleService: ElectronConsoleService,
+    private readonly consoleService: ConsoleService,
     private readonly translateService: TranslateService,
     private readonly toastrService: ToastrService
   ) {
-    this.logs$ = this.electronConsoleService.logs$;
+    this.logs$ = this.consoleService.logs$;
   }
 
   //#region Functions
@@ -83,7 +83,12 @@ export class ConsoleComponent implements OnInit, OnDestroy {
    */
   @HostListener('document:keydown', ['$event'])
   handleKeyboard(event: KeyboardEvent): void {
-    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'c') {
+    if (
+      event.ctrlKey &&
+      event.shiftKey &&
+      event.key.toLowerCase() === 'c' &&
+      !this.consoleService.disabled
+    ) {
       event.preventDefault();
       this.toggleConsole();
     }
@@ -102,7 +107,7 @@ export class ConsoleComponent implements OnInit, OnDestroy {
   protected async downloadLogs(): Promise<void> {
     try {
       const FILTERED_LOGS = this.getFilteredLogs(
-        this.electronConsoleService.currentLogs
+        this.consoleService.currentLogs
       );
 
       if (window.electronAPI) {
@@ -135,7 +140,7 @@ export class ConsoleComponent implements OnInit, OnDestroy {
    * Clears all console logs.
    */
   protected clearLogs(): void {
-    this.electronConsoleService.clearLogs();
+    this.consoleService.clearLogs();
   }
 
   /**
@@ -148,9 +153,9 @@ export class ConsoleComponent implements OnInit, OnDestroy {
       return logs;
     }
     const LOGS: LogData[] = logs.filter(
-      (log) => log.level === this.selectedLogLevel
+      (log) => log.level == this.selectedLogLevel
     );
-    return LOGS.splice(0, LOGS.length - ElectronConsoleService.MAX_LOGS);
+    return LOGS.slice(ConsoleService.MAX_LOGS * -1);
   }
 
   /**

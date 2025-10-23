@@ -6,17 +6,18 @@
 
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { LogData } from '../../../models/log-data';
+import { LogData } from '../../../../models/log-data';
 
 //#endregion
 
 @Injectable({
   providedIn: 'root'
 })
-export class ElectronConsoleService {
+export class ConsoleService {
   //#region Attributes
 
   public static readonly MAX_LOGS = 500;
+  public disabled: boolean = false;
   private _logsSubject = new BehaviorSubject<LogData[]>([]);
 
   //#endregion
