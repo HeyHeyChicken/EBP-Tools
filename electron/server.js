@@ -24,7 +24,7 @@ if (require('electron-squirrel-startup')) {
 const path = require('node:path');
 const express = require('express');
 const os = require('os');
-const { exec, spawn } = require('child_process');
+const { exec, spawn, execFile } = require('child_process');
 const { default: getPort } = require('get-port');
 const { version } = require('../package.json');
 const https = require('https');
@@ -1444,6 +1444,26 @@ let projectLatestVersion /* string */ = '';
 
         // The front-end asks the server to return the project version.
         ipcMain.handle('get-version', () => {
+            //#region Binaries versions
+
+            execFile(FFMPEG_PATH, ['-version'], (error, stdout, stderr) => {
+                if (error) {
+                    console.error('FFMPEG error:\n', error);
+                    return;
+                }
+                console.info('FFMPEG version:\n', stdout);
+            });
+
+            execFile(YTDLP_PATH, ['--version'], (error, stdout, stderr) => {
+                if (error) {
+                    console.error('YT-DLP erreur:\n', error);
+                    return;
+                }
+                console.info('YT-DLP version:\n', stdout.trim());
+            });
+
+            //#endregion
+
             return {
                 current: version,
                 last: projectLatestVersion
