@@ -77,6 +77,7 @@ export class GameHistoryComponent implements OnInit {
     });
 
     window.electronAPI.gamesAreExported((filePath?: string) => {
+      console.log(`The user exported his games here: "${filePath}"`);
       this.ngZone.run(() => {
         this.globalService.loading = undefined;
         if (filePath) {
@@ -127,6 +128,7 @@ export class GameHistoryComponent implements OnInit {
         this.ngZone.run(() => {
           this.globalService.loading = undefined;
           if (path) {
+            console.log(`The user changed games export folder: "${path}"`);
             this.outputPath = path;
           }
         });
@@ -165,6 +167,9 @@ export class GameHistoryComponent implements OnInit {
         .afterClosed()
         .subscribe((answer: boolean | undefined) => {
           if (answer === true) {
+            console.log(
+              `The user is trying to export games from public user "${this.publicPseudo}".`
+            );
             window.electronAPI.extractPublicPseudoGames(
               this.publicPseudo!,
               this.nbPages,
@@ -187,6 +192,7 @@ export class GameHistoryComponent implements OnInit {
       .afterClosed()
       .subscribe((answer: boolean | undefined) => {
         if (answer === true) {
+          console.log(`User is trying to export a private user's games.`);
           window.electronAPI.extractPrivatePseudoGames(
             this.nbPages,
             this.seasonIndex,

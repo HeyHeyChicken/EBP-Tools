@@ -4,7 +4,7 @@
 
 //#region Imports
 
-import { Component, NgZone, OnInit } from '@angular/core';
+import { Component, isDevMode, NgZone, OnInit } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { GridModule } from '../../shared/grid/grid.module';
 import { MatInputModule } from '@angular/material/input';
@@ -37,7 +37,9 @@ import { NotificationService } from '../notification/services/notification.servi
 export class ReplayDownloaderComponent implements OnInit {
   //#region Attributes
 
-  protected youTubeURL?: string; // https://www.youtube.com/watch?v=UKVDSvhIRM8
+  protected youTubeURL?: string = isDevMode()
+    ? 'https://www.youtube.com/watch?v=UKVDSvhIRM8'
+    : undefined;
   protected twitchURL?: string;
   protected outputPath: string | undefined;
   protected percent?: number;
@@ -76,6 +78,7 @@ export class ReplayDownloaderComponent implements OnInit {
       this.ngZone.run(() => {
         this.percent = undefined;
         if (videoPath) {
+          console.log(`The user exported a replay here: "${videoPath}"`);
           this.globalService.loading = undefined;
           this.toastrService.success(videoPath).onTap.subscribe(() => {
             window.electronAPI.openFile(videoPath);
@@ -119,6 +122,9 @@ export class ReplayDownloaderComponent implements OnInit {
         this.ngZone.run(() => {
           this.globalService.loading = undefined;
           if (path) {
+            console.log(
+              `The user changed the replay download folder: "${path}"`
+            );
             this.outputPath = path;
           }
         });
