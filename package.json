@@ -35,7 +35,7 @@
         "eslint": "^9.29.0",
         "prettier": "^3.5.3",
         "typescript": "^5.8.3",
-        "typescript-eslint": "^8.34.1"
+        "typescript-eslint": "^8.46.3"
     },
     "dependencies": {
         "discord-rpc": "^4.0.1",
