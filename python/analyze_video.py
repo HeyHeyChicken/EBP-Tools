@@ -260,10 +260,13 @@ def _most_frequent(arr: list) -> str:
 
 def _score_checker(value: str) -> str:
     """Valide et normalise une chaîne de score OCR vers un entier entre 0 et 100."""
+    DIGITS = re.sub(r'\D', '', value)
+    if not DIGITS:
+        return ''
     try:
-        return str(min(max(int(value[:3]), 0), 100))
+        return str(min(max(int(DIGITS[:3]), 0), 100))
     except Exception:
-        return '0'
+        return ''
 
 
 def _get_map_by_name(text: str) -> str:
@@ -332,7 +335,14 @@ def _ocr_region(
         results = [checker(r) for r in results]
 
     NON_EMPTY = [r for r in results if r]
-    RESULT = _most_frequent(NON_EMPTY) if NON_EMPTY else ''
+    if not NON_EMPTY:
+        RESULT = ''
+    elif checker:
+        MAX_LEN = max(len(r) for r in NON_EMPTY)
+        LONGEST = [r for r in NON_EMPTY if len(r) == MAX_LEN]
+        RESULT = _most_frequent(LONGEST)
+    else:
+        RESULT = _most_frequent(NON_EMPTY)
     _emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
     return RESULT
 
