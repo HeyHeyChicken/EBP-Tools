@@ -72,7 +72,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setSettings: (key, value) => ipcRenderer.invoke("set-settings", key, value),
   // The front-end asks the server to send a socket message to the EBP socket server.
   socketEmit: (socket, path, value) => ipcRenderer.invoke("socket-emit", socket, path, value),
-  fixMp4ForBrowser: (videoPath) => ipcRenderer.invoke("fix-mp4-for-browser", videoPath),
   // The front-end asks the server to run the Python video analyzer.
   runAnalyzer: (videoPath, settingsJSON) => ipcRenderer.invoke("run-analyzer", videoPath, settingsJSON),
 

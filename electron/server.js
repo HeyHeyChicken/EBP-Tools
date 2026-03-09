@@ -1180,6 +1180,16 @@ if (!APP_GOT_THE_LOCK) {
 
         // The front-end asks the server to run the Python video analyzer.
         ipcMain.handle('run-analyzer', (event, videoPath, settingsJSON) => {
+            const NOTIFICATION_DATA = {
+                percent: 0,
+                leftRounded: true,
+                infinite: true,
+                icon: 'fa-sharp fa-solid fa-clapperboard-play',
+                text: '.view.replay_cutter.videoStartsItsAnalysis',
+                state: 'info'
+            };
+            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+
             return new Promise((resolve, reject) => {
                 const ARGS = [videoPath, FFMPEG_PATH, '', settingsJSON || '{}'];
                 const SPAWN_OPTIONS = {
@@ -1454,7 +1464,7 @@ if (!APP_GOT_THE_LOCK) {
                             }
                         });
 
-                        DL.on('close', (code) => {
+                        DL.on('close', async (code) => {
                             if (code == 0) {
                                 const NORMALIZED_OUTPUT_PATH =
                                     OUTPUT_PATH.normalize('NFC');
@@ -1464,6 +1474,10 @@ if (!APP_GOT_THE_LOCK) {
                                         new Date(),
                                         new Date()
                                     );
+                                }
+
+                                if (platform === 'twitch') {
+                                    await fixForBrowser(OUTPUT_PATH);
                                 }
 
                                 getMainWindow().webContents.send(
@@ -1798,21 +1812,6 @@ if (!APP_GOT_THE_LOCK) {
         // The front-end asks the server to ask the user to choose files with the computer explorer.
         ipcMain.handle('open-files', async (event, extensions) => {
             return openFiles(extensions);
-        });
-
-        // The front-end asks the server to fix an mp4 file.
-        ipcMain.handle('fix-mp4-for-browser', async (event, videoPath) => {
-            const NOTIFICATION_DATA = {
-                percent: 0,
-                leftRounded: true,
-                infinite: true,
-                icon: 'fa-sharp fa-solid fa-clapperboard-play',
-                text: '.view.replay_cutter.videoStartsItsAnalysis',
-                state: 'info'
-            };
-            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
-
-            return fixForBrowser(videoPath);
         });
 
         // The front-end asks the server to cut a video file.
