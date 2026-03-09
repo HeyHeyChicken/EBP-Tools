@@ -119,34 +119,6 @@
       },
       "inputOfficialFile": "Cliquez ici pour découper manuellement votre fichier vidéo officiel"
     },
-    "game_history": {
-      "step": "Étape",
-      "pages": "Pages",
-      "pagesExplanations": "Nombre de pages à exporter",
-      "season": "Saison",
-      "seasonExplanations": "Saison à exporter",
-      "firstOption": "Si le joueur a un tag public, renseignez-le ici...",
-      "playerTag": "Tag du joueur",
-      "export": "Exporter",
-      "secondOption": "Sinon, cliquez ici pour vous connecter à votre compte EVA.",
-      "timeBetweenPages": "Délai entre pages (s)",
-      "timeBetweenPagesExplanations": "Temps en secondes à attendre entre chaque page. Plus vous exportez de pages, plus vous risquez de devoir augmenter ce temps.",
-      "ignore": " Pages à ignorer",
-      "ignoreExplanations": "Nombre de pages à ignorer",
-      "edgeIsNotInstalled": "Edge ne semble pas être installé sur votre ordinateur. Veuillez l'installer.",
-      "dialog": {
-        "confirmation": {
-          "p1": "Merci de ne rien manipuler durant l’export. Si celui-ci se déroule correctement, une notification verte confirmera sa réussite.",
-          "p2": "Il se peut que \"Tools\" rencontre des difficultés lors de l’export de vos games. En cas de message indiquant que le pseudo est introuvable ou si un tableau vide s’affiche, veuillez suivre ces étapes :",
-          "li1": "Rafraîchissez la page plusieurs fois.",
-          "li2": "Fermez puis rouvrez le navigateur.",
-          "li3": "Redémarrez \"Tools\".",
-          "p3": "Si vous avez exporté un grand nombre de games, patientez 15 minutes avant de relancer un export."
-        }
-      },
-      "intro": "Exportez l'historique de vos parties au format Excel depuis EVA.",
-      "loginAndexport": "Connexion & export"
-    },
     "notification": {
       "manual-cutting": {
         "description": "Votre replay est en cours de découpage. Veuillez patienter..."
@@ -183,8 +155,7 @@
       "home": "Accueil",
       "tools": {
         "replay_downloader": "Téléchargeur de replay",
-        "replay_cutter": "Découpeur de replay",
-        "game_history": "Historique des parties"
+        "replay_cutter": "Découpeur de replay"
       },
       "getMoreCoins": "Obtenir plus de pièces"
     },

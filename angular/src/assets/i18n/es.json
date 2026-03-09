@@ -119,34 +119,6 @@
       },
       "inputOfficialFile": "Haga clic aquí para cortar manualmente su archivo de video oficial"
     },
-    "game_history": {
-      "step": "Paso",
-      "pages": "Páginas",
-      "pagesExplanations": "Número de páginas a exportar",
-      "season": "Temporada",
-      "seasonExplanations": "Temporada para exportar",
-      "firstOption": "Si el jugador tiene una etiqueta pública, introdúcela aquí...",
-      "playerTag": "Etiqueta del jugador",
-      "export": "Exportar",
-      "secondOption": "De lo contrario, haz clic aquí para iniciar sesión en tu cuenta EVA.",
-      "timeBetweenPages": "Intervalo (s)",
-      "timeBetweenPagesExplanations": "Tiempo en segundos a esperar entre cada página. Cuantas más páginas exportes, más deberás aumentar este tiempo.",
-      "ignore": "Páginas a omitir",
-      "ignoreExplanations": "Número de páginas a ignorar",
-      "edgeIsNotInstalled": "Edge no parece estar instalado en su computadora. Por favor instálelo.",
-      "dialog": {
-        "confirmation": {
-          "p1": "Por favor, no interactúe con nada durante la exportación. Si todo va bien, una notificación verde lo confirmará.",
-          "p2": "Es posible que \"Tools\" tenga problemas al exportar sus partidas. Si aparece un mensaje indicando que el nombre de usuario no existe o si se muestra una tabla vacía, siga estos pasos:",
-          "li1": "Actualice la página varias veces.",
-          "li2": "Cierre y vuelva a abrir el navegador.",
-          "li3": "Reinicie \"Tools\".",
-          "p3": "Si ha exportado una gran cantidad de partidas, espere 15 minutos antes de iniciar otra exportación."
-        }
-      },
-      "intro": "Exporta el historial de tus partidas en formato Excel desde EVA.",
-      "loginAndexport": "Iniciar sesión y exportar"
-    },
     "notification": {
       "manual-cutting": {
         "description": "Su repetición se está recortando. Por favor, espere..."
@@ -183,8 +155,7 @@
       "home": "Inicio",
       "tools": {
         "replay_downloader": "Descargador de repeticiones",
-        "replay_cutter": "Cortador de repetición",
-        "game_history": "Historial de partidas"
+        "replay_cutter": "Cortador de repetición"
       },
       "getMoreCoins": "Obtener más monedas"
     },

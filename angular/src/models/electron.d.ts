@@ -67,20 +67,8 @@ export interface ElectronAPI {
     platform: VideoPlatform,
     formatId?: string
   ) => Promise<void>;
-  extractPublicPseudoGames: (
-    tag: string,
-    nbPages: number,
-    seasonIndex: number,
-    timeToWait: number
-  ) => Promise<void>;
-  extractPrivatePseudoGames: (
-    nbPages: number,
-    seasonIndex: number,
-    timeToWait: number
-  ) => Promise<void>;
   getExpressPort: () => Promise<number>;
   getJWTAccessToken: () => Promise<string>;
-  getGameHistoryOutputPath: () => Promise<string>;
   getOS: () => Promise<NodeJS.Platform>;
   getPublicPseudoGamesOutputPath: () => Promise<string>;
   getPrivatePseudoGamesOutputPath: () => Promise<string>;
@@ -129,8 +117,6 @@ export interface ElectronAPI {
     width: number,
     height: number
   ) => Promise<string>;
-  getSettings: (key: string) => Promise<any | undefined>;
-  setSettings: (key: string, value: any) => void;
   socketEmit: (socket: string, path: string, value: any) => void;
   runAnalyzer: (videoPath: string, settingsJSON: string) => Promise<void>;
 
@@ -150,7 +136,6 @@ export interface ElectronAPI {
       forcedTraining: boolean | undefined
     ) => void
   ) => void;
-  gamesAreExported: (callback: (filePath: string | undefined) => void) => void;
   replayDownloaderError: (callback: (error: string) => void) => void;
   replayDownloaderSuccess: (callback: (path: string) => void) => void;
   globalMessage: (

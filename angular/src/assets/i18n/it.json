@@ -119,34 +119,6 @@
       },
       "inputOfficialFile": "Clicca qui per tagliare manualmente il tuo file video ufficiale"
     },
-    "game_history": {
-      "step": "Fase",
-      "pages": "Pagine",
-      "pagesExplanations": "Numero di pagine da esportare",
-      "season": "Stagione",
-      "seasonExplanations": "Stagione da esportare",
-      "firstOption": "Se il giocatore ha un tag pubblico, inseriscilo qui...",
-      "playerTag": "Tag del giocatore",
-      "export": "Esporta",
-      "secondOption": "Altrimenti, clicca qui per accedere al tuo account EVA.",
-      "timeBetweenPages": "Tempo tra le pagine (s)",
-      "timeBetweenPagesExplanations": "Tempo in secondi da attendere tra ogni pagina. Più pagine esporti, più potrebbe essere necessario aumentare questo tempo.",
-      "ignore": "Pagine da ignorare",
-      "ignoreExplanations": "Numero di pagine da ignorare",
-      "edgeIsNotInstalled": "Edge non sembra essere installato sul tuo computer. Si prega di installarlo.",
-      "dialog": {
-        "confirmation": {
-          "p1": "Si prega di non interagire durante l'esportazione. Se va a buon fine, una notifica verde lo confermerà.",
-          "p2": "È possibile che \"Tools\" riscontri problemi durante l'esportazione delle tue partite. Se appare un messaggio che indica che il nome utente non esiste o viene visualizzata una tabella vuota, segui questi passaggi:",
-          "li1": "Ricarica la pagina più volte.",
-          "li2": "Chiudi e riapri il browser.",
-          "li3": "Riavvia \"Tools\".",
-          "p3": "Se hai esportato un gran numero di partite, attendi 15 minuti prima di avviare una nuova esportazione."
-        }
-      },
-      "intro": "Esporta la cronologia delle tue partite in formato Excel da EVA.",
-      "loginAndexport": "Accesso & esporta"
-    },
     "notification": {
       "manual-cutting": {
         "description": "Il tuo replay è in fase di taglio. Attendere prego..."
@@ -183,8 +155,7 @@
       "home": "Home",
       "tools": {
         "replay_downloader": "Downloader di replay",
-        "replay_cutter": "Taglierina replay",
-        "game_history": "Cronologia partite"
+        "replay_cutter": "Taglierina replay"
       },
       "getMoreCoins": "Ottenere più monete"
     },

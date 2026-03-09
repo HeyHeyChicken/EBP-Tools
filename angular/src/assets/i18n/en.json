@@ -119,34 +119,6 @@
       },
       "inputOfficialFile": "Click here to manually cut your official video file"
     },
-    "game_history": {
-      "step": "Step",
-      "pages": "Pages",
-      "pagesExplanations": "Number of pages to export",
-      "season": "Season",
-      "seasonExplanations": "Season to export",
-      "firstOption": "If the player has a public tag, enter it here...",
-      "playerTag": "Player's tag",
-      "export": "Export",
-      "secondOption": "Otherwise, click here to log in to your EVA account.",
-      "timeBetweenPages": "Time between pages (s)",
-      "timeBetweenPagesExplanations": "Time in seconds to wait between each page. The more pages you export, the more you may need to increase this time.",
-      "ignore": "Pages to skip",
-      "ignoreExplanations": "Number of pages to skip",
-      "edgeIsNotInstalled": "Edge does not appear to be installed on your computer. Please install it.",
-      "dialog": {
-        "confirmation": {
-          "p1": "Please do not interact with anything during the export. If it completes successfully, a green notification will confirm it.",
-          "p2": "\"Tools\" may encounter issues when exporting your games. If you see a message saying the username was not found or if a blank table appears, please follow these steps:",
-          "li1": "Refresh the page several times.",
-          "li2": "Close and then reopen the browser.",
-          "li3": "Restart \"Tools\".",
-          "p3": "If you have exported a large number of games, please wait 15 minutes before starting another export."
-        }
-      },
-      "intro": "Export your game history in Excel format from EVA.",
-      "loginAndexport": "Login & export"
-    },
     "notification": {
       "manual-cutting": {
         "description": "Your replay is being processed. Please wait..."
@@ -183,8 +155,7 @@
       "home": "Home",
       "tools": {
         "replay_downloader": "Replay downloader",
-        "replay_cutter": "Replay cutter",
-        "game_history": "Game history"
+        "replay_cutter": "Replay cutter"
       },
       "getMoreCoins": "Get more coins"
     },

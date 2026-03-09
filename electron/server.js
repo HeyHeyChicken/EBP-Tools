@@ -367,39 +367,6 @@ if (!APP_GOT_THE_LOCK) {
                 }
                 break;
             case 'exportGames':
-                /*
-                if (data.publicPseudo) {
-                    extractPublicPseudoGames(
-                        app,
-                        data.publicPseudo,
-                        data.nbPages,
-                        data.seasonIndex,
-                        data.timeToWait,
-                        dialog,
-                        getMainWindow(),
-                        data.debug,
-                        async (games) => {
-                            socketEmit(data.socket, 'exportGames', games);
-
-                            StorageManager.setTemporarySettingsValue(
-                                'deeplink',
-                                undefined
-                            );
-
-                            if (
-                                games.length > 0 &&
-                                data.excelDestinationFolder
-                            ) {
-                                exportGamesToExcel(
-                                    games,
-                                    data.publicPseudo.split('#')[0],
-                                    data.excelDestinationFolder
-                                );
-                            }
-                        }
-                    );
-                } else {
-                    */
                 extractPrivatePseudoGames(
                     app,
                     data.nbPages,
@@ -432,7 +399,6 @@ if (!APP_GOT_THE_LOCK) {
                         }
                     }
                 );
-                //}
                 break;
             case 'analyzeVideoFile':
                 console.log(data.socket);
@@ -1044,11 +1010,7 @@ if (!APP_GOT_THE_LOCK) {
         });
 
         const FILE_PATH = path.join(
-            folderPath ??
-                StorageManager.getPermanentSettingsValue(
-                    'gameHistoryOutputPath',
-                    path.join(os.homedir(), 'Downloads')
-                ),
+            folderPath,
             `EBP - ${playerName} (${new Date().getTime()}).xlsx`
         );
         // Save to a new file
@@ -1594,14 +1556,6 @@ if (!APP_GOT_THE_LOCK) {
             }
         });
 
-        // The front-end asks the server to return the game-history output path.
-        ipcMain.handle('get-game-history-output-path', () => {
-            return StorageManager.getPermanentSettingsValue(
-                'gameHistoryOutputPath',
-                path.join(os.homedir(), 'Downloads')
-            );
-        });
-
         // The front-end asks the server to return the video cutter output path.
         ipcMain.handle('get-replay-downloader-output-path', () => {
             return StorageManager.getPermanentSettingsValue(
@@ -1646,94 +1600,6 @@ if (!APP_GOT_THE_LOCK) {
         ipcMain.handle('logout', () => {
             logout(getMainWindow);
         });
-
-        // The front-end asks the server return a setting value by key.
-        ipcMain.handle('get-settings', (event, key) => {
-            return StorageManager.getPermanentSettingsValue(key);
-        });
-
-        // The front-end asks the server to set a setting value by key.
-        ipcMain.handle('set-settings', (event, key, value) => {
-            StorageManager.setPermanentSettingsValue(key, value);
-        });
-
-        // The front-end asks the server to extract the public player games.
-        ipcMain.handle(
-            'extract-private-pseudo-games',
-            (event, nbPages, seasonIndex, timeToWait) => {
-                extractPrivatePseudoGames(
-                    app,
-                    nbPages,
-                    seasonIndex,
-                    timeToWait,
-                    dialog,
-                    getMainWindow(),
-                    true,
-                    async (games) => {
-                        if (games.length > 0) {
-                            const FILE_PATH = await exportGamesToExcel(
-                                games,
-                                'private'
-                            );
-                            getMainWindow().webContents.send(
-                                'games-are-exported',
-                                FILE_PATH
-                            );
-                        } else {
-                            getMainWindow().webContents.send(
-                                'games-are-exported',
-                                undefined
-                            );
-                        }
-                    }
-                );
-            }
-        );
-
-        // The front-end asks the server to extract the public player games.
-        ipcMain.handle(
-            'extract-public-pseudo-games',
-            (event, tag, nbPages, seasonIndex, timeToWait) => {
-                if (tag) {
-                    extractPublicPseudoGames(
-                        app,
-                        tag,
-                        nbPages,
-                        seasonIndex,
-                        timeToWait,
-                        dialog,
-                        getMainWindow(),
-                        true,
-                        async (games) => {
-                            if (games.length > 0) {
-                                const FILE_PATH = await exportGamesToExcel(
-                                    games,
-                                    tag.split('#')[0]
-                                );
-
-                                const KEY = 'public-pseudos';
-                                const SETTINGS =
-                                    StorageManager.permanentSettings;
-                                if (!SETTINGS[KEY]) SETTINGS[KEY] = [];
-                                if (!SETTINGS[KEY].includes(tag))
-                                    SETTINGS[KEY].push(tag);
-                                StorageManager.permanentSettings = SETTINGS;
-
-                                getMainWindow().webContents.send(
-                                    'games-are-exported',
-                                    FILE_PATH
-                                );
-                            } else {
-                                getMainWindow().webContents.send(
-                                    'games-are-exported',
-                                    undefined
-                                );
-                            }
-                        }
-                    );
-                }
-            }
-        );
 
         // The front-end asks the server to save the current language.
         ipcMain.handle('set-language', async (event, language) => {

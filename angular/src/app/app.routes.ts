@@ -7,7 +7,6 @@
 import { Routes } from '@angular/router';
 import { HomeComponent } from './views/home/home.component';
 import { ReplayCutterComponent } from './views/replay_cutter/replay_cutter.component';
-import { GameHistoryComponent } from './views/game_history/game_history.component';
 import { ReplayDownloaderComponent } from './views/replay_downloader/replay_downloader.component';
 import { NotificationComponent } from './views/notification/notification.component';
 
@@ -24,10 +23,6 @@ export const routes: Routes = [
       {
         path: 'replay_cutter',
         component: ReplayCutterComponent
-      },
-      {
-        path: 'game_history',
-        component: GameHistoryComponent
       },
       {
         path: 'replay_downloader',

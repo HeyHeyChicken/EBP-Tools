@@ -31,7 +31,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to return the user's login status.
   getLoginState: () => ipcRenderer.invoke("get-login-state"),
   // The front-end asks the server to return the game-history output path.
-  getGameHistoryOutputPath: () => ipcRenderer.invoke("get-game-history-output-path"),
   // The front-end asks the server to return the replay downloader output path.
   getReplayDownloaderOutputPath: () => ipcRenderer.invoke("get-replay-downloader-output-path"),
   // The front-end asks the server to return the cutter output path.
@@ -50,10 +49,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openFile: (path) => ipcRenderer.invoke("open-file", path),
   // The front-end asks the server to ask the user to select files.
   openFiles: (extensions) => ipcRenderer.invoke("open-files", extensions),
-  // The front-end asks the server to extract the public player games.
-  extractPublicPseudoGames: (tag, nbPages, seasonIndex, timeToWait) => ipcRenderer.invoke("extract-public-pseudo-games", tag, nbPages, seasonIndex, timeToWait),
-  // The front-end asks the server to extract the private player games.
-  extractPrivatePseudoGames: (tag, nbPages, seasonIndex, timeToWait) => ipcRenderer.invoke("extract-private-pseudo-games", tag, nbPages, seasonIndex, timeToWait),
   // The front-end asks the server to crop, cut and upload a video to the EBP's S3 server.
   uploadGameMiniMap: (gameIndex, game, cropPosition, margedCropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames) => ipcRenderer.invoke("upload-game-mini-map", gameIndex, game, cropPosition, margedCropPosition, videoPath, gameID, orangeTeamInfosPosition, blueTeamInfosPosition, topInfosPosition, sortedOrangePlayersNames, sortedBluePlayersNames),
   // The front-end asks the server to cut a video file manualy edited.
@@ -68,8 +63,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveConsoleLogs: (logs) => ipcRenderer.invoke("save-console-logs", logs),
   removeBorders: (cropperPosition, videoPath) => ipcRenderer.invoke("remove-borders", cropperPosition, videoPath),
   setVideoResolution: (videoPath, width, height) => ipcRenderer.invoke("set-video-resolution", videoPath, width, height),
-  getSettings: (key) => ipcRenderer.invoke("get-settings", key),
-  setSettings: (key, value) => ipcRenderer.invoke("set-settings", key, value),
   // The front-end asks the server to send a socket message to the EBP socket server.
   socketEmit: (socket, path, value) => ipcRenderer.invoke("socket-emit", socket, path, value),
   // The front-end asks the server to run the Python video analyzer.
@@ -94,7 +87,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The server gives the path of the video file selected by the user.
   setVideoFile: (callback) => ipcRenderer.on("set-video-file", (event, value) => callback(value)),
   // The server informs the front-end that the games are exported.
-  gamesAreExported: (callback) => ipcRenderer.on("games-are-exported", (event, filePath) => callback(filePath)),
   // The server asks the font-end to display a replay downloader error.
   replayDownloaderError: (callback) => ipcRenderer.on("replay-downloader-error", (event, error) => callback(error)),
   // The server asks the font-end that the video is well downloaded.
