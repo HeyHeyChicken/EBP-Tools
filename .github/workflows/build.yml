@@ -1,4 +1,4 @@
-# Copyright (c) 2025, Antoine Duval
+# Copyright (c) 2026, Antoine Duval
 # This file is part of a source-visible project.
 # See LICENSE for terms. Unauthorized use is prohibited.
 
@@ -64,6 +64,42 @@ jobs:
             - name: Install Node dependencies
               run: npm run install_npm
 
+            # Cache Homebrew packages to avoid reinstalling on every run.
+            - name: Cache Homebrew packages
+              uses: actions/cache@v4
+              with:
+                  path: ~/Library/Caches/Homebrew
+                  key: homebrew-tesseract-${{ runner.os }}
+
+            # Install Tesseract and build the Python analyzer binary.
+            - name: Install Tesseract
+              run: brew install tesseract
+
+            - name: Build Python analyzer binary
+              run: cd python && sh build.sh
+
+            # Sign all files in the onedir bundle before Electron Forge packages them.
+            # With --onedir, Python.framework and dylibs are present at build time and
+            # can be individually signed — unlike --onefile which extracts to /tmp at
+            # runtime (where files cannot be pre-signed, causing Team ID mismatch errors).
+            # Sign inside-out: dylibs first, then the main executable.
+            - name: Sign Python analyzer binary
+              run: |
+                  find binaries/analyzer/darwin -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
+                    codesign --force \
+                      --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                      --options runtime \
+                      --entitlements build/entitlements.plist \
+                      --timestamp \
+                      "$f"
+                  done
+                  codesign --force \
+                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime \
+                    --entitlements build/entitlements.plist \
+                    --timestamp \
+                    binaries/analyzer/darwin/darwin
+
             # Building Angular and making the Electron application.
             - name: Build Electron app
               run: npm run make
@@ -103,6 +139,17 @@ jobs:
             # Install NPM dependencies.
             - name: Install Node dependencies
               run: npm run install_npm
+            # Cache Tesseract installation to avoid reinstalling on every run.
+            - name: Cache Tesseract
+              uses: actions/cache@v4
+              with:
+                  path: C:\Program Files\Tesseract-OCR
+                  key: choco-tesseract-${{ runner.os }}
+            # Install Tesseract and build the Python analyzer binary.
+            - name: Install Tesseract
+              run: choco install tesseract --no-progress -y
+            - name: Build Python analyzer binary
+              run: cd python && .\build.bat
             # Building Angular and making the Electron application.
             - name: Build Electron app
               run: npm run make

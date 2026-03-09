@@ -61,10 +61,6 @@ export class HeaderComponent implements OnInit {
   //#region Functions
 
   ngOnInit(): void {
-    if (isDevMode()) {
-      this.pages.push('game_history');
-    }
-
     // List of languages supported by the application.
     this.translateService.addLangs(['fr', 'de', 'en', 'es', 'it', 'ro'].sort());
 

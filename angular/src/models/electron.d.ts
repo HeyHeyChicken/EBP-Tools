@@ -14,6 +14,36 @@ import { VideoFormat } from '../app/views/replay_downloader/models/video-format.
 
 //#endregion
 
+export interface AnalyzerMessage {
+  type: 'progress' | 'done' | 'error' | 'close' | 'log' | 'game';
+  percent?: number;
+  /** In progress messages: number of completed games so far. */
+  nbGames?: number;
+  /** In game messages: the completed game object. */
+  game?: {
+    mode: number;
+    start: number;
+    end: number;
+    map: string;
+    mapImage?: string;
+    orangeTeam: {
+      name: string;
+      score: number;
+      nameImage?: string;
+      scoreImage?: string;
+    };
+    blueTeam: {
+      name: string;
+      score: number;
+      nameImage?: string;
+      scoreImage?: string;
+    };
+  };
+  message?: string;
+  log?: string;
+  code?: number;
+}
+
 export interface ElectronAPI {
   //#region Client to Server
 
@@ -37,20 +67,8 @@ export interface ElectronAPI {
     platform: VideoPlatform,
     formatId?: string
   ) => Promise<void>;
-  extractPublicPseudoGames: (
-    tag: string,
-    nbPages: number,
-    seasonIndex: number,
-    timeToWait: number
-  ) => Promise<void>;
-  extractPrivatePseudoGames: (
-    nbPages: number,
-    seasonIndex: number,
-    timeToWait: number
-  ) => Promise<void>;
   getExpressPort: () => Promise<number>;
   getJWTAccessToken: () => Promise<string>;
-  getGameHistoryOutputPath: () => Promise<string>;
   getOS: () => Promise<NodeJS.Platform>;
   getPublicPseudoGamesOutputPath: () => Promise<string>;
   getPrivatePseudoGamesOutputPath: () => Promise<string>;
@@ -63,7 +81,6 @@ export interface ElectronAPI {
   checkJwtToken: () => Promise<void>;
   openFile: (pathFile: string) => Promise<void>;
   openFiles: (extensions: string[]) => Promise<string[]>;
-  fixMp4ForBrowser: (videoPath: string) => Promise<string>;
   openURL: (url: string) => void;
   setSetting: (setting: string) => Promise<string>;
   setVideoFile: (callback: (path: string) => void) => Promise<void>;
@@ -100,9 +117,8 @@ export interface ElectronAPI {
     width: number,
     height: number
   ) => Promise<string>;
-  getSettings: (key: string) => Promise<any | undefined>;
-  setSettings: (key: string, value: any) => void;
   socketEmit: (socket: string, path: string, value: any) => void;
+  runAnalyzer: (videoPath: string, settingsJSON: string) => Promise<void>;
 
   //#endregion
 
@@ -120,7 +136,6 @@ export interface ElectronAPI {
       forcedTraining: boolean | undefined
     ) => void
   ) => void;
-  gamesAreExported: (callback: (filePath: string | undefined) => void) => void;
   replayDownloaderError: (callback: (error: string) => void) => void;
   replayDownloaderSuccess: (callback: (path: string) => void) => void;
   globalMessage: (
@@ -135,6 +150,7 @@ export interface ElectronAPI {
     ) => void
   ) => void;
   setNotificationData: (callback: (data: Message) => void) => void;
+  onAnalyzerUpdate: (callback: (msg: AnalyzerMessage) => void) => void;
 
   //#endregion
 }

@@ -4,6 +4,7 @@
 
 const os = require('os');
 const path = require('node:path');
+const fs = require('fs');
 const { execSync } = require('child_process');
 const { default: getPort } = require('get-port');
 const { app } = require('electron');
@@ -38,6 +39,20 @@ function getFFmpegPath(osPlatform, isDevMode, rootPath) {
     );
 }
 
+/**
+ * Get the path to the Python video analyzer binary
+ * @returns {string} Path to analyzer executable
+ */
+function getAnalyzerPath(osPlatform, isDevMode, rootPath) {
+    const DIRECTORY = isDevMode ? '../binaries/analyzer' : 'analyzer';
+    if (osPlatform === 'win32') {
+        return path.join(rootPath, DIRECTORY, 'win32.exe');
+    }
+    // macOS/Linux: PyInstaller --onedir produces a directory named after the platform.
+    // The executable lives inside that directory with the same name.
+    return path.join(rootPath, DIRECTORY, osPlatform, osPlatform);
+}
+
 //#endregion
 
 const EBP_DOMAIN = 'evabattleplan.com';
@@ -46,6 +61,7 @@ const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const ROOT_PATH = IS_DEV_MODE ? path.dirname(__dirname) : process.resourcesPath;
 const OS_PLATFORM = os.platform();
 const FFMPEG_PATH = getFFmpegPath(OS_PLATFORM, IS_DEV_MODE, ROOT_PATH);
+const ANALYZER_PATH = getAnalyzerPath(OS_PLATFORM, IS_DEV_MODE, ROOT_PATH);
 const PERMANENT_SETTINGS_PATH = path.join(
     app.getPath('userData'),
     'settings.json'
@@ -107,6 +123,7 @@ module.exports = {
     ROOT_PATH,
 
     FFMPEG_PATH,
+    ANALYZER_PATH,
 
     PERMANENT_SETTINGS_PATH,
     TEMPORARY_SETTINGS_PATH,
