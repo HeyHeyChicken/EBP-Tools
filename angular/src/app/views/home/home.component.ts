@@ -30,7 +30,7 @@ import { GlobalService } from '../../core/services/global.service';
 export class HomeComponent implements OnInit {
   //#region Attributes
 
-  protected developpers: string[] = ['AydenHex'];
+  protected developpers: string[] = ['AydenHex', 'MrTheSkream'];
 
   //#endregion
 
