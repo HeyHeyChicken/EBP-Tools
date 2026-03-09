@@ -78,6 +78,18 @@ jobs:
             - name: Build Python analyzer binary
               run: cd python && sh build.sh
 
+            # Sign the PyInstaller binary before packaging.
+            # PyInstaller extracts the Python runtime to a temp directory at launch.
+            # Without this signature (--options runtime + disable-library-validation),
+            # macOS blocks the extracted Python library because it has a different Team ID.
+            - name: Sign Python analyzer binary
+              run: |
+                  codesign --force \
+                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime \
+                    --entitlements build/entitlements.plist \
+                    binaries/analyzer/darwin
+
             # Building Angular and making the Electron application.
             - name: Build Electron app
               run: npm run make
