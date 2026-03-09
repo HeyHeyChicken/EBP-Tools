@@ -705,7 +705,11 @@ if (!APP_GOT_THE_LOCK) {
             });
 
             res.on('end', () => {
-                callback(JSON.parse(data));
+                try {
+                    callback(JSON.parse(data));
+                } catch (err) {
+                    console.error('Failed to parse API response:', err.message, '| raw:', data);
+                }
             });
         });
 
