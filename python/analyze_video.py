@@ -207,7 +207,7 @@ _MAPS = {
     'Outlaw': ['outlaw', 'qutlaw'],
     'Polaris': ['polaris'],
     'Silva': ['silva'],
-    'The Cliff': ['cliff', 'tnecltt', 'tnecitt', 'thecliff'],
+    'The Cliff': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt'],
     'The Rock': ['rock', 'therock'],
     'Horizon': ['horizon'],
 }
@@ -306,7 +306,7 @@ def _ocr_region(
         try:
             return pytesseract.image_to_string(i, config=CONFIG).replace('\r', '').replace('\n', '').strip()
         except Exception as e:
-            _emit({'log': f'[OCR ERROR] {e}'})
+            #_emit({'log': f'[OCR ERROR] {e}'})
             return ''
 
     results = [_recognize(img)]
@@ -337,13 +337,9 @@ def _ocr_region(
     NON_EMPTY = [r for r in results if r]
     if not NON_EMPTY:
         RESULT = ''
-    elif checker:
-        MAX_LEN = max(len(r) for r in NON_EMPTY)
-        LONGEST = [r for r in NON_EMPTY if len(r) == MAX_LEN]
-        RESULT = _most_frequent(LONGEST)
     else:
         RESULT = _most_frequent(NON_EMPTY)
-    _emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
+    #_emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
     return RESULT
 
 # ---------------------------------------------------------------------------
@@ -500,7 +496,7 @@ def _set_score(game: dict, team: str, raw: str) -> None:
     try:
         V = int(raw)
         if 0 <= V <= 100:
-            _emit({'log': team + ' score : ' + raw})
+            #_emit({'log': team + ' score : ' + raw})
             game[team]['score'] = V
     except Exception:
         pass
@@ -573,7 +569,7 @@ def _analyze(
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             SCORE_MODE = _detect_game_score_frame(FRAME)
             if SCORE_MODE >= 0:
-                _emit({'log': 'Score frame found ' + str(SCORE_MODE)})
+                #_emit({'log': 'Score frame found ' + str(SCORE_MODE)})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(SCORE_MODE, orange_override, blue_override)
@@ -590,14 +586,14 @@ def _analyze(
                         luminance=225, apply_filter=True,
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'Orange team name : '+T.upper()})
+                        #_emit({'log': 'Orange team name : '+T.upper()})
                         GAME['orangeTeam']['name'] = T.upper()
 
                 _set_score(GAME, 'orangeTeam', _ocr_region(
                     FRAME,
                     SF['orangeScore'][0][0], SF['orangeScore'][0][1],
                     SF['orangeScore'][1][0], SF['orangeScore'][1][1],
-                    psm=7, whitelist='0123456789', luminance=200, apply_filter=True,
+                    psm=7, whitelist='0123456789%', luminance=200, apply_filter=True,
                     checker=_score_checker,
                 ))
 
@@ -611,14 +607,14 @@ def _analyze(
                         luminance=225, apply_filter=True,
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'Blue team name : '+T.upper()})
+                        #_emit({'log': 'Blue team name : '+T.upper()})
                         GAME['blueTeam']['name'] = T.upper()
 
                 _set_score(GAME, 'blueTeam', _ocr_region(
                     FRAME,
                     SF['blueScore'][0][0], SF['blueScore'][0][1],
                     SF['blueScore'][1][0], SF['blueScore'][1][1],
-                    psm=7, whitelist='0123456789', luminance=200, apply_filter=True,
+                    psm=7, whitelist='0123456789%', luminance=200, apply_filter=True,
                     checker=_score_checker,
                 ))
 
@@ -633,7 +629,7 @@ def _analyze(
         # ── End frame ──────────────────────────────────────────────────────
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             if _detect_game_end_frame(FRAME):
-                _emit({'log': 'End frame found'})
+                #_emit({'log': 'End frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(1, orange_override, blue_override)
@@ -643,13 +639,13 @@ def _analyze(
                     FRAME,
                     EF['orangeScore'][0][0], EF['orangeScore'][0][1],
                     EF['orangeScore'][1][0], EF['orangeScore'][1][1],
-                    psm=7, whitelist='0123456789', checker=_score_checker,
+                    psm=7, whitelist='0123456789%', checker=_score_checker,
                 ))
                 _set_score(GAME, 'blueTeam', _ocr_region(
                     FRAME,
                     EF['blueScore'][0][0], EF['blueScore'][0][1],
                     EF['blueScore'][1][0], EF['blueScore'][1][1],
-                    psm=7, whitelist='0123456789', checker=_score_checker,
+                    psm=7, whitelist='0123456789%', checker=_score_checker,
                 ))
                 GAMES.insert(0, GAME)
                 CURRENT = GAME
@@ -657,7 +653,7 @@ def _analyze(
         # ── Game start: loading screen ──────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_loading_frame(FRAME, CURRENT['mode']):
-                _emit({'log': 'Loading frame found'})
+                #_emit({'log': 'Loading frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 CURRENT['start'] = TIMESTAMP + 2
@@ -667,7 +663,7 @@ def _analyze(
         # ── Game start: map introduction ────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_intro(FRAME):
-                _emit({'log': 'Game intro frame found'})
+                #_emit({'log': 'Game intro frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 CURRENT['start'] = TIMESTAMP + 2
@@ -678,7 +674,7 @@ def _analyze(
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_playing(FRAME, CURRENT['mode']):
                 FOUND = True
-                _emit({'log': 'Playing frame found'})
+                #_emit({'log': 'Playing frame found'})
                 GF = MODES[CURRENT['mode']]['gameFrame']
 
                 if not CURRENT['map']:
@@ -693,7 +689,7 @@ def _analyze(
                     if T:
                         MAP_NAME = _get_map_by_name(T)
                         if MAP_NAME:
-                            _emit({'log': 'map name : ' + MAP_NAME})
+                            #_emit({'log': 'map name : ' + MAP_NAME})
                             CURRENT['map'] = MAP_NAME
                             CURRENT['mapImage'] = _region_to_base64(
                                 FRAME,
@@ -701,7 +697,7 @@ def _analyze(
                                 GF['map'][1][0], GF['map'][1][1],
                             )
                         else:
-                            _emit({'WAZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA': T})
+                            _emit({"Can't find map name": T})
 
                 if not CURRENT['orangeTeam']['name']:
                     T = _ocr_region(
@@ -712,7 +708,7 @@ def _analyze(
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'orange team name : ' + T.upper()})
+                        #_emit({'log': 'orange team name : ' + T.upper()})
                         CURRENT['orangeTeam']['name'] = T.upper()
 
                 if not CURRENT['blueTeam']['name']:
@@ -724,7 +720,7 @@ def _analyze(
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'blue team name : ' + T.upper()})
+                        #_emit({'log': 'blue team name : ' + T.upper()})
                         CURRENT['blueTeam']['name'] = T.upper()
 
                 # Timer jump — mirrors the TS optimization exactly.
@@ -743,16 +739,16 @@ def _analyze(
                         psm=7, whitelist='0123456789:',
                     )
                     if TIMER:
-                        _emit({'log': 'timer : ' + TIMER})
+                        #_emit({'log': 'timer : ' + TIMER})
                         PARTS = TIMER.split(':')
                         if len(PARTS) == 2:
                             try:
                                 M, S = int(PARTS[0]), int(PARTS[1])
-                                _emit({'log': max_time_per_game, 'm': M, 's': S})
+                                #_emit({'log': max_time_per_game, 'm': M, 's': S})
                                 if M <= max_time_per_game:
                                     DIFF = (max_time_per_game - M) * 60 - S - 20
 
-                                    _emit({'log': "Try to jump " + str(DIFF)})
+                                    #_emit({'log': "Try to jump " + str(DIFF)})
                                     CURRENT['__jumped__'] = True
                                     JUST_JUMPED = True
                                     TIMESTAMP -= DIFF
@@ -760,8 +756,8 @@ def _analyze(
                             except Exception as e:
                                 print(e)
                                 pass
-        if not FOUND:
-            _emit({'log': "Can't identify frame"})
+        #if not FOUND:
+            #_emit({'log': "Can't identify frame"})
 
         # Après un timer jump on est près du début du jeu → STEP=1 pour ne pas
         # rater l'écran de chargement. Dans toutes les autres zones (post-game,

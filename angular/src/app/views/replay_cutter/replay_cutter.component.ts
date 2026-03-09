@@ -340,7 +340,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
         switch (msg.type) {
           case 'progress':
             this.percent = msg.percent ?? this.percent;
-            console.log('onAnalyzerUpdate', this.percent);
             const GAMES_COUNT =
               typeof msg.nbGames === 'number'
                 ? msg.nbGames
