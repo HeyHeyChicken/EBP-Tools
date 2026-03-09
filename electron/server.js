@@ -1204,7 +1204,10 @@ if (!APP_GOT_THE_LOCK) {
                             if (WINDOW && !WINDOW.isDestroyed()) {
                                 WINDOW.webContents.send('analyzer-update', MSG);
                             }
-                            if ((MSG.type === 'done' || MSG.type === 'error') && !RESOLVED) {
+                            if (
+                                (MSG.type === 'done' || MSG.type === 'error') &&
+                                !RESOLVED
+                            ) {
                                 RESOLVED = true;
                                 resolve(MSG);
                             }
@@ -1799,6 +1802,16 @@ if (!APP_GOT_THE_LOCK) {
 
         // The front-end asks the server to fix an mp4 file.
         ipcMain.handle('fix-mp4-for-browser', async (event, videoPath) => {
+            const NOTIFICATION_DATA = {
+                percent: 0,
+                leftRounded: true,
+                infinite: true,
+                icon: 'fa-sharp fa-solid fa-clapperboard-play',
+                text: '.view.replay_cutter.videoStartsItsAnalysis',
+                state: 'info'
+            };
+            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+
             return fixForBrowser(videoPath);
         });
 

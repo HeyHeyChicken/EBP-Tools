@@ -27,6 +27,7 @@
     },
     "replay_cutter": {
       "inputTrainingFile": "Click here to auto cut your training video file",
+      "videoStartsItsAnalysis": "The video is being analyzed, please wait...",
       "videoIsBeingAnalyzed": "The video is being analyzed, please wait...<br/>Number of parts found: <b>{{games}}</b>",
       "saveAll": "Save selected games",
       "copyTimecodes": "Copy selected games timecodes",

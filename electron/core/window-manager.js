@@ -104,6 +104,7 @@ function setWindowSize(width, height) {
  * @param {string} data Data to pass to the notification.
  */
 function createFloatingWindow(width, height, data) {
+    console.log('createFloatingWindow', width, height, data);
     return new Promise((resolve) => {
         const PRIMARY_DISPLAY = screen.getPrimaryDisplay();
         const WIDTH = Math.min(PRIMARY_DISPLAY.workAreaSize.width, width);
@@ -135,7 +136,9 @@ function createFloatingWindow(width, height, data) {
 
         floatingWindow.setBounds({
             width: WIDTH,
-            height: HEIGHT
+            height: HEIGHT,
+            x: PRIMARY_DISPLAY.workAreaSize.width - width,
+            y: PRIMARY_DISPLAY.workAreaSize.height - height
         });
 
         floatingWindow.webContents.once('did-finish-load', () => {

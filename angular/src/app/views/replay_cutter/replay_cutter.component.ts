@@ -340,25 +340,27 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
       this.ngZone.run(() => {
         if (msg.type === 'progress') {
           this.percent = msg.percent ?? this.percent;
-          console.log(this.percent);
+          console.log('onAnalyzerUpdate', this.percent);
           const GAMES_COUNT =
             typeof msg.games === 'number'
               ? msg.games
               : (msg.games?.length ?? this._games.length);
-          this.translateService
-            .get('view.replay_cutter.videoIsBeingAnalyzed', {
-              games: GAMES_COUNT
-            })
-            .subscribe((translated: string) => {
-              this.notificationService.sendMessage({
-                percent: this.percent,
-                infinite: false,
-                icon: undefined,
-                text: translated,
-                leftRounded: true,
-                state: 'info'
+          if (this.percent > 0) {
+            this.translateService
+              .get('view.replay_cutter.videoIsBeingAnalyzed', {
+                games: GAMES_COUNT
+              })
+              .subscribe((translated: string) => {
+                this.notificationService.sendMessage({
+                  percent: this.percent,
+                  infinite: this.percent === 0,
+                  icon: undefined,
+                  text: translated,
+                  leftRounded: true,
+                  state: 'info'
+                });
               });
-            });
+          }
         } else if (msg.type === 'done') {
           console.log('[analyzer] done payload:', JSON.stringify(msg.games));
           this.pythonAnalysisRunning = false;
@@ -1756,23 +1758,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     this._videoPath = videoFilePath;
     this._games = [];
     this.pythonAnalysisRunning = true;
-
-    this.translateService
-      .get('view.replay_cutter.videoIsBeingAnalyzed', { games: 0 })
-      .subscribe((translated: string) => {
-        window.electronAPI.showNotification(
-          true,
-          500,
-          150,
-          JSON.stringify({
-            percent: 0,
-            infinite: false,
-            icon: undefined,
-            text: translated,
-            leftRounded: true
-          })
-        );
-      });
 
     window.electronAPI.runAnalyzer(
       videoFilePath,
