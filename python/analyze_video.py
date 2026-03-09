@@ -302,11 +302,16 @@ def _ocr_region(
     if whitelist:
         CONFIG += f' -c "tessedit_char_whitelist={whitelist}"'
 
+    # Pattern de filtrage : si un whitelist est défini, on ne garde que ses caractères
+    FILTER_PATTERN = re.compile(f'[^{re.escape(whitelist)}]') if whitelist else None
+
     def _recognize(i: Image.Image) -> str:
         try:
-            return pytesseract.image_to_string(i, config=CONFIG).replace('\r', '').replace('\n', '').strip()
-        except Exception as e:
-            #_emit({'log': f'[OCR ERROR] {e}'})
+            TEXT = pytesseract.image_to_string(i, config=CONFIG).replace('\r', '').replace('\n', '').strip()
+            if FILTER_PATTERN:
+                TEXT = FILTER_PATTERN.sub('', TEXT)
+            return TEXT
+        except Exception:
             return ''
 
     results = [_recognize(img)]
