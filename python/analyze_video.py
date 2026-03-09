@@ -549,11 +549,17 @@ def _analyze(
     TIMESTAMP: float = DURATION
     JUST_JUMPED: bool = False
 
+    LAST_SEND_PERCENT: int = -1
+    LAST_SEND_COMPLETED_COUNT: int = -1
+
     while TIMESTAMP > 0:
         PERCENT = int((1.0 - TIMESTAMP / DURATION) * 100) if DURATION > 0 else 0
 
         COMPLETED_COUNT = sum(1 for g in GAMES if g['start'] != -1)
-        _emit({'type': 'progress', 'percent': PERCENT, 'games': COMPLETED_COUNT, 'time': TIMESTAMP})
+        if PERCENT != LAST_SEND_PERCENT or COMPLETED_COUNT != LAST_SEND_COMPLETED_COUNT:
+            _emit({'type': 'progress', 'percent': PERCENT, 'games': COMPLETED_COUNT, 'time': TIMESTAMP})
+            LAST_SEND_PERCENT = PERCENT
+            LAST_SEND_COMPLETED_COUNT = COMPLETED_COUNT
 
         FRAME = _get_frame(CAP, TIMESTAMP)
         if FRAME is None:
