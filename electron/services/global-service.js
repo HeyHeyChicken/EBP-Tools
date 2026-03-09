@@ -16,7 +16,12 @@ const path = require('node:path');
 function unlinkSync(path) {
     const NORMALIZED_CUT_PATH = path.normalize('NFC');
     if (fs.existsSync(NORMALIZED_CUT_PATH)) {
-        fs.unlinkSync(NORMALIZED_CUT_PATH);
+        const STAT = fs.statSync(NORMALIZED_CUT_PATH);
+        if (STAT.isDirectory()) {
+            fs.rmSync(NORMALIZED_CUT_PATH, { recursive: true });
+        } else {
+            fs.unlinkSync(NORMALIZED_CUT_PATH);
+        }
     }
 }
 

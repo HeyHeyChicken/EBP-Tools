@@ -53,6 +53,7 @@ const {
     FFMPEG_PATH,
     ANALYZER_PATH,
     PROTOCOL_NAME,
+    PUPPETEER_USER_DATA_PATH,
     getCurrentPort
 } = require('./config/constants');
 const {
@@ -446,6 +447,9 @@ if (!APP_GOT_THE_LOCK) {
                 }
 
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                break;
+            case 'clean_puppeteer_data':
+                unlinkSync(PUPPETEER_USER_DATA_PATH);
                 break;
         }
     }
@@ -1064,7 +1068,7 @@ if (!APP_GOT_THE_LOCK) {
     // Handle deep link on macOS (when app is already open)
     app.on('open-url', (event, url) => {
         event.preventDefault();
-        getMainWindow().hide();
+        getMainWindow()?.hide();
         handleDeepLink(url);
     });
 
@@ -1763,7 +1767,7 @@ if (!APP_GOT_THE_LOCK) {
                     !getMainWindow().isDestroyed() &&
                     !IS_DEV_MODE
                 ) {
-                    getMainWindow().hide();
+                    getMainWindow()?.hide();
                 }
 
                 await createFloatingWindow(450, 150, notificationData);

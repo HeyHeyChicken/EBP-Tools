@@ -41,7 +41,7 @@ class UpdateService {
      * Displays the "Up to date" notification.
      */
     showUpdatedNotification() {
-        getMainWindow().hide();
+        getMainWindow()?.hide();
 
         createFloatingWindow(
             450,
@@ -96,7 +96,7 @@ class UpdateService {
                             );
 
                             if (invisible === false) {
-                                getMainWindow().hide();
+                                getMainWindow()?.hide();
 
                                 createFloatingWindow(
                                     450,
@@ -151,7 +151,7 @@ class UpdateService {
     getProjectLatestVersion(callback) {
         const OPTIONS = {
             hostname: 'api.github.com',
-            path: '/repos/heyheychicken/EBP-Tools/releases/latest',
+            path: '/repos/heyheychicken/EBP-Tools/releases',
             method: 'GET',
             headers: { 'User-Agent': '' }
         };
@@ -163,7 +163,10 @@ class UpdateService {
             res.on('end', () => {
                 try {
                     const DATA = JSON.parse(data);
-                    this.githubVersion = DATA.tag_name;
+                    const RELEASE = DATA.find(
+                        (r) => r.tag_name && !r.tag_name.startsWith('0')
+                    );
+                    this.githubVersion = RELEASE ? RELEASE.tag_name : undefined;
 
                     if (typeof callback !== 'undefined') {
                         callback();

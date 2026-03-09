@@ -326,7 +326,7 @@ function createWindow(updateService) {
 
 function hideMainWindow() {
     if (getMainWindow() && !getMainWindow().isDestroyed()) {
-        getMainWindow().hide();
+        getMainWindow()?.hide();
     }
 }
 
