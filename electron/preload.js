@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to send a socket message to the EBP socket server.
   socketEmit: (socket, path, value) => ipcRenderer.invoke("socket-emit", socket, path, value),
   fixMp4ForBrowser: (videoPath) => ipcRenderer.invoke("fix-mp4-for-browser", videoPath),
+  // The front-end asks the server to run the Python video analyzer.
+  runAnalyzer: (videoPath, settingsJSON) => ipcRenderer.invoke("run-analyzer", videoPath, settingsJSON),
 
   //#endregion
 
@@ -106,6 +108,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   toast: (callback) => ipcRenderer.on("toast", (event, type, i18nPath, i18nVariables) => callback(type, i18nPath, i18nVariables)),
   // The server asks the font-end to update the notification data.
   setNotificationData: (callback) => ipcRenderer.on("set-notification-data", (event, data) => callback(data)),
+  // The server sends a progress/done/error update from the Python video analyzer.
+  onAnalyzerUpdate: (callback) => ipcRenderer.on("analyzer-update", (event, msg) => callback(msg)),
 
   //#endregion
 });

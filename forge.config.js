@@ -15,6 +15,7 @@ module.exports = {
             './electron/assets/',
             './electron/template.xlsx',
             './binaries/ffmpeg/',
+            './binaries/analyzer/',
             './app-update.yml'
         ],
         icon: 'electron/assets/icon',
@@ -156,22 +157,30 @@ module.exports = {
         async postPackage(config) {
             if (process.platform == 'darwin') {
                 console.log('Running "postPackage" hook on MacOS.');
-                try {
-                    const FFMPEG_PATH = path.join(
-                        __dirname,
-                        'out',
-                        config.packagerConfig.name + '-darwin-arm64',
-                        config.packagerConfig.name + '.app',
-                        'Contents',
-                        'Resources',
-                        'ffmpeg',
-                        'darwin'
-                    );
+                const RESOURCES_BASE = path.join(
+                    __dirname,
+                    'out',
+                    config.packagerConfig.name + '-darwin-arm64',
+                    config.packagerConfig.name + '.app',
+                    'Contents',
+                    'Resources'
+                );
 
-                    execSync(`chmod +x "${FFMPEG_PATH}"`);
-                    console.log('ffmpeg rendu exécutable');
-                } catch (error) {
-                    console.error('Erreur lors du chmod de ffmpeg :', error);
+                const BINARIES = [
+                    path.join(RESOURCES_BASE, 'ffmpeg', 'darwin'),
+                    path.join(RESOURCES_BASE, 'analyzer', 'darwin')
+                ];
+
+                for (const BIN of BINARIES) {
+                    try {
+                        execSync(`chmod +x "${BIN}"`);
+                        console.log(`chmod +x: ${BIN}`);
+                    } catch (error) {
+                        console.error(
+                            `Erreur lors du chmod de ${BIN} :`,
+                            error
+                        );
+                    }
                 }
             }
         }

@@ -14,6 +14,34 @@ import { VideoFormat } from '../app/views/replay_downloader/models/video-format.
 
 //#endregion
 
+export interface AnalyzerMessage {
+  type: 'progress' | 'done' | 'error' | 'close' | 'log';
+  percent?: number;
+  /** In progress messages: number of games so far. In done: array of game objects. */
+  games?: number | Array<{
+    mode: number;
+    start: number;
+    end: number;
+    map: string;
+    mapImage?: string;
+    orangeTeam: {
+      name: string;
+      score: number;
+      nameImage?: string;
+      scoreImage?: string;
+    };
+    blueTeam: {
+      name: string;
+      score: number;
+      nameImage?: string;
+      scoreImage?: string;
+    };
+  }>;
+  message?: string;
+  log?: string;
+  code?: number;
+}
+
 export interface ElectronAPI {
   //#region Client to Server
 
@@ -103,6 +131,7 @@ export interface ElectronAPI {
   getSettings: (key: string) => Promise<any | undefined>;
   setSettings: (key: string, value: any) => void;
   socketEmit: (socket: string, path: string, value: any) => void;
+  runAnalyzer: (videoPath: string, settingsJSON: string) => Promise<void>;
 
   //#endregion
 
@@ -135,6 +164,7 @@ export interface ElectronAPI {
     ) => void
   ) => void;
   setNotificationData: (callback: (data: Message) => void) => void;
+  onAnalyzerUpdate: (callback: (msg: AnalyzerMessage) => void) => void;
 
   //#endregion
 }

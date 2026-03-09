@@ -85,6 +85,7 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
   protected percent: number = -1;
   protected inputFileDisabled: boolean = true;
   private lastDetectedGamePlayingFrame?: number;
+  private pythonAnalysisRunning: boolean = false;
 
   private _videoPath: string | undefined;
   public set videoPath(value: string | undefined) {
@@ -331,6 +332,46 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
           this.globalService.loading = undefined;
         }
         this.miniMapPositionsByMap = {};
+      });
+    });
+
+    // Receive progress / result updates from the Python analyzer binary.
+    window.electronAPI.onAnalyzerUpdate((msg) => {
+      this.ngZone.run(() => {
+        if (msg.type === 'progress') {
+          this.percent = msg.percent ?? this.percent;
+          console.log(this.percent);
+          const GAMES_COUNT =
+            typeof msg.games === 'number'
+              ? msg.games
+              : (msg.games?.length ?? this._games.length);
+          this.translateService
+            .get('view.replay_cutter.videoIsBeingAnalyzed', {
+              games: GAMES_COUNT
+            })
+            .subscribe((translated: string) => {
+              this.notificationService.sendMessage({
+                percent: this.percent,
+                infinite: false,
+                icon: undefined,
+                text: translated,
+                leftRounded: true,
+                state: 'info'
+              });
+            });
+        } else if (msg.type === 'done') {
+          console.log('[analyzer] done payload:', JSON.stringify(msg.games));
+          this.pythonAnalysisRunning = false;
+          const GAMES_LIST = Array.isArray(msg.games) ? msg.games : [];
+          this._games = GAMES_LIST.map((g) => this.createGameFromJSON(g));
+          this.onVideoEnded(this._games);
+        } else if (msg.type === 'error') {
+          console.error('[analyzer] error:', msg.message);
+          this.pythonAnalysisRunning = false;
+          this.onVideoEnded(this._games);
+        } else if (msg.log) {
+          console.log('[analyzer]', msg.log);
+        }
       });
     });
   }
@@ -1512,7 +1553,10 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     return new Promise((resolve) => {
       const ON_SEEKED = () => {
         const FRAME_DATA = ReplayCutterService.captureFrameData(VIDEO);
-        if (FRAME_DATA && ReplayCutterService.detectGamePlaying(FRAME_DATA, [game], true)) {
+        if (
+          FRAME_DATA &&
+          ReplayCutterService.detectGamePlaying(FRAME_DATA, [game], true)
+        ) {
           resolve(VIDEO.currentTime);
           CLEAN();
         } else if (VIDEO.currentTime + jump < VIDEO.duration) {
@@ -1613,7 +1657,7 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
 
           if (SIZE.width == TARGET_WIDTH && SIZE.height == TARGET_HEIGHT) {
             if (training) {
-              this.videoPath = videoFilePath;
+              this.startPythonAnalysis(videoFilePath);
             } else {
               const DIALOG_WIDTH = 'calc(100vw - 12px * 4)';
               this.dialogService
@@ -1703,10 +1747,88 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Launches the Python analyzer binary and wires up progress/result updates.
+   * @param videoFilePath Absolute path to the 1920×1080 video to analyse.
+   */
+  private startPythonAnalysis(videoFilePath: string): void {
+    this.percent = 0;
+    this.globalService.loading = '';
+    this._videoPath = videoFilePath;
+    this._games = [];
+    this.pythonAnalysisRunning = true;
+
+    this.translateService
+      .get('view.replay_cutter.videoIsBeingAnalyzed', { games: 0 })
+      .subscribe((translated: string) => {
+        window.electronAPI.showNotification(
+          true,
+          500,
+          150,
+          JSON.stringify({
+            percent: 0,
+            infinite: false,
+            icon: undefined,
+            text: translated,
+            leftRounded: true
+          })
+        );
+      });
+
+    window.electronAPI.runAnalyzer(
+      videoFilePath,
+      JSON.stringify({
+        orangeTeamName: this.settings.orangeTeamName,
+        blueTeamName: this.settings.blueTeamName
+      })
+    );
+  }
+
+  /**
+   * Reconstructs a typed Game instance from a plain JSON object emitted by the Python analyzer.
+   */
+  private createGameFromJSON(data: {
+    mode: number;
+    start: number;
+    end: number;
+    map: string;
+    mapImage?: string;
+    orangeTeam: {
+      name: string;
+      score: number;
+      nameImage?: string;
+      scoreImage?: string;
+    };
+    blueTeam: {
+      name: string;
+      score: number;
+      nameImage?: string;
+      scoreImage?: string;
+    };
+  }): Game {
+    const GAME = new Game(data.mode ?? 0);
+    GAME.start = data.start ?? 0;
+    GAME.end = data.end ?? 0;
+    GAME.map = data.map ?? '';
+    GAME.mapImage = data.mapImage ?? undefined;
+    GAME.orangeTeam.name = data.orangeTeam?.name ?? '';
+    GAME.orangeTeam.score = data.orangeTeam?.score ?? 0;
+    GAME.orangeTeam.nameImage = data.orangeTeam?.nameImage ?? undefined;
+    GAME.orangeTeam.scoreImage = data.orangeTeam?.scoreImage ?? undefined;
+    GAME.blueTeam.name = data.blueTeam?.name ?? '';
+    GAME.blueTeam.score = data.blueTeam?.score ?? 0;
+    GAME.blueTeam.nameImage = data.blueTeam?.nameImage ?? undefined;
+    GAME.blueTeam.scoreImage = data.blueTeam?.scoreImage ?? undefined;
+    return GAME;
+  }
+
+  /**
    * Sets the video's playhead to the end once the video has loaded.
    * @param event The loaded data event from the video element.
    */
   protected videoLoadedData(event: Event): void {
+    if (this.pythonAnalysisRunning) {
+      return;
+    }
     if (event.target) {
       const VIDEO = event.target as HTMLVideoElement;
       VIDEO.currentTime = VIDEO.duration;
@@ -1721,6 +1843,9 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
    * @param event The time update event from the video element.
    */
   protected async videoTimeUpdate(event: Event): Promise<void> {
+    if (this.pythonAnalysisRunning) {
+      return;
+    }
     if (this.debugPause) {
       setTimeout(() => {
         this.videoTimeUpdate(event);
@@ -2003,7 +2128,10 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
 
             if (!found) {
               if (
-                ReplayCutterService.detectGameLoadingFrame(FRAME_DATA, this._games)
+                ReplayCutterService.detectGameLoadingFrame(
+                  FRAME_DATA,
+                  this._games
+                )
               ) {
                 found = true;
                 this.lastDetectedGamePlayingFrame = undefined;
@@ -2013,7 +2141,9 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
             }
 
             if (!found) {
-              if (ReplayCutterService.detectGameIntro(FRAME_DATA, this._games)) {
+              if (
+                ReplayCutterService.detectGameIntro(FRAME_DATA, this._games)
+              ) {
                 found = true;
                 this.lastDetectedGamePlayingFrame = undefined;
                 this._games[0].start =
@@ -2026,7 +2156,9 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
             //#region Detecting card name during game.
 
             if (!found) {
-              if (ReplayCutterService.detectGamePlaying(FRAME_DATA, this._games)) {
+              if (
+                ReplayCutterService.detectGamePlaying(FRAME_DATA, this._games)
+              ) {
                 this.lastDetectedGamePlayingFrame = NOW;
                 // We are looking for the name of the map.
                 if (this._games[0].map == '') {

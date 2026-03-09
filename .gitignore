@@ -60,3 +60,11 @@ Debug
 # System files
 /angular/.DS_Store
 /angular/Thumbs.db
+
+# Python virtual environment used during build
+/python/.venv/
+
+# Generated Python analyzer binaries (built per-platform with python/build.sh|bat)
+/binaries/analyzer/darwin
+/binaries/analyzer/win32.exe
+/binaries/tesseract/

@@ -64,6 +64,20 @@ jobs:
             - name: Install Node dependencies
               run: npm run install_npm
 
+            # Cache Homebrew packages to avoid reinstalling on every run.
+            - name: Cache Homebrew packages
+              uses: actions/cache@v4
+              with:
+                  path: ~/Library/Caches/Homebrew
+                  key: homebrew-tesseract-${{ runner.os }}
+
+            # Install Tesseract and build the Python analyzer binary.
+            - name: Install Tesseract
+              run: brew install tesseract
+
+            - name: Build Python analyzer binary
+              run: cd python && sh build.sh
+
             # Building Angular and making the Electron application.
             - name: Build Electron app
               run: npm run make
@@ -103,6 +117,17 @@ jobs:
             # Install NPM dependencies.
             - name: Install Node dependencies
               run: npm run install_npm
+            # Cache Tesseract installation to avoid reinstalling on every run.
+            - name: Cache Tesseract
+              uses: actions/cache@v4
+              with:
+                  path: C:\Program Files\Tesseract-OCR
+                  key: choco-tesseract-${{ runner.os }}
+            # Install Tesseract and build the Python analyzer binary.
+            - name: Install Tesseract
+              run: choco install tesseract --no-progress -y
+            - name: Build Python analyzer binary
+              run: cd python && .\build.bat
             # Building Angular and making the Electron application.
             - name: Build Electron app
               run: npm run make
