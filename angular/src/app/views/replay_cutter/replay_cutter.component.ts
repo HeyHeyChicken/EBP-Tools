@@ -76,7 +76,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
   //#region Attributes
 
   @ViewChild('debug') debug?: ElementRef<HTMLDivElement>;
-  protected debugMode: boolean = false;
   public debugPause: boolean = false;
   private settings: Settings = new Settings();
 
@@ -338,41 +337,49 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     // Receive progress / result updates from the Python analyzer binary.
     window.electronAPI.onAnalyzerUpdate((msg) => {
       this.ngZone.run(() => {
-        if (msg.type === 'progress') {
-          this.percent = msg.percent ?? this.percent;
-          console.log('onAnalyzerUpdate', this.percent);
-          const GAMES_COUNT =
-            typeof msg.games === 'number'
-              ? msg.games
-              : (msg.games?.length ?? this._games.length);
-          if (this.percent > 0) {
-            this.translateService
-              .get('view.replay_cutter.videoIsBeingAnalyzed', {
-                games: GAMES_COUNT
-              })
-              .subscribe((translated: string) => {
-                this.notificationService.sendMessage({
-                  percent: this.percent,
-                  infinite: this.percent === 0,
-                  icon: undefined,
-                  text: translated,
-                  leftRounded: true,
-                  state: 'info'
+        switch (msg.type) {
+          case 'progress':
+            this.percent = msg.percent ?? this.percent;
+            console.log('onAnalyzerUpdate', this.percent);
+            const GAMES_COUNT =
+              typeof msg.nbGames === 'number'
+                ? msg.nbGames
+                : this._games.length;
+            if (this.percent > 0) {
+              this.translateService
+                .get('view.replay_cutter.videoIsBeingAnalyzed', {
+                  games: GAMES_COUNT
+                })
+                .subscribe((translated: string) => {
+                  this.notificationService.sendMessage({
+                    percent: this.percent,
+                    infinite: this.percent === 0,
+                    icon: undefined,
+                    text: translated,
+                    leftRounded: true,
+                    state: 'info'
+                  });
                 });
-              });
-          }
-        } else if (msg.type === 'done') {
-          console.log('[analyzer] done payload:', JSON.stringify(msg.games));
-          this.pythonAnalysisRunning = false;
-          const GAMES_LIST = Array.isArray(msg.games) ? msg.games : [];
-          this._games = GAMES_LIST.map((g) => this.createGameFromJSON(g));
-          this.onVideoEnded(this._games);
-        } else if (msg.type === 'error') {
-          console.error('[analyzer] error:', msg.message);
-          this.pythonAnalysisRunning = false;
-          this.onVideoEnded(this._games);
-        } else if (msg.log) {
-          console.log('[analyzer]', msg.log);
+            }
+            break;
+          case 'done':
+            console.log('[analyzer] done');
+            this.pythonAnalysisRunning = false;
+            this.onVideoEnded(this._games);
+            break;
+          case 'error':
+            console.error('[analyzer] error:', msg.message);
+            this.pythonAnalysisRunning = false;
+            this.onVideoEnded(this._games);
+            break;
+          case 'game':
+            if (msg.game) {
+              this._games.unshift(this.createGameFromJSON(msg.game));
+            }
+            break;
+          default:
+            console.log('[analyzer]', msg);
+            break;
         }
       });
     });
@@ -1627,7 +1634,7 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
   protected onInputFileClick(training: boolean): void {
     if (!this.inputFileDisabled) {
       this.training = training;
-      this.globalService.loading = '';
+      this.inputFileDisabled = true;
       this.videoPath = undefined;
       this._games = [];
 
@@ -1754,7 +1761,7 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
    */
   private startPythonAnalysis(videoFilePath: string): void {
     this.percent = 0;
-    this.globalService.loading = '';
+    this.inputFileDisabled = true;
     this._videoPath = videoFilePath;
     this._games = [];
     this.pythonAnalysisRunning = true;
@@ -2357,6 +2364,7 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     this.videoOldTime = undefined;
     window.electronAPI.removeNotification(true);
     this.globalService.loading = undefined;
+    this.inputFileDisabled = false;
   }
 
   /**

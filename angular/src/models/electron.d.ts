@@ -15,10 +15,12 @@ import { VideoFormat } from '../app/views/replay_downloader/models/video-format.
 //#endregion
 
 export interface AnalyzerMessage {
-  type: 'progress' | 'done' | 'error' | 'close' | 'log';
+  type: 'progress' | 'done' | 'error' | 'close' | 'log' | 'game';
   percent?: number;
-  /** In progress messages: number of games so far. In done: array of game objects. */
-  games?: number | Array<{
+  /** In progress messages: number of completed games so far. */
+  nbGames?: number;
+  /** In game messages: the completed game object. */
+  game?: {
     mode: number;
     start: number;
     end: number;
@@ -36,7 +38,7 @@ export interface AnalyzerMessage {
       nameImage?: string;
       scoreImage?: string;
     };
-  }>;
+  };
   message?: string;
   log?: string;
   code?: number;

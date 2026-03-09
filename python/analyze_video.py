@@ -557,7 +557,7 @@ def _analyze(
 
         COMPLETED_COUNT = sum(1 for g in GAMES if g['start'] != -1)
         if PERCENT != LAST_SEND_PERCENT or COMPLETED_COUNT != LAST_SEND_COMPLETED_COUNT:
-            _emit({'type': 'progress', 'percent': PERCENT, 'games': COMPLETED_COUNT, 'time': TIMESTAMP})
+            _emit({'type': 'progress', 'percent': PERCENT, 'nbGames': COMPLETED_COUNT, 'time': TIMESTAMP})
             LAST_SEND_PERCENT = PERCENT
             LAST_SEND_COMPLETED_COUNT = COMPLETED_COUNT
 
@@ -661,6 +661,7 @@ def _analyze(
                 FOUND = True
                 JUST_JUMPED = False
                 CURRENT['start'] = TIMESTAMP + 2
+                _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None   # game complete
 
         # ── Game start: map introduction ────────────────────────────────────
@@ -670,6 +671,7 @@ def _analyze(
                 FOUND = True
                 JUST_JUMPED = False
                 CURRENT['start'] = TIMESTAMP + 2
+                _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None
 
         # ── Playing frame: OCR map / team names + timer jump ────────────────
@@ -768,7 +770,7 @@ def _analyze(
         TIMESTAMP -= STEP
 
     CAP.release()
-    _emit({'type': 'done', 'games': GAMES})
+    _emit({'type': 'done'})
 
 # ---------------------------------------------------------------------------
 # Entry point

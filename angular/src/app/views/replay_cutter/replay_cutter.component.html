@@ -13,6 +13,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
           <div class="box">
             <button
               class="btn squared"
+              [class.disabled]="inputFileDisabled"
               (click)="openRemoveBorderDialog()"
               matTooltip="{{
                 'view.replay_cutter.dialog.before-removing-borders.title'
@@ -36,7 +37,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
               <p>{{ 'view.replay_cutter.inputTrainingFile' | translate }}</p>
             </div>
             <div class="buttons">
-              <button class="btn squared" (click)="openSettings()">
+              <button
+                class="btn squared"
+                (click)="openSettings()"
+                [class.disabled]="inputFileDisabled"
+              >
                 <i class="fa-sharp fa-solid fa-gear"></i>
               </button>
             </div>
@@ -63,7 +68,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
           </div>
         </ebp-column>
       }
-      @if (percent < 0 && games.length) {
+      @if (games.length) {
         <ebp-column [xs]="12">
           <div class="box mb-1">
             <button
@@ -207,52 +212,3 @@ See LICENSE for terms. Unauthorized use is prohibited.
     </ebp-row>
   </ebp-column>
 </ebp-row>
-<div id="debug" #debug [class.invisible]="!debugMode">
-  <div class="buttons">
-    <button class="squared" (click)="playPauseDebug()">
-      <i
-        class="fa-sharp fa-solid fa-pause"
-        [class.fa-pause]="!debugPause"
-        [class.fa-play]="debugPause"
-      ></i>
-    </button>
-    <button class="squared" (click)="debugMode = !debugMode">
-      <i class="fa-sharp fa-solid fa-xmark"></i>
-    </button>
-  </div>
-  @if (videoPath) {
-    <div class="video">
-      <!-- This video is used to analyze the timecodes of games in a replay -->
-      <video
-        muted
-        [src]="
-          'http://localhost:' +
-          globalService.serverPort +
-          '/file?path=' +
-          videoPath
-        "
-        (loadeddata)="videoLoadedData($event)"
-        (timeupdate)="videoTimeUpdate($event)"
-      ></video>
-      <!-- This video is used to analyze the kills of a game in a replay -->
-      @if (killFeedService.videoPath) {
-        <video
-          muted
-          [src]="
-            'http://localhost:' +
-            globalService.serverPort +
-            '/file?path=' +
-            killFeedService.videoPath
-          "
-          (loadeddata)="killFeedService.videoTimeUpdate($event, this)"
-          (timeupdate)="killFeedService.videoTimeUpdate($event, this)"
-        ></video>
-      }
-    </div>
-  }
-</div>
-@if (globalService.devMode) {
-  <button id="debugButton" class="squared" (click)="debugMode = !debugMode">
-    <i class="fa-sharp fa-solid fa-bug"></i>
-  </button>
-}
