@@ -90,12 +90,14 @@ jobs:
                       --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
                       --options runtime \
                       --entitlements build/entitlements.plist \
+                      --timestamp \
                       "$f"
                   done
                   codesign --force \
                     --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
                     --options runtime \
                     --entitlements build/entitlements.plist \
+                    --timestamp \
                     binaries/analyzer/darwin/darwin
 
             # Building Angular and making the Electron application.
