@@ -71,6 +71,14 @@ jobs:
                   path: ~/Library/Caches/Homebrew
                   key: homebrew-tesseract-${{ runner.os }}
 
+            # Pin Python to a python.org build whose .framework is signed with Apple's
+            # Team ID. Homebrew Python (the macOS runner default) has a different Team ID,
+            # which causes macOS to block dlopen of the extracted library at runtime.
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
             # Install Tesseract and build the Python analyzer binary.
             - name: Install Tesseract
               run: brew install tesseract
