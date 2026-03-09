@@ -45,11 +45,12 @@ function getFFmpegPath(osPlatform, isDevMode, rootPath) {
  */
 function getAnalyzerPath(osPlatform, isDevMode, rootPath) {
     const DIRECTORY = isDevMode ? '../binaries/analyzer' : 'analyzer';
-    return path.join(
-        rootPath,
-        DIRECTORY,
-        osPlatform === 'win32' ? 'win32.exe' : osPlatform
-    );
+    if (osPlatform === 'win32') {
+        return path.join(rootPath, DIRECTORY, 'win32.exe');
+    }
+    // macOS/Linux: PyInstaller --onedir produces a directory named after the platform.
+    // The executable lives inside that directory with the same name.
+    return path.join(rootPath, DIRECTORY, osPlatform, osPlatform);
 }
 
 //#endregion

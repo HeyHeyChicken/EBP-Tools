@@ -17,7 +17,10 @@ TESS_DATA="/opt/homebrew/share/tessdata"
 TESS_LIB="/opt/homebrew/lib"
 
 echo "Building macOS binary with PyInstaller (embedding Tesseract)..."
-python3 -m PyInstaller --onefile --name darwin \
+# --onedir instead of --onefile: all files (Python.framework, dylibs) are extracted
+# at build time into a directory, so they can be individually code-signed before
+# packaging. --onefile extracts to /tmp at runtime, making pre-signing impossible.
+python3 -m PyInstaller --onedir --name darwin \
   --add-data "${TESS_BIN}:tesseract" \
   --add-data "${TESS_DATA}/eng.traineddata:tesseract/tessdata" \
   --add-binary "${TESS_LIB}/libtesseract*.dylib:tesseract" \
@@ -28,8 +31,9 @@ deactivate
 
 echo "Moving binary to binaries/analyzer/darwin..."
 mkdir -p ../binaries/analyzer
+rm -rf ../binaries/analyzer/darwin
 mv dist/darwin ../binaries/analyzer/darwin
-chmod +x ../binaries/analyzer/darwin
+chmod +x ../binaries/analyzer/darwin/darwin
 
 echo "Cleaning up PyInstaller artifacts..."
 rm -rf build dist darwin.spec
