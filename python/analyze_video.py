@@ -207,8 +207,8 @@ _MAPS = {
     'Outlaw': ['outlaw', 'qutlaw'],
     'Polaris': ['polaris'],
     'Silva': ['silva'],
-    'The Cliff': ['cliff', 'tnecltt', 'tnecitt'],
-    'The Rock': ['rock'],
+    'The Cliff': ['cliff', 'tnecltt', 'tnecitt', 'thecliff'],
+    'The Rock': ['rock', 'therock'],
     'Horizon': ['horizon'],
 }
 
@@ -300,7 +300,7 @@ def _ocr_region(
     img = _region_to_pil(frame, x1, y1, x2, y2)
     CONFIG = f'--psm {psm}'
     if whitelist:
-        CONFIG += f' -c tessedit_char_whitelist={whitelist}'
+        CONFIG += f' -c "tessedit_char_whitelist={whitelist}"'
 
     def _recognize(i: Image.Image) -> str:
         try:
