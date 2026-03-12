@@ -364,11 +364,13 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
           case 'done':
             console.log('[analyzer] done');
             this.pythonAnalysisRunning = false;
+            this.globalService.loading = undefined;
             this.onVideoEnded(this._games);
             break;
           case 'error':
             console.error('[analyzer] error:', msg.message);
             this.pythonAnalysisRunning = false;
+            this.globalService.loading = undefined;
             this.onVideoEnded(this._games);
             break;
           case 'game':
