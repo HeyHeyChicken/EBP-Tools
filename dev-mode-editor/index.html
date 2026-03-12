@@ -1,0 +1,326 @@
+<!doctype html>
+<html>
+    <head>
+        <title>DEV - Mode editor</title>
+        <link rel="stylesheet" href="./style.css" />
+    </head>
+    <body>
+        <canvas id="canvas"></canvas>
+        <div id="toolbar">
+            <span id="cursor-pos">x: 0, y: 0</span>
+            <select id="img-select"></select>
+            <button id="save-btn">Save</button>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/fabric@7.1.0/dist/index.min.js"></script>
+        <script>
+            const canvas = new fabric.Canvas('canvas');
+
+            const DATA_STR = `{
+            'playersX': (118, 1801),
+            'map': ((825, 81), (1093, 102)),
+            'orangeName': ((686, 22), (833, 68)),
+            'blueName': ((1087, 22), (1226, 68)),
+            'timer': ((935, 0), (985, 28)),
+            'playersY': ((732, 755), (814, 838), (898, 921), (980, 1004)),
+        }`;
+
+            function parseDict(STR) {
+                const RESULT = {};
+                const KEYS_MATCH = [...STR.matchAll(/'(\w+)':\s*/g)];
+                KEYS_MATCH.forEach(function (KM, I) {
+                    const KEY = KM[1];
+                    const START = KM.index + KM[0].length;
+                    const END =
+                        I + 1 < KEYS_MATCH.length
+                            ? KEYS_MATCH[I + 1].index
+                            : STR.length;
+                    const SEGMENT = STR.slice(START, END);
+                    const PT_RE = /\(\s*(\d+)\s*,\s*(\d+)\s*\)/g;
+                    const POINTS = [];
+                    let M;
+                    while ((M = PT_RE.exec(SEGMENT)) !== null) {
+                        POINTS.push([parseInt(M[1]), parseInt(M[2])]);
+                    }
+                    if (POINTS.length > 0) {
+                        RESULT[KEY] = POINTS.length === 1 ? POINTS[0] : POINTS;
+                    }
+                });
+                return RESULT;
+            }
+
+            function parsePythonData(STR) {
+                if (STR.trim().startsWith('[')) {
+                    return [...STR.matchAll(/\{([^}]+)\}/gs)].map(function (M) {
+                        return parseDict(M[1]);
+                    });
+                }
+                return parseDict(STR);
+            }
+
+            const DATA = parsePythonData(DATA_STR);
+
+            const IMGS = ['end.jpg', 'game.jpg', 'loading.jpg', 'score.jpg'];
+            const SELECT = document.getElementById('img-select');
+            IMGS.forEach(function (NAME) {
+                const OPT = document.createElement('option');
+                OPT.value = './imgs/' + NAME;
+                OPT.textContent = NAME.replace('.jpg', '');
+                SELECT.appendChild(OPT);
+            });
+
+            let W, H, SCALE_X, SCALE_Y;
+
+            function loadBackground(SRC) {
+                const NATIVE_IMG = new Image();
+                NATIVE_IMG.onload = function () {
+                    const IMG_RATIO =
+                        NATIVE_IMG.naturalWidth / NATIVE_IMG.naturalHeight;
+                    const MAX_W = window.innerWidth;
+                    const MAX_H = window.innerHeight;
+
+                    if (MAX_W / IMG_RATIO <= MAX_H) {
+                        W = MAX_W;
+                        H = Math.round(MAX_W / IMG_RATIO);
+                    } else {
+                        H = MAX_H;
+                        W = Math.round(MAX_H * IMG_RATIO);
+                    }
+
+                    canvas.setDimensions({ width: W, height: H });
+                    SCALE_X = W / NATIVE_IMG.naturalWidth;
+                    SCALE_Y = H / NATIVE_IMG.naturalHeight;
+
+                    fabric.Image.fromURL(SRC).then(function (img) {
+                        img.scaleToWidth(W);
+                        img.set({ left: W / 2, top: H / 2 });
+                        canvas.backgroundImage = img;
+
+                        canvas.getObjects().forEach(function (OBJ) {
+                            canvas.remove(OBJ);
+                        });
+
+                        const COLORS = [
+                            'red',
+                            '#00aaff',
+                            '#00cc44',
+                            '#ffaa00',
+                            '#aa00ff'
+                        ];
+                        const IS_LIST = Array.isArray(DATA);
+                        const ITEMS = IS_LIST ? DATA : [DATA];
+
+                        ITEMS.forEach(function (DICT, ARR_IDX) {
+                            Object.entries(DICT).forEach(function ([
+                                KEY,
+                                VALUE
+                            ]) {
+                                const IS_MULTI = Array.isArray(VALUE[0]);
+                                const POINTS = IS_MULTI ? VALUE : [VALUE];
+                                POINTS.forEach(function (POINT, IDX) {
+                                    const CIRCLE = new fabric.Circle({
+                                        left: POINT[0] * SCALE_X,
+                                        top: POINT[1] * SCALE_Y,
+                                        radius: 6,
+                                        fill: COLORS[ARR_IDX % COLORS.length],
+                                        stroke: 'white',
+                                        strokeWidth: 1,
+                                        originX: 'center',
+                                        originY: 'center',
+                                        lockRotation: true,
+                                        hasControls: false
+                                    });
+                                    CIRCLE._dataArrIdx = IS_LIST
+                                        ? ARR_IDX
+                                        : null;
+                                    CIRCLE._dataKey = KEY;
+                                    CIRCLE._dataIdx = IS_MULTI ? IDX : null;
+                                    canvas.add(CIRCLE);
+                                });
+                            });
+                        });
+
+                        canvas.on('object:modified', function (E) {
+                            const OBJ = E.target;
+                            const X = Math.round(OBJ.left / SCALE_X);
+                            const Y = Math.round(OBJ.top / SCALE_Y);
+                            const TARGET =
+                                OBJ._dataArrIdx !== null
+                                    ? DATA[OBJ._dataArrIdx]
+                                    : DATA;
+                            if (OBJ._dataIdx === null) {
+                                TARGET[OBJ._dataKey] = [X, Y];
+                            } else {
+                                TARGET[OBJ._dataKey][OBJ._dataIdx] = [X, Y];
+                            }
+                        });
+
+                        const CIRCLE_RADIUS = 6;
+
+                        function updateCircleRadii(ZOOM) {
+                            canvas.getObjects('circle').forEach(function (C) {
+                                C.set({
+                                    radius: CIRCLE_RADIUS / ZOOM,
+                                    strokeWidth: 1 / ZOOM
+                                });
+                            });
+                            canvas.renderAll();
+                        }
+
+                        canvas.on('mouse:wheel', function (E) {
+                            const DELTA = E.e.deltaY;
+                            let ZOOM =
+                                canvas.getZoom() * (DELTA > 0 ? 0.9 : 1.1);
+                            ZOOM = Math.min(Math.max(ZOOM, 1), 10);
+                            canvas.zoomToPoint(
+                                { x: E.e.offsetX, y: E.e.offsetY },
+                                ZOOM
+                            );
+                            const VPT = canvas.viewportTransform;
+                            VPT[4] = Math.min(
+                                0,
+                                Math.max(VPT[4], W * (1 - ZOOM))
+                            );
+                            VPT[5] = Math.min(
+                                0,
+                                Math.max(VPT[5], H * (1 - ZOOM))
+                            );
+                            canvas.setViewportTransform(VPT);
+                            updateCircleRadii(ZOOM);
+                            E.e.preventDefault();
+                        });
+
+                        const OVERLAY_IMAGES = [];
+
+                        document.addEventListener('keydown', function (E) {
+                            if (E.code === 'Space') {
+                                E.preventDefault();
+                                OVERLAY_IMAGES.forEach(function (IMG) {
+                                    IMG.set({
+                                        opacity: IMG.opacity === 0 ? 1 : 0
+                                    });
+                                });
+                                canvas.renderAll();
+                            }
+                        });
+
+                        document.addEventListener('paste', function (E) {
+                            const ITEM = Array.from(E.clipboardData.items).find(
+                                function (I) {
+                                    return I.type.startsWith('image/');
+                                }
+                            );
+                            if (!ITEM) return;
+                            const BLOB_URL = URL.createObjectURL(
+                                ITEM.getAsFile()
+                            );
+                            fabric.Image.fromURL(BLOB_URL).then(function (IMG) {
+                                IMG.scaleToWidth(W);
+                                IMG.set({
+                                    left: W / 2,
+                                    top: H / 2,
+                                    selectable: false,
+                                    evented: false
+                                });
+                                canvas.add(IMG);
+                                canvas.sendObjectToBack(IMG);
+                                OVERLAY_IMAGES.push(IMG);
+                                canvas.renderAll();
+                            });
+                        });
+
+                        const CURSOR_POS =
+                            document.getElementById('cursor-pos');
+                        canvas.upperCanvasEl.addEventListener(
+                            'mousemove',
+                            function (E) {
+                                const RECT =
+                                    canvas.upperCanvasEl.getBoundingClientRect();
+                                CURSOR_POS.textContent =
+                                    'x: ' +
+                                    Math.round(
+                                        (E.clientX - RECT.left) / SCALE_X
+                                    ) +
+                                    ', y: ' +
+                                    Math.round(
+                                        (E.clientY - RECT.top) / SCALE_Y
+                                    );
+                            }
+                        );
+
+                        function formatDict(DICT, INDENT) {
+                            return Object.entries(DICT)
+                                .map(function ([KEY, VALUE]) {
+                                    let FORMATTED;
+                                    if (Array.isArray(VALUE[0])) {
+                                        FORMATTED =
+                                            '(' +
+                                            VALUE.map(function (P) {
+                                                return (
+                                                    '(' +
+                                                    P[0] +
+                                                    ', ' +
+                                                    P[1] +
+                                                    ')'
+                                                );
+                                            }).join(', ') +
+                                            ')';
+                                    } else {
+                                        FORMATTED =
+                                            '(' +
+                                            VALUE[0] +
+                                            ', ' +
+                                            VALUE[1] +
+                                            ')';
+                                    }
+                                    return (
+                                        INDENT +
+                                        "'" +
+                                        KEY +
+                                        "': " +
+                                        FORMATTED +
+                                        ','
+                                    );
+                                })
+                                .join('\n');
+                        }
+
+                        function formatPython(DATA) {
+                            if (Array.isArray(DATA)) {
+                                const ITEMS = DATA.map(function (DICT) {
+                                    return (
+                                        '            {\n' +
+                                        formatDict(DICT, '                ') +
+                                        '\n            },'
+                                    );
+                                });
+                                return '[\n' + ITEMS.join('\n') + '\n        ]';
+                            }
+                            return (
+                                '{\n' +
+                                formatDict(DATA, '            ') +
+                                '\n        }'
+                            );
+                        }
+
+                        document
+                            .getElementById('save-btn')
+                            .addEventListener('click', function () {
+                                navigator.clipboard.writeText(
+                                    formatPython(DATA)
+                                );
+                            });
+
+                        canvas.renderAll();
+                    });
+                };
+                NATIVE_IMG.src = SRC;
+            }
+
+            SELECT.addEventListener('change', function () {
+                loadBackground(SELECT.value);
+            });
+
+            loadBackground(IMGS[0] ? './imgs/' + IMGS[0] : '');
+        </script>
+    </body>
+</html>
