@@ -17,12 +17,12 @@ from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
 
 # ---------------------------------------------------------------------------
-# MODES — mirrored from angular/src/app/views/replay_cutter/models/mode.ts
+# MODES
 # All positions are in 1920×1080 coordinate space.
 # ---------------------------------------------------------------------------
 
 MODES = [
-    # ── Mode 0 ──────────────────────────────────────────────────────────────
+    #region Mode 0
     {
         'scoreFrame': {
             'orangeLogo': (325, 153),
@@ -65,7 +65,8 @@ MODES = [
             },
         ],
     },
-    # ── Mode 1 ──────────────────────────────────────────────────────────────
+    #endregion
+    #region Mode 1
     {
         'scoreFrame': {
             'orangeLogo': (325, 123),
@@ -102,7 +103,8 @@ MODES = [
             },
         ],
     },
-    # ── Mode 2 ──────────────────────────────────────────────────────────────
+    #endregion
+    #region Mode 2
     {
         'scoreFrame': {
             'orangeLogo': (325, 126),
@@ -139,7 +141,8 @@ MODES = [
             },
         ],
     },
-    # ── Mode 3 ──────────────────────────────────────────────────────────────
+    #endregion
+    #region Mode 3
     {
         'scoreFrame': {
             'orangeLogo': (314, 157),
@@ -176,10 +179,47 @@ MODES = [
             },
         ],
     },
+    #endregion
+    #region Mode 4
+    {
+        'scoreFrame': {
+            'orangeLogo': (326, 192),
+            'blueLogo': (313, 607),
+            'orangeName': ((388, 221), (619, 249)),
+            'blueName': ((390, 627), (620, 655)),
+            'orangeScore': ((539, 132), ( 620, 172)),
+            'blueScore': ((1281, 132), (1381, 169)),
+        },
+        'endFrame': {
+            'orangeScore': ((636, 548), (902, 640)),
+            'blueScore': ((983, 550), (1236, 633)),
+        },
+        'gameFrame': {
+            'playersX': (118, 1801),
+            'map': ((825, 73), (1094, 93)),
+            'orangeName': ((686, 22), (833, 67)),
+            'blueName': ((1087, 22), (1225, 56)),
+            'timer': ((935, 0), (985, 24)),
+            'playersY': ((732, 755), (814, 838), (898, 921), (980, 1004)),
+        },
+        'loadingFrames': [
+            {
+                'logoTop': (959, 438),
+                'logoLeft': (857, 643),
+                'logoRight': (1060, 642),
+                'logoMiddle': (958, 642),
+                'logoBlack1': (959, 470),
+                'logoBlack2': (880, 645),
+                'logoBlack3': (1034, 643),
+                'logoBlack4': (959, 604),
+            },
+        ],
+    },
+    #endregion
 ]
 
-# B-letter patterns for game intro detection — from detectGameIntro() in the service
-_B_PATTERNS = [
+# A-letter patterns for game intro detection — from detectGameIntro() in the service
+_A_PATTERNS = [
     [(1495, 942, 255, 30), (1512, 950, 255, 30), (1495, 962, 255, 30),
      (1512, 972, 255, 30), (1495, 982, 255, 30),
      (1503, 951,   0, 200), (1503, 972,   0, 200)],
@@ -404,7 +444,7 @@ def _detect_game_intro(frame: np.ndarray) -> bool:
     Détecte l'écran d'introduction de map (lettre 'B' du logo EVA en bas à droite).
     Miroir de detectGameIntro() en TypeScript.
     """
-    for PATTERN in _B_PATTERNS:
+    for PATTERN in _A_PATTERNS:
         if all(_color_similar(_get_pixel(frame, p[0], p[1]), (p[2], p[2], p[2]), p[3])
                for p in PATTERN):
             return True
@@ -574,7 +614,7 @@ def _analyze(
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             SCORE_MODE = _detect_game_score_frame(FRAME)
             if SCORE_MODE >= 0:
-                #_emit({'log': 'Score frame found ' + str(SCORE_MODE)})
+                _emit({'log': 'Score frame found ' + str(SCORE_MODE)})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(SCORE_MODE, orange_override, blue_override)
