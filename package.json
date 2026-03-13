@@ -32,7 +32,7 @@
         "exceljs": "^4.4.0",
         "express": "^5.2.1",
         "get-port": "^7.1.0",
-        "puppeteer-core": "^24.37.2",
+        "puppeteer-core": "^24.39.1",
         "registry-js": "^1.16.1",
         "socket.io-client": "^4.8.3"
     },
