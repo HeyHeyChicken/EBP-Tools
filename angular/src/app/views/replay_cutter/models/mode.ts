@@ -68,7 +68,7 @@ class Mode {
 }
 
 export const MODES = [
-  //#region Mode 1
+  //#region Mode 0
 
   new Mode(
     new ScoreFrame(
@@ -133,7 +133,7 @@ export const MODES = [
   ),
 
   //#endregion
-  //#region Mode 2
+  //#region Mode 1
 
   new Mode(
     new ScoreFrame(
@@ -188,7 +188,7 @@ export const MODES = [
   ),
 
   //#endregion
-  //#region Mode 3
+  //#region Mode 2
 
   new Mode(
     new ScoreFrame(
@@ -243,8 +243,7 @@ export const MODES = [
   ),
 
   //#endregion
-
-  //#region Mode 4
+  //#region Mode 3
 
   new Mode(
     new ScoreFrame(
@@ -294,6 +293,51 @@ export const MODES = [
         new Position(920, 596),
         new Position(996, 596),
         new Position(959, 573)
+      )
+    ]
+  ),
+
+  //#endregion
+  //#region Mode 4
+
+  new Mode(
+    new ScoreFrame(
+      new Position(326, 192), // orangeLogo
+      new Position(313, 607), // blueLogo
+      [new Position(388, 221), new Position(619, 249)], // orangeName
+      [new Position(390, 627), new Position(620, 655)], // blueName
+      [new Position(539, 132), new Position(620, 172)], // orangeScore
+      [new Position(1281, 132), new Position(1381, 169)] // blueScore
+    ),
+    new EndFrame(
+      [new Position(636, 548), new Position(902, 640)], // orangeScore
+      [new Position(983, 550), new Position(1236, 633)] // blueScore
+    ),
+    new GameFrame(
+      [118, 1801], // playersX
+      [new Position(825, 73), new Position(1094, 93)], // map
+      [new Position(686, 22), new Position(833, 67)], // orangeName
+      [new Position(1087, 22), new Position(1225, 56)], // blueName
+      [new Position(935, 0), new Position(985, 24)], // timer
+      [127, 384], // orangePlayersX
+      [1541, 1799], // bluePlayersX
+      [
+        [732, 755],
+        [814, 838],
+        [898, 921],
+        [980, 1004]
+      ] // playersY
+    ),
+    [
+      new LoadingFrame(
+        new Position(959, 438),
+        new Position(857, 643),
+        new Position(1060, 642),
+        new Position(958, 642),
+        new Position(959, 470),
+        new Position(880, 645),
+        new Position(1034, 643),
+        new Position(959, 604)
       )
     ]
   )
