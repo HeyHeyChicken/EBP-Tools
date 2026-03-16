@@ -1252,12 +1252,14 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     }
 
     const HEIGHT = bottom - top;
+    const WIDTH = right - left;
     if (
+      WIDTH <= 0 ||
       HEIGHT < EXPECTED_HEIGHT * nbPlayers * (1 - TOLERANCE) ||
       HEIGHT > EXPECTED_HEIGHT * nbPlayers * (1 + TOLERANCE)
     ) {
       console.warn(
-        '"getTeamInfosPosition_Step2", the team infos image height seems wrong, retrying...'
+        '"getTeamInfosPosition_Step2", the team infos image width or height seems wrong, retrying...'
       );
       this.getTeamInfosPosition(
         gameIndex,
