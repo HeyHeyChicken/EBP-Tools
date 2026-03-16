@@ -216,6 +216,50 @@ MODES = [
         ],
     },
     #endregion
+    #region Mode 5
+    {
+        'scoreFrame': {
+            'orangeLogo': (319, 123),
+            'blueLogo': (313, 613),
+            'orangeName': ((379, 157), (620, 194)),
+            'blueName': ((384, 638), (620, 677)),
+            'orangeScore': ((529, 54), (618, 96)),
+            'blueScore': ((1282, 57), (1375, 96)),
+        },
+        'endFrame': {
+            'orangeScore': ((636, 545), (903, 648)),
+            'blueScore': ((996, 545), (1257, 648)),
+        },
+        'gameFrame': {
+            'playersX': [118, 1801],
+            'map': ((825, 81), (1093, 102)),
+            'orangeName': ((686, 22), (833, 68)),
+            'blueName': ((1087, 22), (1226, 68)),
+            'timer': ((935, 0), (985, 28)),
+            'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
+        },
+        'loadingFrames': [
+            {
+                'logoTop': (958, 427), 'logoLeft': (857, 653),
+                'logoRight': (1060, 653), 'logoMiddle': (958, 642),
+                'logoBlack1': (958, 463), 'logoBlack2': (880, 653),
+                'logoBlack3': (1037, 653), 'logoBlack4': (958, 610),
+            },
+            {
+                'logoTop': (959, 484), 'logoLeft': (908, 596),
+                'logoRight': (1010, 596), 'logoMiddle': (959, 589),
+                'logoBlack1': (959, 503), 'logoBlack2': (920, 596),
+                'logoBlack3': (996, 596), 'logoBlack4': (959, 573),
+            },
+            {
+                'logoTop': (959, 369), 'logoLeft': (808, 708),
+                'logoRight': (1110, 708), 'logoMiddle': (959, 708),
+                'logoBlack1': (959, 430), 'logoBlack2': (840, 708),
+                'logoBlack3': (1070, 708), 'logoBlack4': (959, 640),
+            },
+        ],
+    },
+    #endregion
 ]
 
 # A-letter patterns for game intro detection — from detectGameIntro() in the service
@@ -241,7 +285,7 @@ _MAPS = {
     'Artefact': ['artefact'],
     'Atlantis': ['atlantis'],
     'Ceres': ['ceres'],
-    'Engine': ['engine'],
+    'Engine': ['engine', 'enaine'],
     'Helios Station': ['helios', 'station', 'hheliosstation', 'rheliosstation', 'heliosstation'],
     'Lunar Outpost': ['lunar', 'outpost', 'lunaroutpost'],
     'Outlaw': ['outlaw', 'qutlaw'],
