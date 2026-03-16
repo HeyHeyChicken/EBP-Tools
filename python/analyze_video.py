@@ -892,7 +892,14 @@ def _get_bundled_tesseract() -> str:
         return ''
     EXE_NAME = 'tesseract.exe' if sys.platform == 'win32' else 'tesseract'
     CANDIDATE = os.path.join(BASE, 'tesseract', EXE_NAME)
-    return CANDIDATE if os.path.isfile(CANDIDATE) else ''
+    if not os.path.isfile(CANDIDATE):
+        return ''
+    # Point TESSDATA_PREFIX to the bundled tessdata so the tesseract subprocess
+    # finds eng.traineddata instead of looking at its compile-time Homebrew path.
+    TESSDATA_DIR = os.path.join(BASE, 'tesseract', 'tessdata')
+    if os.path.isdir(TESSDATA_DIR):
+        os.environ['TESSDATA_PREFIX'] = TESSDATA_DIR
+    return CANDIDATE
 
 
 def main() -> None:
