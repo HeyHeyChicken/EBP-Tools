@@ -701,7 +701,17 @@ def _analyze(
                 _emit({'log': 'Loading frame found'})
                 FOUND = True
                 JUST_JUMPED = False
-                CURRENT['start'] = TIMESTAMP + 2
+                # Scan forward to find the first actual gameplay frame.
+                PROBE = TIMESTAMP + 0.5
+                GAME_START = TIMESTAMP
+                while PROBE <= TIMESTAMP + 30:
+                    PROBE_FRAME = _get_frame(CAP, PROBE)
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME, CURRENT['mode']):
+                        GAME_START = PROBE
+                        break
+                    PROBE += 0.5
+                CURRENT['start'] = GAME_START
+                _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None   # game complete
 
@@ -711,7 +721,17 @@ def _analyze(
                 _emit({'log': 'Game intro frame found'})
                 FOUND = True
                 JUST_JUMPED = False
-                CURRENT['start'] = TIMESTAMP + 2
+                # Scan forward to find the first actual gameplay frame.
+                PROBE = TIMESTAMP + 0.5
+                GAME_START = TIMESTAMP
+                while PROBE <= TIMESTAMP + 30:
+                    PROBE_FRAME = _get_frame(CAP, PROBE)
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME, CURRENT['mode']):
+                        GAME_START = PROBE
+                        break
+                    PROBE += 0.5
+                CURRENT['start'] = GAME_START
+                _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None
 
