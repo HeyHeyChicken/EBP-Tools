@@ -82,14 +82,10 @@ module.exports = {
                     section: 'games',
                     priority: 'optional',
                     depends: [
-                        'gconf2',
-                        'gconf-service',
                         'libnotify4',
-                        'libappindicator1',
                         'libxtst6',
                         'libnss3',
                         'libxss1',
-                        'libgconf-2-4',
                         'tesseract-ocr',
                         'tesseract-ocr-eng'
                     ]
