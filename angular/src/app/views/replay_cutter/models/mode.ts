@@ -340,6 +340,71 @@ export const MODES = [
         new Position(959, 604)
       )
     ]
+  ),
+
+  //#endregion
+  //#region Mode 5
+
+  new Mode(
+    new ScoreFrame(
+      new Position(319, 123), // orangeLogo
+      new Position(313, 613), // blueLogo
+      [new Position(379, 157), new Position(620, 194)], // orangeName
+      [new Position(384, 638), new Position(620, 677)], // blueName
+      [new Position(529, 54), new Position(618, 96)], // orangeScore
+      [new Position(1282, 57), new Position(1375, 96)] // blueScore
+    ),
+    new EndFrame(
+      [new Position(636, 545), new Position(903, 648)], // orangeScore
+      [new Position(996, 545), new Position(1257, 648)] // blueScore
+    ),
+    new GameFrame(
+      [118, 1801], // playersX
+      [new Position(825, 81), new Position(1093, 102)], // map
+      [new Position(686, 22), new Position(833, 68)], // orangeName
+      [new Position(1087, 22), new Position(1226, 68)], // blueName
+      [new Position(935, 0), new Position(985, 28)], // timer
+      [127, 384], // orangePlayersX
+      [1541, 1799], // bluePlayersX
+      [
+        [732, 755],
+        [814, 838],
+        [898, 921],
+        [980, 1004]
+      ] // playersY
+    ),
+    [
+      new LoadingFrame(
+        new Position(958, 427),
+        new Position(857, 653),
+        new Position(1060, 653),
+        new Position(958, 642),
+        new Position(958, 463),
+        new Position(880, 653),
+        new Position(1037, 653),
+        new Position(958, 610)
+      ),
+      new LoadingFrame(
+        new Position(959, 484),
+        new Position(908, 596),
+        new Position(1010, 596),
+        new Position(959, 589),
+        new Position(959, 503),
+        new Position(920, 596),
+        new Position(996, 596),
+        new Position(959, 573)
+      ),
+      new LoadingFrame(
+        new Position(959, 369),
+        new Position(808, 708),
+        new Position(1110, 708),
+        new Position(959, 708),
+        new Position(959, 430),
+        new Position(840, 708),
+        new Position(1070, 708),
+        new Position(959, 640)
+      )
+    ]
   )
 
   //#endregion
