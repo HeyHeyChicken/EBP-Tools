@@ -321,10 +321,6 @@ function createWindow(updateService) {
                   )}`
         );
     });
-
-    if (isJustUpdated) {
-        updateService.showUpdatedNotification();
-    }
 }
 
 function hideMainWindow() {

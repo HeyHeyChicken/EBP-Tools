@@ -38,30 +38,6 @@ class UpdateService {
     //#region Functions
 
     /**
-     * Displays the "Up to date" notification.
-     */
-    showUpdatedNotification() {
-        getMainWindow()?.hide();
-
-        createFloatingWindow(
-            450,
-            150,
-            JSON.stringify({
-                percent: 0,
-                leftRounded: true,
-                infinite: true,
-                icon: 'fa-sharp fa-solid fa-check',
-                text: '.common.upToDate',
-                state: 'info'
-            })
-        );
-
-        setTimeout(() => {
-            deleteFloatingWindow(false);
-        }, 5000);
-    }
-
-    /**
      * Automatically updates the application.
      * @param {boolean} invisible Should we hide the graphical update elements?
      */
@@ -133,10 +109,6 @@ class UpdateService {
                                 }
                                 app.quit();
                             });
-                        }
-                    } else {
-                        if (invisible === false) {
-                            this.showUpdatedNotification();
                         }
                     }
                 }
