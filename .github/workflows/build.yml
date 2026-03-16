@@ -76,7 +76,7 @@ jobs:
               run: brew install tesseract
 
             - name: Build Python analyzer binary
-              run: cd python && sh build.sh
+              run: cd python && bash build.sh
 
             # Sign all files in the onedir bundle before Electron Forge packages them.
             # With --onedir, Python.framework and dylibs are present at build time and
