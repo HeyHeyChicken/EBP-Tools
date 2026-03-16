@@ -89,7 +89,9 @@ module.exports = {
                         'libxtst6',
                         'libnss3',
                         'libxss1',
-                        'libgconf-2-4'
+                        'libgconf-2-4',
+                        'tesseract-ocr',
+                        'tesseract-ocr-eng'
                     ]
                 }
             }
