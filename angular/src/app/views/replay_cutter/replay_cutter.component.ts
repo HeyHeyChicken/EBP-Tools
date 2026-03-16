@@ -189,6 +189,16 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     this.visibilityChangeHandler = this.visibilityChangeHandler.bind(this);
     document.addEventListener('visibilitychange', this.visibilityChangeHandler);
 
+    window.electronAPI.globalMessage(
+      (i18nPath: string, i18nVariables: object) => {
+        this.ngZone.run(() => {
+          if (!i18nPath) {
+            this.inputFileDisabled = false;
+          }
+        });
+      }
+    );
+
     window.electronAPI.gameIsUploaded((gameIndex) => {
       this.ngZone.run(() => {
         this.games[gameIndex].sentForAnalysis = true;
