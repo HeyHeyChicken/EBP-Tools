@@ -26,13 +26,6 @@ class UpdateService {
 
     constructor() {
         this.localVersion = version;
-
-        setInterval(
-            () => {
-                this.autoUpdate(true);
-            },
-            1000 * 60 * 60
-        );
     }
 
     //#region Functions

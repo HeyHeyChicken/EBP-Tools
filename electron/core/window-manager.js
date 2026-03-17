@@ -215,6 +215,10 @@ function createWindow(updateService) {
         hideMainWindow();
     });
 
+    mainWindow.on('show', () => {
+        updateService.autoUpdate(true);
+    });
+
     const TRAY = new Tray(path.join(ROOT_PATH, 'assets', 'favicon.png'));
     const CONTEXT_MENU = Menu.buildFromTemplate([
         {
