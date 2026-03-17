@@ -5,12 +5,10 @@
 import sys
 import os
 import json
-import subprocess
 import io
 import re
 import base64
 import time
-
 import numpy as np
 import cv2
 from PIL import Image, ImageOps, ImageEnhance
@@ -37,7 +35,6 @@ MODES = [
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'playersX': [118, 1801],
             'map': ((825, 81), (1093, 102)),
             'orangeName': ((686, 22), (833, 68)),
             'blueName': ((1087, 22), (1226, 68)),
@@ -81,7 +78,6 @@ MODES = [
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'playersX': [118, 1801],
             'map': ((825, 89), (1093, 110)),
             'orangeName': ((686, 22), (833, 68)),
             'blueName': ((1087, 22), (1226, 68)),
@@ -119,7 +115,6 @@ MODES = [
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'playersX': [118, 1801],
             'map': ((825, 89), (1093, 110)),
             'orangeName': ((686, 22), (833, 68)),
             'blueName': ((1087, 22), (1226, 68)),
@@ -157,7 +152,6 @@ MODES = [
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'playersX': [118, 1801],
             'map': ((825, 79), (1093, 99)),
             'orangeName': ((686, 22), (833, 68)),
             'blueName': ((1087, 22), (1226, 68)),
@@ -195,7 +189,6 @@ MODES = [
             'blueScore': ((983, 550), (1236, 633)),
         },
         'gameFrame': {
-            'playersX': (118, 1801),
             'map': ((825, 73), (1094, 93)),
             'orangeName': ((686, 22), (833, 67)),
             'blueName': ((1087, 22), (1225, 56)),
@@ -231,7 +224,6 @@ MODES = [
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'playersX': [118, 1801],
             'map': ((825, 81), (1093, 102)),
             'orangeName': ((686, 22), (833, 68)),
             'blueName': ((1087, 22), (1226, 68)),
@@ -302,6 +294,33 @@ HEIGHT = 1080
 # ---------------------------------------------------------------------------
 # Low-level helpers
 # ---------------------------------------------------------------------------
+
+def check_pixels(frame, points, tol_color=20, tol_pos=10):
+    """
+    frame: image (H, W, 3)
+    points: liste de tuples (x, y, r, g, b)
+    tol_color: tolérance couleur
+    tol_pos: tolérance position (zone autour du point)
+    """
+    h, w, _ = frame.shape
+
+    for (x, y, r, g, b) in points:
+        x1 = max(0, x - tol_pos)
+        x2 = min(w, x + tol_pos)
+        y1 = max(0, y - tol_pos)
+        y2 = min(h, y + tol_pos)
+
+        roi = frame[y1:y2, x1:x2]
+
+        target = np.array([r, g, b])
+        diff = np.abs(roi - target)
+
+        match = (diff < tol_color).all(axis=2)
+
+        if not match.any():
+            return False
+
+    return True
 
 def _emit(msg: dict) -> None:
     """Sérialise msg en JSON et l'écrit sur stdout (flush immédiat)."""
@@ -495,33 +514,18 @@ def _detect_game_intro(frame: np.ndarray) -> bool:
     return False
 
 
-def _detect_game_playing(frame: np.ndarray, mode_index: int) -> bool:
+def _detect_game_playing(frame: np.ndarray) -> bool:
     """
-    Détecte un frame de jeu en cours en vérifiant les barres de vie des joueurs
-    (couleurs orange/bleu sur les colonnes gauche et droite du HUD).
-    Miroir de detectGamePlayingFrame() en TypeScript.
+    Détecte un frame de jeu en cours 
     """
-    GF  = MODES[mode_index]['gameFrame']
-    PX  = GF['playersX']
-    PY  = GF['playersY']
-    ORANGE = (231, 123, 9)
-    BLUE   = (30, 126, 242)
-    BLACK  = (0, 0, 0)
-
-    OP = [_get_pixel(frame, PX[0], (PY[i][0] + PY[i][1]) / 2) for i in range(4)]
-    BP = [_get_pixel(frame, PX[1], (PY[i][0] + PY[i][1]) / 2) for i in range(4)]
-
-    if not (any(_color_similar(p, ORANGE) for p in OP) and
-            any(_color_similar(p, BLUE)   for p in BP)):
-        return False
-
-    for p in OP:
-        if not (_color_similar(p, ORANGE) or _color_similar(p, BLACK, 50)):
-            return False
-    for p in BP:
-        if not (_color_similar(p, BLUE) or _color_similar(p, BLACK, 50)):
-            return False
-    return True
+    return check_pixels(frame, [
+        # Top orange
+        (692, 73, 231, 118, 2),
+        # Top blanc
+        (960, 11, 255, 255, 255),
+        # Top blue
+        (1226, 73, 37, 104, 201)
+    ], tol_color=20, tol_pos=10)
 
 # ---------------------------------------------------------------------------
 # Video utilities
@@ -658,7 +662,7 @@ def _analyze(
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             SCORE_MODE = _detect_game_score_frame(FRAME)
             if SCORE_MODE >= 0:
-                _emit({'log': 'Score frame found ' + str(SCORE_MODE)})
+                #_emit({'log': 'Score frame found ' + str(SCORE_MODE)})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(SCORE_MODE, orange_override, blue_override)
@@ -675,7 +679,7 @@ def _analyze(
                         luminance=225, apply_filter=True,
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'Orange team name : '+T.upper()})
+                        #_emit({'log': 'Orange team name : '+T.upper()})
                         GAME['orangeTeam']['name'] = T.upper()
 
                 _set_score(GAME, 'orangeTeam', _ocr_region(
@@ -696,7 +700,7 @@ def _analyze(
                         luminance=225, apply_filter=True,
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'Blue team name : '+T.upper()})
+                        #_emit({'log': 'Blue team name : '+T.upper()})
                         GAME['blueTeam']['name'] = T.upper()
 
                 _set_score(GAME, 'blueTeam', _ocr_region(
@@ -718,7 +722,7 @@ def _analyze(
         # ── End frame ──────────────────────────────────────────────────────
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             if _detect_game_end_frame(FRAME):
-                _emit({'log': 'End frame found'})
+                #_emit({'log': 'End frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(1, orange_override, blue_override)
@@ -742,48 +746,56 @@ def _analyze(
         # ── Game start: loading screen ──────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_loading_frame(FRAME, CURRENT['mode']):
-                _emit({'log': 'Loading frame found'})
+                #_emit({'log': 'Loading frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 # Scan forward to find the first actual gameplay frame.
-                PROBE = TIMESTAMP + 0.5
+                PROBE = TIMESTAMP + 1
                 GAME_START = TIMESTAMP
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
-                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME, CURRENT['mode']):
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
                         GAME_START = PROBE
                         break
+                    #_emit({'log': 's'})
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
-                _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
+                #_emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None   # game complete
 
         # ── Game start: map introduction ────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_intro(FRAME):
-                _emit({'log': 'Game intro frame found'})
+                #_emit({'log': 'Game intro frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 # Scan forward to find the first actual gameplay frame.
-                PROBE = TIMESTAMP + 0.5
+                PROBE = TIMESTAMP + 1
                 GAME_START = TIMESTAMP
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
-                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME, CURRENT['mode']):
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
                         GAME_START = PROBE
                         break
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
-                _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
+                #_emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None
 
         # ── Playing frame: OCR map / team names + timer jump ────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
-            if _detect_game_playing(FRAME, CURRENT['mode']):
+            if _detect_game_playing(FRAME):
                 FOUND = True
-                _emit({'log': 'Playing frame found'})
+                #_emit({'log': 'Playing frame found'})
+
+                #if check_pixels(FRAME, GAME_FRAME_PIXELS[0], tol_color=20, tol_pos=10):
+                #    _emit({'log': 'Playing frame found SUUUUUUUUUUUUPER'})
+                #else:
+                #    _emit({'log': 'NOPE !!!!!!!'})
+                #    cv2.imwrite(os.path.expanduser(f'~/Downloads/nope_frame_{TIMESTAMP:.1f}.png'), cv2.cvtColor(FRAME, cv2.COLOR_RGB2BGR))
+
                 GF = MODES[CURRENT['mode']]['gameFrame']
 
                 if not CURRENT['map']:
@@ -798,7 +810,7 @@ def _analyze(
                     if T:
                         MAP_NAME = _get_map_by_name(T)
                         if MAP_NAME:
-                            _emit({'log': 'map name : ' + MAP_NAME})
+                            #_emit({'log': 'map name : ' + MAP_NAME})
                             CURRENT['map'] = MAP_NAME
                             CURRENT['mapImage'] = _region_to_base64(
                                 FRAME,
@@ -817,7 +829,7 @@ def _analyze(
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'orange team name : ' + T.upper()})
+                        #_emit({'log': 'orange team name : ' + T.upper()})
                         CURRENT['orangeTeam']['name'] = T.upper()
 
                 if not CURRENT['blueTeam']['name']:
@@ -829,7 +841,7 @@ def _analyze(
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
                     )
                     if T and len(T) >= 2:
-                        _emit({'log': 'blue team name : ' + T.upper()})
+                        #_emit({'log': 'blue team name : ' + T.upper()})
                         CURRENT['blueTeam']['name'] = T.upper()
 
                 # Timer jump — mirrors the TS optimization exactly.
@@ -848,16 +860,16 @@ def _analyze(
                         psm=7, whitelist='0123456789:',
                     )
                     if TIMER:
-                        _emit({'log': 'timer : ' + TIMER})
+                        #_emit({'log': 'timer : ' + TIMER})
                         PARTS = TIMER.split(':')
                         if len(PARTS) == 2:
                             try:
                                 M, S = int(PARTS[0]), int(PARTS[1])
-                                _emit({'log': max_time_per_game, 'm': M, 's': S})
+                                #_emit({'log': max_time_per_game, 'm': M, 's': S})
                                 if M <= max_time_per_game:
                                     DIFF = (max_time_per_game - M) * 60 - S - 20
 
-                                    _emit({'log': "Try to jump " + str(DIFF)})
+                                    #_emit({'log': "Try to jump " + str(DIFF)})
                                     CURRENT['__jumped__'] = True
                                     JUST_JUMPED = True
                                     TIMESTAMP -= DIFF
