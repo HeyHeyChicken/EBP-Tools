@@ -1533,24 +1533,24 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
       const GAME = new Game(game.mode);
       const URL: string = `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`;
 
-      console.log('Getting game start...');
-      this.getGamePlayingBound(URL, GAME, game.start, 1).then((start) => {
-        if (start !== null) {
-          game.start = start;
+      //console.log('Getting game start...');
+      //this.getGamePlayingBound(URL, GAME, game.start, 1).then((start) => {
+      //if (start !== null) {
+      //game.start = start;
 
-          console.log('Getting game end...');
-          this.getGamePlayingBound(URL, GAME, game.end, -1).then((end) => {
-            if (end !== null) {
-              game.end = end;
-              resolve(game);
-            } else {
-              resolve(null);
-            }
-          });
+      console.log('Getting game end...');
+      this.getGamePlayingBound(URL, GAME, game.end, -1).then((end) => {
+        if (end !== null) {
+          game.end = end;
+          resolve(game);
         } else {
           resolve(null);
         }
       });
+      //} else {
+      //  resolve(null);
+      //}
+      //});
     });
   }
 
