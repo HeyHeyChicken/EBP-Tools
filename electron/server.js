@@ -708,7 +708,12 @@ if (!APP_GOT_THE_LOCK) {
                 try {
                     callback(JSON.parse(data));
                 } catch (err) {
-                    console.error('Failed to parse API response:', err.message, '| raw:', data);
+                    console.error(
+                        'Failed to parse API response:',
+                        err.message,
+                        '| raw:',
+                        data
+                    );
                 }
             });
         });
@@ -1356,13 +1361,17 @@ if (!APP_GOT_THE_LOCK) {
                         if (stderr) console.error('Stderr :', stderr);
 
                         const VIDEO_TITLE = stdout.trim();
-                        const OUTPUT_PATH = path.join(
-                            StorageManager.getPermanentSettingsValue(
-                                'replayDownloaderOutputPath',
-                                path.join(os.homedir(), 'Downloads')
-                            ),
-                            `EBP - ${platform} - ${VIDEO_TITLE} (${new Date().getTime()}).mp4`
+                        const TIMESTAMP = new Date().getTime();
+                        const OUTPUT_DIR = StorageManager.getPermanentSettingsValue(
+                            'replayDownloaderOutputPath',
+                            path.join(os.homedir(), 'Downloads')
                         );
+                        // Clean temp path for yt-dlp (no special characters to avoid FFmpeg/OS issues on Windows)
+                        const TEMP_DOWNLOAD_PATH = path.join(OUTPUT_DIR, `ebp_temp_${TIMESTAMP}.mp4`);
+                        // Sanitize title: remove characters illegal in Windows filenames (\ / : * ? " < > |)
+                        const SANITIZED_TITLE = VIDEO_TITLE.replace(/[\\/:*?"<>|]/g, '').trim();
+                        // Final path with the video title (rename happens after all processing)
+                        const OUTPUT_PATH = path.join(OUTPUT_DIR, `EBP - ${platform} - ${SANITIZED_TITLE} (${TIMESTAMP}).mp4`);
 
                         let settings = [];
                         switch (platform) {
@@ -1378,7 +1387,7 @@ if (!APP_GOT_THE_LOCK) {
                                     '--merge-output-format',
                                     'mp4',
                                     '-o',
-                                    OUTPUT_PATH,
+                                    TEMP_DOWNLOAD_PATH,
                                     url
                                 ];
                                 break;
@@ -1390,7 +1399,7 @@ if (!APP_GOT_THE_LOCK) {
                                     `-f`,
                                     TWITCH_FORMAT,
                                     `-o`,
-                                    OUTPUT_PATH,
+                                    TEMP_DOWNLOAD_PATH,
                                     url
                                 ];
                                 break;
@@ -1404,11 +1413,11 @@ if (!APP_GOT_THE_LOCK) {
                                 .match(/(\d{1,3}\.\d)%/); // extract the % (eg: 42.3%)
                             if (MATCH) {
                                 const PERCENT = Number.parseInt(MATCH[1]);
-                                console.log(PERCENT + '%');
                                 if (
                                     PERCENT > percent ||
                                     (percent != PERCENT && percent == 100)
                                 ) {
+                                    console.log(PERCENT + '%');
                                     percent = PERCENT;
 
                                     getMainWindow().webContents.send(
@@ -1432,19 +1441,15 @@ if (!APP_GOT_THE_LOCK) {
 
                         DL.on('close', async (code) => {
                             if (code == 0) {
-                                const NORMALIZED_OUTPUT_PATH =
-                                    OUTPUT_PATH.normalize('NFC');
-                                if (fs.existsSync(NORMALIZED_OUTPUT_PATH)) {
-                                    fs.utimesSync(
-                                        NORMALIZED_OUTPUT_PATH,
-                                        new Date(),
-                                        new Date()
-                                    );
+                                if (fs.existsSync(TEMP_DOWNLOAD_PATH)) {
+                                    fs.utimesSync(TEMP_DOWNLOAD_PATH, new Date(), new Date());
                                 }
 
                                 if (platform === 'twitch') {
-                                    await fixForBrowser(OUTPUT_PATH);
+                                    await fixForBrowser(TEMP_DOWNLOAD_PATH);
                                 }
+
+                                fs.renameSync(TEMP_DOWNLOAD_PATH, OUTPUT_PATH);
 
                                 getMainWindow().webContents.send(
                                     'replay-downloader-success',

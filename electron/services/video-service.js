@@ -186,29 +186,22 @@ function removeBorders(inputPath, cropPosition) {
 }
 
 function fixForBrowser(videoPath) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const EXTENSION = videoPath.split('.').pop().toLowerCase();
         const VIDEO_DIR = path.dirname(videoPath);
-        const VIDEO_NAME = path.basename(videoPath, `.${EXTENSION}`);
-        const TEMP_FILE_NAME = `fix_${VIDEO_NAME}`;
-        const OUTPUT_FILE_PATH = path.join(
+        const TEMP_OUTPUT_PATH = path.join(
             VIDEO_DIR,
-            `${TEMP_FILE_NAME}.${EXTENSION}`
+            `output_${Date.now()}.${EXTENSION}`
         );
 
-        if (fs.existsSync(OUTPUT_FILE_PATH)) {
-            unlinkSync(OUTPUT_FILE_PATH);
-        }
-
         const FFMPEG_ARGS = [
-            // ffmpeg -i video.mp4 -c copy -movflags faststart fixed.mp4
             '-i',
             videoPath,
             '-c',
-            `copy`,
+            'copy',
             '-movflags',
             'faststart',
-            OUTPUT_FILE_PATH
+            TEMP_OUTPUT_PATH
         ];
 
         console.log(
@@ -218,13 +211,16 @@ function fixForBrowser(videoPath) {
         const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
 
         FFMPEG.on('close', (code) => {
-            if (fs.existsSync(videoPath)) {
+            if (code === 0 && fs.existsSync(TEMP_OUTPUT_PATH)) {
                 unlinkSync(videoPath);
+                fs.renameSync(TEMP_OUTPUT_PATH, videoPath);
+                resolve(videoPath);
+            } else {
+                if (fs.existsSync(TEMP_OUTPUT_PATH)) {
+                    unlinkSync(TEMP_OUTPUT_PATH);
+                }
+                reject(new Error(`FFmpeg process exited with code ${code}`));
             }
-
-            fs.renameSync(OUTPUT_FILE_PATH, videoPath);
-
-            resolve(videoPath);
         });
     });
 }
