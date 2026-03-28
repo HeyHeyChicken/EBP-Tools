@@ -367,38 +367,81 @@ if (!APP_GOT_THE_LOCK) {
                 }
                 break;
             case 'exportGames':
-                extractPrivatePseudoGames(
-                    app,
-                    data.nbPages,
-                    data.seasonIndex,
-                    data.timeToWait,
-                    dialog,
-                    getMainWindow(),
-                    data.debug,
-                    async (games) => {
-                        console.log(
-                            '################################################'
-                        );
-                        console.log(games);
-                        console.log(
-                            '################################################'
-                        );
-                        socketEmit(data.socket, 'exportGames', games);
-
-                        StorageManager.setTemporarySettingsValue(
-                            'deeplink',
-                            undefined
-                        );
-
-                        if (games.length > 0 && data.excelDestinationFolder) {
-                            exportGamesToExcel(
-                                games,
-                                'private',
-                                data.excelDestinationFolder
+                if (data.publicPseudo) {
+                    extractPublicPseudoGames(
+                        app,
+                        data.publicPseudo,
+                        data.nbPages,
+                        data.seasonIndex,
+                        data.timeToWait,
+                        dialog,
+                        getMainWindow(),
+                        data.debug,
+                        async (games) => {
+                            console.log(
+                                '################################################'
                             );
+                            console.log(games);
+                            console.log(
+                                '################################################'
+                            );
+
+                            socketEmit(data.socket, 'exportGames', games);
+
+                            StorageManager.setTemporarySettingsValue(
+                                'deeplink',
+                                undefined
+                            );
+
+                            if (
+                                games.length > 0 &&
+                                data.excelDestinationFolder
+                            ) {
+                                exportGamesToExcel(
+                                    games,
+                                    data.publicPseudo.split('#')[0],
+                                    data.excelDestinationFolder
+                                );
+                            }
                         }
-                    }
-                );
+                    );
+                } else {
+                    extractPrivatePseudoGames(
+                        app,
+                        data.nbPages,
+                        data.seasonIndex,
+                        data.timeToWait,
+                        dialog,
+                        getMainWindow(),
+                        data.debug,
+                        async (games) => {
+                            console.log(
+                                '################################################'
+                            );
+                            console.log(games);
+                            console.log(
+                                '################################################'
+                            );
+                            socketEmit(data.socket, 'exportGames', games);
+
+                            StorageManager.setTemporarySettingsValue(
+                                'deeplink',
+                                undefined
+                            );
+
+                            if (
+                                games.length > 0 &&
+                                data.excelDestinationFolder
+                            ) {
+                                exportGamesToExcel(
+                                    games,
+                                    'private',
+                                    data.excelDestinationFolder
+                                );
+                            }
+                        }
+                    );
+                }
                 break;
             case 'analyzeVideoFile':
                 console.log(data.socket);
@@ -1362,16 +1405,26 @@ if (!APP_GOT_THE_LOCK) {
 
                         const VIDEO_TITLE = stdout.trim();
                         const TIMESTAMP = new Date().getTime();
-                        const OUTPUT_DIR = StorageManager.getPermanentSettingsValue(
-                            'replayDownloaderOutputPath',
-                            path.join(os.homedir(), 'Downloads')
-                        );
+                        const OUTPUT_DIR =
+                            StorageManager.getPermanentSettingsValue(
+                                'replayDownloaderOutputPath',
+                                path.join(os.homedir(), 'Downloads')
+                            );
                         // Clean temp path for yt-dlp (no special characters to avoid FFmpeg/OS issues on Windows)
-                        const TEMP_DOWNLOAD_PATH = path.join(OUTPUT_DIR, `ebp_temp_${TIMESTAMP}.mp4`);
+                        const TEMP_DOWNLOAD_PATH = path.join(
+                            OUTPUT_DIR,
+                            `ebp_temp_${TIMESTAMP}.mp4`
+                        );
                         // Sanitize title: remove characters illegal in Windows filenames (\ / : * ? " < > |)
-                        const SANITIZED_TITLE = VIDEO_TITLE.replace(/[\\/:*?"<>|]/g, '').trim();
+                        const SANITIZED_TITLE = VIDEO_TITLE.replace(
+                            /[\\/:*?"<>|]/g,
+                            ''
+                        ).trim();
                         // Final path with the video title (rename happens after all processing)
-                        const OUTPUT_PATH = path.join(OUTPUT_DIR, `EBP - ${platform} - ${SANITIZED_TITLE} (${TIMESTAMP}).mp4`);
+                        const OUTPUT_PATH = path.join(
+                            OUTPUT_DIR,
+                            `EBP - ${platform} - ${SANITIZED_TITLE} (${TIMESTAMP}).mp4`
+                        );
 
                         let settings = [];
                         switch (platform) {
@@ -1442,7 +1495,11 @@ if (!APP_GOT_THE_LOCK) {
                         DL.on('close', async (code) => {
                             if (code == 0) {
                                 if (fs.existsSync(TEMP_DOWNLOAD_PATH)) {
-                                    fs.utimesSync(TEMP_DOWNLOAD_PATH, new Date(), new Date());
+                                    fs.utimesSync(
+                                        TEMP_DOWNLOAD_PATH,
+                                        new Date(),
+                                        new Date()
+                                    );
                                 }
 
                                 if (platform === 'twitch') {

@@ -195,12 +195,14 @@ async function extractGames(
         if (!isExtractingStopped) {
             const RESOURCE_TYPE = request.resourceType();
 
+            /*
             if (publicMode) {
                 if (['image', 'font', 'media'].includes(RESOURCE_TYPE)) {
                     request.abort();
                     return;
                 }
             }
+            */
 
             const URL = request.url();
 
@@ -215,6 +217,7 @@ async function extractGames(
                 );
             }
 
+            /*
             if (publicMode) {
                 if (
                     (URL.includes('stripe.com') ||
@@ -239,9 +242,10 @@ async function extractGames(
                     return;
                 }
             }
+            */
 
             if (URL.includes('graphql')) {
-                console.log('[PUPPETEER] Requête GraphQL interceptée:', URL);
+                console.log('[PUPPETEER] Requête GraphQL interceptée');
                 try {
                     const DATA = request.postData();
                     if (DATA) {
@@ -253,6 +257,16 @@ async function extractGames(
                         if (
                             JSON_DATA.operationName ===
                             'useAfterhGameHistoryCursor'
+                        ) {
+                            JSON_DATA.variables.seasonId = seasonIndex;
+                            request.continue({
+                                headers: request.headers(),
+                                method: 'POST',
+                                postData: JSON.stringify(JSON_DATA)
+                            });
+                        } else if (
+                            JSON_DATA.operationName ===
+                            'useAfterhGameHistoryPageLastOnly'
                         ) {
                             JSON_DATA.variables.seasonId = seasonIndex;
                             request.continue({
@@ -300,12 +314,16 @@ async function extractGames(
                     }
                     // Si on est sur sa page en étant connecté
                     else if (
-                        JSON_DATA?.data?.getAfterhGameHistoryPage?.nodes &&
+                        JSON_DATA?.data
+                            ?.listLastAfterhGameHistoriesByUserAndSeason &&
                         Array.isArray(
-                            JSON_DATA.data.getAfterhGameHistoryPage.nodes
+                            JSON_DATA.data
+                                .listLastAfterhGameHistoriesByUserAndSeason
                         )
                     ) {
-                        nodes = JSON_DATA.data.getAfterhGameHistoryPage.nodes;
+                        nodes =
+                            JSON_DATA.data
+                                .listLastAfterhGameHistoriesByUserAndSeason;
                     }
 
                     if (nodes) {
@@ -380,6 +398,8 @@ function extractPublicPseudoGames(
     debug,
     callback
 ) {
+    const WIDTH = 700;
+    const HEIGHT = 700;
     const START = new Date().getTime();
     getBrowserPath(mainWindow, async (browserPath) => {
         try {
@@ -390,8 +410,8 @@ function extractPublicPseudoGames(
                 defaultViewport: debug
                     ? null
                     : {
-                          width: 1024,
-                          height: 700
+                          width: WIDTH,
+                          height: HEIGHT
                       },
                 args: debug
                     ? ['--start-maximized']
@@ -404,7 +424,8 @@ function extractPublicPseudoGames(
                           '--disable-notifications',
                           '--disable-infobars',
                           '--disable-session-crashed-bubble',
-                          '--mute-audio'
+                          '--mute-audio',
+                          `--window-size=${WIDTH},${HEIGHT + 100}`
                       ]
             });
 
@@ -412,7 +433,7 @@ function extractPublicPseudoGames(
 
             // Définir le viewport à une taille normale si non en debug
             if (!debug) {
-                await PAGE.setViewport({ width: 1920, height: 1080 });
+                await PAGE.setViewport({ width: WIDTH, height: HEIGHT });
             }
 
             await extractGames(
