@@ -278,7 +278,6 @@ async function extractGames(
         }
     });
     page.on('response', async (response) => {
-        console.log('AAA');
         if (!isExtractingStopped) {
             if (response.status() === 403) {
                 console.log('❌ Accès refusé à l’API :', response.url());
@@ -391,8 +390,8 @@ function extractPublicPseudoGames(
                 defaultViewport: debug
                     ? null
                     : {
-                          width: 1920,
-                          height: 1080
+                          width: 1024,
+                          height: 700
                       },
                 args: debug
                     ? ['--start-maximized']
@@ -451,6 +450,8 @@ async function extractPrivatePseudoGames(
     debug,
     callback
 ) {
+    const WIDTH = 500;
+    const HEIGHT = 700;
     const START = new Date().getTime();
     getBrowserPath(mainWindow, async (browserPath) => {
         try {
@@ -458,8 +459,11 @@ async function extractPrivatePseudoGames(
                 executablePath: browserPath,
                 headless: false,
                 userDataDir: PUPPETEER_USER_DATA_PATH,
-                defaultViewport: null,
-                args: ['--start-maximized']
+                defaultViewport: {
+                    width: WIDTH,
+                    height: HEIGHT
+                },
+                args: [`--window-size=${WIDTH},${HEIGHT + 100}`]
             });
 
             // Cet espion permet de relancer la fonction si elle ne s'est pas bien passée.
@@ -482,7 +486,7 @@ async function extractPrivatePseudoGames(
 
             // Définir le viewport à une taille normale si non en debug
             if (!debug) {
-                await PAGE.setViewport({ width: 1920, height: 1080 });
+                await PAGE.setViewport({ width: WIDTH, height: HEIGHT });
             }
 
             PAGE.on('framenavigated', async (frame) => {
