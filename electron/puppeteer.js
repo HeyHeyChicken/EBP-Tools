@@ -291,6 +291,7 @@ async function extractGames(
             request.continue();
         }
     });
+
     page.on('response', async (response) => {
         if (!isExtractingStopped) {
             if (response.status() === 403) {
@@ -329,8 +330,9 @@ async function extractGames(
                     if (nodes) {
                         index++;
                         const OLD_INDEX = index;
-                        nodes.forEach((game) => {
-                            addGame(GAMES, game);
+                        nodes.forEach((node) => {
+                            //addGame(GAMES, game);
+                            GAMES.push(node);
                         });
 
                         if (index < nbPages) {
