@@ -242,7 +242,7 @@ export class ReplayDownloaderComponent implements OnInit {
    */
   private isTwitchUrl(url: string): boolean {
     const regex =
-      /^(https?:\/\/)?(www\.)?twitch\.tv\/(videos\/\d+|[a-zA-Z0-9_]+\/clip\/[a-zA-Z0-9_-]+)$/;
+      /^(https?:\/\/)?(www\.)?twitch\.tv\/(videos\/\d+|[a-zA-Z0-9_]+\/video\/\d+|[a-zA-Z0-9_]+\/clip\/[a-zA-Z0-9_-]+)$/;
     return regex.test(url);
   }
 
