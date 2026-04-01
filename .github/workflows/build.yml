@@ -35,8 +35,8 @@ jobs:
             - name: Run tests
               run: npm test
 
-    # Create the MacOS version of the application.
-    build-macos:
+    # Create the MacOS ARM64 (Apple Silicon) version of the application.
+    build-macos-arm64:
         runs-on: macos-latest
         needs: [test]
         env:
@@ -69,7 +69,7 @@ jobs:
               uses: actions/cache@v4
               with:
                   path: ~/Library/Caches/Homebrew
-                  key: homebrew-tesseract-${{ runner.os }}
+                  key: homebrew-tesseract-${{ runner.os }}-arm64
 
             # Install Tesseract and build the Python analyzer binary.
             - name: Install Tesseract
@@ -79,10 +79,6 @@ jobs:
               run: cd python && bash build.sh
 
             # Sign all files in the onedir bundle before Electron Forge packages them.
-            # With --onedir, Python.framework and dylibs are present at build time and
-            # can be individually signed — unlike --onefile which extracts to /tmp at
-            # runtime (where files cannot be pre-signed, causing Team ID mismatch errors).
-            # Sign inside-out: dylibs first, then the main executable.
             - name: Sign Python analyzer binary
               run: |
                   find binaries/analyzer/darwin -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
@@ -114,17 +110,108 @@ jobs:
             - name: Rename .dmg
               run: |
                   file=$(find out/make -type f -name "*.dmg" | head -n 1)
-                  mv "$file" out/make/EBP-Tools-${GITHUB_REF_NAME}.dmg
+                  mv "$file" out/make/EBP-Tools-${GITHUB_REF_NAME}-arm64.dmg
 
             # Generate update metadata files
             - name: Generate update metadata
-              run: node scripts/generate-update-metadata.js ${GITHUB_REF_NAME} darwin
+              run: node scripts/generate-update-metadata.js ${GITHUB_REF_NAME} darwin arm64
 
             # Upload the created binary.
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: macos
+                  name: macos-arm64
+                  path: |
+                      out/make/*.dmg
+                      out/make/*.zip
+                      out/make/latest-mac.yml
+
+    # Create the MacOS x64 (Intel) version of the application.
+    build-macos-x64:
+        runs-on: macos-13
+        needs: [test]
+        env:
+            APPLE_ID: ${{ secrets.APPLE_ID }}
+            APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+            APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        steps:
+            # Clone the repository.
+            - uses: actions/checkout@v4
+
+            # Import Apple certificate
+            - name: Import Code-Signing Certificates
+              uses: Apple-Actions/import-codesign-certs@v3
+              with:
+                  p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
+                  p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+            # Install Node.js.
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+
+            # Install NPM dependencies.
+            - name: Install Node dependencies
+              run: npm run install_npm
+
+            # Cache Homebrew packages to avoid reinstalling on every run.
+            - name: Cache Homebrew packages
+              uses: actions/cache@v4
+              with:
+                  path: ~/Library/Caches/Homebrew
+                  key: homebrew-tesseract-${{ runner.os }}-x64
+
+            # Install Tesseract and build the Python analyzer binary.
+            - name: Install Tesseract
+              run: brew install tesseract
+
+            - name: Build Python analyzer binary
+              run: cd python && bash build.sh
+
+            # Sign all files in the onedir bundle before Electron Forge packages them.
+            - name: Sign Python analyzer binary
+              run: |
+                  find binaries/analyzer/darwin -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
+                    codesign --force \
+                      --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                      --options runtime \
+                      --entitlements build/entitlements.plist \
+                      --timestamp \
+                      "$f"
+                  done
+                  codesign --force \
+                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime \
+                    --entitlements build/entitlements.plist \
+                    --timestamp \
+                    binaries/analyzer/darwin/_internal/tesseract/tesseract
+                  codesign --force \
+                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime \
+                    --entitlements build/entitlements.plist \
+                    --timestamp \
+                    binaries/analyzer/darwin/darwin
+
+            # Building Angular and making the Electron application.
+            - name: Build Electron app
+              run: npm run make
+
+            # Rename the created binary.
+            - name: Rename .dmg
+              run: |
+                  file=$(find out/make -type f -name "*.dmg" | head -n 1)
+                  mv "$file" out/make/EBP-Tools-${GITHUB_REF_NAME}-x64.dmg
+
+            # Generate update metadata files
+            - name: Generate update metadata
+              run: node scripts/generate-update-metadata.js ${GITHUB_REF_NAME} darwin x64
+
+            # Upload the created binary.
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: macos-x64
                   path: |
                       out/make/*.dmg
                       out/make/*.zip
@@ -214,17 +301,23 @@ jobs:
     # Deploy the new version.
     deploy-builds:
         runs-on: ubuntu-latest
-        needs: [build-windows, build-macos, build-linux]
+        needs: [build-windows, build-macos-arm64, build-macos-x64, build-linux]
         steps:
             # Retrieve the version number of the application.
             - name: Get version
               id: get_version
               run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            # Download the MacOS binary created from the latest job.
-            - name: Download macos artifact
+            # Download the MacOS ARM64 binary created from the latest job.
+            - name: Download macos-arm64 artifact
               uses: actions/download-artifact@v4
               with:
-                  name: macos
+                  name: macos-arm64
+                  path: ./release
+            # Download the MacOS x64 binary created from the latest job.
+            - name: Download macos-x64 artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: macos-x64
                   path: ./release
             # Download the Windows binary created from the latest job.
             - name: Download Windows artifact
