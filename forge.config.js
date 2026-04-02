@@ -155,11 +155,10 @@ module.exports = {
         async postPackage(config) {
             if (process.platform == 'darwin') {
                 console.log('Running "postPackage" hook on MacOS.');
-                const ARCH = process.arch; // 'arm64' or 'x64'
                 const RESOURCES_BASE = path.join(
                     __dirname,
                     'out',
-                    config.packagerConfig.name + '-darwin-' + ARCH,
+                    config.packagerConfig.name + '-darwin-arm64',
                     config.packagerConfig.name + '.app',
                     'Contents',
                     'Resources'
