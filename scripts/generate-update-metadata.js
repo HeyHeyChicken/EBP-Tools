@@ -9,11 +9,12 @@ const crypto = require('crypto');
 /**
  * Generate metadata files for electron-updater
  */
-function generateUpdateMetadata(version, platform) {
+function generateUpdateMetadata(version, platform, arch) {
     const RELEASE_DIR = path.join(__dirname, '..', 'out', 'make');
 
     if (platform === 'darwin') {
-        const DMG_FILE = `EBP-Tools-${version}.dmg`;
+        const ARCH_SUFFIX = arch ? `-${arch}` : '';
+        const DMG_FILE = `EBP-Tools-${version}${ARCH_SUFFIX}.dmg`;
         const DMG_PATH = path.join(RELEASE_DIR, DMG_FILE);
 
         if (!fs.existsSync(DMG_PATH)) {
@@ -32,12 +33,12 @@ function generateUpdateMetadata(version, platform) {
             version: version,
             files: [
                 {
-                    url: `EBP-Tools-${version}.dmg`,
+                    url: DMG_FILE,
                     sha512: SHA512,
                     size: FILE_STATS.size
                 }
             ],
-            path: `EBP-Tools-${version}.dmg`,
+            path: DMG_FILE,
             sha512: SHA512,
             releaseDate: new Date().toISOString()
         };
@@ -135,13 +136,16 @@ releaseDate: '${WIN_METADATA.releaseDate}'
 // Parse command line arguments
 const VERSION = process.argv[2];
 const PLATFORM = process.argv[3];
+const ARCH = process.argv[4]; // Optional: 'arm64' or 'x64'
 
 if (!VERSION || !PLATFORM) {
     console.error(
-        'Usage: node generate-update-metadata.js <version> <platform>'
+        'Usage: node generate-update-metadata.js <version> <platform> [arch]'
     );
-    console.error('Example: node generate-update-metadata.js 1.6.58 darwin');
+    console.error(
+        'Example: node generate-update-metadata.js 1.6.58 darwin arm64'
+    );
     process.exit(1);
 }
 
-generateUpdateMetadata(VERSION, PLATFORM);
+generateUpdateMetadata(VERSION, PLATFORM, ARCH);
