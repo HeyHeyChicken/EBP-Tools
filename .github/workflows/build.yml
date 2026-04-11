@@ -144,6 +144,13 @@ jobs:
             # Clone the repository.
             - uses: actions/checkout@v4
 
+            # Self-hosted runners persist state between runs. The
+            # import-codesign-certs action creates a `signing_temp.keychain`
+            # every run and fails if one already exists from a previous build,
+            # so we clear any leftover keychain before importing.
+            - name: Clean up leftover signing keychain
+              run: security delete-keychain signing_temp.keychain 2>/dev/null || true
+
             # Import Apple certificate
             - name: Import Code-Signing Certificates
               uses: Apple-Actions/import-codesign-certs@v3
