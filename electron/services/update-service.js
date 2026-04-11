@@ -47,7 +47,17 @@ class UpdateService {
                                 localFileName = `update.exe`;
                                 break;
                             case 'darwin':
-                                githubFileName = `EBP-Tools-${this.githubVersion}.dmg`;
+                                // Starting with the multi-arch release, macOS
+                                // DMGs are published with an arch suffix
+                                // (`-arm64` for Apple Silicon, `-x64` for
+                                // Intel). `process.arch` reports the arch of
+                                // the currently running Electron binary, which
+                                // is what we want: an arm64 build running
+                                // under Rosetta on an Intel Mac should keep
+                                // pulling the arm64 DMG.
+                                const ARCH =
+                                    process.arch === 'arm64' ? 'arm64' : 'x64';
+                                githubFileName = `EBP-Tools-${this.githubVersion}-${ARCH}.dmg`;
                                 localFileName = `update.dmg`;
                                 break;
                         }
