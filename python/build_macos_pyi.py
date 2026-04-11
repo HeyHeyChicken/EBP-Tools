@@ -4,12 +4,55 @@
 # Called by build.sh — must be run from the python/ directory with the venv active.
 
 import os
+import shutil
 import subprocess
 
 import PyInstaller.__main__
 
-TESS_BIN = "/opt/homebrew/bin/tesseract"
-TESS_DATA = "/opt/homebrew/share/tessdata"
+
+def _discover_tesseract() -> tuple:
+    """
+    Locate the Tesseract binary and tessdata directory.
+    Works on both Apple Silicon (/opt/homebrew) and Intel (/usr/local) Homebrew
+    installations by asking `brew` directly, with fallbacks to the well-known
+    prefixes and finally PATH lookup.
+    """
+    # 1) Ask Homebrew for the tesseract formula prefix — most reliable.
+    try:
+        prefix = subprocess.check_output(
+            ["brew", "--prefix", "tesseract"], text=True
+        ).strip()
+        bin_path = os.path.join(prefix, "bin", "tesseract")
+        data_path = os.path.join(prefix, "share", "tessdata")
+        if os.path.isfile(bin_path) and os.path.isdir(data_path):
+            return bin_path, data_path
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    # 2) Fallback: try the two standard Homebrew prefixes.
+    for prefix in ("/opt/homebrew", "/usr/local"):
+        bin_path = os.path.join(prefix, "bin", "tesseract")
+        data_path = os.path.join(prefix, "share", "tessdata")
+        if os.path.isfile(bin_path) and os.path.isdir(data_path):
+            return bin_path, data_path
+
+    # 3) Last resort: resolve via PATH and derive the tessdata sibling.
+    which = shutil.which("tesseract")
+    if which:
+        real = os.path.realpath(which)
+        # .../Cellar/tesseract/<ver>/bin/tesseract -> .../share/tessdata
+        prefix = os.path.dirname(os.path.dirname(real))
+        data_path = os.path.join(prefix, "share", "tessdata")
+        if os.path.isdir(data_path):
+            return which, data_path
+
+    raise FileNotFoundError(
+        "Could not locate the Tesseract binary or tessdata directory. "
+        "Install it with `brew install tesseract`."
+    )
+
+
+TESS_BIN, TESS_DATA = _discover_tesseract()
 
 
 def collect_dylibs(binary_path: str) -> list:
