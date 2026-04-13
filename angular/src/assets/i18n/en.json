@@ -1,5 +1,6 @@
 {
   "common": {
+    "step": "Step",
     "ok": "Ok",
     "cancel": "Cancel",
     "reset": "Reset",

@@ -1,5 +1,6 @@
 {
   "common": {
+    "step": "Étape",
     "ok": "Ok",
     "cancel": "Annuler",
     "reset": "Réinitialiser",
