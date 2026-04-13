@@ -250,7 +250,18 @@ if (!APP_GOT_THE_LOCK) {
                         }
                     });
 
-                    socketEmit(data.socket, 'exportGames', GAMES);
+                    const CHUNK_SIZE = 200;
+                    for (let i = 0; i < GAMES.length; i += CHUNK_SIZE) {
+                        socketEmit(
+                            data.socket,
+                            'exportGames',
+                            GAMES.slice(i, i + CHUNK_SIZE)
+                        );
+                    }
+                    socketEmit(data.socket, 'exportGamesEnd', {
+                        games: GAMES.length,
+                        fromExcel: true
+                    });
                 }
                 break;
             case 'encodeVideo':
@@ -386,7 +397,18 @@ if (!APP_GOT_THE_LOCK) {
                                 '################################################'
                             );
 
-                            socketEmit(data.socket, 'exportGames', games);
+                            const CHUNK_SIZE = 200;
+                            for (let i = 0; i < games.length; i += CHUNK_SIZE) {
+                                socketEmit(
+                                    data.socket,
+                                    'exportGames',
+                                    games.slice(i, i + CHUNK_SIZE)
+                                );
+                            }
+                            socketEmit(data.socket, 'exportGamesEnd', {
+                                games: games.length,
+                                fromExcel: false
+                            });
 
                             StorageManager.setTemporarySettingsValue(
                                 'deeplink',
@@ -422,7 +444,18 @@ if (!APP_GOT_THE_LOCK) {
                             console.log(
                                 '################################################'
                             );
-                            socketEmit(data.socket, 'exportGames', games);
+                            const CHUNK_SIZE = 200;
+                            for (let i = 0; i < games.length; i += CHUNK_SIZE) {
+                                socketEmit(
+                                    data.socket,
+                                    'exportGames',
+                                    games.slice(i, i + CHUNK_SIZE)
+                                );
+                            }
+                            socketEmit(data.socket, 'exportGamesEnd', {
+                                games: games.length,
+                                fromExcel: false
+                            });
 
                             StorageManager.setTemporarySettingsValue(
                                 'deeplink',
