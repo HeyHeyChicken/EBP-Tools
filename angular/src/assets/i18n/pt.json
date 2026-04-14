@@ -1,0 +1,175 @@
+{
+  "common": {
+    "step": "Etapa",
+    "ok": "Ok",
+    "cancel": "Cancelar",
+    "reset": "Reiniciar",
+    "settings": "Configurações",
+    "close": "Fechar",
+    "save": "Guardar",
+    "search": "Pesquisar",
+    "updatingInProgress": "Atualização em curso, por favor aguarde.",
+    "encoding": "A codificar…",
+    "encoded": "O vídeo foi codificado com sucesso!",
+    "download": "Transferir"
+  },
+  "view": {
+    "home": {
+      "welcomeTo": "Bem-vindo ao ",
+      "tuto": "Escolha a ferramenta que pretende utilizar através da lista suspensa acima.",
+      "thanksToTheContributors": "Obrigado aos contribuidores",
+      "dialog": {
+        "linux-intro": {
+          "title": "Oh, um pinguim!",
+          "description": "<span>Olá amigo volátil!</span>\nA aplicação depende de <code>ffmpeg</code>, de <code>yt-dlp</code> e de <code>chromium-browser</code> para funcionar.<br/>\nPor favor, instale-os."
+        }
+      }
+    },
+    "replay_cutter": {
+      "inputTrainingFile": "Clique aqui para cortar automaticamente o seu ficheiro de vídeo de treino",
+      "videoStartsItsAnalysis": "O vídeo está a ser analisado, por favor aguarde...",
+      "videoIsBeingAnalyzed": "O vídeo está a ser analisado, por favor aguarde...<br/>Número de partes encontradas: <b>{{games}}</b>",
+      "saveAll": "Guardar as games selecionadas",
+      "copyTimecodes": "Copiar os timecodes das games selecionadas",
+      "map": "Mapa",
+      "infos": "Informações",
+      "upload": "Analisar esta game com a IA do EBP",
+      "uploadAll": "Analisar as games selecionadas com a IA do EBP",
+      "noFilesSelected": "Nenhum ficheiro selecionado",
+      "toast": {
+        "timeCodesCopiedClipboard": "Os timecodes foram adicionados à sua área de transferência",
+        "videosCutHere": "Os seus vídeos foram cortados aqui: {{filePath}}",
+        "videoCutHere": "O seu vídeo foi cortado aqui: {{filePath}}",
+        "videoFileNotFound": "Ficheiro de vídeo não encontrado.",
+        "noGamesFoundInStatistics": "Nenhuma partida foi encontrada em {{map}} com estas pontuações ({{orangeScore}} vs {{blueScore}}).<br/>Deseja criá-la? <span class='btn mt-1 ml-auto'>Sim</span>",
+        "noGamesFoundInVideo": "Nenhuma partida foi encontrada no seu vídeo. Se achar que é um erro, por favor informe-nos.",
+        "createGameOnEBPHelper": "Aqui estão os nomes de utilizador provenientes do vídeo.<br/>Por favor, certifique-se de os escrever corretamente no EBP."
+      },
+      "outputPath": "Pasta de saída",
+      "detectingPlayerNicknames": "A detetar os nomes dos jogadores...",
+      "detectingOrangeInfoZone": "A detetar a zona de informações laranja...",
+      "detectingBlueInfoZone": "A detetar a zona de informações azul...",
+      "cuttingVideo": "A cortar o vídeo...",
+      "croppingMap": "A recortar o mapa...",
+      "croppingOrangeInfos": "A recortar as informações da equipa laranja...",
+      "croppingTopInfos": "A recortar as informações gerais...",
+      "croppingBlueInfos": "A recortar as informações da equipa azul...",
+      "uploadingMap": "A enviar o mapa...",
+      "uploadingOrangeInfos": "A enviar as informações da equipa laranja...",
+      "uploadingTopInfos": "A enviar as informações gerais...",
+      "uploadingBlueInfos": "A enviar as informações da equipa azul...",
+      "dialog": {
+        "settings": {
+          "orangeTeamName": "Nome da equipa laranja",
+          "blueTeamName": "Nome da equipa azul",
+          "teamNameDescription": "Pode forçar o nome das equipas durante a deteção.",
+          "maxTimePerGame": "Tempo máximo por partida (minutos)",
+          "freeText": "Texto livre no final do nome do ficheiro"
+        },
+        "upscale": {
+          "title": "Ampliação",
+          "description": "O seu vídeo está em {{height}}p, mas o Tools apenas suporta 1080p.<br/>Deseja que o Tools adapte a resolução antes da análise?<br/>Atenção, isto pode demorar algum tempo…"
+        },
+        "edit-score": {
+          "title": "Editar a pontuação",
+          "label": "Pontuação"
+        },
+        "edit-team": {
+          "title": "Editar o nome da equipa",
+          "label": "Nome da equipa"
+        },
+        "check-players-order": {
+          "title": "Verificar a ordem dos jogadores",
+          "player": "Jogador"
+        },
+        "replay-uploaded": {
+          "title": "Replay enviado para análise pela IA",
+          "description": "O replay foi enviado para análise pela IA do EBP.<br/>Receberá um email de confirmação quando tudo tiver sido analisado ({{ email }})."
+        },
+        "beta-required": {
+          "title": "A análise IA do EBP está em beta",
+          "description": "<b>Em breve:</b><br/>a análise das suas partidas com a IA do EBP!<br/>Atualmente na última fase de desenvolvimento e testada em BETA por alguns utilizadores, está a chegar muito em breve…<br/>Ainda um pouco de paciência!"
+        },
+        "manual-video-cut": {
+          "removeTime": "-1 segundo",
+          "addTime": "+1 segundo",
+          "play": "Reproduzir",
+          "pause": "Pausa",
+          "cut": "Cortar",
+          "explanations": "O cortador de replays não deteta pausas de transmissão ou pausas técnicas. Para processar estes vídeos, pode cortá-los manualmente neste editor: navegue pela linha do tempo, clique no ícone «tesoura» para cortar e elimine as partes desnecessárias. Valide de seguida para iniciar a identificação automática.<br/>Lembre-se de conservar o início e o ecrã de pontuação de cada partida."
+        },
+        "crop": {
+          "explanations": "Para garantir uma análise correta, o minimapa deve estar corretamente delimitado.<br/>O Tools nem sempre consegue fazê-lo automaticamente. Verifique os limites e recorte se necessário, tendo o cuidado de incluir as bordas exteriores do mapa no recorte (exclua os TP e outros elementos)."
+        },
+        "edit-map": {
+          "title": "Editar o mapa da game"
+        },
+        "attach-game": {
+          "title": "Associar o replay a uma game",
+          "tags": "Tags",
+          "players": "Jogadores",
+          "date": "Data",
+          "changeFrame": "Alterar a imagem",
+          "description": "Por favor, associe o replay a uma game presente na página <a>estatísticas do EBP</a>.<br />Se não existir, por favor <b>crie-a</b>."
+        },
+        "before-removing-borders": {
+          "description": "O seu replay contém bordas a remover antes da análise?<br/>Pode removê-las manualmente aqui.<br/>O processamento pode demorar algum tempo.",
+          "title": "Remover as bordas"
+        }
+      },
+      "inputOfficialFile": "Clique aqui para cortar manualmente o seu ficheiro de vídeo oficial"
+    },
+    "notification": {
+      "manual-cutting": {
+        "description": "O seu replay está a ser cortado. Por favor aguarde..."
+      },
+      "upscaling": {
+        "description": "A resolução do seu replay está a ser adaptada. Por favor aguarde..."
+      },
+      "replay_downloader": {
+        "checking_ytdlp": "A verificar yt-dlp...",
+        "downloading_ytdlp": "A transferir yt-dlp...",
+        "updating_ytdlp": "A atualizar yt-dlp...",
+        "fetching": "As informações do vídeo estão a ser obtidas...",
+        "downloading": "O vídeo está a ser transferido...",
+        "downloaded": "O vídeo foi transferido com sucesso!"
+      },
+      "removing-border": {
+        "description": "O seu replay está a ser adaptado. Por favor aguarde..."
+      }
+    },
+    "replay_downloader": {
+      "intro": "Transfira aqui os seus replays do YouTube ou Twitch.",
+      "quality": "Qualidade",
+      "noFormats": "Nenhum formato disponível",
+      "urlLabel": "URL do vídeo"
+    }
+  },
+  "shared": {
+    "header": {
+      "accessWebsite": "Aceder ao site do EBP",
+      "changeTool": "Mudar de ferramenta",
+      "accessDiscordServer": "Aceder ao Discord do EBP",
+      "logout": "Terminar sessão",
+      "chooseATeam": "Escolha uma equipa",
+      "home": "Início",
+      "tools": {
+        "replay_downloader": "Transferidor de replay",
+        "replay_cutter": "Cortador de replay"
+      },
+      "getMoreCoins": "Obter mais moedas"
+    },
+    "footer": {
+      "version": "Versão",
+      "newUpdate": "Uma nova atualização está disponível, transfira-a clicando aqui.",
+      "beta": "Está a utilizar uma versão beta da aplicação, por favor não a partilhe.",
+      "showConsole": "Mostrar a consola"
+    },
+    "shared": {
+      "console": "Consola",
+      "downloadLogs": "Transferir os registos",
+      "clearLogs": "Limpar os registos",
+      "logsExported": "Registos exportados com sucesso para: {{path}}"
+    }
+  }
+}

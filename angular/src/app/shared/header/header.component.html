@@ -17,7 +17,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
 </a>
 <a
   class="btn squared"
-  routerLink="/{{ translateService.currentLang }}"
+  routerLink="/{{ translateService.getCurrentLang() }}"
   (click)="page = undefined"
   matTooltip="{{ 'shared.header.home' | translate }}"
 >
@@ -55,16 +55,16 @@ See LICENSE for terms. Unauthorized use is prohibited.
   <div class="language_selector">
     <img
       alt="Language flag"
-      src="/assets/img/flags/{{ translateService.currentLang }}.webp"
+      src="/assets/img/flags/{{ translateService.getCurrentLang() }}.webp"
     />
     <select
       aria-label="Language selector"
       (change)="languageSelectChanged($event)"
     >
-      @for (lang of translateService.langs; track lang) {
+      @for (lang of translateService.getLangs(); track lang) {
         <option
           value="{{ lang }}"
-          [selected]="lang == translateService.currentLang"
+          [selected]="lang == translateService.getCurrentLang()"
         >
           {{ lang }}
         </option>
