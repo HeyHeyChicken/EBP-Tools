@@ -126,7 +126,7 @@ class UpdateService {
     getProjectLatestVersion(callback) {
         const OPTIONS = {
             hostname: 'api.github.com',
-            path: '/repos/heyheychicken/EBP-Tools/releases',
+            path: '/repos/EBP-gg/Tools/releases',
             method: 'GET',
             headers: { 'User-Agent': '' }
         };
