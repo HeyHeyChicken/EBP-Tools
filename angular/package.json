@@ -28,7 +28,7 @@
   "devDependencies": {
     "@angular-devkit/build-angular": "^20.0.3",
     "@angular/build": "^20.0.3",
-    "@angular/cdk": "^20.0.2",
+    "@angular/cdk": "^21.2.6",
     "@angular/cli": "^20.0.3",
     "@angular/compiler-cli": "^20.0.4",
     "@angular/material": "^20.0.2",
