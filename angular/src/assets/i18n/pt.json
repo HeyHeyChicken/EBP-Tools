@@ -165,7 +165,7 @@
       "beta": "Está a utilizar uma versão beta da aplicação, por favor não a partilhe.",
       "showConsole": "Mostrar a consola"
     },
-    "shared": {
+    "console": {
       "console": "Consola",
       "downloadLogs": "Transferir os registos",
       "clearLogs": "Limpar os registos",
