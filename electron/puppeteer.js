@@ -496,10 +496,13 @@ async function extractPrivatePseudoGames(
                 if (URL == 'about:blank') {
                     BROWSER.close();
                     extractPrivatePseudoGames(
+                        app,
                         nbPages,
                         seasonIndex,
                         timeToWait,
                         dialog,
+                        mainWindow,
+                        debug,
                         callback
                     );
                 }
