@@ -294,6 +294,11 @@ jobs:
               uses: actions/setup-python@v5
               with:
                   python-version: '3.11'
+            # tesseract-ocr-eng provides eng.traineddata, which build_linux_pyi.py
+            # bundles next to evadigits.traineddata so the system tesseract finds both
+            # via TESSDATA_PREFIX at runtime.
+            - name: Install Tesseract eng data
+              run: sudo apt-get update && sudo apt-get install -y tesseract-ocr-eng
             - name: Build Python analyzer binary
               run: cd python && bash build_linux.sh
             # Building Angular and making the Electron application.

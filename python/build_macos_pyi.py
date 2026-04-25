@@ -99,6 +99,7 @@ def main() -> None:
         print(f"  + {os.path.basename(lib)}")
     print(f"  {len(dylibs)} dylib(s) collected.")
 
+    repo_tessdata = os.path.join(os.path.dirname(__file__), "tessdata")
     args = [
         "--onedir",
         "--name", "darwin",
@@ -108,6 +109,7 @@ def main() -> None:
         # making pre-signing impossible.
         "--add-data", f"{TESS_BIN}:tesseract",
         "--add-data", f"{TESS_DATA}/eng.traineddata:tesseract/tessdata",
+        "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
     ]
     for dylib in dylibs:
         args += ["--add-binary", f"{dylib}:tesseract"]

@@ -23,212 +23,32 @@ MODES = [
     #region Mode 0
     {
         'scoreFrame': {
-            'orangeLogo': (325, 153),
-            'blueLogo': (313, 613),
-            'orangeName': ((390, 187), (620, 217)),
-            'blueName': ((390, 637), (620, 667)),
-            'orangeScore': ((530, 89), (620, 127)),
-            'blueScore': ((1285, 89), (1384, 127)),
+            'identify': [
+                (78, 412, [(238, 120, 12)]),  # orange team circle
+                (78, 745, [(43, 137, 237)]),  # blue team circle
+            ],
+            'orangeName': ((90, 402), (175, 422)),
+            'blueName': ((90, 735), (175, 756)),
+            'orangeScore': ((30, 435), (355, 530)),
+            'blueScore': ((30, 627), (355, 722)),
         },
         'endFrame': {
             'orangeScore': ((636, 545), (903, 648)),
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'map': ((825, 81), (1093, 102)),
-            'orangeName': ((686, 22), (833, 68)),
-            'blueName': ((1087, 22), (1226, 68)),
-            'timer': ((935, 0), (985, 28)),
+            'map': ((845, 119), (1072, 154)),
+            'orangeName': ((704, 58), (796, 97)),
+            'blueName': ((1121, 58), (1214, 97)),
+            'timer': ((920, 53), (1000, 77)),
             'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
         },
-        'loadingFrames': [
-            {
-                'logoTop': (958, 427), 'logoLeft': (857, 653),
-                'logoRight': (1060, 653), 'logoMiddle': (958, 642),
-                'logoBlack1': (958, 463), 'logoBlack2': (880, 653),
-                'logoBlack3': (1037, 653), 'logoBlack4': (958, 610),
-            },
-            {
-                'logoTop': (959, 484), 'logoLeft': (908, 596),
-                'logoRight': (1010, 596), 'logoMiddle': (959, 589),
-                'logoBlack1': (959, 503), 'logoBlack2': (920, 596),
-                'logoBlack3': (996, 596), 'logoBlack4': (959, 573),
-            },
-            {
-                'logoTop': (959, 369), 'logoLeft': (808, 708),
-                'logoRight': (1110, 708), 'logoMiddle': (959, 708),
-                'logoBlack1': (959, 430), 'logoBlack2': (840, 708),
-                'logoBlack3': (1070, 708), 'logoBlack4': (959, 640),
-            },
-        ],
-    },
-    #endregion
-    #region Mode 1
-    {
-        'scoreFrame': {
-            'orangeLogo': (325, 123),
-            'blueLogo': (313, 618),
-            'orangeName': ((388, 159), (618, 189)),
-            'blueName': ((390, 629), (620, 679)),
-            'orangeScore': ((530, 54), (620, 92)),
-            'blueScore': ((1286, 54), (1376, 93)),
-        },
-        'endFrame': {
-            'orangeScore': ((636, 545), (903, 648)),
-            'blueScore': ((996, 545), (1257, 648)),
-        },
-        'gameFrame': {
-            'map': ((825, 89), (1093, 110)),
-            'orangeName': ((686, 22), (833, 68)),
-            'blueName': ((1087, 22), (1226, 68)),
-            'timer': ((935, 0), (985, 28)),
-            'playersY': [[703, 729], [793, 819], [883, 908], [973, 998]],
-        },
-        'loadingFrames': [
-            {
-                'logoTop': (958, 427), 'logoLeft': (857, 653),
-                'logoRight': (1060, 653), 'logoMiddle': (958, 642),
-                'logoBlack1': (958, 463), 'logoBlack2': (880, 653),
-                'logoBlack3': (1037, 653), 'logoBlack4': (958, 610),
-            },
-            {
-                'logoTop': (959, 484), 'logoLeft': (908, 596),
-                'logoRight': (1010, 596), 'logoMiddle': (959, 589),
-                'logoBlack1': (959, 503), 'logoBlack2': (920, 596),
-                'logoBlack3': (996, 596), 'logoBlack4': (959, 573),
-            },
-        ],
-    },
-    #endregion
-    #region Mode 2
-    {
-        'scoreFrame': {
-            'orangeLogo': (325, 126),
-            'blueLogo': (313, 618),
-            'orangeName': ((388, 159), (620, 196)),
-            'blueName': ((388, 641), (620, 677)),
-            'orangeScore': ((530, 54), (620, 92)),
-            'blueScore': ((1286, 54), (1376, 93)),
-        },
-        'endFrame': {
-            'orangeScore': ((636, 545), (903, 648)),
-            'blueScore': ((996, 545), (1257, 648)),
-        },
-        'gameFrame': {
-            'map': ((825, 89), (1093, 110)),
-            'orangeName': ((686, 22), (833, 68)),
-            'blueName': ((1087, 22), (1226, 68)),
-            'timer': ((935, 0), (985, 28)),
-            'playersY': [[707, 732], [796, 821], [885, 909], [974, 998]],
-        },
-        'loadingFrames': [
-            {
-                'logoTop': (958, 427), 'logoLeft': (857, 653),
-                'logoRight': (1060, 653), 'logoMiddle': (958, 642),
-                'logoBlack1': (958, 463), 'logoBlack2': (880, 653),
-                'logoBlack3': (1037, 653), 'logoBlack4': (958, 610),
-            },
-            {
-                'logoTop': (959, 484), 'logoLeft': (908, 596),
-                'logoRight': (1010, 596), 'logoMiddle': (959, 589),
-                'logoBlack1': (959, 503), 'logoBlack2': (920, 596),
-                'logoBlack3': (996, 596), 'logoBlack4': (959, 573),
-            },
-        ],
-    },
-    #endregion
-    #region Mode 3
-    {
-        'scoreFrame': {
-            'orangeLogo': (314, 157),
-            'blueLogo': (299, 621),
-            'orangeName': ((390, 187), (620, 217)),
-            'blueName': ((390, 637), (620, 667)),
-            'orangeScore': ((530, 89), (620, 127)),
-            'blueScore': ((1285, 89), (1384, 127)),
-        },
-        'endFrame': {
-            'orangeScore': ((636, 545), (903, 648)),
-            'blueScore': ((996, 545), (1257, 648)),
-        },
-        'gameFrame': {
-            'map': ((825, 79), (1093, 99)),
-            'orangeName': ((686, 22), (833, 68)),
-            'blueName': ((1087, 22), (1226, 68)),
-            'timer': ((935, 0), (985, 28)),
-            'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
-        },
-        'loadingFrames': [
-            {
-                'logoTop': (958, 427), 'logoLeft': (857, 653),
-                'logoRight': (1060, 653), 'logoMiddle': (958, 642),
-                'logoBlack1': (958, 463), 'logoBlack2': (880, 653),
-                'logoBlack3': (1037, 653), 'logoBlack4': (958, 610),
-            },
-            {
-                'logoTop': (959, 484), 'logoLeft': (908, 596),
-                'logoRight': (1010, 596), 'logoMiddle': (959, 589),
-                'logoBlack1': (959, 503), 'logoBlack2': (920, 596),
-                'logoBlack3': (996, 596), 'logoBlack4': (959, 573),
-            },
-        ],
-    },
-    #endregion
-    #region Mode 4
-    {
-        'scoreFrame': {
-            'orangeLogo': (326, 192),
-            'blueLogo': (313, 607),
-            'orangeName': ((388, 221), (619, 249)),
-            'blueName': ((390, 627), (620, 655)),
-            'orangeScore': ((539, 132), (620, 172)),
-            'blueScore': ((1281, 132), (1381, 169)),
-        },
-        'endFrame': {
-            'orangeScore': ((636, 548), (902, 640)),
-            'blueScore': ((983, 550), (1236, 633)),
-        },
-        'gameFrame': {
-            'map': ((825, 73), (1094, 93)),
-            'orangeName': ((686, 22), (833, 67)),
-            'blueName': ((1087, 22), (1225, 56)),
-            'timer': ((935, 0), (985, 24)),
-            'playersY': ((732, 755), (814, 838), (898, 921), (980, 1004)),
-        },
-        'loadingFrames': [
-            {
-                'logoTop': (959, 438),
-                'logoLeft': (857, 643),
-                'logoRight': (1060, 642),
-                'logoMiddle': (958, 642),
-                'logoBlack1': (959, 470),
-                'logoBlack2': (880, 645),
-                'logoBlack3': (1034, 643),
-                'logoBlack4': (959, 604),
-            },
-        ],
-    },
-    #endregion
-    #region Mode 5
-    {
-        'scoreFrame': {
-            'orangeLogo': (319, 123),
-            'blueLogo': (313, 613),
-            'orangeName': ((379, 157), (620, 194)),
-            'blueName': ((384, 638), (620, 677)),
-            'orangeScore': ((529, 54), (618, 96)),
-            'blueScore': ((1282, 57), (1375, 96)),
-        },
-        'endFrame': {
-            'orangeScore': ((636, 545), (903, 648)),
-            'blueScore': ((996, 545), (1257, 648)),
-        },
-        'gameFrame': {
-            'map': ((825, 81), (1093, 102)),
-            'orangeName': ((686, 22), (833, 68)),
-            'blueName': ((1087, 22), (1226, 68)),
-            'timer': ((935, 0), (985, 28)),
-            'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
+        'playingFrame': {
+            'identify': [
+                (1731, 811, [(238, 241, 238)]),    # top blanc
+                (1731, 990, [(238, 241, 238)]),  # bottom blanc
+                (1858, 813, [(48, 152, 254), (250, 129, 4)]),  # player color
+            ],
         },
         'loadingFrames': [
             {
@@ -388,54 +208,70 @@ def _ocr_region(
     frame: np.ndarray,
     x1: float, y1: float, x2: float, y2: float,
     psm: int = 7,
+    extra_psms: list = None,
     whitelist: str = '',
     luminance: int = None,
     apply_filter: bool = False,
     checker=None,
+    lang: str = 'eng',
 ) -> str:
     """
     Lance Tesseract sur la région (x1, y1)→(x2, y2) du frame avec plusieurs passes
     d'image (brute, N&B par seuil de luminance, inversion+contraste, niveaux de gris+contraste)
     et retourne le résultat le plus fréquent — miroir de getTextFromImage() en TypeScript.
 
+    extra_psms : liste optionnelle de PSMs supplémentaires à essayer en plus de psm.
+                 Utile pour les scores où PSM 8 (single word) complète PSM 7 (single line).
     checker : fonction optionnelle appliquée à chaque résultat avant le vote (ex. _score_checker).
     """
     img = _region_to_pil(frame, x1, y1, x2, y2)
-    CONFIG = f'--psm {psm}'
-    if whitelist:
-        CONFIG += f' -c "tessedit_char_whitelist={whitelist}"'
+
+    def _build_config(p: int) -> str:
+        c = f'--psm {p}'
+        if whitelist:
+            c += f' -c "tessedit_char_whitelist={whitelist}"'
+        return c
+
+    PSMS = [psm] + [p for p in (extra_psms or []) if p != psm]
+    CONFIGS = [_build_config(p) for p in PSMS]
 
     # Pattern de filtrage : si un whitelist est défini, on ne garde que ses caractères
     FILTER_PATTERN = re.compile(f'[^{re.escape(whitelist)}]') if whitelist else None
 
-    def _recognize(i: Image.Image) -> str:
-        try:
-            TEXT = pytesseract.image_to_string(i, config=CONFIG).replace('\r', '').replace('\n', '').strip()
-            if FILTER_PATTERN:
-                TEXT = FILTER_PATTERN.sub('', TEXT)
-            return TEXT
-        except Exception:
-            return ''
+    def _recognize(i: Image.Image) -> list:
+        out = []
+        for cfg in CONFIGS:
+            try:
+                TEXT = pytesseract.image_to_string(i, lang=lang, config=cfg).replace('\r', '').replace('\n', '').strip()
+                if FILTER_PATTERN:
+                    TEXT = FILTER_PATTERN.sub('', TEXT)
+                out.append(TEXT)
+            except Exception as EXC:
+                _emit({'log': f'[OCR][ERROR] lang={lang!r} cfg={cfg!r} cmd={pytesseract.pytesseract.tesseract_cmd!r} tessdata={os.environ.get("TESSDATA_PREFIX", "<unset>")} exc={type(EXC).__name__}: {EXC}'})
+                out.append('')
+        return out
 
-    results = [_recognize(img)]
+    results = list(_recognize(img))
+    BW = None
 
     if luminance is not None:
-        BW = img.convert('L').point(lambda p: 255 if p > luminance else 0).convert('RGB')
-        results.append(_recognize(BW))
+        BW = img.convert('L').point(lambda p: 255 if p < luminance else 0).convert('RGB')
+        results.extend(_recognize(BW))
 
+    F1 = F2 = None
     if apply_filter:
         try:
             F1 = ImageOps.invert(img.convert('RGB'))
             F1 = ImageEnhance.Contrast(F1).enhance(2.0)
             F1 = ImageEnhance.Brightness(F1).enhance(1.5)
-            results.append(_recognize(F1))
+            results.extend(_recognize(F1))
         except Exception:
             pass
         try:
             F2 = img.convert('L').convert('RGB')
             F2 = ImageEnhance.Contrast(F2).enhance(3.0)
             F2 = ImageEnhance.Brightness(F2).enhance(1.5)
-            results.append(_recognize(F2))
+            results.extend(_recognize(F2))
         except Exception:
             pass
 
@@ -447,27 +283,82 @@ def _ocr_region(
         RESULT = ''
     else:
         RESULT = _most_frequent(NON_EMPTY)
-    #_emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
+    try:
+        STAMP = int(time.time() * 1000)
+        BASE = os.path.expanduser(f'~/Downloads/ocr_{int(x1)}_{int(y1)}_{int(x2)}_{int(y2)}_{STAMP}')
+        img.save(f'{BASE}_0orig.png')
+        if BW is not None:
+            BW.save(f'{BASE}_1bw.png')
+        if F1 is not None:
+            F1.save(f'{BASE}_2inv.png')
+        if F2 is not None:
+            F2.save(f'{BASE}_3gray.png')
+    except Exception:
+        pass
+    _emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
     return RESULT
 
 # ---------------------------------------------------------------------------
 # Frame type detection — mirrors detect* functions from the TypeScript service
 # ---------------------------------------------------------------------------
 
-def _detect_game_score_frame(frame: np.ndarray) -> int:
+def _identify_offset(frame: np.ndarray, identify: list, tol_pos: int = 10, tol_color: int = 20):
+    """
+    Cherche l'offset (dx, dy) auquel les pixels d'identification matchent dans le frame.
+    Pour chaque (x, y, colors), scanne une zone (2*tol_pos+1)² autour de (x, y) et
+    note le centroïde des pixels matchant l'une des couleurs autorisées (tol_color
+    par canal). Si tous les points matchent, retourne la moyenne des décalages — un
+    seul (dx, dy) qui représente le glissement global du HUD.
+
+    Retourne None si au moins un point d'identify ne matche aucune couleur dans sa zone.
+    """
+    h, w = frame.shape[:2]
+    offsets = []
+    for (x, y, colors) in identify:
+        x = int(x); y = int(y)
+        x1 = max(0, x - tol_pos)
+        x2 = min(w, x + tol_pos + 1)
+        y1 = max(0, y - tol_pos)
+        y2 = min(h, y + tol_pos + 1)
+        roi = frame[y1:y2, x1:x2].astype(np.int16)
+        matched = False
+        for c in colors:
+            target = np.array(c, dtype=np.int16)
+            mask = (np.abs(roi - target) <= tol_color).all(axis=2)
+            if mask.any():
+                ys, xs = np.where(mask)
+                # Centroïde des pixels matchants → position absolue dans le frame
+                cx = xs.mean() + x1
+                cy = ys.mean() + y1
+                offsets.append((cx - x, cy - y))
+                matched = True
+                break
+        if not matched:
+            return None
+    if not offsets:
+        return None
+    dx = sum(o[0] for o in offsets) / len(offsets)
+    dy = sum(o[1] for o in offsets) / len(offsets)
+    return (dx, dy)
+
+
+def _shift_box(box, dx, dy):
+    """Translate une région ((x1,y1), (x2,y2)) par (dx, dy)."""
+    (x1, y1), (x2, y2) = box
+    return ((x1 + dx, y1 + dy), (x2 + dx, y2 + dy))
+
+
+def _detect_game_score_frame(frame: np.ndarray):
     """
     Détecte un écran de score final (tableau des scores entre les équipes).
-    Retourne l'index du mode (0-3) si détecté, -1 sinon.
-    Miroir de detectGameScoreFrame() en TypeScript.
+    Retourne (mode_index, dx, dy) si détecté, (-1, 0.0, 0.0) sinon.
+    (dx, dy) = décalage du HUD à appliquer aux régions OCR pour recadrer correctement.
     """
     for i, mode in enumerate(MODES):
-        SF = mode['scoreFrame']
-        OL = SF['orangeLogo']
-        BL = SF['blueLogo']
-        if (_color_similar(_get_pixel(frame, OL[0], OL[1]), (239, 203, 14)) and
-                _color_similar(_get_pixel(frame, BL[0], BL[1]), (50, 138, 230))):
-            return i
-    return -1
+        offset = _identify_offset(frame, mode['scoreFrame']['identify'])
+        if offset is not None:
+            return (i, offset[0], offset[1])
+    return (-1, 0.0, 0.0)
 
 
 def _detect_game_end_frame(frame: np.ndarray) -> bool:
@@ -514,18 +405,16 @@ def _detect_game_intro(frame: np.ndarray) -> bool:
     return False
 
 
-def _detect_game_playing(frame: np.ndarray) -> bool:
+def _detect_game_playing(frame: np.ndarray):
     """
-    Détecte un frame de jeu en cours 
+    Détecte un frame de jeu en cours.
+    Retourne (matched, dx, dy). dx/dy = décalage du HUD à appliquer aux régions OCR.
     """
-    return check_pixels(frame, [
-        # Top orange
-        (692, 73, 231, 118, 2),
-        # Top blanc
-        (960, 11, 255, 255, 255),
-        # Top blue
-        (1226, 73, 37, 104, 201)
-    ], tol_color=20, tol_pos=10)
+    for mode in MODES:
+        offset = _identify_offset(frame, mode['playingFrame']['identify'])
+        if offset is not None:
+            return (True, offset[0], offset[1])
+    return (False, 0.0, 0.0)
 
 # ---------------------------------------------------------------------------
 # Video utilities
@@ -589,7 +478,7 @@ def _set_score(game: dict, team: str, raw: str) -> None:
     try:
         V = int(raw)
         if 0 <= V <= 100:
-            #_emit({'log': team + ' score : ' + raw})
+            _emit({'log': team + ' score : ' + raw})
             game[team]['score'] = V
     except Exception:
         pass
@@ -660,61 +549,62 @@ def _analyze(
         # ── Score frame ────────────────────────────────────────────────────
         # Only create a new game when there is no pending one (start == -1).
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
-            SCORE_MODE = _detect_game_score_frame(FRAME)
+            SCORE_MODE, SF_DX, SF_DY = _detect_game_score_frame(FRAME)
             if SCORE_MODE >= 0:
-                #_emit({'log': 'Score frame found ' + str(SCORE_MODE)})
+                _emit({'log': f'Score frame found {SCORE_MODE} (HUD offset dx={SF_DX:+.1f}, dy={SF_DY:+.1f})'})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(SCORE_MODE, orange_override, blue_override)
                 GAME['end'] = TIMESTAMP - 1
-                SF = MODES[SCORE_MODE]['scoreFrame']
+                _SF_RAW = MODES[SCORE_MODE]['scoreFrame']
+                # Décale chaque région OCR de l'offset HUD détecté.
+                ON = _shift_box(_SF_RAW['orangeName'], SF_DX, SF_DY)
+                BN = _shift_box(_SF_RAW['blueName'],   SF_DX, SF_DY)
+                OS = _shift_box(_SF_RAW['orangeScore'], SF_DX, SF_DY)
+                BS = _shift_box(_SF_RAW['blueScore'],   SF_DX, SF_DY)
 
                 if not GAME['orangeTeam']['name']:
                     T = _ocr_region(
                         FRAME,
-                        SF['orangeName'][0][0], SF['orangeName'][0][1],
-                        SF['orangeName'][1][0], SF['orangeName'][1][1],
+                        ON[0][0], ON[0][1], ON[1][0], ON[1][1],
                         psm=7,
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-                        luminance=225, apply_filter=True,
+                        luminance=100, apply_filter=True,
                     )
                     if T and len(T) >= 2:
-                        #_emit({'log': 'Orange team name : '+T.upper()})
+                        _emit({'log': 'Orange team name : '+T.upper()})
                         GAME['orangeTeam']['name'] = T.upper()
 
                 _set_score(GAME, 'orangeTeam', _ocr_region(
                     FRAME,
-                    SF['orangeScore'][0][0], SF['orangeScore'][0][1],
-                    SF['orangeScore'][1][0], SF['orangeScore'][1][1],
-                    psm=7, whitelist='0123456789%', luminance=200, apply_filter=True,
+                    OS[0][0], OS[0][1], OS[1][0], OS[1][1],
+                    psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
                     checker=_score_checker,
                 ))
 
                 if not GAME['blueTeam']['name']:
                     T = _ocr_region(
                         FRAME,
-                        SF['blueName'][0][0], SF['blueName'][0][1],
-                        SF['blueName'][1][0], SF['blueName'][1][1],
+                        BN[0][0], BN[0][1], BN[1][0], BN[1][1],
                         psm=7,
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-                        luminance=225, apply_filter=True,
+                        luminance=100, apply_filter=True,
                     )
                     if T and len(T) >= 2:
-                        #_emit({'log': 'Blue team name : '+T.upper()})
+                        _emit({'log': 'Blue team name : '+T.upper()})
                         GAME['blueTeam']['name'] = T.upper()
 
                 _set_score(GAME, 'blueTeam', _ocr_region(
                     FRAME,
-                    SF['blueScore'][0][0], SF['blueScore'][0][1],
-                    SF['blueScore'][1][0], SF['blueScore'][1][1],
-                    psm=7, whitelist='0123456789%', luminance=200, apply_filter=True,
+                    BS[0][0], BS[0][1], BS[1][0], BS[1][1],
+                    psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
                     checker=_score_checker,
                 ))
 
-                GAME['orangeTeam']['nameImage']  = _region_to_base64(FRAME, SF['orangeName'][0][0],  SF['orangeName'][0][1],  SF['orangeName'][1][0],  SF['orangeName'][1][1])
-                GAME['orangeTeam']['scoreImage'] = _region_to_base64(FRAME, SF['orangeScore'][0][0], SF['orangeScore'][0][1], SF['orangeScore'][1][0], SF['orangeScore'][1][1])
-                GAME['blueTeam']['nameImage']    = _region_to_base64(FRAME, SF['blueName'][0][0],    SF['blueName'][0][1],    SF['blueName'][1][0],    SF['blueName'][1][1])
-                GAME['blueTeam']['scoreImage']   = _region_to_base64(FRAME, SF['blueScore'][0][0],   SF['blueScore'][0][1],   SF['blueScore'][1][0],   SF['blueScore'][1][1])
+                GAME['orangeTeam']['nameImage']  = _region_to_base64(FRAME, ON[0][0], ON[0][1], ON[1][0], ON[1][1])
+                GAME['orangeTeam']['scoreImage'] = _region_to_base64(FRAME, OS[0][0], OS[0][1], OS[1][0], OS[1][1])
+                GAME['blueTeam']['nameImage']    = _region_to_base64(FRAME, BN[0][0], BN[0][1], BN[1][0], BN[1][1])
+                GAME['blueTeam']['scoreImage']   = _region_to_base64(FRAME, BS[0][0], BS[0][1], BS[1][0], BS[1][1])
 
                 GAMES.insert(0, GAME)
                 CURRENT = GAME
@@ -722,7 +612,7 @@ def _analyze(
         # ── End frame ──────────────────────────────────────────────────────
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             if _detect_game_end_frame(FRAME):
-                #_emit({'log': 'End frame found'})
+                _emit({'log': 'End frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(1, orange_override, blue_override)
@@ -746,7 +636,7 @@ def _analyze(
         # ── Game start: loading screen ──────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_loading_frame(FRAME, CURRENT['mode']):
-                #_emit({'log': 'Loading frame found'})
+                _emit({'log': 'Loading frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 # Scan forward to find the first actual gameplay frame.
@@ -754,20 +644,20 @@ def _analyze(
                 GAME_START = TIMESTAMP
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
-                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME)[0]:
                         GAME_START = PROBE
                         break
-                    #_emit({'log': 's'})
+                    _emit({'log': 's'})
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
-                #_emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
+                _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None   # game complete
 
         # ── Game start: map introduction ────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_intro(FRAME):
-                #_emit({'log': 'Game intro frame found'})
+                _emit({'log': 'Game intro frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 # Scan forward to find the first actual gameplay frame.
@@ -775,47 +665,50 @@ def _analyze(
                 GAME_START = TIMESTAMP
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
-                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME)[0]:
                         GAME_START = PROBE
                         break
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
-                #_emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
+                _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None
 
         # ── Playing frame: OCR map / team names + timer jump ────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
-            if _detect_game_playing(FRAME):
+            PLAYING, _, _ = _detect_game_playing(FRAME)
+            if PLAYING:
                 FOUND = True
-                #_emit({'log': 'Playing frame found'})
+                _emit({'log': 'Playing frame found'})
 
-                #if check_pixels(FRAME, GAME_FRAME_PIXELS[0], tol_color=20, tol_pos=10):
-                #    _emit({'log': 'Playing frame found SUUUUUUUUUUUUPER'})
-                #else:
-                #    _emit({'log': 'NOPE !!!!!!!'})
-                #    cv2.imwrite(os.path.expanduser(f'~/Downloads/nope_frame_{TIMESTAMP:.1f}.png'), cv2.cvtColor(FRAME, cv2.COLOR_RGB2BGR))
-
-                GF = MODES[CURRENT['mode']]['gameFrame']
+                # NOTE : on n'applique PAS d'offset HUD ici. Les pixels
+                # d'identify du playingFrame sont dans des zones blanches étendues
+                # (bandeau bas-droite) qui rendent le centroïde bruité ; et la map
+                # / les noms d'équipe en haut-centre ne sont pas corrélés au shift
+                # de cette zone. Si un jour tu veux corriger un drift en jeu,
+                # ajoute des anchors d'identify proches de chaque région OCR.
+                GF        = MODES[CURRENT['mode']]['gameFrame']
+                MAP_BOX   = GF['map']
+                ON_BOX    = GF['orangeName']
+                BN_BOX    = GF['blueName']
+                TIMER_BOX = GF['timer']
 
                 if not CURRENT['map']:
                     T = _ocr_region(
                         FRAME,
-                        GF['map'][0][0], GF['map'][0][1],
-                        GF['map'][1][0], GF['map'][1][1],
+                        MAP_BOX[0][0], MAP_BOX[0][1], MAP_BOX[1][0], MAP_BOX[1][1],
                         psm=7,
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
-                        luminance=225, apply_filter=True,
+                        luminance=100, apply_filter=True,
                     )
                     if T:
                         MAP_NAME = _get_map_by_name(T)
                         if MAP_NAME:
-                            #_emit({'log': 'map name : ' + MAP_NAME})
+                            _emit({'log': 'map name : ' + MAP_NAME})
                             CURRENT['map'] = MAP_NAME
                             CURRENT['mapImage'] = _region_to_base64(
                                 FRAME,
-                                GF['map'][0][0], GF['map'][0][1],
-                                GF['map'][1][0], GF['map'][1][1],
+                                MAP_BOX[0][0], MAP_BOX[0][1], MAP_BOX[1][0], MAP_BOX[1][1],
                             )
                         else:
                             _emit({"Can't find map name": T})
@@ -823,25 +716,23 @@ def _analyze(
                 if not CURRENT['orangeTeam']['name']:
                     T = _ocr_region(
                         FRAME,
-                        GF['orangeName'][0][0], GF['orangeName'][0][1],
-                        GF['orangeName'][1][0], GF['orangeName'][1][1],
+                        ON_BOX[0][0], ON_BOX[0][1], ON_BOX[1][0], ON_BOX[1][1],
                         psm=6,
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
                     )
                     if T and len(T) >= 2:
-                        #_emit({'log': 'orange team name : ' + T.upper()})
+                        _emit({'log': 'orange team name : ' + T.upper()})
                         CURRENT['orangeTeam']['name'] = T.upper()
 
                 if not CURRENT['blueTeam']['name']:
                     T = _ocr_region(
                         FRAME,
-                        GF['blueName'][0][0], GF['blueName'][0][1],
-                        GF['blueName'][1][0], GF['blueName'][1][1],
+                        BN_BOX[0][0], BN_BOX[0][1], BN_BOX[1][0], BN_BOX[1][1],
                         psm=6,
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
                     )
                     if T and len(T) >= 2:
-                        #_emit({'log': 'blue team name : ' + T.upper()})
+                        _emit({'log': 'blue team name : ' + T.upper()})
                         CURRENT['blueTeam']['name'] = T.upper()
 
                 # Timer jump — mirrors the TS optimization exactly.
@@ -855,21 +746,20 @@ def _analyze(
                         and not JUST_JUMPED):
                     TIMER = _ocr_region(
                         FRAME,
-                        GF['timer'][0][0], GF['timer'][0][1],
-                        GF['timer'][1][0], GF['timer'][1][1],
+                        TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
                         psm=7, whitelist='0123456789:',
                     )
                     if TIMER:
-                        #_emit({'log': 'timer : ' + TIMER})
+                        _emit({'log': 'timer : ' + TIMER})
                         PARTS = TIMER.split(':')
                         if len(PARTS) == 2:
                             try:
                                 M, S = int(PARTS[0]), int(PARTS[1])
-                                #_emit({'log': max_time_per_game, 'm': M, 's': S})
+                                _emit({'log': max_time_per_game, 'm': M, 's': S})
                                 if M <= max_time_per_game:
                                     DIFF = (max_time_per_game - M) * 60 - S - 20
 
-                                    #_emit({'log': "Try to jump " + str(DIFF)})
+                                    _emit({'log': "Try to jump " + str(DIFF)})
                                     CURRENT['__jumped__'] = True
                                     JUST_JUMPED = True
                                     TIMESTAMP -= DIFF
@@ -878,7 +768,7 @@ def _analyze(
                                 print(e)
                                 pass
         #if not FOUND:
-            #_emit({'log': "Can't identify frame"})
+            _emit({'log': "Can't identify frame"})
 
         # Après un timer jump on est près du début du jeu → STEP=1 pour ne pas
         # rater l'écran de chargement. Dans toutes les autres zones (post-game,
@@ -897,6 +787,19 @@ def _analyze(
 # Entry point
 # ---------------------------------------------------------------------------
 
+def _get_bundled_tessdata() -> str:
+    """Retourne le chemin du tessdata embarqué (s'il contient des .traineddata), ou ''.
+    Appelé indépendamment du binaire tesseract : sur Linux on bundle uniquement
+    les .traineddata (eng + evadigits), pas le binaire."""
+    BASE = getattr(sys, '_MEIPASS', '')
+    if not BASE:
+        return ''
+    TESSDATA_DIR = os.path.join(BASE, 'tesseract', 'tessdata')
+    if os.path.isdir(TESSDATA_DIR) and any(f.endswith('.traineddata') for f in os.listdir(TESSDATA_DIR)):
+        return TESSDATA_DIR
+    return ''
+
+
 def _get_bundled_tesseract() -> str:
     """Renvoie le chemin vers le tesseract embarqué par PyInstaller, ou ''."""
     BASE = getattr(sys, '_MEIPASS', '')
@@ -906,12 +809,27 @@ def _get_bundled_tesseract() -> str:
     CANDIDATE = os.path.join(BASE, 'tesseract', EXE_NAME)
     if not os.path.isfile(CANDIDATE):
         return ''
-    # Point TESSDATA_PREFIX to the bundled tessdata so the tesseract subprocess
-    # finds eng.traineddata instead of looking at its compile-time Homebrew path.
-    TESSDATA_DIR = os.path.join(BASE, 'tesseract', 'tessdata')
-    if os.path.isdir(TESSDATA_DIR):
-        os.environ['TESSDATA_PREFIX'] = TESSDATA_DIR
     return CANDIDATE
+
+
+def _tesseract_works(cmd: str) -> bool:
+    """Smoke-test : lance `cmd --version` et retourne True si exit code == 0."""
+    import subprocess
+    try:
+        R = subprocess.run([cmd, '--version'], capture_output=True, timeout=5)
+        return R.returncode == 0
+    except Exception:
+        return False
+
+
+def _find_system_tesseract() -> str:
+    """Cherche un tesseract installé hors du bundle (Homebrew, PATH)."""
+    import shutil
+    for c in ('/opt/homebrew/bin/tesseract', '/usr/local/bin/tesseract', '/usr/bin/tesseract'):
+        if os.path.isfile(c):
+            return c
+    FOUND = shutil.which('tesseract')
+    return FOUND or ''
 
 
 def main() -> None:
@@ -931,9 +849,28 @@ def main() -> None:
     VIDEO_PATH  = sys.argv[1]
     FFMPEG_PATH = sys.argv[2]
 
+    # Pointe TESSDATA_PREFIX vers le tessdata bundlé (eng + evadigits) si présent.
+    # Fait avant le choix du binaire car ça s'applique aussi au tesseract système
+    # (cas Linux où on bundle uniquement les data, ou fallback macOS).
+    BUNDLED_TESSDATA = _get_bundled_tessdata()
+    if BUNDLED_TESSDATA:
+        BUNDLED_HAS_REQUIRED = all(
+            os.path.isfile(os.path.join(BUNDLED_TESSDATA, f))
+            for f in ('eng.traineddata', 'evadigits.traineddata')
+        )
+        if BUNDLED_HAS_REQUIRED:
+            os.environ['TESSDATA_PREFIX'] = BUNDLED_TESSDATA
+
     TESSERACT_CMD = sys.argv[3] if len(sys.argv) > 3 else ''
     if not TESSERACT_CMD:
         TESSERACT_CMD = _get_bundled_tesseract()
+    # Si le binaire bundlé est tué par macOS (signature ad-hoc + hardened runtime
+    # sur certaines machines), on bascule sur le tesseract système.
+    if TESSERACT_CMD and not _tesseract_works(TESSERACT_CMD):
+        FALLBACK = _find_system_tesseract()
+        if FALLBACK and _tesseract_works(FALLBACK):
+            _emit({'log': f'[tesseract] bundled SIGKILL → fallback to {FALLBACK}'})
+            TESSERACT_CMD = FALLBACK
     if TESSERACT_CMD:
         pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 
