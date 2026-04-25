@@ -848,15 +848,20 @@ def _analyze(
                         if len(PARTS) == 2:
                             try:
                                 M, S = int(PARTS[0]), int(PARTS[1])
-                                _emit({'log': max_time_per_game, 'm': M, 's': S})
-                                if M <= max_time_per_game:
+                                # Sanity-check OCR : un timer valide a M ∈ [0, max_time_per_game]
+                                # et S ∈ [0, 59]. Sans ça un OCR foireux comme "0:3228"
+                                # produit un DIFF négatif → TIMESTAMP saute en avant
+                                # dans la vidéo et l'algo backward boucle indéfiniment.
+                                VALID = 0 <= M <= max_time_per_game and 0 <= S < 60
+                                _emit({'log': f'timer parsed m={M} s={S} valid={VALID}'})
+                                if VALID:
                                     DIFF = (max_time_per_game - M) * 60 - S - 20
-
-                                    _emit({'log': "Try to jump " + str(DIFF)})
-                                    CURRENT['__jumped__'] = True
-                                    JUST_JUMPED = True
-                                    TIMESTAMP -= DIFF
-                                    continue   # skip TIMESTAMP -= STEP
+                                    if DIFF > 0:
+                                        _emit({'log': "Try to jump " + str(DIFF)})
+                                        CURRENT['__jumped__'] = True
+                                        JUST_JUMPED = True
+                                        TIMESTAMP -= DIFF
+                                        continue   # skip TIMESTAMP -= STEP
                             except Exception as e:
                                 print(e)
                                 pass
