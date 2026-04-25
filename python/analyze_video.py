@@ -19,25 +19,53 @@ import pytesseract
 # All positions are in 1920×1080 coordinate space.
 # ---------------------------------------------------------------------------
 
+# Couleurs des équipes — partagées entre l'identify (matching pixel) et la
+# détection de bordure (find_text_border). Une seule source de vérité par couleur.
+TEAM_ORANGE = [(238, 120, 12)]
+TEAM_BLUE   = [(43, 137, 237)]
+
 MODES = [
     #region Mode 0
     {
         'scoreFrame': {
             'identify': [
-                (78, 412, [(238, 120, 12)]),  # orange team circle
-                (78, 745, [(43, 137, 237)]),  # blue team circle
+                (78, 412, TEAM_ORANGE),  # orange team circle
+                (78, 745, TEAM_BLUE),    # blue team circle
             ],
-            'orangeName': ((90, 402), (175, 422)),
-            'blueName': ((90, 735), (175, 756)),
-            'orangeScore': ((30, 435), (355, 530)),
-            'blueScore': ((30, 627), (355, 722)),
+            # Le nom d'équipe est entouré d'une bordure colorée. On la cherche
+            # dynamiquement dans une zone large, on prend son bbox, on rentre
+            # de quelques px (inset) pour ne pas inclure le bord lui-même dans
+            # le crop OCR.
+            'orangeName': {
+                'colors': TEAM_ORANGE,
+                'search': ((70, 381), (192, 431)),
+                'inset': 4,    # rentre dans la bordure (texte à l'intérieur)
+            },
+            'blueName': {
+                'colors': TEAM_BLUE,
+                'search': ((70, 727), (192, 781)),
+                'inset': 4,
+            },
+            # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
+            # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
+            # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
+            'orangeScore': {
+                'colors': TEAM_ORANGE,
+                'search': ((30, 430), (356, 527)),
+                'inset': -10,
+            },
+            'blueScore': {
+                'colors': TEAM_BLUE,
+                'search': ((30, 626), (356, 728)),
+                'inset': -10,
+            },
         },
         'endFrame': {
             'orangeScore': ((636, 545), (903, 648)),
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'map': ((845, 119), (1072, 154)),
+            'map': ((845, 124), (1072, 159)),
             'orangeName': ((704, 58), (796, 97)),
             'blueName': ((1121, 58), (1214, 97)),
             'timer': ((920, 53), (1000, 77)),
@@ -348,6 +376,59 @@ def _shift_box(box, dx, dy):
     return ((x1 + dx, y1 + dy), (x2 + dx, y2 + dy))
 
 
+def _find_text_border(frame: np.ndarray, colors: list, search_region, tol_color: int = 20, min_pixels: int = 50, inset: int = 0):
+    """
+    Trouve le bounding box des pixels matchant une des couleurs dans search_region.
+    Cas d'usage : un texte est entouré d'une bordure colorée (ex: bouton orange autour
+    d'un nom d'équipe). On masque les pixels de la couleur de bordure, on prend le
+    bbox englobant, on rentre de inset px pour ne pas inclure le bord lui-même.
+
+    Retourne ((x1, y1), (x2, y2)) ou None si pas assez de pixels matchent.
+    """
+    h, w = frame.shape[:2]
+    (sx1, sy1), (sx2, sy2) = search_region
+    sx1 = max(0, int(sx1)); sy1 = max(0, int(sy1))
+    sx2 = min(w, int(sx2)); sy2 = min(h, int(sy2))
+    if sx1 >= sx2 or sy1 >= sy2:
+        return None
+    sub = frame[sy1:sy2, sx1:sx2].astype(np.int16)
+    mask = np.zeros(sub.shape[:2], dtype=bool)
+    for c in colors:
+        target = np.array(c, dtype=np.int16)
+        mask |= (np.abs(sub - target) <= tol_color).all(axis=2)
+    if mask.sum() < min_pixels:
+        return None
+    ys, xs = np.where(mask)
+    # inset positif = rentre vers l'intérieur (utile quand la couleur cible est
+    # une BORDURE entourant le texte). inset négatif = élargit autour (utile
+    # quand la couleur cible est le TEXTE lui-même, ex: chiffres colorés du score).
+    # On clamp aux bornes du frame pour éviter de sortir de l'image.
+    x1 = max(0, int(xs.min()) + sx1 + inset)
+    y1 = max(0, int(ys.min()) + sy1 + inset)
+    x2 = min(w, int(xs.max()) + sx1 + 1 - inset)
+    y2 = min(h, int(ys.max()) + sy1 + 1 - inset)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return ((x1, y1), (x2, y2))
+
+
+def _resolve_region(spec, frame: np.ndarray, dx: float = 0, dy: float = 0):
+    """
+    Résout un spec de région en box absolu ((x1,y1),(x2,y2)).
+    - spec tuple ((x1,y1),(x2,y2)) → région statique, on applique le shift HUD (dx, dy).
+    - spec dict {'colors', 'search', 'inset'} → région dynamique, on cherche la bordure colorée.
+    Retourne None si la détection dynamique échoue.
+    """
+    if isinstance(spec, dict):
+        return _find_text_border(
+            frame, spec['colors'], spec['search'],
+            tol_color=spec.get('tol_color', 20),
+            min_pixels=spec.get('min_pixels', 50),
+            inset=spec.get('inset', 0),
+        )
+    return _shift_box(spec, dx, dy)
+
+
 def _detect_game_score_frame(frame: np.ndarray):
     """
     Détecte un écran de score final (tableau des scores entre les équipes).
@@ -557,13 +638,19 @@ def _analyze(
                 GAME = _new_game(SCORE_MODE, orange_override, blue_override)
                 GAME['end'] = TIMESTAMP - 1
                 _SF_RAW = MODES[SCORE_MODE]['scoreFrame']
-                # Décale chaque région OCR de l'offset HUD détecté.
-                ON = _shift_box(_SF_RAW['orangeName'], SF_DX, SF_DY)
-                BN = _shift_box(_SF_RAW['blueName'],   SF_DX, SF_DY)
-                OS = _shift_box(_SF_RAW['orangeScore'], SF_DX, SF_DY)
-                BS = _shift_box(_SF_RAW['blueScore'],   SF_DX, SF_DY)
+                # Noms d'équipe : bbox dynamique trouvé via la bordure colorée.
+                # Scores : bbox statique, juste translaté de l'offset HUD identifié.
+                ON = _resolve_region(_SF_RAW['orangeName'], FRAME, SF_DX, SF_DY)
+                BN = _resolve_region(_SF_RAW['blueName'],   FRAME, SF_DX, SF_DY)
+                OS = _resolve_region(_SF_RAW['orangeScore'], FRAME, SF_DX, SF_DY)
+                BS = _resolve_region(_SF_RAW['blueScore'],   FRAME, SF_DX, SF_DY)
+                for label, box in (('orange name', ON), ('blue name', BN), ('orange score', OS), ('blue score', BS)):
+                    if box is not None:
+                        _emit({'log': f'{label} border: {box}'})
+                    else:
+                        _emit({'log': f'[border] {label} not found in search region'})
 
-                if not GAME['orangeTeam']['name']:
+                if ON is not None and not GAME['orangeTeam']['name']:
                     T = _ocr_region(
                         FRAME,
                         ON[0][0], ON[0][1], ON[1][0], ON[1][1],
@@ -575,14 +662,15 @@ def _analyze(
                         _emit({'log': 'Orange team name : '+T.upper()})
                         GAME['orangeTeam']['name'] = T.upper()
 
-                _set_score(GAME, 'orangeTeam', _ocr_region(
-                    FRAME,
-                    OS[0][0], OS[0][1], OS[1][0], OS[1][1],
-                    psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
-                    checker=_score_checker,
-                ))
+                if OS is not None:
+                    _set_score(GAME, 'orangeTeam', _ocr_region(
+                        FRAME,
+                        OS[0][0], OS[0][1], OS[1][0], OS[1][1],
+                        psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
+                        checker=_score_checker,
+                    ))
 
-                if not GAME['blueTeam']['name']:
+                if BN is not None and not GAME['blueTeam']['name']:
                     T = _ocr_region(
                         FRAME,
                         BN[0][0], BN[0][1], BN[1][0], BN[1][1],
@@ -594,17 +682,22 @@ def _analyze(
                         _emit({'log': 'Blue team name : '+T.upper()})
                         GAME['blueTeam']['name'] = T.upper()
 
-                _set_score(GAME, 'blueTeam', _ocr_region(
-                    FRAME,
-                    BS[0][0], BS[0][1], BS[1][0], BS[1][1],
-                    psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
-                    checker=_score_checker,
-                ))
+                if BS is not None:
+                    _set_score(GAME, 'blueTeam', _ocr_region(
+                        FRAME,
+                        BS[0][0], BS[0][1], BS[1][0], BS[1][1],
+                        psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
+                        checker=_score_checker,
+                    ))
 
-                GAME['orangeTeam']['nameImage']  = _region_to_base64(FRAME, ON[0][0], ON[0][1], ON[1][0], ON[1][1])
-                GAME['orangeTeam']['scoreImage'] = _region_to_base64(FRAME, OS[0][0], OS[0][1], OS[1][0], OS[1][1])
-                GAME['blueTeam']['nameImage']    = _region_to_base64(FRAME, BN[0][0], BN[0][1], BN[1][0], BN[1][1])
-                GAME['blueTeam']['scoreImage']   = _region_to_base64(FRAME, BS[0][0], BS[0][1], BS[1][0], BS[1][1])
+                if ON is not None:
+                    GAME['orangeTeam']['nameImage']  = _region_to_base64(FRAME, ON[0][0], ON[0][1], ON[1][0], ON[1][1])
+                if OS is not None:
+                    GAME['orangeTeam']['scoreImage'] = _region_to_base64(FRAME, OS[0][0], OS[0][1], OS[1][0], OS[1][1])
+                if BN is not None:
+                    GAME['blueTeam']['nameImage']    = _region_to_base64(FRAME, BN[0][0], BN[0][1], BN[1][0], BN[1][1])
+                if BS is not None:
+                    GAME['blueTeam']['scoreImage']   = _region_to_base64(FRAME, BS[0][0], BS[0][1], BS[1][0], BS[1][1])
 
                 GAMES.insert(0, GAME)
                 CURRENT = GAME
