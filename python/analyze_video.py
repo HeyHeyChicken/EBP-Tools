@@ -801,7 +801,7 @@ def _analyze(
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_playing(FRAME):
                 FOUND = True
-                _emit({'log': 'Playing frame found'})
+                #_emit({'log': 'Playing frame found'})
 
                 GF        = MODES[CURRENT['mode']]['gameFrame']
                 MAP_BOX   = GF['map']
@@ -820,7 +820,7 @@ def _analyze(
                     if T:
                         MAP_NAME = _get_map_by_name(T)
                         if MAP_NAME:
-                            _emit({'log': 'map name : ' + MAP_NAME})
+                            #_emit({'log': 'map name : ' + MAP_NAME})
                             CURRENT['map'] = MAP_NAME
                             CURRENT['mapImage'] = _region_to_base64(
                                 FRAME,
@@ -1099,15 +1099,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     le timer jump de la phase 1 : première lecture valide gagne).
     """
     CHUNKS = settings.get('chunks', []) or []
-    _emit({'log': f'[_analyze_chunks] {settings}'})
+    #_emit({'log': f'[_analyze_chunks] {settings}'})
 
     if not CHUNKS:
-        _emit({'percent': 100, 'results': []})
+        #_emit({'percent': 100, 'results': []})
         return
 
     CAP = _open_video(video_path)
     if CAP is None:
-        _emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
+        #_emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
         return
 
     GENERATED_BY = 'analyze_video.py:chunks v1'
@@ -1126,7 +1126,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     WINDOW = max(1, min(CPU // 4, 4))
     MAX_WORKERS = max(3, WINDOW * 3)
     EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
-    _emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
+    #_emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
 
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
@@ -1201,7 +1201,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             EXISTING = SAMPLES.get(ELAPSED, {})
             ORANGE = ORANGE_RAW if 'orange' not in EXISTING else None
             BLUE = BLUE_RAW if 'blue' not in EXISTING else None
-            _emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
+            #_emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
             if ORANGE is None and BLUE is None:
                 return
             if not _is_score_change_valid(SAMPLES, ELAPSED, ORANGE, BLUE):
@@ -1212,7 +1212,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             if BLUE is not None:
                 MERGED['blue'] = BLUE
             SAMPLES[ELAPSED] = MERGED
-            _emit({'log': f'[_analyze_chunks] sample @ t={ELAPSED}s → orange={MERGED.get("orange")} blue={MERGED.get("blue")}'})
+            #_emit({'log': f'[_analyze_chunks] sample @ t={ELAPSED}s → orange={MERGED.get("orange")} blue={MERGED.get("blue")}'})
 
         TIMESTAMP = float(START)
         INFLIGHT = deque()

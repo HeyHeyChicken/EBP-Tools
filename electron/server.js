@@ -805,6 +805,7 @@ if (!APP_GOT_THE_LOCK) {
                         }
                         if (WINDOW && !WINDOW.isDestroyed()) {
                             WINDOW.webContents.send('analyzer-update', MSG);
+
                             WINDOW.webContents.send('set-notification-data', {
                                 ...NOTIFICATION_DATA,
                                 ...{
@@ -820,6 +821,7 @@ if (!APP_GOT_THE_LOCK) {
                             (MSG.type === 'done' || MSG.type === 'error') &&
                             !RESOLVED
                         ) {
+                            deleteFloatingWindow();
                             RESOLVED = true;
                             resolve(MSG);
                         }
@@ -935,6 +937,7 @@ if (!APP_GOT_THE_LOCK) {
                             });
                         }
                         if ((MSG.error || percent >= 100) && !RESOLVED) {
+                            deleteFloatingWindow();
                             RESOLVED = true;
                             resolve(MSG);
                         }
@@ -1767,9 +1770,6 @@ if (!APP_GOT_THE_LOCK) {
             checkYTDLPVersion();
 
             //#endregion
-
-            //autoUpdater.checkForUpdatesAndNotify();
-            UPDATE_SERVICE.autoUpdate(true);
 
             console.log('Number of openings', NUMBER_OF_OPENINGS);
             console.log({
