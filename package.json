@@ -1,6 +1,6 @@
 {
     "name": "ebp-tools",
-    "version": "1.8.1",
+    "version": "1.8.2",
     "description": "",
     "main": ".webpack/main",
     "scripts": {
@@ -31,8 +31,8 @@
         "electron-updater": "^6.7.3",
         "exceljs": "^4.4.0",
         "express": "^5.2.1",
-        "get-port": "^7.1.0",
-        "puppeteer-core": "^24.37.2",
+        "get-port": "^7.2.0",
+        "puppeteer-core": "^24.42.0",
         "registry-js": "^1.16.1",
         "socket.io-client": "^4.8.3"
     },
@@ -47,15 +47,15 @@
         "@electron-forge/plugin-fuses": "^7.11.1",
         "@electron-forge/plugin-webpack": "^7.11.1",
         "@electron-forge/publisher-github": "^7.11.1",
-        "@eslint/js": "^9.39.2",
+        "@eslint/js": "^10.0.1",
         "@vercel/webpack-asset-relocator-loader": "^1.10.0",
         "concurrently": "^9.2.1",
-        "copy-webpack-plugin": "^13.0.1",
-        "electron": "^40.2.1",
+        "copy-webpack-plugin": "^14.0.0",
+        "electron": "^41.3.0",
         "electron-squirrel-startup": "^1.0.1",
-        "eslint": "^9.39.2",
-        "prettier": "^3.8.1",
-        "typescript": "^5.9.3",
-        "typescript-eslint": "^8.54.0"
+        "eslint": "^10.2.1",
+        "prettier": "^3.8.3",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.59.1"
     }
 }
