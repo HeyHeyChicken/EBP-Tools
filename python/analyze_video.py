@@ -1091,11 +1091,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     PROCESSED_SECONDS = 0
     LAST_PERCENT = -1
 
-    # Pool de 2 workers : un pour l'OCR orange, un pour l'OCR blue. pytesseract
-    # spawn un sous-process Tesseract distinct par appel → le GIL ne bloque pas,
-    # la parallélisation est réelle. Pool persistant (vs créé par frame) pour
-    # éviter le coût de spawn/teardown de threads à chaque seconde de vidéo.
-    EXECUTOR = ThreadPoolExecutor(max_workers=2)
+    # Pool de 3 workers : timer + score orange + score blue, lancés en parallèle
+    # spéculatif sur la même frame. pytesseract spawn un sous-process Tesseract
+    # distinct par appel → le GIL ne bloque pas, la parallélisation est réelle.
+    # Pool persistant (vs créé par frame) pour éviter le coût de spawn/teardown
+    # de threads à chaque seconde de vidéo.
+    EXECUTOR = ThreadPoolExecutor(max_workers=3)
 
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
@@ -1129,15 +1130,30 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 PROCESSED_SECONDS += 1
                 continue
 
-            # 1. Timer — valide la cohérence (M, S) du HUD.
-            #    PSM 7 seul (single line) : suffisant pour MM:SS, gain ~50% vs +PSM 8.
-            #    Si trop de timers ratés, ré-ajouter `extra_psms=[8]`.
-            TIMER_TEXT = _ocr_region(
+            # 1. Lancement spéculatif des 3 OCR en parallèle. On ne sait pas
+            #    encore si le timer parsera ni si l'ELAPSED résultant sera déjà
+            #    saturé : on soumet quand même les scores et on jette les
+            #    résultats si inutiles. Coût : 2 OCR scores parfois gaspillés ;
+            #    bénéfice : la latence wall-clock devient max(timer, score) au
+            #    lieu de timer + score.
+            FUT_TIMER = EXECUTOR.submit(
+                _ocr_region,
                 FRAME,
                 TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
                 psm=7, whitelist='0123456789:',
                 luminance=100, apply_filter=True, lang='evadigits',
             )
+            FUT_ORANGE = EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE)
+            FUT_BLUE = EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE)
+
+            # Drain des 3 futures dès maintenant : le travail est lancé en
+            #    parallèle, peu importe si on jette ensuite. Ça simplifie le
+            #    contrôle de flot (un seul point de récupération) et évite
+            #    d'orphaner des futures dans les branches d'invalidation.
+            TIMER_TEXT = FUT_TIMER.result()
+            ORANGE_RAW = FUT_ORANGE.result()
+            BLUE_RAW = FUT_BLUE.result()
+
             MS = _parse_timer_text(TIMER_TEXT)
             if MS is None:
                 TIMESTAMP += 1.0
@@ -1180,17 +1196,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
 
             # 2. Scores : pas d'offset HUD. Les anchors du playingFrame sont dans
             #    des zones blanches étendues → centroïde bruité, on garde dx=dy=0.
+            #    First-OCR-wins par équipe : si une équipe a déjà sa valeur pour
+            #    cet ELAPSED (cas pause technique : même timer à plusieurs frames
+            #    successifs), on jette le résultat OCR de cette équipe.
             EXISTING = SAMPLES.get(ELAPSED, {})
-            # First-OCR-wins par équipe : si une équipe a déjà sa valeur pour ce
-            # timer, on ne ré-OCR pas (ni n'écrase) — on ne complète que ce qui manque.
-            # Les deux OCR sont parallélisés via le ThreadPool (chaque pytesseract
-            # spawn un sous-process Tesseract distinct, GIL transparent).
-            NEED_ORANGE = 'orange' not in EXISTING
-            NEED_BLUE = 'blue' not in EXISTING
-            FUT_ORANGE = EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE) if NEED_ORANGE else None
-            FUT_BLUE = EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE) if NEED_BLUE else None
-            ORANGE = FUT_ORANGE.result() if FUT_ORANGE is not None else None
-            BLUE = FUT_BLUE.result() if FUT_BLUE is not None else None
+            ORANGE = ORANGE_RAW if 'orange' not in EXISTING else None
+            BLUE = BLUE_RAW if 'blue' not in EXISTING else None
             _emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
 
             # Si rien de nouveau à apporter (les deux déjà présents, ou les deux OCR ratés) → skip.
