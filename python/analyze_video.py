@@ -1036,6 +1036,9 @@ def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = 
     BW = _color_isolated_bw(frame, BOX, colors)
     WHITELIST = '0123456789%'
     FILTER_PATTERN = re.compile(f'[^{re.escape(WHITELIST)}]')
+    # PSM 7 seul (single line) : suffit dans la quasi-totalité des cas avec
+    # le pré-masque couleur. Fallback PSM 8 (single word) seulement si PSM 7
+    # n'a rien retourné de valide → divise par 2 le coût scores en nominal.
     RESULTS = []
     for PSM in (7, 8):
         try:
@@ -1049,6 +1052,8 @@ def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = 
                 RESULTS.append(CHECKED)
         except Exception:
             pass
+        if RESULTS:
+            break
     V = None
     if RESULTS:
         try:
