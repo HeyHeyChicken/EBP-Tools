@@ -996,6 +996,25 @@ def _color_isolated_bw(frame: np.ndarray, box, colors: list, tol: int = 50) -> I
     return Image.fromarray(BW, mode='L').convert('RGB')
 
 
+def _ocr_timer_fast(frame: np.ndarray, box) -> str:
+    """
+    Fast-path timer OCR : 1 seule passe BW (luminance < 100) + PSM 7. Couvre la
+    quasi-totalité des frames in-game en 1 appel Tesseract au lieu des 4 du
+    `_ocr_region(apply_filter=True)`. L'appelant doit fallback sur `_ocr_region`
+    complet si le retour ne parse pas en (M, S).
+    """
+    IMG = _region_to_pil(frame, box[0][0], box[0][1], box[1][0], box[1][1])
+    BW = IMG.convert('L').point(lambda p: 255 if p < 100 else 0).convert('RGB')
+    try:
+        TEXT = pytesseract.image_to_string(
+            BW, lang='evadigits',
+            config='--psm 7 -c tessedit_char_whitelist=0123456789:',
+        ).replace('\r', '').replace('\n', '').strip()
+        return re.sub(r'[^0-9:]', '', TEXT)
+    except Exception:
+        return ''
+
+
 def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = None) -> int:
     """
     OCR un score in-game et retourne un int 0-100, ou None si invalide.
@@ -1136,13 +1155,9 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             #    résultats si inutiles. Coût : 2 OCR scores parfois gaspillés ;
             #    bénéfice : la latence wall-clock devient max(timer, score) au
             #    lieu de timer + score.
-            FUT_TIMER = EXECUTOR.submit(
-                _ocr_region,
-                FRAME,
-                TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
-                psm=7, whitelist='0123456789:',
-                luminance=100, apply_filter=True, lang='evadigits',
-            )
+            #    Le timer utilise un fast-path (1 call Tesseract) ; si parse KO,
+            #    fallback sur `_ocr_region` complet (4 calls) en séquentiel après.
+            FUT_TIMER = EXECUTOR.submit(_ocr_timer_fast, FRAME, TIMER_BOX)
             FUT_ORANGE = EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE)
             FUT_BLUE = EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE)
 
@@ -1155,6 +1170,16 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             BLUE_RAW = FUT_BLUE.result()
 
             MS = _parse_timer_text(TIMER_TEXT)
+            if MS is None:
+                # Fast-path KO : on tente le pipeline OCR complet sur le timer.
+                # Coût supplémentaire seulement sur les frames problématiques.
+                TIMER_TEXT = _ocr_region(
+                    FRAME,
+                    TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
+                    psm=7, whitelist='0123456789:',
+                    luminance=100, apply_filter=True, lang='evadigits',
+                )
+                MS = _parse_timer_text(TIMER_TEXT)
             if MS is None:
                 TIMESTAMP += 1.0
                 PROCESSED_SECONDS += 1
