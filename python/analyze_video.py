@@ -1130,10 +1130,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 continue
 
             # 1. Timer — valide la cohérence (M, S) du HUD.
+            #    PSM 7 seul (single line) : suffisant pour MM:SS, gain ~50% vs +PSM 8.
+            #    Si trop de timers ratés, ré-ajouter `extra_psms=[8]`.
             TIMER_TEXT = _ocr_region(
                 FRAME,
                 TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
-                psm=7, extra_psms=[8], whitelist='0123456789:',
+                psm=7, whitelist='0123456789:',
                 luminance=100, apply_filter=True, lang='evadigits',
             )
             MS = _parse_timer_text(TIMER_TEXT)
