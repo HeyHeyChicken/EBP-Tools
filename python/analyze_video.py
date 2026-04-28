@@ -11,6 +11,7 @@ import base64
 import time
 import numpy as np
 import cv2
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
@@ -1110,12 +1111,17 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     PROCESSED_SECONDS = 0
     LAST_PERCENT = -1
 
-    # Pool de 3 workers : timer + score orange + score blue, lancés en parallèle
-    # spéculatif sur la même frame. pytesseract spawn un sous-process Tesseract
-    # distinct par appel → le GIL ne bloque pas, la parallélisation est réelle.
-    # Pool persistant (vs créé par frame) pour éviter le coût de spawn/teardown
-    # de threads à chaque seconde de vidéo.
-    EXECUTOR = ThreadPoolExecutor(max_workers=3)
+    # Sizing adaptatif machine. WINDOW = nombre de frames in-flight ; chaque
+    # frame consomme jusqu'à 3 workers (timer + 2 scores). Sur 4 cœurs ou moins
+    # (laptop type client), WINDOW=1 et pool=3 → comportement strictement
+    # identique à l'avant-pipeline (pas de régression). Sur des machines plus
+    # grosses, WINDOW monte pour saturer les cœurs. Cap à 4 pour limiter la
+    # mémoire (chaque frame ≈ 6 MB) et le coût des forks Tesseract simultanés.
+    CPU = os.cpu_count() or 4
+    WINDOW = max(1, min(CPU // 4, 4))
+    MAX_WORKERS = max(3, WINDOW * 3)
+    EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+    _emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
 
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
@@ -1136,112 +1142,65 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         SAMPLES = {}   # {elapsed_s: {'orange': O, 'blue': B}}
         MAX_TIME = None   # auto-détecté à la première lecture timer valide
 
-        TIMESTAMP = float(START)
-        while TIMESTAMP <= END:
-            FRAME = _get_frame(CAP, TIMESTAMP)
-            if FRAME is None:
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
+        # Pipeline : on garde WINDOW frames en vol simultanées dans le pool.
+        # `_submit_frame` décode + lance les 3 OCR speculatif ; `_process_ocr_item`
+        # drain les futures (en ordre FIFO, critique pour MAX_TIME et la
+        # validation `_is_score_change_valid` qui dépendent de SAMPLES[ELAPSED-1]).
+        # Coût du speculative work amplifié : avec WINDOW=4, jusqu'à 12 OCR
+        # peuvent tourner en parallèle pour une frame qui sera finalement jetée.
+        # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
+        # comportement bit-pour-bit (cf. sizing plus haut).
+        def _submit_frame(ts):
+            FRAME = _get_frame(CAP, ts)
+            if FRAME is None or not _detect_game_playing(FRAME):
+                return ('skip', ts)
+            return ('ocr', ts, FRAME,
+                    EXECUTOR.submit(_ocr_timer_fast, FRAME, TIMER_BOX),
+                    EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE),
+                    EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE))
 
-            if not _detect_game_playing(FRAME):
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
-
-            # 1. Lancement spéculatif des 3 OCR en parallèle. On ne sait pas
-            #    encore si le timer parsera ni si l'ELAPSED résultant sera déjà
-            #    saturé : on soumet quand même les scores et on jette les
-            #    résultats si inutiles. Coût : 2 OCR scores parfois gaspillés ;
-            #    bénéfice : la latence wall-clock devient max(timer, score) au
-            #    lieu de timer + score.
-            #    Le timer utilise un fast-path (1 call Tesseract) ; si parse KO,
-            #    fallback sur `_ocr_region` complet (4 calls) en séquentiel après.
-            FUT_TIMER = EXECUTOR.submit(_ocr_timer_fast, FRAME, TIMER_BOX)
-            FUT_ORANGE = EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE)
-            FUT_BLUE = EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE)
-
-            # Drain des 3 futures dès maintenant : le travail est lancé en
-            #    parallèle, peu importe si on jette ensuite. Ça simplifie le
-            #    contrôle de flot (un seul point de récupération) et évite
-            #    d'orphaner des futures dans les branches d'invalidation.
-            TIMER_TEXT = FUT_TIMER.result()
-            ORANGE_RAW = FUT_ORANGE.result()
-            BLUE_RAW = FUT_BLUE.result()
+        def _process_ocr_item(item):
+            nonlocal MAX_TIME
+            _, _, frame, fut_timer, fut_orange, fut_blue = item
+            TIMER_TEXT = fut_timer.result()
+            ORANGE_RAW = fut_orange.result()
+            BLUE_RAW = fut_blue.result()
 
             MS = _parse_timer_text(TIMER_TEXT)
             if MS is None:
-                # Fast-path KO : on tente le pipeline OCR complet sur le timer.
-                # Coût supplémentaire seulement sur les frames problématiques.
+                # Fast-path KO : pipeline OCR complet (4 calls) en séquentiel.
                 TIMER_TEXT = _ocr_region(
-                    FRAME,
+                    frame,
                     TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
                     psm=7, whitelist='0123456789:',
                     luminance=100, apply_filter=True, lang='evadigits',
                 )
                 MS = _parse_timer_text(TIMER_TEXT)
             if MS is None:
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
+                return
             M, S = MS
-            # Bornes : S est toujours < 60. Pour M, on accepte ≤ 15 tant que
-            # MAX_TIME n'est pas connu (game ne dépasse pas raisonnablement
-            # 15 min). Une fois fixé, on rejette tout M > MAX_TIME.
             if not (0 <= S < 60):
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
+                return
             if MAX_TIME is None:
                 if not (0 <= M <= 15):
-                    TIMESTAMP += 1.0
-                    PROCESSED_SECONDS += 1
-                    continue
+                    return
                 REMAINING = M * 60 + S
                 if REMAINING <= 0:
-                    # Timer = 00:00 sur la première lecture → on est en fin
-                    # de game ou sur une frame aberrante. On skippe sans
-                    # fixer MAX_TIME et on retentera plus loin.
-                    TIMESTAMP += 1.0
-                    PROCESSED_SECONDS += 1
-                    continue
-                # ceil((M*60+S)/60) — round up vers la minute pleine
+                    return
                 MAX_TIME = -(-REMAINING // 60)
-                #_emit({'log': f'[_analyze_chunks] MAX TIME {MAX_TIME}'})
             elif M > MAX_TIME:
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
-
+                return
             ELAPSED = MAX_TIME * 60 - (M * 60 + S)
             if ELAPSED < 0:
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
-
-            # 2. Scores : pas d'offset HUD. Les anchors du playingFrame sont dans
-            #    des zones blanches étendues → centroïde bruité, on garde dx=dy=0.
-            #    First-OCR-wins par équipe : si une équipe a déjà sa valeur pour
-            #    cet ELAPSED (cas pause technique : même timer à plusieurs frames
-            #    successifs), on jette le résultat OCR de cette équipe.
+                return
             EXISTING = SAMPLES.get(ELAPSED, {})
             ORANGE = ORANGE_RAW if 'orange' not in EXISTING else None
             BLUE = BLUE_RAW if 'blue' not in EXISTING else None
             _emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
-
-            # Si rien de nouveau à apporter (les deux déjà présents, ou les deux OCR ratés) → skip.
             if ORANGE is None and BLUE is None:
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
-
-            # 3. Validation physique : monotonie + rate max (3 pt/s en EVA).
-            #    Filtre les OCR aberrants type 0→100 en 1s. Indépendante par équipe.
+                return
             if not _is_score_change_valid(SAMPLES, ELAPSED, ORANGE, BLUE):
-                TIMESTAMP += 1.0
-                PROCESSED_SECONDS += 1
-                continue
-
+                return
             MERGED = dict(EXISTING)
             if ORANGE is not None:
                 MERGED['orange'] = ORANGE
@@ -1250,8 +1209,25 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             SAMPLES[ELAPSED] = MERGED
             _emit({'log': f'[_analyze_chunks] sample @ t={ELAPSED}s → orange={MERGED.get("orange")} blue={MERGED.get("blue")}'})
 
+        TIMESTAMP = float(START)
+        INFLIGHT = deque()
+
+        # Remplissage initial de la fenêtre : on submit jusqu'à WINDOW frames
+        # avant de commencer à drainer.
+        while len(INFLIGHT) < WINDOW and TIMESTAMP <= END:
+            INFLIGHT.append(_submit_frame(TIMESTAMP))
             TIMESTAMP += 1.0
+
+        # Roulement : drain le plus vieux, refill par le plus jeune.
+        while INFLIGHT:
+            ITEM = INFLIGHT.popleft()
             PROCESSED_SECONDS += 1
+            if ITEM[0] == 'ocr':
+                _process_ocr_item(ITEM)
+
+            if TIMESTAMP <= END:
+                INFLIGHT.append(_submit_frame(TIMESTAMP))
+                TIMESTAMP += 1.0
 
             PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 0
             if PERCENT != LAST_PERCENT and PERCENT < 100:
