@@ -21,8 +21,14 @@ import pytesseract
 
 # Couleurs des équipes — partagées entre l'identify (matching pixel) et la
 # détection de bordure (find_text_border). Une seule source de vérité par couleur.
-TEAM_ORANGE = [(238, 120, 12)]
-TEAM_BLUE   = [(43, 137, 237)]
+TEAM_ORANGE = [
+    (238, 120, 12), # Orange
+    (40, 255, 119)  # Vert fluo
+]
+TEAM_BLUE   = [
+    (43, 137, 237), # Bleu
+    (180, 0, 244)  # Violet
+]
 
 MODES = [
     #region Mode 0
@@ -70,12 +76,22 @@ MODES = [
             'blueName': ((1121, 58), (1214, 97)),
             'timer': ((916, 50), (1004, 88)),
             'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
+            'orangeScore': {
+                'colors': TEAM_ORANGE,
+                'search': ((830, 65), (906, 107)),
+                'inset': -10,
+            },
+            'blueScore': {
+                'colors': TEAM_BLUE,
+                'search': ((1014, 65), (1095, 107)),
+                'inset': -10,
+            },
         },
         'playingFrame': {
             'identify': [
-                (1731, 811, [(238, 241, 238)]),    # top blanc
+                (1731, 811, [(238, 241, 238)]),  # top blanc
                 (1731, 990, [(238, 241, 238)]),  # bottom blanc
-                (1858, 813, [(48, 152, 254), (250, 129, 4)]),  # player color
+                (1858, 813, TEAM_ORANGE + TEAM_BLUE),  # player color
             ],
         },
         'loadingFrames': [
@@ -138,6 +154,10 @@ _MAPS = {
 
 WIDTH  = 1920
 HEIGHT = 1080
+
+# Vitesse max de progression du score en EVA : 3 points par seconde de hold.
+# Sert à filtrer les OCR aberrants en phase 2 (ex : score qui saute de 0 à 100).
+MAX_SCORE_RATE_PER_SECOND = 3
 
 # ---------------------------------------------------------------------------
 # Low-level helpers
@@ -493,16 +513,14 @@ def _detect_game_intro(frame: np.ndarray) -> bool:
     return False
 
 
-def _detect_game_playing(frame: np.ndarray):
+def _detect_game_playing(frame: np.ndarray) -> bool:
     """
-    Détecte un frame de jeu en cours.
-    Retourne (matched, dx, dy). dx/dy = décalage du HUD à appliquer aux régions OCR.
+    Détecte un frame de jeu en cours via les pixels d'identify du playingFrame.
     """
     for mode in MODES:
-        offset = _identify_offset(frame, mode['playingFrame']['identify'])
-        if offset is not None:
-            return (True, offset[0], offset[1])
-    return (False, 0.0, 0.0)
+        if _identify_offset(frame, mode['playingFrame']['identify']) is not None:
+            return True
+    return False
 
 # ---------------------------------------------------------------------------
 # Video utilities
@@ -744,7 +762,7 @@ def _analyze(
                 GAME_START = TIMESTAMP
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
-                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME)[0]:
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
                         GAME_START = PROBE
                         break
                     #_emit({'log': 's'})
@@ -765,7 +783,7 @@ def _analyze(
                 GAME_START = TIMESTAMP
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
-                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME)[0]:
+                    if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
                         GAME_START = PROBE
                         break
                     PROBE += 0.5
@@ -776,17 +794,10 @@ def _analyze(
 
         # ── Playing frame: OCR map / team names + timer jump ────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
-            PLAYING, _, _ = _detect_game_playing(FRAME)
-            if PLAYING:
+            if _detect_game_playing(FRAME):
                 FOUND = True
-                #_emit({'log': 'Playing frame found'})
+                _emit({'log': 'Playing frame found'})
 
-                # NOTE : on n'applique PAS d'offset HUD ici. Les pixels
-                # d'identify du playingFrame sont dans des zones blanches étendues
-                # (bandeau bas-droite) qui rendent le centroïde bruité ; et la map
-                # / les noms d'équipe en haut-centre ne sont pas corrélés au shift
-                # de cette zone. Si un jour tu veux corriger un drift en jeu,
-                # ajoute des anchors d'identify proches de chaque région OCR.
                 GF        = MODES[CURRENT['mode']]['gameFrame']
                 MAP_BOX   = GF['map']
                 ON_BOX    = GF['orangeName']
@@ -804,7 +815,7 @@ def _analyze(
                     if T:
                         MAP_NAME = _get_map_by_name(T)
                         if MAP_NAME:
-                            #_emit({'log': 'map name : ' + MAP_NAME})
+                            _emit({'log': 'map name : ' + MAP_NAME})
                             CURRENT['map'] = MAP_NAME
                             CURRENT['mapImage'] = _region_to_base64(
                                 FRAME,
@@ -896,6 +907,282 @@ def _analyze(
 
     _emit({'type': 'done'})
 
+#region Chunk analysis — phase 2 : score timeline indexée par le timer in-game
+
+def _parse_timer_text(timer_text: str):
+    """
+    Parse une chaîne timer ('MM:SS' ou 'MMSS' si Tesseract loupe le ':')
+    et retourne le tuple (M, S), ou None si non parsable.
+    Aucune validation de bornes — l'appelant valide selon son contexte
+    (en phase 2, la borne max dépend du max_time_per_game auto-détecté).
+    """
+    if not timer_text:
+        return None
+    PARTS = None
+    if len(timer_text) == 5 and ':' in timer_text:
+        PARTS = timer_text.split(':')
+    elif len(timer_text) == 4 and timer_text.isdigit():
+        PARTS = [timer_text[:2], timer_text[2:]]
+    if not PARTS or len(PARTS) != 2:
+        return None
+    try:
+        return (int(PARTS[0]), int(PARTS[1]))
+    except Exception:
+        return None
+
+
+def _is_score_change_valid(samples: dict, elapsed: int, orange, blue, max_rate: int = MAX_SCORE_RATE_PER_SECOND) -> bool:
+    """
+    Valide qu'insérer (orange, blue) à l'index `elapsed` respecte les invariants
+    physiques du score EVA. Validation indépendante par équipe (supporte les
+    samples partiels), `orange` ou `blue` peut être None.
+
+    Deux invariants :
+      1. Borne intrinsèque : score ≤ elapsed * max_rate
+         (depuis l'implicite score=0 à elapsed=0 : on ne peut gagner plus de
+         max_rate points par seconde de jeu).
+      2. Rate borné par rapport aux voisins :
+         - V passé (K < elapsed) : V ≤ new (monotonie) ET (new - V) ≤ Δt*max_rate
+         - V futur (K > elapsed) : new ≤ V (monotonie) ET (V - new) ≤ Δt*max_rate
+         Δt = abs(elapsed - K). Filtre les sauts violents même sans sample voisin.
+
+    `max_rate` : points/seconde max. Défaut = MAX_SCORE_RATE_PER_SECOND (=3 en EVA).
+    """
+    # 1. Borne intrinsèque depuis t=0
+    if orange is not None and orange > elapsed * max_rate:
+        return False
+    if blue is not None and blue > elapsed * max_rate:
+        return False
+    # 2. Rate borné vs samples voisins
+    for K, V in samples.items():
+        DT = abs(elapsed - K)
+        if K < elapsed:
+            if orange is not None and 'orange' in V:
+                if V['orange'] > orange or (orange - V['orange']) > DT * max_rate:
+                    return False
+            if blue is not None and 'blue' in V:
+                if V['blue'] > blue or (blue - V['blue']) > DT * max_rate:
+                    return False
+        elif K > elapsed:
+            if orange is not None and 'orange' in V:
+                if V['orange'] < orange or (V['orange'] - orange) > DT * max_rate:
+                    return False
+            if blue is not None and 'blue' in V:
+                if V['blue'] < blue or (V['blue'] - blue) > DT * max_rate:
+                    return False
+    return True
+
+
+def _ocr_score_at(frame: np.ndarray, box) -> int:
+    """OCR un score in-game et retourne un int 0-100, ou None si invalide."""
+    if box is None:
+        return None
+    T = _ocr_region(
+        frame,
+        box[0][0], box[0][1], box[1][0], box[1][1],
+        psm=7, extra_psms=[8], whitelist='0123456789%',
+        luminance=100, apply_filter=True, lang='evadigits',
+        checker=_score_checker,
+    )
+    if not T:
+        return None
+    try:
+        V = int(T)
+    except Exception:
+        return None
+    if 0 <= V <= 100:
+        return V
+    return None
+
+
+def _open_video(video_path: str):
+    """Ouvre la vidéo avec accélération hardware si disponible. Retourne None si KO."""
+    if sys.platform == 'darwin':
+        CAP = cv2.VideoCapture(video_path, cv2.CAP_AVFOUNDATION)
+    else:
+        CAP = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+        CAP.set(cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_D3D11)
+    if not CAP.isOpened():
+        CAP = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+    if not CAP.isOpened():
+        return None
+    return CAP
+
+
+def _analyze_chunks(video_path: str, settings: dict) -> None:
+    """
+    Phase 2 : analyse approfondie de chunks pré-identifiés. Pour chaque chunk,
+    on seek seconde par seconde sur [start, end], on OCR (timer, scoreOrange,
+    scoreBlue), on convertit le timer en temps écoulé in-game, puis on insère
+    dans samples[elapsed] si :
+      - le timer parse en (M, S) valide
+      - les deux scores parsent en int ∈ [0, 100]
+      - cette seconde de jeu n'a pas déjà été collectée (first OCR wins)
+      - l'insertion respecte la monotonie globale du dict
+
+    Auto-détection de la durée totale : la première lecture timer valide
+    fixe MAX_TIME du chunk via ceil((M*60+S)/60). Pas besoin de configurer
+    maxTimePerGame côté Site — le HUD dit la vérité (même heuristique que
+    le timer jump de la phase 1 : première lecture valide gagne).
+    """
+    CHUNKS = settings.get('chunks', []) or []
+    _emit({'log': f'[_analyze_chunks] {settings}'})
+
+    if not CHUNKS:
+        _emit({'percent': 100, 'results': []})
+        return
+
+    CAP = _open_video(video_path)
+    if CAP is None:
+        _emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
+        return
+
+    GENERATED_BY = 'analyze_video.py:chunks v1'
+
+    TOTAL_SECONDS = sum(max(0, int(c['endSeconds']) - int(c['startSeconds'])) for c in CHUNKS)
+    PROCESSED_SECONDS = 0
+    LAST_PERCENT = -1
+
+    for CHUNK in CHUNKS:
+        GAME_ID = CHUNK['gameID']
+        START = int(CHUNK['startSeconds'])
+        END = int(CHUNK['endSeconds'])
+        MODE_INDEX = int(CHUNK.get('mode', 0))
+
+        GF = MODES[MODE_INDEX]['gameFrame']
+        TIMER_BOX = GF['timer']
+        ORANGE_SCORE_SPEC = GF['orangeScore']
+        BLUE_SCORE_SPEC = GF['blueScore']
+
+        SAMPLES = {}   # {elapsed_s: {'orange': O, 'blue': B}}
+        MAX_TIME = None   # auto-détecté à la première lecture timer valide
+
+        TIMESTAMP = float(START)
+        while TIMESTAMP <= END:
+            FRAME = _get_frame(CAP, TIMESTAMP)
+            if FRAME is None:
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+
+            if not _detect_game_playing(FRAME):
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+
+            # 1. Timer — valide la cohérence (M, S) du HUD.
+            TIMER_TEXT = _ocr_region(
+                FRAME,
+                TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
+                psm=7, extra_psms=[8], whitelist='0123456789:',
+                luminance=100, apply_filter=True, lang='evadigits',
+            )
+            MS = _parse_timer_text(TIMER_TEXT)
+            if MS is None:
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+            M, S = MS
+            # Bornes : S est toujours < 60. Pour M, on accepte ≤ 15 tant que
+            # MAX_TIME n'est pas connu (game ne dépasse pas raisonnablement
+            # 15 min). Une fois fixé, on rejette tout M > MAX_TIME.
+            if not (0 <= S < 60):
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+            if MAX_TIME is None:
+                if not (0 <= M <= 15):
+                    TIMESTAMP += 1.0
+                    PROCESSED_SECONDS += 1
+                    continue
+                REMAINING = M * 60 + S
+                if REMAINING <= 0:
+                    # Timer = 00:00 sur la première lecture → on est en fin
+                    # de game ou sur une frame aberrante. On skippe sans
+                    # fixer MAX_TIME et on retentera plus loin.
+                    TIMESTAMP += 1.0
+                    PROCESSED_SECONDS += 1
+                    continue
+                # ceil((M*60+S)/60) — round up vers la minute pleine
+                MAX_TIME = -(-REMAINING // 60)
+                #_emit({'log': f'[_analyze_chunks] MAX TIME {MAX_TIME}'})
+            elif M > MAX_TIME:
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+
+            ELAPSED = MAX_TIME * 60 - (M * 60 + S)
+            if ELAPSED < 0:
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+
+            # 2. Scores : pas d'offset HUD. Les anchors du playingFrame sont dans
+            #    des zones blanches étendues → centroïde bruité, on garde dx=dy=0.
+            EXISTING = SAMPLES.get(ELAPSED, {})
+            # First-OCR-wins par équipe : si une équipe a déjà sa valeur pour ce
+            # timer, on ne ré-OCR pas (ni n'écrase) — on ne complète que ce qui manque.
+            ORANGE = None
+            if 'orange' not in EXISTING:
+                ORANGE = _ocr_score_at(FRAME, _resolve_region(ORANGE_SCORE_SPEC, FRAME))
+            BLUE = None
+            if 'blue' not in EXISTING:
+                BLUE = _ocr_score_at(FRAME, _resolve_region(BLUE_SCORE_SPEC, FRAME))
+            _emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
+
+            # Si rien de nouveau à apporter (les deux déjà présents, ou les deux OCR ratés) → skip.
+            if ORANGE is None and BLUE is None:
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+
+            # 3. Validation physique : monotonie + rate max (3 pt/s en EVA).
+            #    Filtre les OCR aberrants type 0→100 en 1s. Indépendante par équipe.
+            if not _is_score_change_valid(SAMPLES, ELAPSED, ORANGE, BLUE):
+                TIMESTAMP += 1.0
+                PROCESSED_SECONDS += 1
+                continue
+
+            MERGED = dict(EXISTING)
+            if ORANGE is not None:
+                MERGED['orange'] = ORANGE
+            if BLUE is not None:
+                MERGED['blue'] = BLUE
+            SAMPLES[ELAPSED] = MERGED
+            _emit({'log': f'[_analyze_chunks] sample @ t={ELAPSED}s → orange={MERGED.get("orange")} blue={MERGED.get("blue")}'})
+
+            TIMESTAMP += 1.0
+            PROCESSED_SECONDS += 1
+
+            PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 0
+            _emit({'log': f'[_analyze_chunks] PERCENT {PERCENT}'})
+            if PERCENT != LAST_PERCENT and PERCENT < 100:
+                _emit({'percent': PERCENT, 'results': []})
+                LAST_PERCENT = PERCENT
+
+        # Chunk done : on émet le résultat. JSON keys must be string → str(K).
+        # Sorted pour que l'ordre d'insertion JS corresponde au temps croissant
+        # (Object literal en JS itère les clés numériques string en ordre numérique
+        # de toute façon, mais on est explicite).
+        SCORE_TIMELINE = {str(K): SAMPLES[K] for K in sorted(SAMPLES.keys())}
+        CHUNK_PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 100
+        _emit({
+            'percent': CHUNK_PERCENT,
+            'results': [{
+                'gameID': GAME_ID,
+                'generated_by': GENERATED_BY,
+                'payload': {'score_timeline': SCORE_TIMELINE},
+            }],
+        })
+        LAST_PERCENT = CHUNK_PERCENT
+
+    CAP.release()
+
+    if LAST_PERCENT < 100:
+        _emit({'percent': 100, 'results': []})
+
+#endregion
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -948,19 +1235,38 @@ def _find_system_tesseract() -> str:
 def main() -> None:
     """
     Point d'entrée du binaire.
-    Arguments positionnels :
-      1  video_path    — chemin absolu vers la vidéo à analyser
-      2  ffmpeg_path   — chemin vers le binaire ffmpeg bundlé
-      3  tesseract_cmd — (optionnel) chemin vers le binaire Tesseract bundlé
-      4  settings_json — (optionnel) JSON avec orangeTeamName, blueTeamName, maxTimePerGame
-    Toutes les sorties sont des JSON lines sur stdout (progress / done / error).
+
+    Sous-commandes :
+      detect <video> <ffmpeg> [tess] [settings_json]
+        → phase 1 : détection inverse des games dans la vidéo.
+          settings : { orangeTeamName?, blueTeamName?, maxTimePerGame? }
+          stdout   : { type: 'progress'|'game'|'done'|'error', ... }
+      chunks <video> <ffmpeg> [tess] [settings_json]
+        → phase 2 : analyse approfondie des chunks pré-identifiés.
+          settings : { maxTimePerGame?, chunks: [{startSeconds, endSeconds, gameID, mode}] }
+          stdout   : { percent, results: [{gameID, generated_by, payload}] }
+
+    Rétro-compat : si argv[1] n'est pas une sous-commande connue, on assume
+    'detect' et on shift les arguments — l'invocation historique
+    `analyze_video <video> <ffmpeg> ...` continue de marcher.
     """
-    if len(sys.argv) < 3:
-        _emit({'type': 'error', 'message': 'Usage: analyze_video <video_path> <ffmpeg_path> [tesseract_cmd] [settings_json]'})
+    if len(sys.argv) < 2:
+        _emit({'type': 'error', 'message': 'Usage: analyze_video <detect|chunks> <video_path> <ffmpeg_path> [tesseract_cmd] [settings_json]'})
         sys.exit(1)
 
-    VIDEO_PATH  = sys.argv[1]
-    FFMPEG_PATH = sys.argv[2]
+    if sys.argv[1] in ('detect', 'chunks'):
+        SUBCOMMAND = sys.argv[1]
+        OFFSET = 2
+    else:
+        SUBCOMMAND = 'detect'
+        OFFSET = 1
+
+    if len(sys.argv) < OFFSET + 2:
+        _emit({'type': 'error', 'message': 'Usage: analyze_video <detect|chunks> <video_path> <ffmpeg_path> [tesseract_cmd] [settings_json]'})
+        sys.exit(1)
+
+    VIDEO_PATH  = sys.argv[OFFSET]
+    FFMPEG_PATH = sys.argv[OFFSET + 1]
 
     # Pointe TESSDATA_PREFIX vers le tessdata bundlé (eng + evadigits) si présent.
     # Fait avant le choix du binaire car ça s'applique aussi au tesseract système
@@ -974,7 +1280,7 @@ def main() -> None:
         if BUNDLED_HAS_REQUIRED:
             os.environ['TESSDATA_PREFIX'] = BUNDLED_TESSDATA
 
-    TESSERACT_CMD = sys.argv[3] if len(sys.argv) > 3 else ''
+    TESSERACT_CMD = sys.argv[OFFSET + 2] if len(sys.argv) > OFFSET + 2 else ''
     if not TESSERACT_CMD:
         TESSERACT_CMD = _get_bundled_tesseract()
     # Si le binaire bundlé est tué par macOS (signature ad-hoc + hardened runtime
@@ -988,22 +1294,28 @@ def main() -> None:
         pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 
     SETTINGS: dict = {}
-    if len(sys.argv) > 4:
+    if len(sys.argv) > OFFSET + 3:
         try:
-            SETTINGS = json.loads(sys.argv[4])
+            SETTINGS = json.loads(sys.argv[OFFSET + 3])
         except Exception:
             pass
 
-    ORANGE   = SETTINGS.get('orangeTeamName', '').strip()
-    BLUE     = SETTINGS.get('blueTeamName', '').strip()
-    MAX_TIME = int(SETTINGS.get('maxTimePerGame', 10))
-
     START = time.time()
-    try:
-        _analyze(VIDEO_PATH, FFMPEG_PATH, ORANGE, BLUE, MAX_TIME)
-    except Exception as EXC:
-        _emit({'type': 'error', 'message': str(EXC)})
-        sys.exit(1)
+    if SUBCOMMAND == 'detect':
+        ORANGE   = SETTINGS.get('orangeTeamName', '').strip()
+        BLUE     = SETTINGS.get('blueTeamName', '').strip()
+        MAX_TIME = int(SETTINGS.get('maxTimePerGame', 10))
+        try:
+            _analyze(VIDEO_PATH, FFMPEG_PATH, ORANGE, BLUE, MAX_TIME)
+        except Exception as EXC:
+            _emit({'type': 'error', 'message': str(EXC)})
+            sys.exit(1)
+    else:
+        try:
+            _analyze_chunks(VIDEO_PATH, SETTINGS)
+        except Exception as EXC:
+            _emit({'percent': 0, 'results': [], 'error': str(EXC)})
+            sys.exit(1)
     ELAPSED = int(time.time() - START)
     #_emit({'log': f'Durée : {ELAPSED // 60:02d}:{ELAPSED % 60:02d}'})
 

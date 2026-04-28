@@ -479,9 +479,24 @@ if (!APP_GOT_THE_LOCK) {
             case 'analyzeVideoFile':
                 const FILES_PATHS = await openFiles(data.filesExtensions);
                 if (FILES_PATHS.length == 1) {
+                    socketEmit(data.socket, 'analyzeVideoFileGames', {
+                        type: 'video_path',
+                        value: FILES_PATHS[0]
+                    });
+
                     runAnalyzer(FILES_PATHS[0], data.socket);
                 }
 
+                StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                break;
+            case 'analyzeChunks':
+                if (
+                    data.videoPath &&
+                    Array.isArray(data.chunks) &&
+                    data.chunks.length > 0
+                ) {
+                    runChunkAnalyzer(data.videoPath, data.socket, data.chunks);
+                }
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
             case 'clean_puppeteer_data':
@@ -757,7 +772,7 @@ if (!APP_GOT_THE_LOCK) {
         createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
 
         return new Promise((resolve, reject) => {
-            const ARGS = [videoPath, FFMPEG_PATH, '', '{}'];
+            const ARGS = ['detect', videoPath, FFMPEG_PATH, '', '{}'];
             const SPAWN_OPTIONS = {
                 stdio: ['ignore', 'pipe', 'pipe'],
                 cwd: path.dirname(ANALYZER_PATH),
@@ -847,6 +862,121 @@ if (!APP_GOT_THE_LOCK) {
 
             ANALYZER.on('error', (err) => {
                 const MSG = { type: 'error', message: err.message };
+                getMainWindow().webContents.send('analyzer-update', MSG);
+                reject(err);
+            });
+        });
+    }
+
+    /**
+     * Phase 2 : analyse approfondie de chunks pré-identifiés (timer + scores in-game).
+     * Stream les events JSON-lines du binaire Python sur le socket
+     * `analyzeVideoFileChunkAnalysis` du front. Le payload émis a la forme
+     * { percent, results: [{ gameID, generated_by, payload }] }.
+     * @param {string} videoPath Chemin absolu vers la vidéo (déjà choisi en phase 1, propagé par le front).
+     * @param {string} socket    Socket ID du front qui doit recevoir les events.
+     * @param {Array}  chunks    [{startSeconds, endSeconds, gameID, mode}] — segments à analyser.
+     */
+    function runChunkAnalyzer(videoPath, socket, chunks) {
+        const NOTIFICATION_DATA = {
+            percent: 0,
+            leftRounded: true,
+            infinite: true,
+            icon: 'fa-sharp fa-solid fa-clapperboard-play',
+            text: '.view.replay_cutter.videoStartsItsAnalysis',
+            state: 'info'
+        };
+        createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+
+        return new Promise((resolve, reject) => {
+            const SETTINGS_JSON = JSON.stringify({ chunks: chunks });
+            const ARGS = ['chunks', videoPath, FFMPEG_PATH, '', SETTINGS_JSON];
+            const SPAWN_OPTIONS = {
+                stdio: ['ignore', 'pipe', 'pipe'],
+                cwd: path.dirname(ANALYZER_PATH),
+                windowsHide: true
+            };
+            const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            let BUFFER = '';
+            const LINE_QUEUE = [];
+            let SCHEDULED = false;
+            let RESOLVED = false;
+
+            const processQueue = () => {
+                SCHEDULED = false;
+                const WINDOW = getMainWindow();
+                let percent = 0;
+                while (LINE_QUEUE.length > 0) {
+                    const LINE = LINE_QUEUE.shift();
+                    if (!LINE.trim()) continue;
+                    try {
+                        const MSG = JSON.parse(LINE);
+
+                        socketEmit(
+                            socket,
+                            'analyzeVideoFileChunkAnalysis',
+                            MSG
+                        );
+                        console.log(MSG);
+
+                        if (typeof MSG.percent === 'number') {
+                            percent = MSG.percent;
+                        }
+                        if (WINDOW && !WINDOW.isDestroyed()) {
+                            WINDOW.webContents.send('analyzer-update', MSG);
+                            WINDOW.webContents.send('set-notification-data', {
+                                ...NOTIFICATION_DATA,
+                                ...{
+                                    infinite: false,
+                                    percent: percent,
+                                    icon: undefined,
+                                    text: '.view.replay_cutter.videoStartsItsAnalysis'
+                                }
+                            });
+                        }
+                        if ((MSG.error || percent >= 100) && !RESOLVED) {
+                            RESOLVED = true;
+                            resolve(MSG);
+                        }
+                    } catch (_) {}
+                }
+            };
+
+            ANALYZER.stdout.on('data', (data) => {
+                BUFFER += data.toString();
+                const LINES = BUFFER.split('\n');
+                BUFFER = LINES.pop();
+                for (const LINE of LINES) {
+                    LINE_QUEUE.push(LINE);
+                }
+                if (LINE_QUEUE.length > 0 && !SCHEDULED) {
+                    SCHEDULED = true;
+                    setImmediate(processQueue);
+                }
+            });
+
+            ANALYZER.stderr.on('data', (data) => {
+                console.error('[chunk-analyzer stderr]', data.toString());
+            });
+
+            ANALYZER.on('close', (code) => {
+                if (BUFFER.trim()) {
+                    LINE_QUEUE.push(BUFFER.trim());
+                    if (!SCHEDULED) {
+                        SCHEDULED = true;
+                        setImmediate(processQueue);
+                    }
+                }
+                setImmediate(() => {
+                    if (!RESOLVED) {
+                        RESOLVED = true;
+                        resolve({ type: 'close', code });
+                    }
+                });
+            });
+
+            ANALYZER.on('error', (err) => {
+                const MSG = { error: err.message };
                 getMainWindow().webContents.send('analyzer-update', MSG);
                 reject(err);
             });
