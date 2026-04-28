@@ -11,6 +11,7 @@ import base64
 import time
 import numpy as np
 import cv2
+from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
 
@@ -1090,6 +1091,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     PROCESSED_SECONDS = 0
     LAST_PERCENT = -1
 
+    # Pool de 2 workers : un pour l'OCR orange, un pour l'OCR blue. pytesseract
+    # spawn un sous-process Tesseract distinct par appel → le GIL ne bloque pas,
+    # la parallélisation est réelle. Pool persistant (vs créé par frame) pour
+    # éviter le coût de spawn/teardown de threads à chaque seconde de vidéo.
+    EXECUTOR = ThreadPoolExecutor(max_workers=2)
+
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
         START = int(CHUNK['startSeconds'])
@@ -1174,12 +1181,14 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             EXISTING = SAMPLES.get(ELAPSED, {})
             # First-OCR-wins par équipe : si une équipe a déjà sa valeur pour ce
             # timer, on ne ré-OCR pas (ni n'écrase) — on ne complète que ce qui manque.
-            ORANGE = None
-            if 'orange' not in EXISTING:
-                ORANGE = _ocr_score_at(FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE)
-            BLUE = None
-            if 'blue' not in EXISTING:
-                BLUE = _ocr_score_at(FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE)
+            # Les deux OCR sont parallélisés via le ThreadPool (chaque pytesseract
+            # spawn un sous-process Tesseract distinct, GIL transparent).
+            NEED_ORANGE = 'orange' not in EXISTING
+            NEED_BLUE = 'blue' not in EXISTING
+            FUT_ORANGE = EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE) if NEED_ORANGE else None
+            FUT_BLUE = EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE) if NEED_BLUE else None
+            ORANGE = FUT_ORANGE.result() if FUT_ORANGE is not None else None
+            BLUE = FUT_BLUE.result() if FUT_BLUE is not None else None
             _emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
 
             # Si rien de nouveau à apporter (les deux déjà présents, ou les deux OCR ratés) → skip.
@@ -1227,6 +1236,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         })
         LAST_PERCENT = CHUNK_PERCENT
 
+    EXECUTOR.shutdown()
     CAP.release()
 
     if LAST_PERCENT < 100:
