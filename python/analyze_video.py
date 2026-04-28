@@ -155,9 +155,9 @@ _MAPS = {
 WIDTH  = 1920
 HEIGHT = 1080
 
-# Vitesse max de progression du score en EVA : 3 points par seconde de hold.
+# Vitesse max de progression du score en EVA : 2 points par seconde de hold.
 # Sert à filtrer les OCR aberrants en phase 2 (ex : score qui saute de 0 à 100).
-MAX_SCORE_RATE_PER_SECOND = 3
+MAX_SCORE_RATE_PER_SECOND = 2
 
 # ---------------------------------------------------------------------------
 # Low-level helpers
@@ -260,6 +260,7 @@ def _ocr_region(
     whitelist: str = '',
     luminance: int = None,
     apply_filter: bool = False,
+    include_raw: bool = True,
     checker=None,
     lang: str = 'eng',
     debug_save_bw: str = '',
@@ -271,6 +272,8 @@ def _ocr_region(
 
     extra_psms : liste optionnelle de PSMs supplémentaires à essayer en plus de psm.
                  Utile pour les scores où PSM 8 (single word) complète PSM 7 (single line).
+    include_raw : si False, skip la passe sur l'image brute (utile quand un modèle
+                  custom comme evadigits a été entraîné uniquement sur du N&B).
     checker : fonction optionnelle appliquée à chaque résultat avant le vote (ex. _score_checker).
     """
     img = _region_to_pil(frame, x1, y1, x2, y2)
@@ -300,7 +303,7 @@ def _ocr_region(
                 out.append('')
         return out
 
-    results = list(_recognize(img))
+    results = list(_recognize(img)) if include_raw else []
     BW = None
 
     if luminance is not None:
@@ -973,26 +976,70 @@ def _is_score_change_valid(samples: dict, elapsed: int, orange, blue, max_rate: 
     return True
 
 
-def _ocr_score_at(frame: np.ndarray, box) -> int:
-    """OCR un score in-game et retourne un int 0-100, ou None si invalide."""
-    if box is None:
+def _color_isolated_bw(frame: np.ndarray, box, colors: list, tol: int = 50) -> Image.Image:
+    """
+    Crée une image PIL N&B isolant les pixels matchant `colors` dans la région `box`
+    du frame. Pixels matchants → noir (texte), tout le reste → blanc (fond).
+    Élimine les ombres, fonds et artefacts qui parasitent un seuil de luminance
+    générique. La signature visuelle d'un score EVA, c'est sa couleur d'équipe.
+    """
+    X1, Y1 = int(box[0][0]), int(box[0][1])
+    X2, Y2 = int(box[1][0]), int(box[1][1])
+    REGION = frame[Y1:Y2, X1:X2].astype(np.int16)
+    MASK = np.zeros(REGION.shape[:2], dtype=bool)
+    for C in colors:
+        TARGET = np.array(C, dtype=np.int16)
+        MASK |= (np.abs(REGION - TARGET) <= tol).all(axis=2)
+    BW = np.full(REGION.shape[:2], 255, dtype=np.uint8)
+    BW[MASK] = 0
+    return Image.fromarray(BW, mode='L').convert('RGB')
+
+
+def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = None) -> int:
+    """
+    OCR un score in-game et retourne un int 0-100, ou None si invalide.
+    Pré-traitement par masque couleur : seuls les pixels matchant `colors` sont
+    rendus noirs, le reste blanc. Élimine les artefacts.
+    `max_score` (optionnel) : borne supérieure connue (score final de la game).
+    Tout résultat OCR > max_score est traité comme hallucination → None.
+
+    DEBUG : tout cas qui retourne None dump une image dans ~/Downloads/train pour
+    inspection. Préfixe de fichier distinct selon la cause :
+      - score_nobox_*  : pas assez de pixels colorés détectés (bbox introuvable)
+      - score_fail_*   : OCR n'a rien retourné de valide
+      - score_max_*    : OCR a retourné une valeur > max_score (hallucination)
+    """
+    BOX = _resolve_region(spec, frame)
+    if BOX is None:
         return None
-    T = _ocr_region(
-        frame,
-        box[0][0], box[0][1], box[1][0], box[1][1],
-        psm=7, extra_psms=[8], whitelist='0123456789%',
-        luminance=100, apply_filter=True, lang='evadigits',
-        checker=_score_checker,
-    )
-    if not T:
-        return None
-    try:
-        V = int(T)
-    except Exception:
-        return None
-    if 0 <= V <= 100:
-        return V
-    return None
+    BW = _color_isolated_bw(frame, BOX, colors)
+    WHITELIST = '0123456789%'
+    FILTER_PATTERN = re.compile(f'[^{re.escape(WHITELIST)}]')
+    RESULTS = []
+    for PSM in (7, 8):
+        try:
+            TEXT = pytesseract.image_to_string(
+                BW, lang='evadigits',
+                config=f'--psm {PSM} -c tessedit_char_whitelist={WHITELIST}',
+            ).replace('\r', '').replace('\n', '').strip()
+            TEXT = FILTER_PATTERN.sub('', TEXT)
+            CHECKED = _score_checker(TEXT)
+            if CHECKED:
+                RESULTS.append(CHECKED)
+        except Exception:
+            pass
+    V = None
+    if RESULTS:
+        try:
+            CANDIDATE = int(_most_frequent(RESULTS))
+            if 0 <= CANDIDATE <= 100:
+                V = CANDIDATE
+        except Exception:
+            pass
+    REJECTED_BY_MAX = (V is not None and max_score is not None and V > max_score)
+    if REJECTED_BY_MAX:
+        V = None
+    return V
 
 
 def _open_video(video_path: str):
@@ -1048,6 +1095,11 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         START = int(CHUNK['startSeconds'])
         END = int(CHUNK['endSeconds'])
         MODE_INDEX = int(CHUNK.get('mode', 0))
+        # Bornes supérieures : score final connu de la game (issu du scoreFrame
+        # détecté en phase 1). Un OCR in-game ne peut PHYSIQUEMENT pas dépasser
+        # le score final — sinon c'est une hallucination.
+        MAX_ORANGE = CHUNK.get('orangeScore')
+        MAX_BLUE = CHUNK.get('blueScore')
 
         GF = MODES[MODE_INDEX]['gameFrame']
         TIMER_BOX = GF['timer']
@@ -1124,10 +1176,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # timer, on ne ré-OCR pas (ni n'écrase) — on ne complète que ce qui manque.
             ORANGE = None
             if 'orange' not in EXISTING:
-                ORANGE = _ocr_score_at(FRAME, _resolve_region(ORANGE_SCORE_SPEC, FRAME))
+                ORANGE = _ocr_score_at(FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE)
             BLUE = None
             if 'blue' not in EXISTING:
-                BLUE = _ocr_score_at(FRAME, _resolve_region(BLUE_SCORE_SPEC, FRAME))
+                BLUE = _ocr_score_at(FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE)
             _emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
 
             # Si rien de nouveau à apporter (les deux déjà présents, ou les deux OCR ratés) → skip.
@@ -1155,7 +1207,6 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             PROCESSED_SECONDS += 1
 
             PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 0
-            _emit({'log': f'[_analyze_chunks] PERCENT {PERCENT}'})
             if PERCENT != LAST_PERCENT and PERCENT < 100:
                 _emit({'percent': PERCENT, 'results': []})
                 LAST_PERCENT = PERCENT
@@ -1317,7 +1368,7 @@ def main() -> None:
             _emit({'percent': 0, 'results': [], 'error': str(EXC)})
             sys.exit(1)
     ELAPSED = int(time.time() - START)
-    #_emit({'log': f'Durée : {ELAPSED // 60:02d}:{ELAPSED % 60:02d}'})
+    _emit({'log': f'[{SUBCOMMAND}] done in {ELAPSED // 60:02d}:{ELAPSED % 60:02d}'})
 
 
 if __name__ == '__main__':
