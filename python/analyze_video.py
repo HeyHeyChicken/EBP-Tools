@@ -68,7 +68,7 @@ MODES = [
             'map': ((845, 124), (1072, 159)),
             'orangeName': ((704, 58), (796, 97)),
             'blueName': ((1121, 58), (1214, 97)),
-            'timer': ((920, 53), (1000, 77)),
+            'timer': ((916, 50), (1004, 88)),
             'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
         },
         'playingFrame': {
@@ -131,7 +131,7 @@ _MAPS = {
     'Outlaw': ['outlaw', 'qutlaw'],
     'Polaris': ['polaris'],
     'Silva': ['silva'],
-    'The Cliff': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt'],
+    'The Cliff': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt', 'theclife', 'the clife', 'theclifen'],
     'The Rock': ['rock', 'therock'],
     'Horizon': ['horizon'],
 }
@@ -242,6 +242,7 @@ def _ocr_region(
     apply_filter: bool = False,
     checker=None,
     lang: str = 'eng',
+    debug_save_bw: str = '',
 ) -> str:
     """
     Lance Tesseract sur la région (x1, y1)→(x2, y2) du frame avec plusieurs passes
@@ -285,6 +286,12 @@ def _ocr_region(
     if luminance is not None:
         BW = img.convert('L').point(lambda p: 255 if p < luminance else 0).convert('RGB')
         results.extend(_recognize(BW))
+        if debug_save_bw:
+            try:
+                STAMP = int(time.time() * 1000)
+                BW.save(os.path.expanduser(f'~/Downloads/{debug_save_bw}_{STAMP}.png'))
+            except Exception:
+                pass
 
     F1 = F2 = None
     if apply_filter:
@@ -840,12 +847,20 @@ def _analyze(
                     TIMER = _ocr_region(
                         FRAME,
                         TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
-                        psm=7, whitelist='0123456789:',
+                        psm=7, extra_psms=[8], whitelist='0123456789:',
+                        luminance=100, apply_filter=True, lang='evadigits',
+                        #debug_save_bw='timer_',
                     )
                     if TIMER:
                         #_emit({'log': 'timer : ' + TIMER})
-                        PARTS = TIMER.split(':')
-                        if len(PARTS) == 2:
+                        # Tesseract loupe parfois le ":" → "0205" au lieu de "02:05".
+                        # On accepte 4 ou 5 caractères et on reconstruit MM:SS.
+                        PARTS = None
+                        if len(TIMER) == 5 and ':' in TIMER:
+                            PARTS = TIMER.split(':')
+                        elif len(TIMER) == 4 and TIMER.isdigit():
+                            PARTS = [TIMER[:2], TIMER[2:]]
+                        if PARTS and len(PARTS) == 2:
                             try:
                                 M, S = int(PARTS[0]), int(PARTS[1])
                                 # Sanity-check OCR : un timer valide a M ∈ [0, max_time_per_game]

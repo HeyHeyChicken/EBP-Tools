@@ -9,6 +9,7 @@ export interface Message {
   infinite: boolean;
   icon: string | undefined;
   text: string;
+  textParams?: Record<string, unknown>;
   leftRounded: boolean;
   state: 'info' | 'success' | 'error';
 

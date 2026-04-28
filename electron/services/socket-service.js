@@ -26,11 +26,13 @@ SOCKET.on('connect_error', (err) => {
 });
 
 function emit(sessionID, path, value) {
-    SOCKET.emit('tools_to_client', {
-        sessionID: sessionID,
-        path: path,
-        value: value
-    });
+    if (sessionID) {
+        SOCKET.emit('tools_to_client', {
+            sessionID: sessionID,
+            path: path,
+            value: value
+        });
+    }
 }
 
 module.exports = emit;

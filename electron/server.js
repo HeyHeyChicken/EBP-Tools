@@ -477,15 +477,9 @@ if (!APP_GOT_THE_LOCK) {
                 }
                 break;
             case 'analyzeVideoFile':
-                console.log(data.socket);
                 const FILES_PATHS = await openFiles(data.filesExtensions);
                 if (FILES_PATHS.length == 1) {
-                    getMainWindow().webContents.send(
-                        'analyze-video-file',
-                        data.socket,
-                        FILES_PATHS[0],
-                        true
-                    );
+                    runAnalyzer(FILES_PATHS[0], data.socket);
                 }
 
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
@@ -749,6 +743,114 @@ if (!APP_GOT_THE_LOCK) {
 
         REQUEST.write(REQUEST_BODY);
         REQUEST.end();
+    }
+
+    function runAnalyzer(videoPath, socket) {
+        const NOTIFICATION_DATA = {
+            percent: 0,
+            leftRounded: true,
+            infinite: true,
+            icon: 'fa-sharp fa-solid fa-clapperboard-play',
+            text: '.view.replay_cutter.videoStartsItsAnalysis',
+            state: 'info'
+        };
+        createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+
+        return new Promise((resolve, reject) => {
+            const ARGS = [videoPath, FFMPEG_PATH, '', '{}'];
+            const SPAWN_OPTIONS = {
+                stdio: ['ignore', 'pipe', 'pipe'],
+                cwd: path.dirname(ANALYZER_PATH),
+                windowsHide: true
+            };
+            const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            let BUFFER = '';
+            const LINE_QUEUE = [];
+            let SCHEDULED = false;
+            let RESOLVED = false;
+
+            const processQueue = () => {
+                SCHEDULED = false;
+                const WINDOW = getMainWindow();
+                let percent = 0;
+                let nbGames = 0;
+                while (LINE_QUEUE.length > 0) {
+                    const LINE = LINE_QUEUE.shift();
+                    if (!LINE.trim()) continue;
+                    try {
+                        const MSG = JSON.parse(LINE);
+
+                        socketEmit(socket, 'analyzeVideoFileGames', MSG);
+
+                        if (MSG.percent) {
+                            percent = MSG.percent;
+                        }
+                        if (MSG.nbGames) {
+                            nbGames = MSG.nbGames;
+                        }
+                        if (WINDOW && !WINDOW.isDestroyed()) {
+                            WINDOW.webContents.send('analyzer-update', MSG);
+                            WINDOW.webContents.send('set-notification-data', {
+                                ...NOTIFICATION_DATA,
+                                ...{
+                                    infinite: percent == 100,
+                                    percent: percent,
+                                    icon: undefined,
+                                    text: '.view.replay_cutter.videoIsBeingAnalyzed',
+                                    textParams: { games: nbGames }
+                                }
+                            });
+                        }
+                        if (
+                            (MSG.type === 'done' || MSG.type === 'error') &&
+                            !RESOLVED
+                        ) {
+                            RESOLVED = true;
+                            resolve(MSG);
+                        }
+                    } catch (_) {}
+                }
+            };
+
+            ANALYZER.stdout.on('data', (data) => {
+                BUFFER += data.toString();
+                const LINES = BUFFER.split('\n');
+                BUFFER = LINES.pop();
+                for (const LINE of LINES) {
+                    LINE_QUEUE.push(LINE);
+                }
+                if (LINE_QUEUE.length > 0 && !SCHEDULED) {
+                    SCHEDULED = true;
+                    setImmediate(processQueue);
+                }
+            });
+
+            ANALYZER.stderr.on('data', (data) => {
+                console.error('[analyzer stderr]', data.toString());
+            });
+
+            ANALYZER.on('close', (code) => {
+                if (BUFFER.trim()) {
+                    LINE_QUEUE.push(BUFFER.trim());
+                    if (!SCHEDULED) {
+                        SCHEDULED = true;
+                        setImmediate(processQueue);
+                    }
+                }
+                setImmediate(() => {
+                    if (!RESOLVED) {
+                        RESOLVED = true;
+                        resolve({ type: 'close', code });
+                    }
+                });
+            });
+
+            ANALYZER.on('error', (err) => {
+                const MSG = { type: 'error', message: err.message };
+                getMainWindow().webContents.send('analyzer-update', MSG);
+                reject(err);
+            });
+        });
     }
 
     /**
@@ -1227,90 +1329,7 @@ if (!APP_GOT_THE_LOCK) {
 
         // The front-end asks the server to run the Python video analyzer.
         ipcMain.handle('run-analyzer', (event, videoPath, settingsJSON) => {
-            const NOTIFICATION_DATA = {
-                percent: 0,
-                leftRounded: true,
-                infinite: true,
-                icon: 'fa-sharp fa-solid fa-clapperboard-play',
-                text: '.view.replay_cutter.videoStartsItsAnalysis',
-                state: 'info'
-            };
-            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
-
-            return new Promise((resolve, reject) => {
-                const ARGS = [videoPath, FFMPEG_PATH, '', settingsJSON || '{}'];
-                const SPAWN_OPTIONS = {
-                    stdio: ['ignore', 'pipe', 'pipe'],
-                    cwd: path.dirname(ANALYZER_PATH),
-                    windowsHide: true
-                };
-                const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
-                let BUFFER = '';
-                const LINE_QUEUE = [];
-                let SCHEDULED = false;
-                let RESOLVED = false;
-
-                const processQueue = () => {
-                    SCHEDULED = false;
-                    const WINDOW = getMainWindow();
-                    while (LINE_QUEUE.length > 0) {
-                        const LINE = LINE_QUEUE.shift();
-                        if (!LINE.trim()) continue;
-                        try {
-                            const MSG = JSON.parse(LINE);
-                            if (WINDOW && !WINDOW.isDestroyed()) {
-                                WINDOW.webContents.send('analyzer-update', MSG);
-                            }
-                            if (
-                                (MSG.type === 'done' || MSG.type === 'error') &&
-                                !RESOLVED
-                            ) {
-                                RESOLVED = true;
-                                resolve(MSG);
-                            }
-                        } catch (_) {}
-                    }
-                };
-
-                ANALYZER.stdout.on('data', (data) => {
-                    BUFFER += data.toString();
-                    const LINES = BUFFER.split('\n');
-                    BUFFER = LINES.pop();
-                    for (const LINE of LINES) {
-                        LINE_QUEUE.push(LINE);
-                    }
-                    if (LINE_QUEUE.length > 0 && !SCHEDULED) {
-                        SCHEDULED = true;
-                        setImmediate(processQueue);
-                    }
-                });
-
-                ANALYZER.stderr.on('data', (data) => {
-                    console.error('[analyzer stderr]', data.toString());
-                });
-
-                ANALYZER.on('close', (code) => {
-                    if (BUFFER.trim()) {
-                        LINE_QUEUE.push(BUFFER.trim());
-                        if (!SCHEDULED) {
-                            SCHEDULED = true;
-                            setImmediate(processQueue);
-                        }
-                    }
-                    setImmediate(() => {
-                        if (!RESOLVED) {
-                            RESOLVED = true;
-                            resolve({ type: 'close', code });
-                        }
-                    });
-                });
-
-                ANALYZER.on('error', (err) => {
-                    const MSG = { type: 'error', message: err.message };
-                    getMainWindow().webContents.send('analyzer-update', MSG);
-                    reject(err);
-                });
-            });
+            runAnalyzer(videoPath);
         });
 
         // The front-end asks the server to enables/disables debug mode.

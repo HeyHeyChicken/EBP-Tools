@@ -14,7 +14,10 @@ See LICENSE for terms. Unauthorized use is prohibited.
       ></ebp-loader>
     </div>
     @if (data.text.startsWith('.')) {
-      <ebp-message [state]="data.state" [html]="data.text.slice(1) | translate">
+      <ebp-message
+        [state]="data.state"
+        [html]="data.text.slice(1) | translate: data.textParams"
+      >
       </ebp-message>
     } @else {
       <ebp-message [state]="data.state" [html]="data.text"> </ebp-message>
