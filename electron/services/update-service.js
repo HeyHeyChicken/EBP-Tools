@@ -8,7 +8,7 @@ const https = require('https');
 const fs = require('fs');
 const os = require('os');
 const { version } = require('../../package.json');
-const { app } = require('electron');
+const { app, dialog } = require('electron');
 const path = require('node:path');
 const { spawn } = require('child_process');
 const {
@@ -36,7 +36,7 @@ class UpdateService {
      */
     autoUpdate(invisible) {
         if (!IS_DEV_MODE && !this.localVersion.startsWith('0')) {
-            this.getProjectLatestVersion(() => {
+            this.getProjectLatestVersion(async () => {
                 if (this.githubVersion) {
                     if (this.githubVersion != this.localVersion) {
                         let githubFileName = '';
@@ -63,6 +63,21 @@ class UpdateService {
                         }
 
                         if (githubFileName && localFileName) {
+                            const { response } = await dialog.showMessageBox(
+                                getMainWindow(),
+                                {
+                                    type: 'question',
+                                    buttons: ['Update', 'Later'],
+                                    defaultId: 0,
+                                    cancelId: 1,
+                                    title: 'Update available',
+                                    message: `A new version (${this.githubVersion}) is available. Do you want to install it now?`
+                                }
+                            );
+                            if (response !== 0) {
+                                return;
+                            }
+
                             getMainWindow().webContents.send(
                                 'global-message',
                                 'common.updatingInProgress'
