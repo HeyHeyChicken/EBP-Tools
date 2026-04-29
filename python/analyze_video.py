@@ -1099,15 +1099,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     le timer jump de la phase 1 : première lecture valide gagne).
     """
     CHUNKS = settings.get('chunks', []) or []
-    #_emit({'log': f'[_analyze_chunks] {settings}'})
+    _emit({'log': f'[_analyze_chunks] {settings}'})
 
     if not CHUNKS:
-        #_emit({'percent': 100, 'results': []})
+        _emit({'percent': 100, 'results': []})
         return
 
     CAP = _open_video(video_path)
     if CAP is None:
-        #_emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
+        _emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
         return
 
     GENERATED_BY = 'analyze_video.py:chunks v1'
@@ -1126,7 +1126,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     WINDOW = max(1, min(CPU // 4, 4))
     MAX_WORKERS = max(3, WINDOW * 3)
     EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
-    #_emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
+    _emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
 
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
@@ -1147,6 +1147,19 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         SAMPLES = {}   # {elapsed_s: {'orange': O, 'blue': B}}
         MAX_TIME = None   # auto-détecté à la première lecture timer valide
 
+        # Garde-fou anti-pollution OCR : un timer OCR foireux (ex: "09:43" lu
+        # "03:43") génère un ELAPSED aberrant qui pollue SAMPLES et fait ensuite
+        # rejeter par `_is_score_change_valid` tous les vrais samples futurs
+        # (le faux sample futur "verrouille" la monotonie).
+        # Stratégie : borne dynamique sur ELAPSED, avec adoption d'un nouveau
+        # référentiel si N timers consécutifs forment une progression linéaire
+        # (cas d'une vraie coupe vidéo dans le chunk).
+        TIMELINE_OFFSET = 0   # in-game elapsed - video elapsed, mis à jour aux coupes
+        SUSPECT_BUFFER = []   # [(ts, raw_elapsed, orange_raw, blue_raw), ...]
+        SUSPECT_TOLERANCE = 5      # secondes de marge sur la borne dynamique
+        SUSPECT_CONFIRM_LEN = 5    # samples consécutifs requis pour confirmer une coupe
+        SUSPECT_DRIFT_TOL = 2      # |Δelapsed - Δts| toléré pour "linéaire"
+
         # Pipeline : on garde WINDOW frames en vol simultanées dans le pool.
         # `_submit_frame` décode + lance les 3 OCR speculatif ; `_process_ocr_item`
         # drain les futures (en ordre FIFO, critique pour MAX_TIME et la
@@ -1164,9 +1177,41 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE),
                     EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE))
 
+        def _try_insert(elapsed, orange_raw, blue_raw, timer_text=''):
+            EXISTING = SAMPLES.get(elapsed, {})
+            ORANGE = orange_raw if 'orange' not in EXISTING else None
+            BLUE = blue_raw if 'blue' not in EXISTING else None
+            _emit({'log': f'[_analyze_chunks] --------> {timer_text}: Orange: {ORANGE}, blue: {BLUE}'})
+            if ORANGE is None and BLUE is None:
+                return
+            if not _is_score_change_valid(SAMPLES, elapsed, ORANGE, BLUE):
+                _emit({'log': f'[_analyze_chunks] RATE rejet @ t={elapsed}s (orange={ORANGE}, blue={BLUE})'})
+                return
+            MERGED = dict(EXISTING)
+            if ORANGE is not None:
+                MERGED['orange'] = ORANGE
+            if BLUE is not None:
+                MERGED['blue'] = BLUE
+            SAMPLES[elapsed] = MERGED
+            _emit({'log': f'[_analyze_chunks] sample @ t={elapsed}s → orange={MERGED.get("orange")} blue={MERGED.get("blue")}'})
+
+        def _is_linear_progression(buf):
+            # Vraie coupe vidéo : in-game time avance ~1s/frame comme le temps vidéo.
+            # Hallucination Tesseract isolée ou répétée : pas cette structure.
+            for i in range(1, len(buf)):
+                TS_PREV, E_PREV, _, _ = buf[i - 1]
+                TS_CURR, E_CURR, _, _ = buf[i]
+                DTS = TS_CURR - TS_PREV
+                DE = E_CURR - E_PREV
+                if DE < 0:
+                    return False
+                if abs(DE - DTS) > SUSPECT_DRIFT_TOL:
+                    return False
+            return True
+
         def _process_ocr_item(item):
-            nonlocal MAX_TIME
-            _, _, frame, fut_timer, fut_orange, fut_blue = item
+            nonlocal MAX_TIME, TIMELINE_OFFSET
+            _, ts, frame, fut_timer, fut_orange, fut_blue = item
             TIMER_TEXT = fut_timer.result()
             ORANGE_RAW = fut_orange.result()
             BLUE_RAW = fut_blue.result()
@@ -1182,37 +1227,57 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 )
                 MS = _parse_timer_text(TIMER_TEXT)
             if MS is None:
+                _emit({'log': f'[_analyze_chunks] --------> FFF'})
                 return
             M, S = MS
             if not (0 <= S < 60):
+                _emit({'log': f'[_analyze_chunks] --------> EEE'})
                 return
             if MAX_TIME is None:
                 if not (0 <= M <= 15):
+                    _emit({'log': f'[_analyze_chunks] --------> DDD'})
                     return
                 REMAINING = M * 60 + S
                 if REMAINING <= 0:
+                    _emit({'log': f'[_analyze_chunks] --------> CCC'})
                     return
                 MAX_TIME = -(-REMAINING // 60)
             elif M > MAX_TIME:
+                _emit({'log': f'[_analyze_chunks] --------> BBB'})
                 return
-            ELAPSED = MAX_TIME * 60 - (M * 60 + S)
-            if ELAPSED < 0:
+            RAW_ELAPSED = MAX_TIME * 60 - (M * 60 + S)
+            if RAW_ELAPSED < 0:
+                _emit({'log': f'[_analyze_chunks] --------> AAA'})
                 return
-            EXISTING = SAMPLES.get(ELAPSED, {})
-            ORANGE = ORANGE_RAW if 'orange' not in EXISTING else None
-            BLUE = BLUE_RAW if 'blue' not in EXISTING else None
-            #_emit({'log': f'[_analyze_chunks] --------> {TIMER_TEXT}: Orange: {ORANGE}, blue: {BLUE}'})
-            if ORANGE is None and BLUE is None:
+
+            # Borne dynamique : in-game elapsed ne peut pas dépasser
+            # (temps vidéo écoulé) + offset déjà adopté + tolérance.
+            VIDEO_ELAPSED = ts - START
+            EXPECTED_MAX = VIDEO_ELAPSED + TIMELINE_OFFSET + SUSPECT_TOLERANCE
+
+            if RAW_ELAPSED > EXPECTED_MAX:
+                SUSPECT_BUFFER.append((ts, RAW_ELAPSED, ORANGE_RAW, BLUE_RAW))
+                _emit({'log': f'[_analyze_chunks] SUSPECT {TIMER_TEXT}: ELAPSED={RAW_ELAPSED}s @ vid={VIDEO_ELAPSED:.0f}s (buffer {len(SUSPECT_BUFFER)}/{SUSPECT_CONFIRM_LEN})'})
+                if len(SUSPECT_BUFFER) >= SUSPECT_CONFIRM_LEN:
+                    if _is_linear_progression(SUSPECT_BUFFER):
+                        FIRST_TS, FIRST_RAW, _, _ = SUSPECT_BUFFER[0]
+                        OLD_OFFSET = TIMELINE_OFFSET
+                        TIMELINE_OFFSET = FIRST_RAW - (FIRST_TS - START)
+                        _emit({'log': f'[_analyze_chunks] COUPE confirmée : offset {OLD_OFFSET}s → {TIMELINE_OFFSET}s, flush {len(SUSPECT_BUFFER)} samples'})
+                        for _, B_RAW, B_O, B_B in SUSPECT_BUFFER:
+                            _try_insert(B_RAW, B_O, B_B, '(flush)')
+                        SUSPECT_BUFFER.clear()
+                    else:
+                        DROPPED = SUSPECT_BUFFER.pop(0)
+                        _emit({'log': f'[_analyze_chunks] SUSPECT drop @ ts={DROPPED[0]:.0f}s (non-linéaire)'})
                 return
-            if not _is_score_change_valid(SAMPLES, ELAPSED, ORANGE, BLUE):
-                return
-            MERGED = dict(EXISTING)
-            if ORANGE is not None:
-                MERGED['orange'] = ORANGE
-            if BLUE is not None:
-                MERGED['blue'] = BLUE
-            SAMPLES[ELAPSED] = MERGED
-            #_emit({'log': f'[_analyze_chunks] sample @ t={ELAPSED}s → orange={MERGED.get("orange")} blue={MERGED.get("blue")}'})
+
+            # Sample dans la borne : tout suspect en attente était une hallucination isolée.
+            if SUSPECT_BUFFER:
+                _emit({'log': f'[_analyze_chunks] SUSPECT clear ({len(SUSPECT_BUFFER)} samples invalidés par sample normal)'})
+                SUSPECT_BUFFER.clear()
+
+            _try_insert(RAW_ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
 
         TIMESTAMP = float(START)
         INFLIGHT = deque()

@@ -485,6 +485,11 @@ if (!APP_GOT_THE_LOCK) {
                     });
 
                     runAnalyzer(FILES_PATHS[0], data.socket);
+                } else {
+                    socketEmit(data.socket, 'analyzeVideoFileGames', {
+                        type: 'video_path',
+                        value: ''
+                    });
                 }
 
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
