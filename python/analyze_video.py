@@ -936,45 +936,38 @@ def _parse_timer_text(timer_text: str):
         return None
 
 
-def _is_score_change_valid(samples: dict, elapsed: int, orange, blue, max_rate: int = MAX_SCORE_RATE_PER_SECOND) -> bool:
+def _is_field_change_valid(samples: dict, elapsed: int, field: str, value, max_rate: int = MAX_SCORE_RATE_PER_SECOND) -> bool:
     """
-    Valide qu'insérer (orange, blue) à l'index `elapsed` respecte les invariants
-    physiques du score EVA. Validation indépendante par équipe (supporte les
-    samples partiels), `orange` ou `blue` peut être None.
+    Valide qu'insérer `field=value` à l'index `elapsed` respecte les invariants
+    physiques du score EVA. Validation **par champ** : un OCR foireux sur
+    orange ne disqualifie pas un blue valide dans le même sample.
 
     Deux invariants :
-      1. Borne intrinsèque : score ≤ elapsed * max_rate
+      1. Borne intrinsèque : value ≤ elapsed * max_rate
          (depuis l'implicite score=0 à elapsed=0 : on ne peut gagner plus de
          max_rate points par seconde de jeu).
-      2. Rate borné par rapport aux voisins :
-         - V passé (K < elapsed) : V ≤ new (monotonie) ET (new - V) ≤ Δt*max_rate
-         - V futur (K > elapsed) : new ≤ V (monotonie) ET (V - new) ≤ Δt*max_rate
+      2. Rate borné par rapport aux voisins du même champ :
+         - V passé (K < elapsed) : V ≤ value (monotonie) ET (value - V) ≤ Δt*max_rate
+         - V futur (K > elapsed) : value ≤ V (monotonie) ET (V - value) ≤ Δt*max_rate
          Δt = abs(elapsed - K). Filtre les sauts violents même sans sample voisin.
 
+    `value=None` est toujours valide (rien à insérer).
     `max_rate` : points/seconde max. Défaut = MAX_SCORE_RATE_PER_SECOND (=3 en EVA).
     """
-    # 1. Borne intrinsèque depuis t=0
-    if orange is not None and orange > elapsed * max_rate:
+    if value is None:
+        return True
+    if value > elapsed * max_rate:
         return False
-    if blue is not None and blue > elapsed * max_rate:
-        return False
-    # 2. Rate borné vs samples voisins
     for K, V in samples.items():
+        if field not in V:
+            continue
         DT = abs(elapsed - K)
         if K < elapsed:
-            if orange is not None and 'orange' in V:
-                if V['orange'] > orange or (orange - V['orange']) > DT * max_rate:
-                    return False
-            if blue is not None and 'blue' in V:
-                if V['blue'] > blue or (blue - V['blue']) > DT * max_rate:
-                    return False
+            if V[field] > value or (value - V[field]) > DT * max_rate:
+                return False
         elif K > elapsed:
-            if orange is not None and 'orange' in V:
-                if V['orange'] < orange or (V['orange'] - orange) > DT * max_rate:
-                    return False
-            if blue is not None and 'blue' in V:
-                if V['blue'] < blue or (V['blue'] - blue) > DT * max_rate:
-                    return False
+            if V[field] < value or (V[field] - value) > DT * max_rate:
+                return False
     return True
 
 
@@ -1149,7 +1142,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
 
         # Garde-fou anti-pollution OCR : un timer OCR foireux (ex: "09:43" lu
         # "03:43") génère un ELAPSED aberrant qui pollue SAMPLES et fait ensuite
-        # rejeter par `_is_score_change_valid` tous les vrais samples futurs
+        # rejeter par `_is_field_change_valid` tous les vrais samples futurs
         # (le faux sample futur "verrouille" la monotonie).
         # Stratégie : borne dynamique sur ELAPSED, avec adoption d'un nouveau
         # référentiel si N timers consécutifs forment une progression linéaire
@@ -1163,7 +1156,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Pipeline : on garde WINDOW frames en vol simultanées dans le pool.
         # `_submit_frame` décode + lance les 3 OCR speculatif ; `_process_ocr_item`
         # drain les futures (en ordre FIFO, critique pour MAX_TIME et la
-        # validation `_is_score_change_valid` qui dépendent de SAMPLES[ELAPSED-1]).
+        # validation `_is_field_change_valid` qui dépendent de SAMPLES[ELAPSED-1]).
         # Coût du speculative work amplifié : avec WINDOW=4, jusqu'à 12 OCR
         # peuvent tourner en parallèle pour une frame qui sera finalement jetée.
         # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
@@ -1184,8 +1177,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             _emit({'log': f'[_analyze_chunks] --------> {timer_text}: Orange: {ORANGE}, blue: {BLUE}'})
             if ORANGE is None and BLUE is None:
                 return
-            if not _is_score_change_valid(SAMPLES, elapsed, ORANGE, BLUE):
-                _emit({'log': f'[_analyze_chunks] RATE rejet @ t={elapsed}s (orange={ORANGE}, blue={BLUE})'})
+            # Validation par champ : un OCR foireux sur un champ ne fait pas
+            # perdre un champ valide dans le même sample.
+            if ORANGE is not None and not _is_field_change_valid(SAMPLES, elapsed, 'orange', ORANGE):
+                _emit({'log': f'[_analyze_chunks] RATE rejet orange @ t={elapsed}s (orange={ORANGE})'})
+                ORANGE = None
+            if BLUE is not None and not _is_field_change_valid(SAMPLES, elapsed, 'blue', BLUE):
+                _emit({'log': f'[_analyze_chunks] RATE rejet blue @ t={elapsed}s (blue={BLUE})'})
+                BLUE = None
+            if ORANGE is None and BLUE is None:
                 return
             MERGED = dict(EXISTING)
             if ORANGE is not None:
