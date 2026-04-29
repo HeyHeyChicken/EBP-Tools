@@ -11,7 +11,7 @@ import base64
 import time
 import numpy as np
 import cv2
-from collections import deque
+from collections import deque, Counter
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
@@ -936,39 +936,98 @@ def _parse_timer_text(timer_text: str):
         return None
 
 
-def _is_field_change_valid(samples: dict, elapsed: int, field: str, value, max_rate: int = MAX_SCORE_RATE_PER_SECOND) -> bool:
+def _reconstruct_field(raw_obs: dict, field: str, max_score, max_rate: int = MAX_SCORE_RATE_PER_SECOND) -> dict:
     """
-    Valide qu'insérer `field=value` à l'index `elapsed` respecte les invariants
-    physiques du score EVA. Validation **par champ** : un OCR foireux sur
-    orange ne disqualifie pas un blue valide dans le même sample.
+    Reconstruction globale de la timeline d'un champ (orange/blue) à partir
+    des lectures OCR brutes via programmation dynamique.
 
-    Deux invariants :
-      1. Borne intrinsèque : value ≤ elapsed * max_rate
-         (depuis l'implicite score=0 à elapsed=0 : on ne peut gagner plus de
-         max_rate points par seconde de jeu).
-      2. Rate borné par rapport aux voisins du même champ :
-         - V passé (K < elapsed) : V ≤ value (monotonie) ET (value - V) ≤ Δt*max_rate
-         - V futur (K > elapsed) : value ≤ V (monotonie) ET (V - value) ≤ Δt*max_rate
-         Δt = abs(elapsed - K). Filtre les sauts violents même sans sample voisin.
+    Cherche f: elapsed → score, monotone non-décroissante, avec
+    f(K) - f(K-1) ∈ [0, max_rate] et 0 ≤ f(K) ≤ max_score, qui MAXIMISE
+    l'accord avec les observations (= minimise le nombre de lectures OCR
+    en désaccord avec f). C'est la solution optimale au sens du nombre
+    d'observations honorées sous les contraintes physiques.
 
-    `value=None` est toujours valide (rien à insérer).
-    `max_rate` : points/seconde max. Défaut = MAX_SCORE_RATE_PER_SECOND (=3 en EVA).
+    Complexité O(T * V * max_rate) ; pour T~600s et V~100, instantané.
+
+    Avantages vs validation à l'insertion :
+    - Une hallucination isolée (1-2 frames) est dominée par le consensus
+      des frames voisines, sans pouvoir polluer la suite par cascade de
+      rejets monotones.
+    - Pas de seuil arbitraire (fenêtre, tolérance) : seules les contraintes
+      physiques du jeu (monotonie, rate cap, bornes) interviennent.
+    - Décision globale plutôt que séquentielle : un point ambigu en début
+      de chunk peut être tranché par les observations qui le suivent.
+
+    raw_obs : {elapsed: {'orange': [v1, ...], 'blue': [v1, ...]}}
+    Retourne : {elapsed: value} pour les K avec au moins une observation.
     """
-    if value is None:
-        return True
-    if value > elapsed * max_rate:
-        return False
-    for K, V in samples.items():
-        if field not in V:
-            continue
-        DT = abs(elapsed - K)
-        if K < elapsed:
-            if V[field] > value or (value - V[field]) > DT * max_rate:
-                return False
-        elif K > elapsed:
-            if V[field] < value or (V[field] - value) > DT * max_rate:
-                return False
-    return True
+    if max_score is None:
+        max_score = 100
+    V_MAX = int(max_score)
+    if V_MAX < 0:
+        return {}
+
+    OBS_COUNTS = {}
+    for K, FIELDS in raw_obs.items():
+        VALUES = FIELDS.get(field) or []
+        if VALUES:
+            OBS_COUNTS[K] = Counter(VALUES)
+    if not OBS_COUNTS:
+        return {}
+
+    T_MIN = min(OBS_COUNTS)
+    T_MAX = max(OBS_COUNTS)
+    T_LEN = T_MAX - T_MIN + 1
+
+    INF = float('inf')
+    DP = [[INF] * (V_MAX + 1) for _ in range(T_LEN)]
+    PARENT = [[-1] * (V_MAX + 1) for _ in range(T_LEN)]
+
+    # Init : aucune contrainte amont, coût = mismatchs à T_MIN.
+    COUNTS_0 = OBS_COUNTS.get(T_MIN, Counter())
+    TOTAL_0 = sum(COUNTS_0.values())
+    for v in range(V_MAX + 1):
+        DP[0][v] = TOTAL_0 - COUNTS_0.get(v, 0)
+
+    for OFF in range(1, T_LEN):
+        K = T_MIN + OFF
+        COUNTS = OBS_COUNTS.get(K, Counter())
+        TOTAL = sum(COUNTS.values())
+        for v in range(V_MAX + 1):
+            MISMATCH = TOTAL - COUNTS.get(v, 0)
+            BEST_COST = INF
+            BEST_PREV = -1
+            for DELTA in range(0, max_rate + 1):
+                PREV_V = v - DELTA
+                if PREV_V < 0:
+                    break
+                if DP[OFF - 1][PREV_V] < BEST_COST:
+                    BEST_COST = DP[OFF - 1][PREV_V]
+                    BEST_PREV = PREV_V
+            if BEST_COST < INF:
+                DP[OFF][v] = BEST_COST + MISMATCH
+                PARENT[OFF][v] = BEST_PREV
+
+    LAST_OFF = T_LEN - 1
+    BEST_V = 0
+    BEST_COST = INF
+    for v in range(V_MAX + 1):
+        if DP[LAST_OFF][v] < BEST_COST:
+            BEST_COST = DP[LAST_OFF][v]
+            BEST_V = v
+    if BEST_COST == INF:
+        return {}
+
+    PATH = [0] * T_LEN
+    v = BEST_V
+    for OFF in range(T_LEN - 1, -1, -1):
+        PATH[OFF] = v
+        if OFF > 0:
+            v = PARENT[OFF][v]
+            if v < 0:
+                break
+
+    return {T_MIN + OFF: PATH[OFF] for OFF in range(T_LEN) if (T_MIN + OFF) in OBS_COUNTS}
 
 
 def _color_isolated_bw(frame: np.ndarray, box, colors: list, tol: int = 50) -> Image.Image:
@@ -1092,7 +1151,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     le timer jump de la phase 1 : première lecture valide gagne).
     """
     CHUNKS = settings.get('chunks', []) or []
-    _emit({'log': f'[_analyze_chunks] {settings}'})
+    #_emit({'log': f'[_analyze_chunks] {settings}'})
 
     if not CHUNKS:
         _emit({'percent': 100, 'results': []})
@@ -1119,7 +1178,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     WINDOW = max(1, min(CPU // 4, 4))
     MAX_WORKERS = max(3, WINDOW * 3)
     EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
-    _emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
+    #_emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
 
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
@@ -1137,13 +1196,16 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         ORANGE_SCORE_SPEC = GF['orangeScore']
         BLUE_SCORE_SPEC = GF['blueScore']
 
-        SAMPLES = {}   # {elapsed_s: {'orange': O, 'blue': B}}
+        # Toutes les lectures OCR brutes (orange/blue) indexées par elapsed.
+        # Pas de filtrage à l'insertion : c'est `_reconstruct_field` qui tranche
+        # en fin de chunk via DP global sous contraintes physiques (monotonie,
+        # rate cap, bornes). Une hallucination isolée se fait dominer par le
+        # consensus des voisines, sans cascade de rejets.
+        RAW_OBSERVATIONS = {}   # {elapsed_s: {'orange': [v, ...], 'blue': [v, ...]}}
         MAX_TIME = None   # auto-détecté à la première lecture timer valide
 
-        # Garde-fou anti-pollution OCR : un timer OCR foireux (ex: "09:43" lu
-        # "03:43") génère un ELAPSED aberrant qui pollue SAMPLES et fait ensuite
-        # rejeter par `_is_field_change_valid` tous les vrais samples futurs
-        # (le faux sample futur "verrouille" la monotonie).
+        # Garde-fou anti-pollution timer : un timer OCR foireux (ex: "09:43" lu
+        # "03:43") génère un ELAPSED aberrant qui décale toute la timeline.
         # Stratégie : borne dynamique sur ELAPSED, avec adoption d'un nouveau
         # référentiel si N timers consécutifs forment une progression linéaire
         # (cas d'une vraie coupe vidéo dans le chunk).
@@ -1155,8 +1217,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
 
         # Pipeline : on garde WINDOW frames en vol simultanées dans le pool.
         # `_submit_frame` décode + lance les 3 OCR speculatif ; `_process_ocr_item`
-        # drain les futures (en ordre FIFO, critique pour MAX_TIME et la
-        # validation `_is_field_change_valid` qui dépendent de SAMPLES[ELAPSED-1]).
+        # drain les futures en ordre FIFO (critique pour MAX_TIME et la borne
+        # dynamique du SUSPECT_BUFFER qui dépendent du temps croissant).
         # Coût du speculative work amplifié : avec WINDOW=4, jusqu'à 12 OCR
         # peuvent tourner en parallèle pour une frame qui sera finalement jetée.
         # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
@@ -1170,30 +1232,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE),
                     EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE))
 
-        def _try_insert(elapsed, orange_raw, blue_raw, timer_text=''):
-            EXISTING = SAMPLES.get(elapsed, {})
-            ORANGE = orange_raw if 'orange' not in EXISTING else None
-            BLUE = blue_raw if 'blue' not in EXISTING else None
-            _emit({'log': f'[_analyze_chunks] --------> {timer_text}: Orange: {ORANGE}, blue: {BLUE}'})
-            if ORANGE is None and BLUE is None:
+        def _record_raw(elapsed, orange_raw, blue_raw, timer_text=''):
+            #_emit({'log': f'[_analyze_chunks] --------> {timer_text}: orange={orange_raw} blue={blue_raw}'})
+            if orange_raw is None and blue_raw is None:
                 return
-            # Validation par champ : un OCR foireux sur un champ ne fait pas
-            # perdre un champ valide dans le même sample.
-            if ORANGE is not None and not _is_field_change_valid(SAMPLES, elapsed, 'orange', ORANGE):
-                _emit({'log': f'[_analyze_chunks] RATE rejet orange @ t={elapsed}s (orange={ORANGE})'})
-                ORANGE = None
-            if BLUE is not None and not _is_field_change_valid(SAMPLES, elapsed, 'blue', BLUE):
-                _emit({'log': f'[_analyze_chunks] RATE rejet blue @ t={elapsed}s (blue={BLUE})'})
-                BLUE = None
-            if ORANGE is None and BLUE is None:
-                return
-            MERGED = dict(EXISTING)
-            if ORANGE is not None:
-                MERGED['orange'] = ORANGE
-            if BLUE is not None:
-                MERGED['blue'] = BLUE
-            SAMPLES[elapsed] = MERGED
-            _emit({'log': f'[_analyze_chunks] sample @ t={elapsed}s → orange={MERGED.get("orange")} blue={MERGED.get("blue")}'})
+            BUCKET = RAW_OBSERVATIONS.setdefault(elapsed, {'orange': [], 'blue': []})
+            if orange_raw is not None:
+                BUCKET['orange'].append(orange_raw)
+            if blue_raw is not None:
+                BUCKET['blue'].append(blue_raw)
 
         def _is_linear_progression(buf):
             # Vraie coupe vidéo : in-game time avance ~1s/frame comme le temps vidéo.
@@ -1227,27 +1274,21 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 )
                 MS = _parse_timer_text(TIMER_TEXT)
             if MS is None:
-                _emit({'log': f'[_analyze_chunks] --------> FFF'})
                 return
             M, S = MS
             if not (0 <= S < 60):
-                _emit({'log': f'[_analyze_chunks] --------> EEE'})
                 return
             if MAX_TIME is None:
                 if not (0 <= M <= 15):
-                    _emit({'log': f'[_analyze_chunks] --------> DDD'})
                     return
                 REMAINING = M * 60 + S
                 if REMAINING <= 0:
-                    _emit({'log': f'[_analyze_chunks] --------> CCC'})
                     return
                 MAX_TIME = -(-REMAINING // 60)
             elif M > MAX_TIME:
-                _emit({'log': f'[_analyze_chunks] --------> BBB'})
                 return
             RAW_ELAPSED = MAX_TIME * 60 - (M * 60 + S)
             if RAW_ELAPSED < 0:
-                _emit({'log': f'[_analyze_chunks] --------> AAA'})
                 return
 
             # Borne dynamique : in-game elapsed ne peut pas dépasser
@@ -1257,27 +1298,27 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
 
             if RAW_ELAPSED > EXPECTED_MAX:
                 SUSPECT_BUFFER.append((ts, RAW_ELAPSED, ORANGE_RAW, BLUE_RAW))
-                _emit({'log': f'[_analyze_chunks] SUSPECT {TIMER_TEXT}: ELAPSED={RAW_ELAPSED}s @ vid={VIDEO_ELAPSED:.0f}s (buffer {len(SUSPECT_BUFFER)}/{SUSPECT_CONFIRM_LEN})'})
+                #_emit({'log': f'[_analyze_chunks] SUSPECT {TIMER_TEXT}: ELAPSED={RAW_ELAPSED}s @ vid={VIDEO_ELAPSED:.0f}s (buffer {len(SUSPECT_BUFFER)}/{SUSPECT_CONFIRM_LEN})'})
                 if len(SUSPECT_BUFFER) >= SUSPECT_CONFIRM_LEN:
                     if _is_linear_progression(SUSPECT_BUFFER):
                         FIRST_TS, FIRST_RAW, _, _ = SUSPECT_BUFFER[0]
                         OLD_OFFSET = TIMELINE_OFFSET
                         TIMELINE_OFFSET = FIRST_RAW - (FIRST_TS - START)
-                        _emit({'log': f'[_analyze_chunks] COUPE confirmée : offset {OLD_OFFSET}s → {TIMELINE_OFFSET}s, flush {len(SUSPECT_BUFFER)} samples'})
+                        #_emit({'log': f'[_analyze_chunks] COUPE confirmée : offset {OLD_OFFSET}s → {TIMELINE_OFFSET}s, flush {len(SUSPECT_BUFFER)} samples'})
                         for _, B_RAW, B_O, B_B in SUSPECT_BUFFER:
-                            _try_insert(B_RAW, B_O, B_B, '(flush)')
+                            _record_raw(B_RAW, B_O, B_B, '(flush)')
                         SUSPECT_BUFFER.clear()
                     else:
                         DROPPED = SUSPECT_BUFFER.pop(0)
-                        _emit({'log': f'[_analyze_chunks] SUSPECT drop @ ts={DROPPED[0]:.0f}s (non-linéaire)'})
+                        #_emit({'log': f'[_analyze_chunks] SUSPECT drop @ ts={DROPPED[0]:.0f}s (non-linéaire)'})
                 return
 
             # Sample dans la borne : tout suspect en attente était une hallucination isolée.
             if SUSPECT_BUFFER:
-                _emit({'log': f'[_analyze_chunks] SUSPECT clear ({len(SUSPECT_BUFFER)} samples invalidés par sample normal)'})
+                #_emit({'log': f'[_analyze_chunks] SUSPECT clear ({len(SUSPECT_BUFFER)} samples invalidés par sample normal)'})
                 SUSPECT_BUFFER.clear()
 
-            _try_insert(RAW_ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
+            _record_raw(RAW_ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
 
         TIMESTAMP = float(START)
         INFLIGHT = deque()
@@ -1304,11 +1345,24 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 _emit({'percent': PERCENT, 'results': []})
                 LAST_PERCENT = PERCENT
 
-        # Chunk done : on émet le résultat. JSON keys must be string → str(K).
-        # Sorted pour que l'ordre d'insertion JS corresponde au temps croissant
-        # (Object literal en JS itère les clés numériques string en ordre numérique
-        # de toute façon, mais on est explicite).
-        SCORE_TIMELINE = {str(K): SAMPLES[K] for K in sorted(SAMPLES.keys())}
+        # Reconstruction globale par DP : à partir de toutes les lectures OCR
+        # brutes, on trouve la trajectoire monotone (par champ, indépendamment)
+        # qui maximise l'accord avec les observations sous contraintes physiques.
+        ORANGE_TL = _reconstruct_field(RAW_OBSERVATIONS, 'orange', MAX_ORANGE)
+        BLUE_TL = _reconstruct_field(RAW_OBSERVATIONS, 'blue', MAX_BLUE)
+        #_emit({'log': f'[_analyze_chunks] reconstruction: {len(ORANGE_TL)} pts orange, {len(BLUE_TL)} pts blue (sur {len(RAW_OBSERVATIONS)} elapsed observés)'})
+
+        # JSON keys must be string → str(K). Une entrée n'est émise que pour
+        # les K avec au moins une observation pour ce champ — l'absence
+        # signifie "pas de signal", pas "score à 0".
+        SCORE_TIMELINE = {}
+        for K in sorted(set(ORANGE_TL) | set(BLUE_TL)):
+            ENTRY = {}
+            if K in ORANGE_TL:
+                ENTRY['orange'] = ORANGE_TL[K]
+            if K in BLUE_TL:
+                ENTRY['blue'] = BLUE_TL[K]
+            SCORE_TIMELINE[str(K)] = ENTRY
         CHUNK_PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 100
         _emit({
             'percent': CHUNK_PERCENT,
