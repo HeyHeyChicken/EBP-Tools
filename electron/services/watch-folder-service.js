@@ -52,6 +52,17 @@ function ensureSubfolders(root) {
     }
 }
 
+/**
+ * Ensures the watch root and its subfolders exist on disk. Idempotent and
+ * cheap — call from `start()` or before opening any of these folders from
+ * the tray menu so users always land on a real folder.
+ */
+function ensureFolders() {
+    const ROOT = getWatchFolder();
+    if (!fs.existsSync(ROOT)) fs.mkdirSync(ROOT, { recursive: true });
+    ensureSubfolders(ROOT);
+}
+
 function isSupportedVideo(filePath) {
     const EXT = path.extname(filePath).toLowerCase();
     return SUPPORTED_EXT.has(EXT);
@@ -349,9 +360,8 @@ function start(deps) {
         );
     }
 
+    ensureFolders();
     const ROOT = getWatchFolder();
-    if (!fs.existsSync(ROOT)) fs.mkdirSync(ROOT, { recursive: true });
-    ensureSubfolders(ROOT);
 
     // Purge any orphan .tmp/ files left by a previous crashed run — the pipeline
     // restarts from scratch on retry, so leftovers are guaranteed to be unused.
@@ -439,5 +449,6 @@ module.exports = {
     stop,
     getWatchFolder,
     getDefaultFolder,
-    getStatus
+    getStatus,
+    ensureFolders
 };

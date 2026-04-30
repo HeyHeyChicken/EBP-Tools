@@ -235,7 +235,10 @@ function createWindow(updateService) {
         for (const SECTION of SECTIONS) {
             MENU.push({
                 label: `${SECTION.title} (${SECTION.items.length})`,
-                click: () => shell.openPath(SECTION.folder)
+                click: () => {
+                    watchFolderService.ensureFolders();
+                    shell.openPath(SECTION.folder);
+                }
             });
             if (SECTION.items.length === 0) {
                 MENU.push({ label: '   —', enabled: false });
