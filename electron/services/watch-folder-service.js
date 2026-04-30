@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('node:path');
 const chokidar = require('chokidar');
-const { Notification } = require('electron');
+const { Notification, app } = require('electron');
 const StorageManager = require('../core/storage-manager');
 const { unlinkSync } = require('./global-service');
 const { cutAndEncodeGame } = require('./video-service');
@@ -52,15 +52,39 @@ function ensureSubfolders(root) {
     }
 }
 
+function getFallbackFolder() {
+    return path.join(app.getPath('userData'), 'EBP-Tools-Replays');
+}
+
+function tryEnsure(root) {
+    if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true });
+    ensureSubfolders(root);
+}
+
 /**
  * Ensures the watch root and its subfolders exist on disk. Idempotent and
  * cheap — call from `start()` or before opening any of these folders from
  * the tray menu so users always land on a real folder.
+ *
+ * On Windows, the default location under the user profile can be blocked by
+ * Controlled Folder Access / antivirus (EPERM/EACCES). In that case we fall
+ * back to `%APPDATA%\<app>\Replays`, persist it as the new setting, and
+ * notify the user so the relocation is visible.
  */
 function ensureFolders() {
     const ROOT = getWatchFolder();
-    if (!fs.existsSync(ROOT)) fs.mkdirSync(ROOT, { recursive: true });
-    ensureSubfolders(ROOT);
+    try {
+        tryEnsure(ROOT);
+    } catch (e) {
+        if (e.code !== 'EPERM' && e.code !== 'EACCES') throw e;
+        const FALLBACK = getFallbackFolder();
+        if (FALLBACK === ROOT) throw e;
+        console.warn(
+            `[watch-folder] cannot use ${ROOT} (${e.code}), falling back to ${FALLBACK}`
+        );
+        tryEnsure(FALLBACK);
+        StorageManager.setPermanentSettingsValue(SETTINGS_KEY_FOLDER, FALLBACK);
+    }
 }
 
 function isSupportedVideo(filePath) {
@@ -203,7 +227,10 @@ async function processVideo(videoPath, deps) {
     });
     const MATCHES = MATCH_RES.matches || [];
     const MATCH_BY_TEMP = new Map(
-        MATCHES.map((m) => [m.tempId, { gameID: m.gameID, hasVideo: !!m.hasVideo }])
+        MATCHES.map((m) => [
+            m.tempId,
+            { gameID: m.gameID, hasVideo: !!m.hasVideo }
+        ])
     );
 
     // Phase 4: cut every detected game into its own file (skip those qui ont déjà
