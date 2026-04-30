@@ -80,6 +80,7 @@ const {
 const { unlinkSync } = require('./services/global-service');
 const UpdateService = require('./services/update-service');
 const ytDlpService = require('./services/ytdlp-service');
+const watchFolderService = require('./services/watch-folder-service');
 
 //#endregion
 
@@ -766,6 +767,7 @@ if (!APP_GOT_THE_LOCK) {
     }
 
     function runAnalyzer(videoPath, socket) {
+        const HEADLESS = !socket;
         const NOTIFICATION_DATA = {
             percent: 0,
             leftRounded: true,
@@ -774,7 +776,9 @@ if (!APP_GOT_THE_LOCK) {
             text: '.view.replay_cutter.videoStartsItsAnalysis',
             state: 'info'
         };
-        createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+        if (!HEADLESS) {
+            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+        }
 
         return new Promise((resolve, reject) => {
             const ARGS = ['detect', videoPath, FFMPEG_PATH, '', '{}'];
@@ -786,12 +790,13 @@ if (!APP_GOT_THE_LOCK) {
             const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
             let BUFFER = '';
             const LINE_QUEUE = [];
+            const GAMES = [];
             let SCHEDULED = false;
             let RESOLVED = false;
 
             const processQueue = () => {
                 SCHEDULED = false;
-                const WINDOW = getMainWindow();
+                const WINDOW = HEADLESS ? null : getMainWindow();
                 let percent = 0;
                 let nbGames = 0;
                 while (LINE_QUEUE.length > 0) {
@@ -800,7 +805,13 @@ if (!APP_GOT_THE_LOCK) {
                     try {
                         const MSG = JSON.parse(LINE);
 
-                        socketEmit(socket, 'analyzeVideoFileGames', MSG);
+                        if (MSG.type === 'game' && MSG.game) {
+                            GAMES.push(MSG.game);
+                        }
+
+                        if (!HEADLESS) {
+                            socketEmit(socket, 'analyzeVideoFileGames', MSG);
+                        }
 
                         if (MSG.percent) {
                             percent = MSG.percent;
@@ -826,9 +837,9 @@ if (!APP_GOT_THE_LOCK) {
                             (MSG.type === 'done' || MSG.type === 'error') &&
                             !RESOLVED
                         ) {
-                            deleteFloatingWindow();
+                            if (!HEADLESS) deleteFloatingWindow();
                             RESOLVED = true;
-                            resolve(MSG);
+                            resolve({ ...MSG, games: GAMES });
                         }
                     } catch (_) {}
                 }
@@ -862,14 +873,19 @@ if (!APP_GOT_THE_LOCK) {
                 setImmediate(() => {
                     if (!RESOLVED) {
                         RESOLVED = true;
-                        resolve({ type: 'close', code });
+                        resolve({ type: 'close', code, games: GAMES });
                     }
                 });
             });
 
             ANALYZER.on('error', (err) => {
                 const MSG = { type: 'error', message: err.message };
-                getMainWindow().webContents.send('analyzer-update', MSG);
+                if (!HEADLESS) {
+                    const WINDOW = getMainWindow();
+                    if (WINDOW && !WINDOW.isDestroyed()) {
+                        WINDOW.webContents.send('analyzer-update', MSG);
+                    }
+                }
                 reject(err);
             });
         });
@@ -885,6 +901,7 @@ if (!APP_GOT_THE_LOCK) {
      * @param {Array}  chunks    [{startSeconds, endSeconds, gameID, mode}] — segments à analyser.
      */
     function runChunkAnalyzer(videoPath, socket, chunks) {
+        const HEADLESS = !socket;
         const NOTIFICATION_DATA = {
             percent: 0,
             leftRounded: true,
@@ -893,7 +910,9 @@ if (!APP_GOT_THE_LOCK) {
             text: '.view.replay_cutter.videoStartsItsAnalysis',
             state: 'info'
         };
-        createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+        if (!HEADLESS) {
+            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+        }
 
         return new Promise((resolve, reject) => {
             const SETTINGS_JSON = JSON.stringify({ chunks: chunks });
@@ -906,12 +925,14 @@ if (!APP_GOT_THE_LOCK) {
             const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
             let BUFFER = '';
             const LINE_QUEUE = [];
+            const RESULTS = [];
+            let LAST_ERROR = null;
             let SCHEDULED = false;
             let RESOLVED = false;
 
             const processQueue = () => {
                 SCHEDULED = false;
-                const WINDOW = getMainWindow();
+                const WINDOW = HEADLESS ? null : getMainWindow();
                 let percent = 0;
                 while (LINE_QUEUE.length > 0) {
                     const LINE = LINE_QUEUE.shift();
@@ -919,11 +940,20 @@ if (!APP_GOT_THE_LOCK) {
                     try {
                         const MSG = JSON.parse(LINE);
 
-                        socketEmit(
-                            socket,
-                            'analyzeVideoFileChunkAnalysis',
-                            MSG
-                        );
+                        if (Array.isArray(MSG.results) && MSG.results.length) {
+                            RESULTS.push(...MSG.results);
+                        }
+                        if (MSG.error) {
+                            LAST_ERROR = MSG.error;
+                        }
+
+                        if (!HEADLESS) {
+                            socketEmit(
+                                socket,
+                                'analyzeVideoFileChunkAnalysis',
+                                MSG
+                            );
+                        }
                         console.log(MSG);
 
                         if (typeof MSG.percent === 'number') {
@@ -942,9 +972,13 @@ if (!APP_GOT_THE_LOCK) {
                             });
                         }
                         if ((MSG.error || percent >= 100) && !RESOLVED) {
-                            deleteFloatingWindow();
+                            if (!HEADLESS) deleteFloatingWindow();
                             RESOLVED = true;
-                            resolve(MSG);
+                            resolve({
+                                ...MSG,
+                                results: RESULTS,
+                                error: LAST_ERROR
+                            });
                         }
                     } catch (_) {}
                 }
@@ -978,14 +1012,24 @@ if (!APP_GOT_THE_LOCK) {
                 setImmediate(() => {
                     if (!RESOLVED) {
                         RESOLVED = true;
-                        resolve({ type: 'close', code });
+                        resolve({
+                            type: 'close',
+                            code,
+                            results: RESULTS,
+                            error: LAST_ERROR
+                        });
                     }
                 });
             });
 
             ANALYZER.on('error', (err) => {
                 const MSG = { error: err.message };
-                getMainWindow().webContents.send('analyzer-update', MSG);
+                if (!HEADLESS) {
+                    const WINDOW = getMainWindow();
+                    if (WINDOW && !WINDOW.isDestroyed()) {
+                        WINDOW.webContents.send('analyzer-update', MSG);
+                    }
+                }
                 reject(err);
             });
         });
@@ -1376,6 +1420,12 @@ if (!APP_GOT_THE_LOCK) {
      * This method will be called when Electron has finished initialization and is ready to create browser windows.
      */
     app.whenReady().then(() => {
+        try {
+            watchFolderService.start({ runAnalyzer, runChunkAnalyzer });
+        } catch (e) {
+            console.error('[watch-folder] failed to start', e);
+        }
+
         if (IS_DEV_MODE) {
             // We wait until the Angular server is ready before creating the window that will contain the HMI.
             waitForHttp(4201).then(() => {

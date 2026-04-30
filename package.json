@@ -1,6 +1,6 @@
 {
     "name": "ebp-tools",
-    "version": "1.8.3",
+    "version": "1.8.4",
     "description": "",
     "main": ".webpack/main",
     "scripts": {
@@ -16,7 +16,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/HeyHeyChicken/EBP-Tools.git"
+        "url": "https://github.com/EBP-gg/Tools.git"
     },
     "publish": {
         "provider": "github",
@@ -27,6 +27,7 @@
     "author": "Antoine Duval",
     "license": "See LICENSE.txt",
     "dependencies": {
+        "chokidar": "^5.0.0",
         "discord-rpc": "^4.0.1",
         "electron-updater": "^6.7.3",
         "exceljs": "^4.4.0",

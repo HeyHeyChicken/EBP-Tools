@@ -1,1 +1,1 @@
-{"numberOfOpenings":23,"deeplink":{"action":"exportGames","data":{"socket":"U6hIdQQZ7AhqVF55AACr","seasonIndex":2,"timeToWait":3,"nbPages":50,"debug":false}}}
+{"numberOfOpenings":183,"replayWatchQueue":[{"path":"/Users/antoine/EBP-Tools-Replays/LFA.mp4","state":"queued","addedAt":1777537775189}],"deeplink":{"action":"importGamesFromExcel","data":{"socket":"mdPQ48mwC3PJOlC7AAAN"}}}

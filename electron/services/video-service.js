@@ -225,8 +225,104 @@ function fixForBrowser(videoPath) {
     });
 }
 
+/**
+ * Probes the video codec of a file by spawning ffmpeg and parsing its stderr.
+ * Cheap (no decoding); returns the codec short name (e.g. "h264", "hevc")
+ * lowercased, or null if unknown.
+ */
+function probeVideoCodec(inputPath) {
+    return new Promise((resolve) => {
+        const FFMPEG = spawn(FFMPEG_PATH, [
+            '-hide_banner',
+            '-i',
+            inputPath
+        ]);
+        let stderr = '';
+        FFMPEG.stderr.on('data', (d) => {
+            stderr += d.toString();
+        });
+        FFMPEG.on('close', () => {
+            const M = stderr.match(/Stream #\d+:\d+[^\n]*Video:\s+(\w+)/);
+            resolve(M ? M[1].toLowerCase() : null);
+        });
+        FFMPEG.on('error', () => resolve(null));
+    });
+}
+
+/**
+ * Cuts a video segment, stream-copying the video track if it's already H.264
+ * (the common case for game capture tools) and re-encoding to libx264
+ * otherwise. Audio is always re-encoded to AAC (MP4 doesn't officially
+ * support Opus). Faststart for browser streaming. With stream-copy the cut
+ * lands at the nearest keyframe before `startSec`, so the actual start may
+ * be a few seconds earlier than requested — acceptable for replay gameplay.
+ * @param {string} inputPath  Source video.
+ * @param {string} outputPath Destination .mp4.
+ * @param {number} startSec   Inclusive start time (seconds).
+ * @param {number} endSec     Exclusive end time (seconds).
+ * @returns {Promise<string>} Resolves with outputPath on success.
+ */
+async function cutAndEncodeGame(inputPath, outputPath, startSec, endSec) {
+    if (fs.existsSync(outputPath)) {
+        unlinkSync(outputPath);
+    }
+
+    const VIDEO_CODEC = await probeVideoCodec(inputPath);
+    const STREAM_COPY = VIDEO_CODEC === 'h264';
+    console.log(
+        `[FFMPEG] Cut+encode - source video codec=${VIDEO_CODEC ?? 'unknown'}, ${STREAM_COPY ? 'stream-copy' : 'libx264 re-encode'}`
+    );
+
+    const VIDEO_ARGS = STREAM_COPY
+        ? ['-c:v', 'copy']
+        : ['-c:v', 'libx264', '-preset', 'medium', '-crf', '23'];
+
+    return new Promise((resolve, reject) => {
+        const FFMPEG_ARGS = [
+            '-ss',
+            String(startSec),
+            '-to',
+            String(endSec),
+            '-i',
+            inputPath,
+            ...VIDEO_ARGS,
+            '-c:a',
+            'aac',
+            '-b:a',
+            '128k',
+            '-movflags',
+            '+faststart',
+            outputPath
+        ];
+
+        console.log(
+            `[FFMPEG] Cut+encode - Executing: ${FFMPEG_PATH} ${FFMPEG_ARGS.join(' ')}`
+        );
+
+        const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+
+        FFMPEG.stderr.on('data', (data) => {
+            console.log(`[FFMPEG] Cut+encode - ${data.toString().trim()}`);
+        });
+
+        FFMPEG.on('close', (code) => {
+            if (code === 0 && fs.existsSync(outputPath)) {
+                resolve(outputPath);
+            } else {
+                if (fs.existsSync(outputPath)) {
+                    unlinkSync(outputPath);
+                }
+                reject(new Error(`FFmpeg process exited with code ${code}`));
+            }
+        });
+
+        FFMPEG.on('error', (err) => reject(err));
+    });
+}
+
 module.exports = {
     changeVideoResolution,
     removeBorders,
-    fixForBrowser
+    fixForBrowser,
+    cutAndEncodeGame
 };

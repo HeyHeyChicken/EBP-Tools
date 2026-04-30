@@ -171,5 +171,6 @@ function logout(getMainWindow) {
 
 module.exports = {
     checkJwtToken,
-    logout
+    logout,
+    isJwtAccessTokenOk
 };

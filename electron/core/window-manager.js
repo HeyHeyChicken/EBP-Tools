@@ -10,7 +10,8 @@ const {
     app,
     Tray,
     Menu,
-    nativeImage
+    nativeImage,
+    shell
 } = require('electron');
 const path = require('node:path');
 const { setupConsoleRedirection } = require('./console-manager');
@@ -25,6 +26,7 @@ const {
     PROTOCOL_NAME
 } = require('../config/constants');
 const { checkJwtToken } = require('../services/auth-service');
+const watchFolderService = require('../services/watch-folder-service');
 const StorageManager = require('./storage-manager');
 
 //#endregion
@@ -220,80 +222,137 @@ function createWindow(updateService) {
     });
 
     const TRAY = new Tray(path.join(ROOT_PATH, 'assets', 'favicon.png'));
-    const CONTEXT_MENU = Menu.buildFromTemplate([
-        {
-            label: 'Open',
-            icon: nativeImage
-                .createFromPath(
-                    path.join(ROOT_PATH, 'assets', 'context-menu', 'circle.png')
-                )
-                .resize({ width: 12, height: 12 }),
-            click: () => {
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.show();
-                    mainWindow.focus();
+
+    function buildReplaysSubmenu(status) {
+        const ROOT = watchFolderService.getWatchFolder();
+        const FAILED_DIR = path.join(ROOT, 'failed');
+        const SECTIONS = [
+            { title: 'In progress', items: status.processing, folder: ROOT },
+            { title: 'Queued', items: status.queued, folder: ROOT },
+            { title: 'Failed', items: status.failed, folder: FAILED_DIR }
+        ];
+        const MENU = [];
+        for (const SECTION of SECTIONS) {
+            MENU.push({
+                label: `${SECTION.title} (${SECTION.items.length})`,
+                click: () => shell.openPath(SECTION.folder)
+            });
+            if (SECTION.items.length === 0) {
+                MENU.push({ label: '   —', enabled: false });
+            } else {
+                for (const ITEM of SECTION.items.slice(0, 20)) {
+                    MENU.push({
+                        label: `   ${ITEM.name}`,
+                        click: () => shell.showItemInFolder(ITEM.path)
+                    });
+                }
+                if (SECTION.items.length > 20) {
+                    MENU.push({
+                        label: `   … and ${SECTION.items.length - 20} more`,
+                        enabled: false
+                    });
                 }
             }
-        },
-        {
-            label: 'Restart',
-            icon: nativeImage
-                .createFromPath(
-                    path.join(
-                        ROOT_PATH,
-                        'assets',
-                        'context-menu',
-                        'arrow-circle-left.png'
-                    )
-                )
-                .resize({ width: 12, height: 12 }),
-            submenu: [
-                {
-                    label: 'Confirm restart',
-                    click: () => {
-                        app.relaunch();
-                        if (mainWindow && !mainWindow.isDestroyed()) {
-                            mainWindow.destroy();
-                        }
-                        app.quit();
-                    }
-                }
-            ]
-        },
-        {
-            label: 'Quit',
-            icon: nativeImage
-                .createFromPath(
-                    path.join(ROOT_PATH, 'assets', 'context-menu', 'power.png')
-                )
-                .resize({ width: 12, height: 12 }),
-            submenu: [
-                {
-                    label: 'Confirm quit',
-                    click: () => {
-                        if (mainWindow && !mainWindow.isDestroyed()) {
-                            mainWindow.destroy();
-                        }
-                        app.quit();
-                    }
-                }
-            ]
-        },
-        {
-            label: `Check for update (${updateService.localVersion})`,
-            icon: nativeImage
-                .createFromPath(
-                    path.join(ROOT_PATH, 'assets', 'context-menu', 'up.png')
-                )
-                .resize({ width: 12, height: 12 }),
-            click: () => {
-                updateService.autoUpdate(false);
-            }
+            MENU.push({ type: 'separator' });
         }
-    ]);
+        MENU.pop();
+        return MENU;
+    }
+
+    function buildContextMenu() {
+        const STATUS = watchFolderService.getStatus();
+        return Menu.buildFromTemplate([
+            {
+                label: 'Open',
+                icon: nativeImage
+                    .createFromPath(
+                        path.join(
+                            ROOT_PATH,
+                            'assets',
+                            'context-menu',
+                            'circle.png'
+                        )
+                    )
+                    .resize({ width: 12, height: 12 }),
+                click: () => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.show();
+                        mainWindow.focus();
+                    }
+                }
+            },
+            {
+                label: 'Restart',
+                icon: nativeImage
+                    .createFromPath(
+                        path.join(
+                            ROOT_PATH,
+                            'assets',
+                            'context-menu',
+                            'arrow-circle-left.png'
+                        )
+                    )
+                    .resize({ width: 12, height: 12 }),
+                submenu: [
+                    {
+                        label: 'Confirm restart',
+                        click: () => {
+                            app.relaunch();
+                            if (mainWindow && !mainWindow.isDestroyed()) {
+                                mainWindow.destroy();
+                            }
+                            app.quit();
+                        }
+                    }
+                ]
+            },
+            {
+                label: 'Quit',
+                icon: nativeImage
+                    .createFromPath(
+                        path.join(
+                            ROOT_PATH,
+                            'assets',
+                            'context-menu',
+                            'power.png'
+                        )
+                    )
+                    .resize({ width: 12, height: 12 }),
+                submenu: [
+                    {
+                        label: 'Confirm quit',
+                        click: () => {
+                            if (mainWindow && !mainWindow.isDestroyed()) {
+                                mainWindow.destroy();
+                            }
+                            app.quit();
+                        }
+                    }
+                ]
+            },
+            {
+                label: `Check for update (${updateService.localVersion})`,
+                icon: nativeImage
+                    .createFromPath(
+                        path.join(ROOT_PATH, 'assets', 'context-menu', 'up.png')
+                    )
+                    .resize({ width: 12, height: 12 }),
+                click: () => {
+                    updateService.autoUpdate(false);
+                }
+            },
+            {
+                label: `Replay analysis (${STATUS.processing.length}, ${STATUS.queued.length}, ${STATUS.failed.length})`,
+                submenu: buildReplaysSubmenu(STATUS)
+            }
+        ]);
+    }
 
     TRAY.setToolTip('EBP - Tools');
-    TRAY.setContextMenu(CONTEXT_MENU);
+    TRAY.setContextMenu(buildContextMenu());
+    setInterval(() => {
+        TRAY.setContextMenu(buildContextMenu());
+    }, 3000);
 
     // Double-click on the icon to reopen the window.
     TRAY.on('double-click', () => {
