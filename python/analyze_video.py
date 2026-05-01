@@ -676,7 +676,10 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     cfg = '-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
     if user_words_path:
         cfg += f' -c user_words_file={user_words_path}'
-    for psm in (7, 8):
+    # PSM 6 (uniform block) en 1er : sur cette font cursive il sort des
+    # caractères mieux groupés que PSM 7 (line) qui peut couper. PSM 7/8
+    # gardent le rôle de fallback si PSM 6 sort vide.
+    for psm in (6, 7, 8):
         try:
             txt = pytesseract.image_to_string(
                 pil, config=f'--psm {psm} {cfg}'
