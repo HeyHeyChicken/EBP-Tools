@@ -644,7 +644,7 @@ def _split_kill_row(frame: np.ndarray, bbox,
 
 def _ocr_kill_name(frame: np.ndarray, box, target_color,
                    tol_color: int = 80, upscale: int = 4, pad: int = 20,
-                   y_extend: int = 3) -> str:
+                   y_extend: int = 3, user_words_path: str = None) -> str:
     """
     OCR un nom de joueur dans une bbox killfeed. Masque par couleur d'équipe
     (texte couleur cible → noir, fond → blanc, polarité standard Tesseract),
@@ -674,6 +674,8 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     )
     pil = ImageOps.expand(pil, border=pad, fill=255).convert('RGB')
     cfg = '-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    if user_words_path:
+        cfg += f' -c user_words_file={user_words_path}'
     for psm in (7, 8):
         try:
             txt = pytesseract.image_to_string(
@@ -1661,6 +1663,26 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                           str([p.get('name') for p in ORANGE_ROSTER]) +
                           ' blue=' + str([p.get('name') for p in BLUE_ROSTER])})
 
+        # Fichier user_words pour Tesseract : biaise (faiblement) le LM vers
+        # les pseudos roster connus. Effet modeste (~+1 kill / 80 sur LE TEST)
+        # car PSM 7/8 + whitelist court-circuite le LM, mais c'est gratuit.
+        # On stocke en /tmp avec un nom déterministe par chunk.
+        USER_WORDS_PATH = None
+        if ORANGE_ROSTER or BLUE_ROSTER:
+            USER_WORDS_PATH = os.path.join('/tmp', f'eva_user_words_{GAME_ID}.txt')
+            ALL_NAMES = set()
+            for p in ORANGE_ROSTER + BLUE_ROSTER:
+                n = p.get('name')
+                if n:
+                    ALL_NAMES.add(n)
+                    ALL_NAMES.add(n.upper())
+                    ALL_NAMES.add(n.lower())
+            try:
+                with open(USER_WORDS_PATH, 'w') as f:
+                    f.write('\n'.join(ALL_NAMES) + '\n')
+            except Exception:
+                USER_WORDS_PATH = None
+
         GF = MODES[MODE_INDEX]['gameFrame']
         TIMER_BOX = GF['timer']
         ORANGE_SCORE_SPEC = GF['orangeScore']
@@ -1846,8 +1868,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     KT, VT = SPLIT['killer']['team'], SPLIT['victim']['team']
                     KT_COLOR = RESOLVED_ORANGE if KT == 'orange' else RESOLVED_BLUE
                     VT_COLOR = RESOLVED_ORANGE if VT == 'orange' else RESOLVED_BLUE
-                    KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR)
-                    VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR)
+                    KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR, user_words_path=USER_WORDS_PATH)
+                    VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR, user_words_path=USER_WORDS_PATH)
                     KMATCH = _match_player(KRAW, ROSTER_O_NAMES if KT == 'orange' else ROSTER_B_NAMES)
                     VMATCH = _match_player(VRAW, ROSTER_O_NAMES if VT == 'orange' else ROSTER_B_NAMES)
                     if KMATCH and VMATCH:
