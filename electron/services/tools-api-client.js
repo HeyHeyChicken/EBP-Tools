@@ -161,14 +161,31 @@ async function apiRequest(
 }
 
 /**
- * POST /api/tools/games/match
- * @param {object} payload { videoFingerprint, segments: [{ tempId, ... }] }
- * @returns {Promise<{ matches: Array<{tempId, gameID, hasVideo}>, unmatched: Array<string|number> }>}
+ * POST /api/tools/games/identify
+ * Première étape : matche les segments aux games BDD (LCS sur mapID + scores
+ * ±1, sessions 4h) et retourne les rosters avec K/D pour pouvoir nourrir la
+ * phase 2 d'analyse approfondie avec des pseudos full-confiance.
+ *
+ * @param {object} payload { sourceFilename?, segments: [{ tempId, startSeconds, endSeconds, mode, mapName, blueScore, orangeScore, ... }] }
+ * @returns {Promise<{ matches: Array<{tempId, gameID, hasVideo, orangePlayers: Array<{name, K, D}>, bluePlayers: Array<{name, K, D}>}>, unmatched: Array<string> }>}
  *   `hasVideo` indique qu'une vidéo est déjà attachée à la game côté serveur :
  *   le client doit alors skip découpage / réencodage / upload pour ce segment.
  */
-function matchGames(payload) {
-    return apiRequest('POST', '/games/match', payload);
+function identifyGames(payload) {
+    return apiRequest('POST', '/games/identify', payload);
+}
+
+/**
+ * POST /api/tools/games/persist-analysis
+ * Seconde étape : persiste les analyses approfondies de phase 2 pour les games
+ * matchées via `/identify`. Le client envoie directement les `gameID` (pas de
+ * re-matching côté back). Ownership re-vérifiée par game.
+ *
+ * @param {object} payload { analyses: [{ gameID, generated_by?, payload }] }
+ * @returns {Promise<{ persisted: Array<string>, failed: Array<{gameID, reason}> }>}
+ */
+function persistAnalysis(payload) {
+    return apiRequest('POST', '/games/persist-analysis', payload);
 }
 
 /**
@@ -261,7 +278,8 @@ async function uploadFileToPresignedUrl(
 }
 
 module.exports = {
-    matchGames,
+    identifyGames,
+    persistAnalysis,
     requestUploadUrl,
     confirmUpload,
     uploadFileToPresignedUrl,

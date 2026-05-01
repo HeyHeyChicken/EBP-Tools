@@ -25,11 +25,13 @@ import pytesseract
 # détection de bordure (find_text_border). Une seule source de vérité par couleur.
 TEAM_ORANGE = [
     (238, 120, 12), # Orange
-    (40, 255, 119)  # Vert fluo
+    (40, 255, 119), # Vert fluo
+    (169, 220, 83)  # Jaune fluo (pro league)
 ]
 TEAM_BLUE   = [
     (43, 137, 237), # Bleu
-    (180, 0, 244)  # Violet
+    (180, 0, 244),  # Violet
+    (55, 189, 218)  # Bleu fluo (pro league)
 ]
 
 MODES = [
@@ -87,6 +89,35 @@ MODES = [
                 'colors': TEAM_BLUE,
                 'search': ((1014, 65), (1095, 107)),
                 'inset': -10,
+            },
+            # Killfeed top-right : on détecte des bandes de texte (couleur équipe
+            # + picto arme blanc) par row-scan vertical. textHeight = hauteur de
+            # la bande de texte coloré (≠ hauteur de la box visuelle ~30 px,
+            # le reste est du fond noir non discriminant).
+            'killFeed': {
+                'region': ((1690, 140), (1920, 400)),
+                'textHeight': 11,
+                'textHeightTol': 6,
+                'minTextPixels': 3,         # min pixels couleur équipe par row pour être "row de texte"
+                'rowGap': 3,                # max rows sans signal couleur tolérés au sein d'un cluster
+                'minTotalWhitePixels': 20,  # min pixels near-white cumulés dans la bande (= picto arme)
+                'minWhitePerRow': 3,        # min near-white pixels par row pour considérer une row "dans la bande de texte"
+                                            # (sert à trimmer la fuite du cluster dans le décor team-couleur)
+                'minWidth': 80,             # une vraie kill row fait ~120-160 px (killer+picto+victim) ;
+                                            # rejette les clusters étroits type bord de HUD ou notif "DÉFENDRE"
+                # Validation anti-faux-positif : on vérifie le bord droit du bbox,
+                # qui correspond à l'extrémité arrondie de la box noire de la victime.
+                # Toujours quasi-100 % noir pour un vrai kill (le fond solide noir
+                # entoure le texte). Approche plus robuste qu'une moyenne sur la
+                # moitié droite, car celle-ci peut leak dans le gap entre 2 kills
+                # empilés (qui montre le décor) → ratio dégradé.
+                'edgePx': 15,                # largeur du bord droit à inspecter
+                'edgePadY': 5,               # extension verticale ± px (juste de quoi sortir de l'anti-aliasing)
+                'blackMaxChannel': 60,       # max(R,G,B) pour qualifier "noir"
+                'minEdgeBlackRatio': 0.15,   # min black ratio dans le bord droit. Volontairement bas
+                                             # pour accepter les kill rows en fade-in/fade-out (background
+                                             # encore semi-transparent). Les vrais faux positifs (DÉFENDRE,
+                                             # HUD) restent à ~0 % donc séparation reste nette.
             },
         },
         'playingFrame': {
@@ -442,6 +473,420 @@ def _find_text_border(frame: np.ndarray, colors: list, search_region, tol_color:
     if x2 <= x1 or y2 <= y1:
         return None
     return ((x1, y1), (x2, y2))
+
+
+def _pick_dominant_color(frame: np.ndarray, search_region, candidates: list, tol_color: int = 20, min_pixels: int = 30):
+    """
+    Parmi une liste de couleurs candidates, retourne celle qui matche le plus
+    de pixels dans search_region (ou None si aucune ne dépasse min_pixels).
+    Utilisé pour verrouiller la couleur d'équipe réellement présente dans la
+    partie courante (TEAM_ORANGE et TEAM_BLUE listent plusieurs valeurs possibles).
+    """
+    h, w = frame.shape[:2]
+    (sx1, sy1), (sx2, sy2) = search_region
+    sx1 = max(0, int(sx1)); sy1 = max(0, int(sy1))
+    sx2 = min(w, int(sx2)); sy2 = min(h, int(sy2))
+    if sx1 >= sx2 or sy1 >= sy2:
+        return None
+    sub = frame[sy1:sy2, sx1:sx2].astype(np.int16)
+    best = None
+    best_count = 0
+    for c in candidates:
+        target = np.array(c, dtype=np.int16)
+        count = int(((np.abs(sub - target) <= tol_color).all(axis=2)).sum())
+        if count > best_count:
+            best_count = count
+            best = c
+    return best if best_count >= min_pixels else None
+
+
+def _resolve_team_colors(frame: np.ndarray, mode_index: int):
+    """
+    Détermine la couleur effective de chaque équipe sur la frame courante en
+    comptant les pixels matchant chaque candidat dans la search region du score
+    HUD. Retourne (orange_rgb, blue_rgb) — chaque élément peut être None si
+    la zone n'est pas assez peuplée (frame de transition, etc.).
+    """
+    GF = MODES[mode_index]['gameFrame']
+    return (
+        _pick_dominant_color(frame, GF['orangeScore']['search'], TEAM_ORANGE),
+        _pick_dominant_color(frame, GF['blueScore']['search'], TEAM_BLUE),
+    )
+
+
+def _validate_kill_row(frame: np.ndarray, bbox, kf_spec: dict) -> bool:
+    """
+    Vérifie qu'une bbox candidate est bien une ligne de kill en inspectant le
+    BORD DROIT du bbox — l'extrémité arrondie de la box noire de la victime,
+    quasi 100 % noir sur un vrai kill quel que soit le contexte (map, gameplay).
+
+    Pourquoi pas la moitié droite entière : le bbox détecté à l'étape 1 peut
+    être plus court que la box visuelle réelle (couleur du killer atténuée par
+    un fond transparent → cluster tronqué) et l'extension verticale peut leak
+    dans le gap entre 2 kills empilés → on inclurait du décor non-noir, ratio
+    s'effondre, vrai kill rejeté.
+
+    Le bord droit (15 derniers px) est lui toujours dans la box noire, et avec
+    un pad_y minimal il reste centré sur la bande de texte → mesure stable.
+
+    Retourne True si black_ratio ≥ minEdgeBlackRatio.
+    """
+    (_, y1), (x2, y2) = bbox
+    h, w = frame.shape[:2]
+    pad_y = kf_spec.get('edgePadY', 5)
+    edge  = kf_spec.get('edgePx', 15)
+    y1e = max(0, int(y1) - pad_y)
+    y2e = min(h, int(y2) + pad_y)
+    xa  = max(0, int(x2) - edge)
+    xb  = min(w, int(x2))
+    if y1e >= y2e or xa >= xb:
+        return False
+
+    sub = frame[y1e:y2e, xa:xb]
+    total = sub.shape[0] * sub.shape[1]
+    if total == 0:
+        return False
+
+    black_max = kf_spec.get('blackMaxChannel', 60)
+    sub_max = sub.max(axis=2)
+    black_ratio = int((sub_max <= black_max).sum()) / total
+    return black_ratio >= kf_spec.get('minEdgeBlackRatio', 0.30)
+
+
+def _split_kill_row(frame: np.ndarray, bbox,
+                    hue_threshold: int = 30, min_brightness: int = 100):
+    """
+    Découpe une bbox de kill row en killer / weapon / victim en localisant les
+    colonnes ayant des pixels orange-ish / blue-ish par dominance de hue. Le
+    killer et la victime ont chacun leur cluster (couleurs distinctes — kill
+    cross-team obligatoire), le picto arme tient entre les deux.
+
+    On NE peut PAS se fier aux pixels near-white pour localiser le picto : si
+    le killer a un mur blanc derrière sa box transparente, tout le côté killer
+    matche near-white et le picto "fuit" sur toute la bbox.
+
+    On utilise la dominance de hue plutôt qu'un match RGB exact car le texte
+    du killer (fond transparent) est alpha-blendé avec le décor : un pixel
+    orange peut s'afficher (225,154,100) sur un mur gris au lieu de
+    (238,120,12), |B-12|=88 hors tol_color=40 → match raté. Mais R reste
+    largement supérieur à B donc la dominance R-over-B subsiste. La couleur
+    exacte d'équipe (RESOLVED_ORANGE/BLUE) n'est donc pas utilisée ici.
+
+    Retourne dict {'killer': {'box', 'team'}, 'weapon': {'box'}, 'victim':
+    {'box', 'team'}} ou None si :
+      - une seule couleur d'équipe présente (pas un kill cross-team)
+      - les clusters orange/bleu s'overlap (pas de zone picto fiable)
+    """
+    (x1, y1), (x2, y2) = bbox
+    sub = frame[y1:y2, x1:x2].astype(np.int16)
+    R, G, B = sub[:, :, 0], sub[:, :, 1], sub[:, :, 2]
+
+    # Dominance de hue + brightness mini pour ignorer les pixels sombres parasites.
+    m_o = (R > B + hue_threshold) & (R > G) & (R >= min_brightness)
+    m_b = (B > R + hue_threshold) & (B > G) & (B >= min_brightness)
+
+    # ≥ 2 px par col : un pixel isolé (artéfact de scenery, anti-aliasing) ne
+    # compte pas comme une col du cluster.
+    n_o_per_col = m_o.sum(axis=0)
+    n_b_per_col = m_b.sum(axis=0)
+    cols_o = np.where(n_o_per_col >= 2)[0]
+    cols_b = np.where(n_b_per_col >= 2)[0]
+    if len(cols_o) < 4 or len(cols_b) < 4:
+        return None
+
+    def _largest_block(cols, max_gap: int = 5):
+        """Plus gros bloc contigu de cols (gaps ≤ max_gap tolérés)."""
+        if len(cols) == 0:
+            return None
+        s = np.sort(cols)
+        blocks = []
+        cur_start = cur_end = int(s[0])
+        for c in s[1:]:
+            c = int(c)
+            if c - cur_end <= max_gap:
+                cur_end = c
+            else:
+                blocks.append((cur_start, cur_end))
+                cur_start = cur_end = c
+        blocks.append((cur_start, cur_end))
+        return max(blocks, key=lambda b: b[1] - b[0])
+
+    # Plus gros bloc contigu pour chaque couleur. Les pixels parasites isolés
+    # (scenery dont la couleur ressemble à une équipe, p.ex. champ d'énergie
+    # bleu derrière un kill row) forment des petits blocs ignorés.
+    block_o = _largest_block(cols_o)
+    block_b = _largest_block(cols_b)
+    if block_o is None or block_b is None:
+        return None
+
+    # Killer = bloc dont le centre est le plus à gauche.
+    center_o = (block_o[0] + block_o[1]) / 2
+    center_b = (block_b[0] + block_b[1]) / 2
+    if center_o < center_b:
+        killer_team, victim_team = 'orange', 'blue'
+        killer_block, victim_block = block_o, block_b
+    else:
+        killer_team, victim_team = 'blue', 'orange'
+        killer_block, victim_block = block_b, block_o
+
+    killer_right = killer_block[1] + 1
+    victim_left  = victim_block[0]
+    if victim_left <= killer_right:
+        # Blocs s'overlap : split non fiable.
+        return None
+
+    return {
+        'killer': {'box': ((x1,                y1), (x1 + killer_right, y2)), 'team': killer_team},
+        'weapon': {'box': ((x1 + killer_right, y1), (x1 + victim_left,  y2))},
+        'victim': {'box': ((x1 + victim_left,  y1), (x2,                y2)), 'team': victim_team},
+    }
+
+
+def _ocr_kill_name(frame: np.ndarray, box, target_color,
+                   tol_color: int = 80, upscale: int = 4, pad: int = 20,
+                   y_extend: int = 3) -> str:
+    """
+    OCR un nom de joueur dans une bbox killfeed. Masque par couleur d'équipe
+    (texte couleur cible → noir, fond → blanc, polarité standard Tesseract),
+    upscale BICUBIC et pad pour Tesseract qui aime ~32+ px de hauteur de glyph.
+
+    `y_extend` étend la bbox verticalement (haut + bas) pour capter les
+    descendants ("j", "y", "p") et ascendants ("h", "k") des glyphes — la
+    bbox détectée à l'étape 1 borne le cluster des pixels couleur d'équipe,
+    qui correspond au CORPS du glyph, pas aux pleins/déliés. Sans ça, "junior"
+    est cropped au "lurior" (le j perd son crochet).
+
+    Fallback PSM 7 (line) → 8 (word) si vide. Retourne raw OCR string (à
+    fuzzy-matcher contre le roster ensuite).
+    """
+    (x1, y1), (x2, y2) = box
+    h, w = frame.shape[:2]
+    x1 = max(0, int(x1)); y1 = max(0, int(y1) - y_extend)
+    x2 = min(w, int(x2)); y2 = min(h, int(y2) + y_extend)
+    if x2 <= x1 or y2 <= y1:
+        return ''
+    sub = frame[y1:y2, x1:x2].astype(np.int16)
+    target = np.array(target_color, dtype=np.int16)
+    mask = (np.abs(sub - target).max(axis=2) <= tol_color)
+    bw = np.where(mask, 0, 255).astype(np.uint8)
+    pil = Image.fromarray(bw).resize(
+        (bw.shape[1] * upscale, bw.shape[0] * upscale), Image.BICUBIC
+    )
+    pil = ImageOps.expand(pil, border=pad, fill=255).convert('RGB')
+    cfg = '-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    for psm in (7, 8):
+        try:
+            txt = pytesseract.image_to_string(
+                pil, config=f'--psm {psm} {cfg}'
+            ).replace('\r', '').replace('\n', '').strip()
+            if txt:
+                return txt
+        except Exception:
+            pass
+    return ''
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Distance d'édition standard (DP en O(n*m)). Pure Python."""
+    if len(a) < len(b):
+        a, b = b, a
+    if len(b) == 0:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a):
+        curr = [i + 1]
+        for j, cb in enumerate(b):
+            ins = prev[j + 1] + 1
+            del_ = curr[j] + 1
+            sub = prev[j] + (0 if ca == cb else 1)
+            curr.append(min(ins, del_, sub))
+        prev = curr
+    return prev[-1]
+
+
+def _match_player(raw: str, roster_names: list, cutoff: float = 0.5):
+    """
+    Fuzzy-match raw OCR contre une liste de pseudos roster (case-insensitive).
+    Retourne le nom canonique (avec sa casse roster) ou None si pas de match
+    suffisamment proche.
+
+    Utilise Levenshtein (edit distance) plutôt que `difflib` (LCS) : le LCS
+    bonus les préfixes communs, ce qui fait matcher "Thki" → "Thibs" au lieu
+    de "Myki" alors qu'on est à 2 edits de Myki vs 3 de Thibs. Levenshtein
+    pénalise correctement par longueur.
+
+    cutoff bas (0.55) volontaire : multi-frame consensus (kill affiché 5 s ×
+    1 Hz = 4-5 OCR, dédup post-process arbitre) compense les misreads isolés.
+    """
+    if not raw or not roster_names:
+        return None
+    raw_up = raw.upper()
+    best_name = None
+    best_ratio = 0.0
+    for n in roster_names:
+        n_up = n.upper()
+        max_len = max(len(raw_up), len(n_up))
+        if max_len == 0:
+            continue
+        ratio = 1 - _levenshtein(raw_up, n_up) / max_len
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best_name = n
+    return best_name if best_ratio >= cutoff else None
+
+
+def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1) -> dict:
+    """
+    Dédup multi-frame des observations killfeed. Un kill reste 5 s à l'écran ×
+    sampling 1 Hz = ~5 observations par event. On veut un seul event par kill,
+    daté à l'elapsed le plus tôt vu.
+
+    Stratégie : grouper par paire (killer, victim) ; au sein d'une paire,
+    cluster les elapseds avec un gap max de `window` secondes. Chaque cluster
+    = un event distinct. Au-delà de `window`, on considère que c'est un nouvel
+    event (le même duo peut killer 2× dans un game).
+
+    `min_observations` permet de filtrer les clusters d'observations isolées
+    (typiquement OCR raté qui produit une paire fantôme 1× isolée). Défaut 1
+    pour ne rien jeter ; bumper à 2 si trop de bruit OCR persiste.
+
+    Retourne {str(elapsed): {'killer', 'victim'}, ...} trié par elapsed.
+    """
+    by_pair = {}
+    for elapsed, obs_list in observations.items():
+        for obs in obs_list:
+            key = (obs['killer'], obs['victim'])
+            by_pair.setdefault(key, []).append(int(elapsed))
+
+    kills = []
+    for (killer, victim), elapseds in by_pair.items():
+        es = sorted(set(elapseds))
+        if not es:
+            continue
+        cluster = [es[0]]
+        for e in es[1:]:
+            if e - cluster[-1] > window:
+                if len(cluster) >= min_observations:
+                    kills.append((cluster[0], killer, victim))
+                cluster = [e]
+            else:
+                cluster.append(e)
+        if len(cluster) >= min_observations:
+            kills.append((cluster[0], killer, victim))
+
+    kills.sort(key=lambda x: x[0])
+    return {str(e): {'killer': k, 'victim': v} for e, k, v in kills}
+
+
+def _detect_kill_rows(frame: np.ndarray, kf_spec: dict, orange_color, blue_color,
+                      tol_color: int = 40, white_min_channel: int = 150,
+                      white_chan_diff: int = 25) -> list:
+    """
+    Row-scan du killfeed : on cluster les rows ayant du texte couleur d'équipe
+    (avec tolérance de petits gaps au sein d'un cluster, le picto arme peut
+    "manger" 1-2 rows de couleur), puis on valide chaque cluster en vérifiant
+    qu'il contient assez de pixels near-white cumulés (= le picto arme).
+
+    Le picto arme n'est PAS blanc pur (anti-aliasing → gris ~200,200,200), donc
+    on détecte les pixels grayscale (max-min ≤ chan_diff) ET brillants (min ≥
+    white_min_channel) plutôt qu'une simple proximité de (255,255,255).
+
+    Retourne la liste des bbox de chaque bande de texte détectée, en coords
+    absolues frame : [((x1, y1), (x2, y2)), ...]. Pas de vérif anti-faux-positif
+    ici (étape 2). Si une couleur d'équipe est None, retourne [].
+    """
+    if orange_color is None or blue_color is None:
+        return []
+
+    (rx1, ry1), (rx2, ry2) = kf_spec['region']
+    h, w = frame.shape[:2]
+    rx1 = max(0, int(rx1)); ry1 = max(0, int(ry1))
+    rx2 = min(w, int(rx2)); ry2 = min(h, int(ry2))
+    if rx1 >= rx2 or ry1 >= ry2:
+        return []
+
+    sub = frame[ry1:ry2, rx1:rx2].astype(np.int16)
+
+    m_orange = (np.abs(sub - np.array(orange_color, dtype=np.int16)) <= tol_color).all(axis=2)
+    m_blue   = (np.abs(sub - np.array(blue_color,   dtype=np.int16)) <= tol_color).all(axis=2)
+
+    sub_max = sub.max(axis=2)
+    sub_min = sub.min(axis=2)
+    m_white = (sub_min >= white_min_channel) & ((sub_max - sub_min) <= white_chan_diff)
+
+    n_orange = m_orange.sum(axis=1)
+    n_blue   = m_blue.sum(axis=1)
+    n_white  = m_white.sum(axis=1)
+
+    min_team        = kf_spec.get('minTextPixels', 4)
+    max_gap         = kf_spec.get('rowGap', 3)
+    min_total_white = kf_spec.get('minTotalWhitePixels', 20)
+    target_h        = kf_spec.get('textHeight', 11)
+    tol_h           = kf_spec.get('textHeightTol', 5)
+    min_width       = kf_spec.get('minWidth', 80)
+
+    is_text_row = (n_orange >= min_team) | (n_blue >= min_team)
+
+    # Cluster avec tolérance de gap. Quand on dépasse max_gap rows consécutives
+    # sans signal, on ferme le cluster en excluant les gap rows trailing.
+    clusters = []
+    in_cluster = False
+    g_start = 0
+    last_true = -1
+    gap = 0
+    for y in range(len(is_text_row)):
+        if is_text_row[y]:
+            if not in_cluster:
+                in_cluster = True
+                g_start = y
+            last_true = y
+            gap = 0
+        elif in_cluster:
+            gap += 1
+            if gap > max_gap:
+                clusters.append((g_start, last_true + 1))
+                in_cluster = False
+                gap = 0
+    if in_cluster:
+        clusters.append((g_start, last_true + 1))
+
+    min_white_per_row = kf_spec.get('minWhitePerRow', 3)
+
+    bboxes = []
+    for (g_start, g_end) in clusters:
+        # Trim cluster aux rows où le picto blanc est présent. Sans ça, un décor
+        # de la couleur d'une équipe (ex : champ d'énergie bleu) prolonge le
+        # cluster bien au-delà de la bande de texte → height check fail.
+        # La bande de texte est exactement où le picto est visible.
+        white_rows = np.where(n_white[g_start:g_end] >= min_white_per_row)[0]
+        if len(white_rows) == 0:
+            continue
+        t_start = g_start + int(white_rows.min())
+        t_end   = g_start + int(white_rows.max()) + 1
+
+        height = t_end - t_start
+        if abs(height - target_h) > tol_h:
+            continue
+        if int(n_white[t_start:t_end].sum()) < min_total_white:
+            continue
+        slab_o = m_orange[t_start:t_end]
+        slab_b = m_blue[t_start:t_end]
+        slab_w = m_white[t_start:t_end]
+        cols = np.where(slab_o.any(axis=0) | slab_b.any(axis=0) | slab_w.any(axis=0))[0]
+        if len(cols) == 0:
+            continue
+        width = int(cols.max()) - int(cols.min()) + 1
+        if width < min_width:
+            continue
+        bbox = (
+            (rx1 + int(cols.min()),     ry1 + t_start),
+            (rx1 + int(cols.max()) + 1, ry1 + t_end),
+        )
+        if not _validate_kill_row(frame, bbox, kf_spec):
+            continue
+        bboxes.append(bbox)
+
+    return bboxes
 
 
 def _resolve_region(spec, frame: np.ndarray, dx: float = 0, dy: float = 0):
@@ -1049,18 +1494,26 @@ def _color_isolated_bw(frame: np.ndarray, box, colors: list, tol: int = 50) -> I
     return Image.fromarray(BW, mode='L').convert('RGB')
 
 
-def _ocr_timer_fast(frame: np.ndarray, box) -> str:
+def _ocr_timer_fast(frame: np.ndarray, box, text_color=(10, 10, 10), tol_color: int = 50) -> str:
     """
-    Fast-path timer OCR : 1 seule passe BW (luminance < 100) + PSM 7. Couvre la
-    quasi-totalité des frames in-game en 1 appel Tesseract au lieu des 4 du
-    `_ocr_region(apply_filter=True)`. L'appelant doit fallback sur `_ocr_region`
-    complet si le retour ne parse pas en (M, S).
+    Fast-path timer OCR : sélection du texte par MATCH COULEUR (texte ~rgb(10,10,10)
+    sur fond ~rgb(137,137,137)) plutôt que par luminance. Évite que la pure
+    silhouette d'un glyph anti-aliasé borderline soit reconstruite à tort
+    (ex : un "0" dont le seuillage casse la boucle → lu "3").
+
+    Polarité conservée : pixels texte → blanc, fond → noir. lang='evadigits' a
+    été entraîné sur cette polarité.
     """
-    IMG = _region_to_pil(frame, box[0][0], box[0][1], box[1][0], box[1][1])
-    BW = IMG.convert('L').point(lambda p: 255 if p < 100 else 0).convert('RGB')
+    x1, y1 = int(box[0][0]), int(box[0][1])
+    x2, y2 = int(box[1][0]), int(box[1][1])
+    SUB = frame[y1:y2, x1:x2].astype(np.int16)
+    DIFF = np.abs(SUB - np.array(text_color, dtype=np.int16)).max(axis=2)
+    MASK = DIFF <= tol_color
+    BW = np.where(MASK, 255, 0).astype(np.uint8)
     try:
         TEXT = pytesseract.image_to_string(
-            BW, lang='evadigits',
+            Image.fromarray(BW).convert('RGB'),
+            lang='evadigits',
             config='--psm 7 -c tessedit_char_whitelist=0123456789:',
         ).replace('\r', '').replace('\n', '').strip()
         return re.sub(r'[^0-9:]', '', TEXT)
@@ -1151,6 +1604,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     le timer jump de la phase 1 : première lecture valide gagne).
     """
     CHUNKS = settings.get('chunks', []) or []
+    # Plafond connu de la durée d'une game (10 min en EVA standard). Sert à
+    # rejeter les OCR aberrants sur la 1ère frame du chunk : si le timer est
+    # OCR'd "13:00" alors que la vraie valeur est "10:00", sans cap on
+    # initialise MAX_TIME=13 et toute la timeline est shiftée. Avec cap, on
+    # rejette et on attend une lecture cohérente.
+    MAX_TIME_CAP = int(settings.get('maxTimePerGame', 10))
     #_emit({'log': f'[_analyze_chunks] {settings}'})
 
     if not CHUNKS:
@@ -1191,6 +1650,17 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         MAX_ORANGE = CHUNK.get('orangeScore')
         MAX_BLUE = CHUNK.get('blueScore')
 
+        # Rosters trustés issus de l'API /games/identify (appelée AVANT phase 2
+        # par le client). Format : [{name, K, D}, ...]. Sera utilisé à l'étape 4
+        # comme référence pour le fuzzy match des pseudos OCR du killfeed. Si
+        # la game n'a pas matché côté back, listes vides → fallback OCR-only.
+        ORANGE_ROSTER = CHUNK.get('orangePlayers') or []
+        BLUE_ROSTER = CHUNK.get('bluePlayers') or []
+        if ORANGE_ROSTER or BLUE_ROSTER:
+            _emit({'log': f'[_analyze_chunks] {GAME_ID} roster orange=' +
+                          str([p.get('name') for p in ORANGE_ROSTER]) +
+                          ' blue=' + str([p.get('name') for p in BLUE_ROSTER])})
+
         GF = MODES[MODE_INDEX]['gameFrame']
         TIMER_BOX = GF['timer']
         ORANGE_SCORE_SPEC = GF['orangeScore']
@@ -1202,7 +1672,20 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # rate cap, bornes). Une hallucination isolée se fait dominer par le
         # consensus des voisines, sans cascade de rejets.
         RAW_OBSERVATIONS = {}   # {elapsed_s: {'orange': [v, ...], 'blue': [v, ...]}}
+        # Observations brutes de killfeed : chaque elapsed peut avoir plusieurs
+        # observations (kill affiché 5 s × sampling 1 Hz = ~5 frames par kill).
+        # Le dédup post-process tranche pour ne garder qu'un kill par paire
+        # (killer, victim) sur la fenêtre de 5-10 s.
+        KILL_OBSERVATIONS = {}   # {elapsed_s: [{'killer': str, 'victim': str, 'killer_raw': str, 'victim_raw': str}, ...]}
         MAX_TIME = None   # auto-détecté à la première lecture timer valide
+
+        # Couleur effectivement utilisée par chaque équipe dans cette partie.
+        # TEAM_ORANGE et TEAM_BLUE listent plusieurs valeurs possibles (orange/vert
+        # fluo, bleu/violet) ; on verrouille la couleur réelle sur la 1ère frame
+        # de gameplay du chunk pour éviter les faux positifs en aval (killfeed,
+        # masquage OCR). Reste None si la 1ère frame ne donne pas assez de pixels.
+        RESOLVED_ORANGE = None
+        RESOLVED_BLUE = None
 
         # Garde-fou anti-pollution timer : un timer OCR foireux (ex: "09:43" lu
         # "03:43") génère un ELAPSED aberrant qui décale toute la timeline.
@@ -1224,13 +1707,38 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
         # comportement bit-pour-bit (cf. sizing plus haut).
         def _submit_frame(ts):
+            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE
             FRAME = _get_frame(CAP, ts)
             if FRAME is None or not _detect_game_playing(FRAME):
                 return ('skip', ts)
+
+            # Verrouille la couleur d'équipe sur la 1ère frame exploitable du
+            # chunk. On le fait ICI (avant les submit OCR) plutôt que dans
+            # `_process_ocr_item` pour que le pipeline OCR du score utilise
+            # directement la couleur résolue (et pas la liste complète qui
+            # contient des candidats "pro league" tels que jaune fluo / cyan
+            # qui matchent du HUD parasite et faussent la détection du bbox).
+            if RESOLVED_ORANGE is None or RESOLVED_BLUE is None:
+                ORG, BLU = _resolve_team_colors(FRAME, MODE_INDEX)
+                if RESOLVED_ORANGE is None and ORG is not None:
+                    RESOLVED_ORANGE = ORG
+                if RESOLVED_BLUE is None and BLU is not None:
+                    RESOLVED_BLUE = BLU
+                if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None:
+                    _emit({'log': f'[_analyze_chunks] {GAME_ID} resolved colors: orange={RESOLVED_ORANGE} blue={RESOLVED_BLUE}'})
+
+            # Spec dérivée avec la couleur résolue (override `colors` du spec
+            # statique). Si la résolution n'a pas encore réussi, on retombe
+            # sur la liste complète — comportement identique à l'ancien code.
+            O_COLORS = [RESOLVED_ORANGE] if RESOLVED_ORANGE else TEAM_ORANGE
+            B_COLORS = [RESOLVED_BLUE]   if RESOLVED_BLUE   else TEAM_BLUE
+            O_SPEC = {**ORANGE_SCORE_SPEC, 'colors': O_COLORS}
+            B_SPEC = {**BLUE_SCORE_SPEC,   'colors': B_COLORS}
+
             return ('ocr', ts, FRAME,
                     EXECUTOR.submit(_ocr_timer_fast, FRAME, TIMER_BOX),
-                    EXECUTOR.submit(_ocr_score_at, FRAME, ORANGE_SCORE_SPEC, TEAM_ORANGE, MAX_ORANGE),
-                    EXECUTOR.submit(_ocr_score_at, FRAME, BLUE_SCORE_SPEC, TEAM_BLUE, MAX_BLUE))
+                    EXECUTOR.submit(_ocr_score_at, FRAME, O_SPEC, O_COLORS, MAX_ORANGE),
+                    EXECUTOR.submit(_ocr_score_at, FRAME, B_SPEC, B_COLORS, MAX_BLUE))
 
         def _record_raw(elapsed, orange_raw, blue_raw, timer_text=''):
             #_emit({'log': f'[_analyze_chunks] --------> {timer_text}: orange={orange_raw} blue={blue_raw}'})
@@ -1279,7 +1787,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             if not (0 <= S < 60):
                 return
             if MAX_TIME is None:
-                if not (0 <= M <= 15):
+                # Cap dur sur M : un OCR foireux qui lit "13:00" au lieu de
+                # "10:00" verrouillerait MAX_TIME à 13 et shifterait toute la
+                # timeline de 180 s. On attend une lecture ≤ MAX_TIME_CAP.
+                if not (0 <= M <= MAX_TIME_CAP):
                     return
                 REMAINING = M * 60 + S
                 if REMAINING <= 0:
@@ -1319,6 +1830,31 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 SUSPECT_BUFFER.clear()
 
             _record_raw(RAW_ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
+
+            # Killfeed : detect → split → OCR killer/victim → fuzzy match contre
+            # le roster de l'équipe correspondante. Multi-frame consensus (kill
+            # affiché 5 s) compense les misreads isolés. Skipped si rosters vides
+            # (chunk non matché côté back) — on pourrait fallback sur OCR brut
+            # mais sans validation roster c'est trop risqué de faux positifs.
+            if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None and (ORANGE_ROSTER or BLUE_ROSTER):
+                ROSTER_O_NAMES = [p['name'] for p in ORANGE_ROSTER if p.get('name')]
+                ROSTER_B_NAMES = [p['name'] for p in BLUE_ROSTER if p.get('name')]
+                for KILL_BBOX in _detect_kill_rows(frame, GF['killFeed'], RESOLVED_ORANGE, RESOLVED_BLUE):
+                    SPLIT = _split_kill_row(frame, KILL_BBOX)
+                    if SPLIT is None:
+                        continue
+                    KT, VT = SPLIT['killer']['team'], SPLIT['victim']['team']
+                    KT_COLOR = RESOLVED_ORANGE if KT == 'orange' else RESOLVED_BLUE
+                    VT_COLOR = RESOLVED_ORANGE if VT == 'orange' else RESOLVED_BLUE
+                    KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR)
+                    VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR)
+                    KMATCH = _match_player(KRAW, ROSTER_O_NAMES if KT == 'orange' else ROSTER_B_NAMES)
+                    VMATCH = _match_player(VRAW, ROSTER_O_NAMES if VT == 'orange' else ROSTER_B_NAMES)
+                    if KMATCH and VMATCH:
+                        KILL_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append({
+                            'killer': KMATCH, 'victim': VMATCH,
+                            'killer_raw': KRAW, 'victim_raw': VRAW,
+                        })
 
         TIMESTAMP = float(START)
         INFLIGHT = deque()
@@ -1363,13 +1899,19 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             if K in BLUE_TL:
                 ENTRY['blue'] = BLUE_TL[K]
             SCORE_TIMELINE[str(K)] = ENTRY
+        # Killfeed : dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
+        # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.
+        KILLS_OUT = _dedup_kills(KILL_OBSERVATIONS)
         CHUNK_PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 100
         _emit({
             'percent': CHUNK_PERCENT,
             'results': [{
                 'gameID': GAME_ID,
                 'generated_by': GENERATED_BY,
-                'payload': {'score_timeline': SCORE_TIMELINE},
+                'payload': {
+                    'score_timeline': SCORE_TIMELINE,
+                    'kills': KILLS_OUT,
+                },
             }],
         })
         LAST_PERCENT = CHUNK_PERCENT
@@ -1503,7 +2045,7 @@ def main() -> None:
     if SUBCOMMAND == 'detect':
         ORANGE   = SETTINGS.get('orangeTeamName', '').strip()
         BLUE     = SETTINGS.get('blueTeamName', '').strip()
-        MAX_TIME = int(SETTINGS.get('maxTimePerGame', 10))
+        MAX_TIME = int(SETTINGS.get('maxTimePerGame', 12))
         try:
             _analyze(VIDEO_PATH, FFMPEG_PATH, ORANGE, BLUE, MAX_TIME)
         except Exception as EXC:

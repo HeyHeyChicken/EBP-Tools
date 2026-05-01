@@ -13,7 +13,8 @@ const StorageManager = require('../core/storage-manager');
 const { unlinkSync } = require('./global-service');
 const { cutAndEncodeGame } = require('./video-service');
 const {
-    matchGames,
+    identifyGames,
+    persistAnalysis,
     requestUploadUrl,
     confirmUpload,
     uploadFileToPresignedUrl,
@@ -155,30 +156,30 @@ function notifyQueueEmpty(processedCount) {
 }
 
 /**
- * Builds the segments payload for /games/match from analyzer-detected games.
+ * Builds the segments payload for /games/identify from analyzer-detected games.
+ * Pas de champ `analysis` ici : la phase 2 n'a pas encore tourné quand on appelle
+ * identify (l'idée justement c'est de récupérer les rosters AVANT phase 2 pour
+ * pouvoir les injecter dans l'OCR du killfeed).
  */
-function toMatchSegments(games, analysisByTempId) {
-    return games.map((g, i) => {
-        const TEMP_ID = `temp-${i}`;
-        return {
-            tempId: TEMP_ID,
-            startSeconds: g.start,
-            endSeconds: g.end,
-            mode: g.mode,
-            mapName: g.map,
-            mapImage: g.mapImage,
-            blueScore: g.blueTeam ? g.blueTeam.score : null,
-            orangeScore: g.orangeTeam ? g.orangeTeam.score : null,
-            blueTeam: g.blueTeam,
-            orangeTeam: g.orangeTeam,
-            analysis: analysisByTempId[TEMP_ID] || null
-        };
-    });
+function toIdentifySegments(games) {
+    return games.map((g, i) => ({
+        tempId: `temp-${i}`,
+        startSeconds: g.start,
+        endSeconds: g.end,
+        mode: g.mode,
+        mapName: g.map,
+        mapImage: g.mapImage,
+        blueScore: g.blueTeam ? g.blueTeam.score : null,
+        orangeScore: g.orangeTeam ? g.orangeTeam.score : null,
+        blueTeam: g.blueTeam,
+        orangeTeam: g.orangeTeam
+    }));
 }
 
 /**
- * Processes a single video: detect → analyze chunks → match → cut → upload.
- * Throws NotAuthenticatedError if auth lost mid-pipeline (caller pauses).
+ * Processes a single video: detect → identify → analyze chunks (with rosters) →
+ * persist analyses → cut → upload. Throws NotAuthenticatedError if auth lost
+ * mid-pipeline (caller pauses).
  */
 async function processVideo(videoPath, deps) {
     const ROOT = getWatchFolder();
@@ -200,13 +201,43 @@ async function processVideo(videoPath, deps) {
         return;
     }
 
-    // Phase 2: deep analysis on all detected games
-    const CHUNKS = GAMES.map((g, i) => ({
-        startSeconds: g.start,
-        endSeconds: g.end,
-        gameID: `temp-${i}`,
-        mode: g.mode
-    }));
+    // Identify : on demande au back les rosters trustés AVANT la phase 2 pour
+    // pouvoir les passer en argument à l'analyse approfondie (utile au fuzzy
+    // match du killfeed OCR).
+    const IDENTIFY_RES = await identifyGames({
+        sourceFilename: path.basename(videoPath),
+        segments: toIdentifySegments(GAMES)
+    });
+    console.log('[watch-folder] identify response:', JSON.stringify(IDENTIFY_RES, null, 2));
+    const MATCHES = IDENTIFY_RES.matches || [];
+    const MATCH_BY_TEMP = new Map(
+        MATCHES.map((m) => [
+            m.tempId,
+            {
+                gameID: m.gameID,
+                hasVideo: !!m.hasVideo,
+                orangePlayers: m.orangePlayers || [],
+                bluePlayers: m.bluePlayers || []
+            }
+        ])
+    );
+
+    // Phase 2: deep analysis on all detected games. On injecte les rosters de
+    // l'identify dans chaque chunk — Python s'en sert comme liste de pseudos
+    // trustés pour le fuzzy match du killfeed OCR. Pas de match côté back ?
+    // tableaux vides → fallback OCR-only côté Python.
+    const CHUNKS = GAMES.map((g, i) => {
+        const TEMP_ID = `temp-${i}`;
+        const M = MATCH_BY_TEMP.get(TEMP_ID);
+        return {
+            startSeconds: g.start,
+            endSeconds: g.end,
+            gameID: TEMP_ID,
+            mode: g.mode,
+            orangePlayers: M ? M.orangePlayers : [],
+            bluePlayers: M ? M.bluePlayers : []
+        };
+    });
     const CHUNK_RES = await deps.runChunkAnalyzer(videoPath, null, CHUNKS);
     if (CHUNK_RES.error) {
         throw new Error(`Chunk analyzer failed: ${CHUNK_RES.error}`);
@@ -220,18 +251,29 @@ async function processVideo(videoPath, deps) {
     }
     console.log(ANALYSIS_BY_TEMP);
 
-    // Phase 3: ask back to match + persist analysis
-    const MATCH_RES = await matchGames({
-        sourceFilename: path.basename(videoPath),
-        segments: toMatchSegments(GAMES, ANALYSIS_BY_TEMP)
-    });
-    const MATCHES = MATCH_RES.matches || [];
-    const MATCH_BY_TEMP = new Map(
-        MATCHES.map((m) => [
-            m.tempId,
-            { gameID: m.gameID, hasVideo: !!m.hasVideo }
-        ])
-    );
+    // Persist : on remonte au back les analyses approfondies pour les games
+    // matchées par identify (les unmatched n'ont pas de gameID, on skip).
+    const ANALYSES_TO_PERSIST = [];
+    for (const M of MATCHES) {
+        const A = ANALYSIS_BY_TEMP[M.tempId];
+        if (!A || A.payload === undefined) continue;
+        ANALYSES_TO_PERSIST.push({
+            gameID: M.gameID,
+            generated_by: A.generated_by,
+            payload: A.payload
+        });
+    }
+    if (ANALYSES_TO_PERSIST.length > 0) {
+        const PERSIST_RES = await persistAnalysis({
+            analyses: ANALYSES_TO_PERSIST
+        });
+        if (PERSIST_RES.failed && PERSIST_RES.failed.length > 0) {
+            console.log(
+                '[watch-folder] persist-analysis partial failures:',
+                PERSIST_RES.failed
+            );
+        }
+    }
 
     // Phase 4: cut every detected game into its own file (skip those qui ont déjà
     // une vidéo côté serveur — pas de découpage, pas de réencodage).
