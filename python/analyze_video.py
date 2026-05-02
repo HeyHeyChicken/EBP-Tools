@@ -1755,10 +1755,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # Spec dérivée avec la couleur résolue (override `colors` du spec
             # statique). Si la résolution n'a pas encore réussi, on retombe
             # sur la liste complète — comportement identique à l'ancien code.
+            #
+            # tol_color = 40 (au lieu du défaut 20) car avec UNE seule couleur
+            # candidate (résolue), beaucoup moins de pixels du chiffre matchent
+            # à 20 que quand on avait 2-3 candidats en union. Compense la perte
+            # de couverture en élargissant la tolérance par couleur.
             O_COLORS = [RESOLVED_ORANGE] if RESOLVED_ORANGE else TEAM_ORANGE
             B_COLORS = [RESOLVED_BLUE]   if RESOLVED_BLUE   else TEAM_BLUE
-            O_SPEC = {**ORANGE_SCORE_SPEC, 'colors': O_COLORS}
-            B_SPEC = {**BLUE_SCORE_SPEC,   'colors': B_COLORS}
+            O_SPEC = {**ORANGE_SCORE_SPEC, 'colors': O_COLORS, 'tol_color': 40}
+            B_SPEC = {**BLUE_SCORE_SPEC,   'colors': B_COLORS, 'tol_color': 40}
 
             return ('ocr', ts, FRAME,
                     EXECUTOR.submit(_ocr_timer_fast, FRAME, TIMER_BOX),
@@ -1864,6 +1869,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None and (ORANGE_ROSTER or BLUE_ROSTER):
                 ROSTER_O_NAMES = [p['name'] for p in ORANGE_ROSTER if p.get('name')]
                 ROSTER_B_NAMES = [p['name'] for p in BLUE_ROSTER if p.get('name')]
+                # Slot mapping : orange[0..3] → 1..4, blue[0..3] → 6..9 (5 réservé).
+                # L'API /games/identify retourne les rosters dans le bon ordre slot.
                 for KILL_BBOX in _detect_kill_rows(frame, GF['killFeed'], RESOLVED_ORANGE, RESOLVED_BLUE):
                     SPLIT = _split_kill_row(frame, KILL_BBOX)
                     if SPLIT is None:
@@ -1873,11 +1880,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     VT_COLOR = RESOLVED_ORANGE if VT == 'orange' else RESOLVED_BLUE
                     KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR, user_words_path=USER_WORDS_PATH)
                     VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR, user_words_path=USER_WORDS_PATH)
-                    KMATCH = _match_player(KRAW, ROSTER_O_NAMES if KT == 'orange' else ROSTER_B_NAMES)
-                    VMATCH = _match_player(VRAW, ROSTER_O_NAMES if VT == 'orange' else ROSTER_B_NAMES)
+                    K_ROSTER = ROSTER_O_NAMES if KT == 'orange' else ROSTER_B_NAMES
+                    V_ROSTER = ROSTER_O_NAMES if VT == 'orange' else ROSTER_B_NAMES
+                    KMATCH = _match_player(KRAW, K_ROSTER)
+                    VMATCH = _match_player(VRAW, V_ROSTER)
                     if KMATCH and VMATCH:
+                        K_SLOT = K_ROSTER.index(KMATCH) + (1 if KT == 'orange' else 6)
+                        V_SLOT = V_ROSTER.index(VMATCH) + (1 if VT == 'orange' else 6)
                         KILL_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append({
-                            'killer': KMATCH, 'victim': VMATCH,
+                            'killer': K_SLOT, 'victim': V_SLOT,
                             'killer_raw': KRAW, 'victim_raw': VRAW,
                         })
 
@@ -1927,6 +1938,24 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Killfeed : dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
         # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.
         KILLS_OUT = _dedup_kills(KILL_OBSERVATIONS)
+
+        # Trailer non-gameplay : à la fin du chunk, l'écran de score final
+        # s'affiche jusqu'à ~15 s (ou moins si la vidéo a été pré-coupée). On
+        # remonte le chunk seconde par seconde depuis END, jusqu'à 20 s max,
+        # et on compte les secondes consécutives où `_detect_game_playing`
+        # est False. Le client peut s'en servir pour découper proprement.
+        END_NON_GAMEPLAY = 0
+        for OFFSET in range(1, 21):
+            TS = END - OFFSET
+            if TS < START:
+                break
+            FRAME_END = _get_frame(CAP, TS)
+            if FRAME_END is None:
+                break
+            if _detect_game_playing(FRAME_END):
+                break
+            END_NON_GAMEPLAY = OFFSET
+
         CHUNK_PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 100
         _emit({
             'percent': CHUNK_PERCENT,
@@ -1936,6 +1965,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 'payload': {
                     'score_timeline': SCORE_TIMELINE,
                     'kills': KILLS_OUT,
+                    'end_non_gameplay_seconds': END_NON_GAMEPLAY,
                 },
             }],
         })
