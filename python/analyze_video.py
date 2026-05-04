@@ -95,13 +95,20 @@ MODES = [
             # la bande de texte coloré (≠ hauteur de la box visuelle ~30 px,
             # le reste est du fond noir non discriminant).
             'killFeed': {
-                # Extension du bord gauche à 1500 (vs 1690) pour les pseudos
-                # longs (TAESxJacquepastel = 17 chars). Mesuré : un row long
-                # peut commencer à x=1641, soit 49 px avant l'ancien bord.
-                # 1500 donne une marge confortable. Le quart sup-droit reste
-                # libre de HUD parasite (timer/scores sont à x≤1095) donc pas
-                # de faux positifs introduits.
-                'region': ((1500, 140), (1920, 400)),
+                # Région de détection conservatrice : la victime (texte coloré
+                # sur fond noir) et le picto arme sont toujours dans cette
+                # zone même pour les pseudos très longs. La détection de row
+                # ne génère donc pas de faux positifs ici.
+                'region': ((1690, 140), (1920, 400)),
+                # Bord gauche d'extension dynamique du bbox : pour les
+                # pseudos longs (ex. TAESxJacquepastel = 17 chars), le killer
+                # peut commencer bien avant x=1690. Une fois la row détectée
+                # par la victime, on étend bbox.x1 vers la gauche tant qu'on
+                # voit du signal team-color dans la y-band, jusqu'à cette
+                # limite. Mesuré : la row la plus longue commence à x=1641.
+                'leftExtendLimit': 1500,
+                'leftExtendMaxGap': 8,  # arrêt si N cols consécutives sans team color
+
                 'textHeight': 11,
                 'textHeightTol': 6,
                 'minTextPixels': 3,         # min pixels couleur équipe par row pour être "row de texte"
@@ -977,10 +984,40 @@ def _detect_kill_rows(frame: np.ndarray, kf_spec: dict, orange_color, blue_color
         width = int(cols.max()) - int(cols.min()) + 1
         if width < min_width:
             continue
-        bbox = (
-            (rx1 + int(cols.min()),     ry1 + t_start),
-            (rx1 + int(cols.max()) + 1, ry1 + t_end),
-        )
+        bbox_x1 = rx1 + int(cols.min())
+        bbox_x2 = rx1 + int(cols.max()) + 1
+        bbox_y1 = ry1 + t_start
+        bbox_y2 = ry1 + t_end
+
+        # Extension dynamique vers la gauche pour les pseudos killer longs.
+        # La row a été détectée par la VICTIME (fond noir, dans la zone
+        # conservatrice x≥1690). Le killer (fond transparent) peut s'étendre
+        # bien plus à gauche. On scanne col par col vers la gauche tant qu'il
+        # y a du signal team-color sur la y-band, jusqu'à `leftExtendLimit`.
+        left_limit = kf_spec.get('leftExtendLimit')
+        if left_limit is not None and bbox_x1 > left_limit:
+            ext_max_gap = kf_spec.get('leftExtendMaxGap', 8)
+            ext_x1 = max(0, int(left_limit))
+            ext_x2 = bbox_x1
+            ext_sub = frame[bbox_y1:bbox_y2, ext_x1:ext_x2].astype(np.int16)
+            ext_o = (np.abs(ext_sub - np.array(orange_color, dtype=np.int16)) <= tol_color).all(axis=2)
+            ext_b = (np.abs(ext_sub - np.array(blue_color,   dtype=np.int16)) <= tol_color).all(axis=2)
+            ext_team = (ext_o.any(axis=0) | ext_b.any(axis=0))
+            # Parcours de droite à gauche : on s'arrête au 1er gap de N cols
+            # consécutives sans team-color (= espace entre killer et HUD vide).
+            gap_run = 0
+            new_x1 = bbox_x1
+            for c in range(ext_team.shape[0] - 1, -1, -1):
+                if ext_team[c]:
+                    gap_run = 0
+                    new_x1 = ext_x1 + c
+                else:
+                    gap_run += 1
+                    if gap_run >= ext_max_gap:
+                        break
+            bbox_x1 = new_x1
+
+        bbox = ((bbox_x1, bbox_y1), (bbox_x2, bbox_y2))
         if not _validate_kill_row(frame, bbox, kf_spec):
             continue
         bboxes.append(bbox)
