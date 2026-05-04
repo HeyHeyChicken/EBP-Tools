@@ -95,7 +95,13 @@ MODES = [
             # la bande de texte coloré (≠ hauteur de la box visuelle ~30 px,
             # le reste est du fond noir non discriminant).
             'killFeed': {
-                'region': ((1690, 140), (1920, 400)),
+                # Extension du bord gauche à 1500 (vs 1690) pour les pseudos
+                # longs (TAESxJacquepastel = 17 chars). Mesuré : un row long
+                # peut commencer à x=1641, soit 49 px avant l'ancien bord.
+                # 1500 donne une marge confortable. Le quart sup-droit reste
+                # libre de HUD parasite (timer/scores sont à x≤1095) donc pas
+                # de faux positifs introduits.
+                'region': ((1500, 140), (1920, 400)),
                 'textHeight': 11,
                 'textHeightTol': 6,
                 'minTextPixels': 3,         # min pixels couleur équipe par row pour être "row de texte"
@@ -700,8 +706,8 @@ def _split_kill_row(frame: np.ndarray, bbox,
 
 
 def _ocr_kill_name(frame: np.ndarray, box, target_color,
-                   tol_color: int = 80, upscale: int = 4, pad: int = 20,
-                   y_extend: int = 3, user_words_path: str = None) -> str:
+                   tol_color: int = 80, pad: int = 20,
+                   y_extend: int = 3, user_words_path: str = None) -> list:
     """
     OCR un nom de joueur dans une bbox killfeed. Masque par couleur d'équipe
     (texte couleur cible → noir, fond → blanc, polarité standard Tesseract),
@@ -713,39 +719,59 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     qui correspond au CORPS du glyph, pas aux pleins/déliés. Sans ça, "junior"
     est cropped au "lurior" (le j perd son crochet).
 
-    Fallback PSM 7 (line) → 8 (word) si vide. Retourne raw OCR string (à
-    fuzzy-matcher contre le roster ensuite).
+    Retourne une LISTE de candidats OCR (multi-PSM × multi-upscale). En
+    cas de fade-in où l'image est légèrement dégradée, certaines combinaisons
+    upscale/PSM échouent là où d'autres réussissent (vu en debug : 4x PSM6
+    sort "Thyhi" sur un Myki en fade-in alors que 8x PSM8 sort "Myki").
+    Le caller (`_match_player`) prend le meilleur match roster sur la liste.
     """
     (x1, y1), (x2, y2) = box
     h, w = frame.shape[:2]
     x1 = max(0, int(x1)); y1 = max(0, int(y1) - y_extend)
     x2 = min(w, int(x2)); y2 = min(h, int(y2) + y_extend)
     if x2 <= x1 or y2 <= y1:
-        return ''
+        return []
     sub = frame[y1:y2, x1:x2].astype(np.int16)
     target = np.array(target_color, dtype=np.int16)
     mask = (np.abs(sub - target).max(axis=2) <= tol_color)
     bw = np.where(mask, 0, 255).astype(np.uint8)
-    pil = Image.fromarray(bw).resize(
-        (bw.shape[1] * upscale, bw.shape[0] * upscale), Image.BICUBIC
-    )
-    pil = ImageOps.expand(pil, border=pad, fill=255).convert('RGB')
+
     cfg = '-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
     if user_words_path:
         cfg += f' -c user_words_file={user_words_path}'
-    # PSM 6 (uniform block) en 1er : sur cette font cursive il sort des
-    # caractères mieux groupés que PSM 7 (line) qui peut couper. PSM 7/8
-    # gardent le rôle de fallback si PSM 6 sort vide.
+
+    candidates = []
+    # 4x BICUBIC × {PSM 6, 7, 8} est notre cheval de bataille (cas stable).
+    # 8x BICUBIC + PSM 8 (single word) rattrape spécifiquement les fade-ins :
+    # l'LSTM tesseract est sensible à la résolution sur les pixels semi-
+    # saturés du fade-in, et le PSM 8 (mot unique) tolère mieux la
+    # ségmentation de lettres qu'un PSM 6 (block) sur ces conditions.
+    pil4 = Image.fromarray(bw).resize(
+        (bw.shape[1] * 4, bw.shape[0] * 4), Image.BICUBIC
+    )
+    pil4 = ImageOps.expand(pil4, border=pad, fill=255).convert('RGB')
     for psm in (6, 7, 8):
         try:
             txt = pytesseract.image_to_string(
-                pil, config=f'--psm {psm} {cfg}'
+                pil4, config=f'--psm {psm} {cfg}'
             ).replace('\r', '').replace('\n', '').strip()
             if txt:
-                return txt
+                candidates.append(txt)
         except Exception:
             pass
-    return ''
+    pil8 = Image.fromarray(bw).resize(
+        (bw.shape[1] * 8, bw.shape[0] * 8), Image.BICUBIC
+    )
+    pil8 = ImageOps.expand(pil8, border=pad, fill=255).convert('RGB')
+    try:
+        txt = pytesseract.image_to_string(
+            pil8, config=f'--psm 8 {cfg}'
+        ).replace('\r', '').replace('\n', '').strip()
+        if txt:
+            candidates.append(txt)
+    except Exception:
+        pass
+    return candidates
 
 
 def _levenshtein(a: str, b: str) -> int:
@@ -766,34 +792,42 @@ def _levenshtein(a: str, b: str) -> int:
     return prev[-1]
 
 
-def _match_player(raw: str, roster_names: list, cutoff: float = 0.5):
+def _match_player(raws, roster_names: list, cutoff: float = 0.5):
     """
-    Fuzzy-match raw OCR contre une liste de pseudos roster (case-insensitive).
-    Retourne le nom canonique (avec sa casse roster) ou None si pas de match
-    suffisamment proche.
+    Fuzzy-match contre une liste de pseudos roster (case-insensitive).
+    Accepte un raw OCR (str) OU une liste de candidats (cas multi-PSM ×
+    multi-upscale dans `_ocr_kill_name`). Retourne le nom canonique du
+    meilleur match toutes-variantes-confondues, ou None si aucun candidat
+    n'atteint le cutoff.
 
     Utilise Levenshtein (edit distance) plutôt que `difflib` (LCS) : le LCS
     bonus les préfixes communs, ce qui fait matcher "Thki" → "Thibs" au lieu
     de "Myki" alors qu'on est à 2 edits de Myki vs 3 de Thibs. Levenshtein
     pénalise correctement par longueur.
 
-    cutoff bas (0.55) volontaire : multi-frame consensus (kill affiché 5 s ×
-    1 Hz = 4-5 OCR, dédup post-process arbitre) compense les misreads isolés.
+    cutoff 0.5 : laisse passer "Myhi"/"Myki" (ratio 0.75) tout en filtrant
+    les misreads complets (`Thyhi` → ratio 0.0 vs Myki). Couplé au multi-
+    candidat, on récupère le meilleur OCR sans baisser le seuil.
     """
-    if not raw or not roster_names:
+    if not roster_names:
         return None
-    raw_up = raw.upper()
+    candidates = [raws] if isinstance(raws, str) else (raws or [])
+    candidates = [c for c in candidates if c]
+    if not candidates:
+        return None
     best_name = None
     best_ratio = 0.0
-    for n in roster_names:
-        n_up = n.upper()
-        max_len = max(len(raw_up), len(n_up))
-        if max_len == 0:
-            continue
-        ratio = 1 - _levenshtein(raw_up, n_up) / max_len
-        if ratio > best_ratio:
-            best_ratio = ratio
-            best_name = n
+    for raw in candidates:
+        raw_up = raw.upper()
+        for n in roster_names:
+            n_up = n.upper()
+            max_len = max(len(raw_up), len(n_up))
+            if max_len == 0:
+                continue
+            ratio = 1 - _levenshtein(raw_up, n_up) / max_len
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_name = n
     return best_name if best_ratio >= cutoff else None
 
 
