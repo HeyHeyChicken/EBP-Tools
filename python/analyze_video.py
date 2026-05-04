@@ -797,7 +797,7 @@ def _match_player(raw: str, roster_names: list, cutoff: float = 0.5):
     return best_name if best_ratio >= cutoff else None
 
 
-def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1) -> dict:
+def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1) -> list:
     """
     Dédup multi-frame des observations killfeed. Un kill reste 5 s à l'écran ×
     sampling 1 Hz = ~5 observations par event. On veut un seul event par kill,
@@ -812,7 +812,10 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1)
     (typiquement OCR raté qui produit une paire fantôme 1× isolée). Défaut 1
     pour ne rien jeter ; bumper à 2 si trop de bruit OCR persiste.
 
-    Retourne {str(elapsed): {'killer', 'victim'}, ...} trié par elapsed.
+    Retourne [{'elapsed', 'killer', 'victim'}, ...] trié par elapsed. Format
+    liste (et pas dict keyé par elapsed) pour préserver les kills simultanés :
+    deux paires distinctes peuvent partager le même cluster start (kills à la
+    même seconde) — un dict perdrait le premier au profit du second.
     """
     by_pair = {}
     for elapsed, obs_list in observations.items():
@@ -837,7 +840,7 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1)
             kills.append((cluster[0], killer, victim))
 
     kills.sort(key=lambda x: x[0])
-    return {str(e): {'killer': k, 'victim': v} for e, k, v in kills}
+    return [{'elapsed': e, 'killer': k, 'victim': v} for e, k, v in kills]
 
 
 def _detect_kill_rows(frame: np.ndarray, kf_spec: dict, orange_color, blue_color,
