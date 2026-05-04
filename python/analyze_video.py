@@ -389,6 +389,63 @@ def _ocr_region(
     #_emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
     return RESULT
 
+
+def _ocr_color_masked(
+    frame: np.ndarray,
+    x1: float, y1: float, x2: float, y2: float,
+    target_color: tuple,
+    tol_color: int = 80,
+    upscale: int = 4,
+    pad: int = 20,
+    whitelist: str = '',
+    psms: tuple = (7, 6, 8),
+    debug_save_prefix: str = '',
+) -> str:
+    """OCR avec masque couleur : pixels proches de target_color → noir,
+    reste → blanc (polarité Tesseract standard), upscale BICUBIC + pad.
+    Vote sur les PSMs, retourne le résultat le plus fréquent."""
+    h, w = frame.shape[:2]
+    x1 = max(0, int(x1)); y1 = max(0, int(y1))
+    x2 = min(w, int(x2)); y2 = min(h, int(y2))
+    if x2 <= x1 or y2 <= y1:
+        return ''
+    sub = frame[y1:y2, x1:x2].astype(np.int16)
+    target = np.array(target_color, dtype=np.int16)
+    mask = (np.abs(sub - target).max(axis=2) <= tol_color)
+    bw = np.where(mask, 0, 255).astype(np.uint8)
+    pil = Image.fromarray(bw).resize(
+        (bw.shape[1] * upscale, bw.shape[0] * upscale), Image.BICUBIC
+    )
+    pil = ImageOps.expand(pil, border=pad, fill=255).convert('RGB')
+
+    if debug_save_prefix:
+        try:
+            STAMP = int(time.time() * 1000)
+            BASE = os.path.expanduser(f'~/Downloads/{debug_save_prefix}{STAMP}')
+            Image.fromarray(frame[y1:y2, x1:x2]).save(f'{BASE}_0orig.png')
+            pil.save(f'{BASE}_1mask.png')
+        except Exception:
+            pass
+
+    cfg_wl = f' -c "tessedit_char_whitelist={whitelist}"' if whitelist else ''
+    FILTER_PATTERN = re.compile(f'[^{re.escape(whitelist)}]') if whitelist else None
+    results = []
+    for psm in psms:
+        try:
+            txt = pytesseract.image_to_string(
+                pil, config=f'--psm {psm}{cfg_wl}'
+            ).replace('\r', '').replace('\n', '').strip()
+            if FILTER_PATTERN:
+                txt = FILTER_PATTERN.sub('', txt)
+            results.append(txt)
+        except Exception:
+            results.append('')
+    NON_EMPTY = [r for r in results if r]
+    RESULT = _most_frequent(NON_EMPTY) if NON_EMPTY else ''
+    #_emit({'log': f'[OCR/mask] region=({x1},{y1})-({x2},{y2}) target={target_color} results={results} → {repr(RESULT)}'})
+    return RESULT
+
+
 # ---------------------------------------------------------------------------
 # Frame type detection — mirrors detect* functions from the TypeScript service
 # ---------------------------------------------------------------------------
@@ -1260,12 +1317,12 @@ def _analyze(
                 TIMER_BOX = GF['timer']
 
                 if not CURRENT['map']:
-                    T = _ocr_region(
+                    T = _ocr_color_masked(
                         FRAME,
                         MAP_BOX[0][0], MAP_BOX[0][1], MAP_BOX[1][0], MAP_BOX[1][1],
-                        psm=7,
+                        target_color=(255, 255, 255),
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
-                        luminance=100, apply_filter=True,
+                        tol_color=35
                     )
                     if T:
                         MAP_NAME = _get_map_by_name(T)
@@ -1334,9 +1391,10 @@ def _analyze(
                                 # produit un DIFF négatif → TIMESTAMP saute en avant
                                 # dans la vidéo et l'algo backward boucle indéfiniment.
                                 VALID = 0 <= M <= max_time_per_game and 0 <= S < 60
-                                #_emit({'log': f'timer parsed m={M} s={S} valid={VALID}'})
+                                #_emit({'log': f'timer parsed m={M} s={S} valid={VALID} max_time_per_game={max_time_per_game}'})
                                 if VALID:
-                                    DIFF = (max_time_per_game - M) * 60 - S - 20
+                                    SECURITY = 20
+                                    DIFF = (max_time_per_game - M) * 60 - S - SECURITY
                                     if DIFF > 0:
                                         #_emit({'log': "Try to jump " + str(DIFF)})
                                         CURRENT['__jumped__'] = True
@@ -1618,12 +1676,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     #_emit({'log': f'[_analyze_chunks] {settings}'})
 
     if not CHUNKS:
-        _emit({'percent': 100, 'results': []})
+        #_emit({'percent': 100, 'results': []})
         return
 
     CAP = _open_video(video_path)
     if CAP is None:
-        _emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
+        #_emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
         return
 
     GENERATED_BY = 'analyze_video.py:chunks v1'
@@ -1661,10 +1719,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # la game n'a pas matché côté back, listes vides → fallback OCR-only.
         ORANGE_ROSTER = CHUNK.get('orangePlayers') or []
         BLUE_ROSTER = CHUNK.get('bluePlayers') or []
-        if ORANGE_ROSTER or BLUE_ROSTER:
-            _emit({'log': f'[_analyze_chunks] {GAME_ID} roster orange=' +
-                          str([p.get('name') for p in ORANGE_ROSTER]) +
-                          ' blue=' + str([p.get('name') for p in BLUE_ROSTER])})
+        #if ORANGE_ROSTER or BLUE_ROSTER:
+            #_emit({'log': f'[_analyze_chunks] {GAME_ID} roster orange=' + str([p.get('name') for p in ORANGE_ROSTER]) + ' blue=' + str([p.get('name') for p in BLUE_ROSTER])})
 
         # Fichier user_words pour Tesseract : biaise (faiblement) le LM vers
         # les pseudos roster connus. Effet modeste (~+1 kill / 80 sur LE TEST)
@@ -1749,8 +1805,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     RESOLVED_ORANGE = ORG
                 if RESOLVED_BLUE is None and BLU is not None:
                     RESOLVED_BLUE = BLU
-                if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None:
-                    _emit({'log': f'[_analyze_chunks] {GAME_ID} resolved colors: orange={RESOLVED_ORANGE} blue={RESOLVED_BLUE}'})
+                #if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None:
+                    #_emit({'log': f'[_analyze_chunks] {GAME_ID} resolved colors: orange={RESOLVED_ORANGE} blue={RESOLVED_BLUE}'})
 
             # Spec dérivée avec la couleur résolue (override `colors` du spec
             # statique). Si la résolution n'a pas encore réussi, on retombe
@@ -2100,7 +2156,7 @@ def main() -> None:
     if SUBCOMMAND == 'detect':
         ORANGE   = SETTINGS.get('orangeTeamName', '').strip()
         BLUE     = SETTINGS.get('blueTeamName', '').strip()
-        MAX_TIME = int(SETTINGS.get('maxTimePerGame', 12))
+        MAX_TIME = int(SETTINGS.get('maxTimePerGame', 10))
         try:
             _analyze(VIDEO_PATH, FFMPEG_PATH, ORANGE, BLUE, MAX_TIME)
         except Exception as EXC:

@@ -768,17 +768,6 @@ if (!APP_GOT_THE_LOCK) {
 
     function runAnalyzer(videoPath, socket) {
         const HEADLESS = !socket;
-        const NOTIFICATION_DATA = {
-            percent: 0,
-            leftRounded: true,
-            infinite: true,
-            icon: 'fa-sharp fa-solid fa-clapperboard-play',
-            text: '.view.replay_cutter.videoStartsItsAnalysis',
-            state: 'info'
-        };
-        if (!HEADLESS) {
-            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
-        }
 
         return new Promise((resolve, reject) => {
             const ARGS = ['detect', videoPath, FFMPEG_PATH, '', '{}'];
@@ -796,7 +785,7 @@ if (!APP_GOT_THE_LOCK) {
 
             const processQueue = () => {
                 SCHEDULED = false;
-                const WINDOW = HEADLESS ? null : getMainWindow();
+                const WINDOW = getMainWindow();
                 let percent = 0;
                 let nbGames = 0;
                 while (LINE_QUEUE.length > 0) {
@@ -809,9 +798,7 @@ if (!APP_GOT_THE_LOCK) {
                             GAMES.push(MSG.game);
                         }
 
-                        if (!HEADLESS) {
-                            socketEmit(socket, 'analyzeVideoFileGames', MSG);
-                        }
+                        socketEmit(socket, 'analyzeVideoFileGames', MSG);
 
                         if (MSG.percent) {
                             percent = MSG.percent;
@@ -819,25 +806,15 @@ if (!APP_GOT_THE_LOCK) {
                         if (MSG.nbGames) {
                             nbGames = MSG.nbGames;
                         }
+
                         if (WINDOW && !WINDOW.isDestroyed()) {
                             WINDOW.webContents.send('analyzer-update', MSG);
-
-                            WINDOW.webContents.send('set-notification-data', {
-                                ...NOTIFICATION_DATA,
-                                ...{
-                                    infinite: percent == 100,
-                                    percent: percent,
-                                    icon: undefined,
-                                    text: '.view.replay_cutter.videoIsBeingAnalyzed',
-                                    textParams: { games: nbGames }
-                                }
-                            });
                         }
                         if (
                             (MSG.type === 'done' || MSG.type === 'error') &&
                             !RESOLVED
                         ) {
-                            if (!HEADLESS) deleteFloatingWindow();
+                            if (!HEADLESS) deleteFloatingWindow(false);
                             RESOLVED = true;
                             resolve({ ...MSG, games: GAMES });
                         }
