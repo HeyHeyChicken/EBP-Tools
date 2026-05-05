@@ -781,6 +781,250 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     return candidates
 
 
+def _load_template_image(path: str):
+    """
+    Charge un PNG template (RGBA, RGB, P palette ou grayscale) en (gray, mask)
+    où :
+      - gray : intensité (0=noir, 255=icône claire)
+      - mask : alpha si présent, sinon = pixels non-noirs (luminance > 30)
+
+    Le mask sert à `cv2.matchTemplate(..., mask=...)` pour ignorer les pixels
+    de fond (transparents ou noirs) lors du score — seule la silhouette de
+    l'icône compte. Robuste aux fonds semi-transparents du killfeed.
+    """
+    pil = Image.open(path).convert('RGBA')
+    arr = np.array(pil)
+    rgb = arr[:, :, :3]
+    alpha = arr[:, :, 3]
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    if alpha.max() == 0:
+        # Pas de canal alpha utile (PNG sans transparence) → fallback sur la
+        # luminance : tout pixel non-noir compte comme silhouette.
+        mask = (gray > 30).astype(np.uint8) * 255
+    else:
+        mask = alpha
+    return gray, mask
+
+
+def _resize_template_to_height(gray: np.ndarray, mask: np.ndarray, target_h: int):
+    """Redimensionne un template à `target_h` en hauteur, ratio préservé.
+    Le killfeed affiche les icônes à hauteur ~13 px ; les templates source
+    peuvent être à des résolutions variées (12-29 px), on les ramène tous
+    à la même échelle pour comparer."""
+    h, w = gray.shape
+    if h == target_h:
+        return gray, mask
+    new_w = max(1, int(round(w * target_h / h)))
+    interp = cv2.INTER_AREA if target_h < h else cv2.INTER_CUBIC
+    g = cv2.resize(gray, (new_w, target_h), interpolation=interp)
+    m = cv2.resize(mask, (new_w, target_h), interpolation=interp)
+    return g, m
+
+
+def _load_weapon_templates(template_dir: str, target_h: int = 13) -> dict:
+    """
+    Charge tous les PNG du dossier `weapons/` comme templates {name: (gray, mask)},
+    redimensionnés à `target_h` px de haut (= hauteur typique d'une kill row).
+    `name` = stem du fichier (m12.png → "m12").
+
+    Retourne {} si le dossier n'existe pas — désactive proprement la détection
+    d'arme sans casser le pipeline killfeed.
+    """
+    out = {}
+    weapons_dir = os.path.join(template_dir, 'weapons')
+    if not os.path.isdir(weapons_dir):
+        return out
+    for fname in sorted(os.listdir(weapons_dir)):
+        if not fname.lower().endswith('.png'):
+            continue
+        name = os.path.splitext(fname)[0]
+        try:
+            gray, mask = _load_template_image(os.path.join(weapons_dir, fname))
+            gray, mask = _resize_template_to_height(gray, mask, target_h)
+            out[name] = (gray, mask)
+        except Exception:
+            continue
+    return out
+
+
+def _load_headshot_template(template_dir: str):
+    """Charge le template headshot à sa résolution native (l'icône ⊕ dans le
+    killfeed est rendue à ~17-18 px de haut, plus grande que le glyph de texte
+    13 px — ne pas la resize au target_h des armes)."""
+    path = os.path.join(template_dir, 'headshot.png')
+    if not os.path.isfile(path):
+        return None
+    try:
+        return _load_template_image(path)
+    except Exception:
+        return None
+
+
+def _match_template_score(target_gray: np.ndarray, tpl_gray: np.ndarray, tpl_mask: np.ndarray,
+                           target_thresh: int = 100, tpl_thresh: int = 100):
+    """
+    Score de match IoU (Intersection-over-Union) sur images binarisées en
+    glissant le template (x et y) sur le target. Sert au headshot detection
+    où le template a une taille proche de l'icône réelle (pas de slide
+    important).
+
+    Pour matcher des armes de tailles très différentes, voir
+    `_match_template_to_icon` qui crop d'abord la bbox de l'icône.
+    """
+    th, tw = tpl_gray.shape
+    H, W = target_gray.shape
+    if th > H or tw > W:
+        return None, -1
+    target_bin = target_gray > target_thresh
+    tpl_bin = (tpl_mask > 0) & (tpl_gray > tpl_thresh)
+    if not tpl_bin.any():
+        return None, -1
+    best_score = -1.0
+    best_x = 0
+    for yo in range(H - th + 1):
+        for xo in range(W - tw + 1):
+            win = target_bin[yo:yo + th, xo:xo + tw]
+            inter = int(np.logical_and(win, tpl_bin).sum())
+            uni = int(np.logical_or(win, tpl_bin).sum())
+            if uni == 0:
+                continue
+            iou = inter / uni
+            if iou > best_score:
+                best_score = iou
+                best_x = xo
+    return float(best_score), int(best_x)
+
+
+def _match_template_to_icon(target_gray: np.ndarray, tpl_gray: np.ndarray, tpl_mask: np.ndarray,
+                             target_thresh: int = 100, tpl_thresh: int = 100):
+    """
+    Score IoU template vs icône, à HAUTEUR commune (aspect ratio préservé).
+
+    Étapes :
+      1. Bbox des pixels actifs dans le target → l'icône réelle (h_icon × w_icon).
+      2. Resize le template À LA HAUTEUR h_icon (en préservant son aspect ratio
+         → w_tpl_resized).
+      3. Centrer le template dans une zone de largeur max(w_icon, w_tpl_resized).
+         Idem pour l'icône (centrer dans la même zone).
+      4. IoU sur cette zone commune.
+
+    Pourquoi pas le full-stretch (largeur ET hauteur sans aspect) : ça
+    permettait à un template compact (admin, grenade) d'être étiré en
+    horizontal pour "fitter" la bbox d'un AR long → faux positifs systé-
+    matiques. En préservant l'aspect ratio, un template trop court vs un AR
+    long laisse de l'icône non-matchée à droite/gauche → IoU faible.
+
+    Retourne (score, bbox) avec bbox = (x0, y0, x1, y1) de l'icône détectée.
+    """
+    target_bin = (target_gray > target_thresh)
+    if not target_bin.any():
+        return None, None
+    rows = np.any(target_bin, axis=1)
+    cols = np.any(target_bin, axis=0)
+    y0, y1 = int(np.argmax(rows)), int(len(rows) - 1 - np.argmax(rows[::-1]))
+    x0, x1 = int(np.argmax(cols)), int(len(cols) - 1 - np.argmax(cols[::-1]))
+    icon = target_bin[y0:y1 + 1, x0:x1 + 1]
+    h_icon, w_icon = icon.shape
+    if h_icon < 3 or w_icon < 3:
+        return None, None
+    tpl_bin = ((tpl_mask > 0) & (tpl_gray > tpl_thresh)).astype(np.uint8)
+    if tpl_bin.sum() == 0:
+        return None, None
+    h_tpl, w_tpl = tpl_bin.shape
+    # Resize template à la hauteur h_icon, aspect ratio préservé.
+    new_w = max(1, int(round(w_tpl * h_icon / h_tpl)))
+    tpl_resized = cv2.resize(tpl_bin, (new_w, h_icon), interpolation=cv2.INTER_NEAREST).astype(bool)
+    # Zone commune : largeur = max(w_icon, new_w), centrer chaque image dedans.
+    canvas_w = max(w_icon, new_w)
+    canvas_icon = np.zeros((h_icon, canvas_w), dtype=bool)
+    canvas_tpl = np.zeros((h_icon, canvas_w), dtype=bool)
+    icon_off = (canvas_w - w_icon) // 2
+    tpl_off = (canvas_w - new_w) // 2
+    canvas_icon[:, icon_off:icon_off + w_icon] = icon
+    canvas_tpl[:, tpl_off:tpl_off + new_w] = tpl_resized
+    inter = int(np.logical_and(canvas_icon, canvas_tpl).sum())
+    uni = int(np.logical_or(canvas_icon, canvas_tpl).sum())
+    if uni == 0:
+        return None, None
+    return float(inter / uni), (x0, y0, x1, y1)
+
+
+def _identify_weapon(frame: np.ndarray, weapon_box, weapon_templates: dict,
+                      headshot_template, min_score: float = 0.45,
+                      headshot_min_score: float = 0.5):
+    """
+    Identifie l'arme dans la weapon_box d'un kill row. Retourne (name, headshot,
+    score) où :
+      - name = nom du template gagnant ou None si aucun ne dépasse min_score
+      - headshot = bool, True si l'icône headshot est détectée à droite de l'arme
+      - score = IoU best match (debug)
+
+    Stratégie en 2 passes :
+      1. CHERCHER LE HEADSHOT D'ABORD dans la moitié droite de la zone (là où
+         il est toujours, à côté du nom de la victime). Sa silhouette ronde
+         (cible + croix) ressemble à certains templates d'armes (skull admin,
+         etc.) → si on cherche l'arme avant, le template arme matche le ⊕.
+      2. MATCHER LES ARMES en restreignant la recherche À GAUCHE du headshot
+         si trouvé, sinon sur toute la zone. Le template au meilleur IoU gagne.
+
+    Pourquoi pas l'inverse (arme puis headshot) : essayé, le template skull
+    "admin" gagnait sur toutes les frames headshot car sa silhouette ronde
+    matche le ⊕.
+    """
+    if not weapon_templates:
+        return None, False, 0.0
+    (x1, y1), (x2, y2) = weapon_box
+    h, w = frame.shape[:2]
+    # Padding vertical généreux : l'icône headshot ⊕ est rendue à ~17 px (vs
+    # ~13 px pour le glyph de texte du killfeed) → la weapon_box (~13 px) ne
+    # la contient pas verticalement. On élargit pour la capter en entier.
+    pad_y = 6
+    y1e = max(0, int(y1) - pad_y); y2e = min(h, int(y2) + pad_y)
+    x1e = max(0, int(x1)); x2e = min(w, int(x2))
+    if x2e <= x1e or y2e <= y1e:
+        return None, False, 0.0
+    crop = frame[y1e:y2e, x1e:x2e]
+    target_gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
+    W = target_gray.shape[1]
+
+    # --- Passe 1 : headshot ? ---
+    # On cherche dans la moitié droite (là où le ⊕ apparaît systématiquement,
+    # collé au nom de la victime). Si trouvé, on note où il commence pour
+    # restreindre la recherche d'arme.
+    headshot = False
+    weapon_x_max = W  # par défaut, l'arme peut occuper toute la zone
+    if headshot_template is not None:
+        hs_g, hs_m = headshot_template
+        # Recherche bornée à la moitié droite du target.
+        search_left = max(0, W // 2)
+        right_region = target_gray[:, search_left:]
+        if right_region.shape[1] >= hs_g.shape[1] and right_region.shape[0] >= hs_g.shape[0]:
+            hs_score, hs_x_local = _match_template_score(right_region, hs_g, hs_m)
+            if hs_score is not None and hs_score >= headshot_min_score:
+                headshot = True
+                # Position absolue du début du headshot dans target_gray.
+                # On exclut la zone du headshot (et 2 px de marge) du match arme.
+                weapon_x_max = max(0, search_left + hs_x_local - 2)
+
+    # --- Passe 2 : arme dans [0, weapon_x_max] ---
+    target_for_weapon = target_gray[:, :weapon_x_max] if weapon_x_max < W else target_gray
+    if target_for_weapon.shape[1] == 0:
+        return None, headshot, 0.0
+
+    best_name = None
+    best_score = -1.0
+    for name, (tpl_g, tpl_m) in weapon_templates.items():
+        score, _ = _match_template_to_icon(target_for_weapon, tpl_g, tpl_m)
+        if score is None:
+            continue
+        if score > best_score:
+            best_score = score
+            best_name = name
+
+    weapon = best_name if best_score >= min_score else None
+    return weapon, headshot, best_score
+
+
 def _levenshtein(a: str, b: str) -> int:
     """Distance d'édition standard (DP en O(n*m)). Pure Python."""
     if len(a) < len(b):
@@ -875,34 +1119,62 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
     # Une frame qui matche fortement (1.0) compte plus qu'une frame qui
     # matche faiblement (0.6) — sert au vote respawn pour départager
     # killer correct vs misread quand les counts sont proches.
+    # On collecte aussi weapon et headshot par observation pour propager au
+    # final dedup (vote majoritaire arme, OR sur headshot).
     by_pair = {}
     for elapsed, obs_list in observations.items():
         for obs in obs_list:
             key = (obs['killer'], obs['victim'])
             kr = obs.get('killer_ratio', 1.0)
             vr = obs.get('victim_ratio', 1.0)
-            by_pair.setdefault(key, []).append((int(elapsed), kr * vr))
+            by_pair.setdefault(key, []).append({
+                'elapsed': int(elapsed),
+                'score': kr * vr,
+                'weapon': obs.get('weapon'),
+                'headshot': bool(obs.get('headshot', False)),
+            })
+
+    def _finalize_cluster(cluster):
+        weapons = [c['weapon'] for c in cluster if c['weapon']]
+        weapon = None
+        if weapons:
+            # Vote majoritaire sur les frames qui ont matché une arme. Tie-break
+            # arbitraire (premier ordre d'apparition) — peu d'impact en pratique.
+            weapon = Counter(weapons).most_common(1)[0][0]
+        # Headshot : vote majoritaire (≥50% des frames votent True). `any()`
+        # explosait les FP : 1 frame avec un faux match du template ⊕ → kill
+        # tagué headshot. Un vrai headshot apparaît sur la quasi-totalité des
+        # frames d'affichage (~5 frames), donc > 50% est naturel.
+        n_hs = sum(1 for c in cluster if c['headshot'])
+        return {
+            'count': len(cluster),
+            'score': sum(c['score'] for c in cluster),
+            'weapon': weapon,
+            'headshot': n_hs * 2 > len(cluster),
+        }
 
     candidates = []
     for (killer, victim), entries in by_pair.items():
-        entries.sort(key=lambda x: x[0])
+        entries.sort(key=lambda x: x['elapsed'])
         if not entries:
             continue
         cluster = [entries[0]]
         for e in entries[1:]:
-            if e[0] - cluster[-1][0] > window:
+            if e['elapsed'] - cluster[-1]['elapsed'] > window:
                 if len(cluster) >= min_observations:
+                    fin = _finalize_cluster(cluster)
                     candidates.append({
-                        'elapsed': cluster[0][0], 'killer': killer, 'victim': victim,
-                        'count': len(cluster), 'score': sum(c[1] for c in cluster),
+                        'elapsed': cluster[0]['elapsed'], 'killer': killer, 'victim': victim,
+                        **fin,
                     })
                 cluster = [e]
             else:
                 cluster.append(e)
         if len(cluster) >= min_observations:
+            fin = _finalize_cluster(cluster)
             candidates.append({
-                'elapsed': cluster[0][0], 'killer': killer, 'victim': victim,
-                'count': len(cluster), 'score': sum(c[1] for c in cluster),
+                'elapsed': cluster[0]['elapsed'], 'killer': killer, 'victim': victim,
+                **fin,
             })
 
     # --- Étape 2 : dédup par victime sur la fenêtre de respawn ---
@@ -928,7 +1200,22 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
             # frames du cluster). Tie-break sur l'event le plus tôt.
             best = max(cluster_events, key=lambda c: (c['score'], -c['elapsed']))
             earliest = min(c['elapsed'] for c in cluster_events)
-            final.append({'elapsed': earliest, 'killer': best['killer'], 'victim': victim})
+            # L'arme et le headshot sortent du cluster gagnant (= celui qui a
+            # le plus de signal pour ce kill). Si le gagnant n'a pas d'arme
+            # identifiée, fallback sur n'importe quel event du cluster.
+            weapon = best['weapon']
+            if weapon is None:
+                for c in cluster_events:
+                    if c['weapon']:
+                        weapon = c['weapon']; break
+            # Headshot final : majorité des events (eux-mêmes déjà vote-majo
+            # frame-level dans _finalize_cluster).
+            n_hs = sum(1 for c in cluster_events if c['headshot'])
+            headshot = n_hs * 2 > len(cluster_events)
+            final.append({
+                'elapsed': earliest, 'killer': best['killer'], 'victim': victim,
+                'weapon': weapon, 'headshot': headshot,
+            })
             i = j + 1
 
     final.sort(key=lambda k: k['elapsed'])
@@ -1827,6 +2114,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
     #_emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
 
+    # Templates pour identifier l'arme et le headshot icon dans chaque kill row.
+    # Chargés une seule fois en début de run. Le dossier `templates/` est résolu
+    # depuis le PYINSTALLER bundle (sys._MEIPASS) ou le répertoire du script.
+    TEMPLATE_BASE = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    TEMPLATE_DIR = os.path.join(TEMPLATE_BASE, 'templates')
+    WEAPON_TEMPLATES = _load_weapon_templates(TEMPLATE_DIR)
+    HEADSHOT_TEMPLATE = _load_headshot_template(TEMPLATE_DIR)
+    #_emit({'log': f'[_analyze_chunks] loaded {len(WEAPON_TEMPLATES)} weapon templates, headshot={HEADSHOT_TEMPLATE is not None}'})
+
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
         START = int(CHUNK['startSeconds'])
@@ -2068,10 +2364,19 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     if KMATCH and VMATCH:
                         K_SLOT = K_ROSTER.index(KMATCH) + (1 if KT == 'orange' else 6)
                         V_SLOT = V_ROSTER.index(VMATCH) + (1 if VT == 'orange' else 6)
+                        # Identifie l'arme et le headshot via template matching.
+                        # Stocké par observation (= par frame) pour que le dédup
+                        # puisse voter sur l'arme la plus fréquemment matchée
+                        # sur les ~5 frames d'affichage du kill.
+                        WEAPON, HEADSHOT, _ = _identify_weapon(
+                            frame, SPLIT['weapon']['box'],
+                            WEAPON_TEMPLATES, HEADSHOT_TEMPLATE,
+                        )
                         KILL_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append({
                             'killer': K_SLOT, 'victim': V_SLOT,
                             'killer_raw': KRAW, 'victim_raw': VRAW,
                             'killer_ratio': KRATIO, 'victim_ratio': VRATIO,
+                            'weapon': WEAPON, 'headshot': HEADSHOT,
                         })
 
         TIMESTAMP = float(START)
