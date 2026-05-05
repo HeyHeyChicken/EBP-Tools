@@ -799,13 +799,19 @@ def _levenshtein(a: str, b: str) -> int:
     return prev[-1]
 
 
-def _match_player(raws, roster_names: list, cutoff: float = 0.5):
+def _match_player(raws, roster_names: list, cutoff: float = 0.5,
+                  with_ratio: bool = False):
     """
     Fuzzy-match contre une liste de pseudos roster (case-insensitive).
     Accepte un raw OCR (str) OU une liste de candidats (cas multi-PSM ×
     multi-upscale dans `_ocr_kill_name`). Retourne le nom canonique du
     meilleur match toutes-variantes-confondues, ou None si aucun candidat
     n'atteint le cutoff.
+
+    Si `with_ratio=True`, retourne (name, ratio) ou (None, 0.0). Le ratio
+    permet au dédup respawn de pondérer le vote sur le killer par la
+    qualité du match plutôt que par le simple compte de frames — une frame
+    qui matche "Myki" à 1.0 vaut plus qu'une frame qui matche "Thibs" à 0.6.
 
     Utilise Levenshtein (edit distance) plutôt que `difflib` (LCS) : le LCS
     bonus les préfixes communs, ce qui fait matcher "Thki" → "Thibs" au lieu
@@ -817,11 +823,11 @@ def _match_player(raws, roster_names: list, cutoff: float = 0.5):
     candidat, on récupère le meilleur OCR sans baisser le seuil.
     """
     if not roster_names:
-        return None
+        return (None, 0.0) if with_ratio else None
     candidates = [raws] if isinstance(raws, str) else (raws or [])
     candidates = [c for c in candidates if c]
     if not candidates:
-        return None
+        return (None, 0.0) if with_ratio else None
     best_name = None
     best_ratio = 0.0
     for raw in candidates:
@@ -835,53 +841,98 @@ def _match_player(raws, roster_names: list, cutoff: float = 0.5):
             if ratio > best_ratio:
                 best_ratio = ratio
                 best_name = n
+    if with_ratio:
+        return (best_name, best_ratio) if best_ratio >= cutoff else (None, 0.0)
     return best_name if best_ratio >= cutoff else None
 
 
-def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1) -> list:
+def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
+                 respawn_window: int = 15) -> list:
     """
     Dédup multi-frame des observations killfeed. Un kill reste 5 s à l'écran ×
     sampling 1 Hz = ~5 observations par event. On veut un seul event par kill,
     daté à l'elapsed le plus tôt vu.
 
-    Stratégie : grouper par paire (killer, victim) ; au sein d'une paire,
-    cluster les elapseds avec un gap max de `window` secondes. Chaque cluster
-    = un event distinct. Au-delà de `window`, on considère que c'est un nouvel
-    event (le même duo peut killer 2× dans un game).
+    Étape 1 — Cluster par paire (killer, victim) :
+        au sein d'une paire, cluster les elapseds avec un gap max de `window` s.
+        Chaque cluster = un event candidat (count = nb d'observations).
 
-    `min_observations` permet de filtrer les clusters d'observations isolées
-    (typiquement OCR raté qui produit une paire fantôme 1× isolée). Défaut 1
-    pour ne rien jeter ; bumper à 2 si trop de bruit OCR persiste.
+    Étape 2 — Dédup par victime (règle de respawn) :
+        en EVA, un joueur tué a ~20 s avant respawn — il ne peut pas mourir 2×
+        dans un délai court. Si deux events candidats ont la même victime à
+        moins de `respawn_window` s d'écart, c'est forcément le même kill avec
+        une OCR du killer ratée sur certaines frames (typiquement Myki↔Thibs).
+        Vote majoritaire : on garde le killer avec le plus d'observations,
+        on garde l'elapsed le plus tôt observé toutes paires confondues.
 
     Retourne [{'elapsed', 'killer', 'victim'}, ...] trié par elapsed. Format
     liste (et pas dict keyé par elapsed) pour préserver les kills simultanés :
     deux paires distinctes peuvent partager le même cluster start (kills à la
     même seconde) — un dict perdrait le premier au profit du second.
     """
+    # --- Étape 1 : cluster par paire (killer, victim), avec score pondéré ---
+    # Le score d'un cluster = somme des fuzzy match ratios (killer × victim).
+    # Une frame qui matche fortement (1.0) compte plus qu'une frame qui
+    # matche faiblement (0.6) — sert au vote respawn pour départager
+    # killer correct vs misread quand les counts sont proches.
     by_pair = {}
     for elapsed, obs_list in observations.items():
         for obs in obs_list:
             key = (obs['killer'], obs['victim'])
-            by_pair.setdefault(key, []).append(int(elapsed))
+            kr = obs.get('killer_ratio', 1.0)
+            vr = obs.get('victim_ratio', 1.0)
+            by_pair.setdefault(key, []).append((int(elapsed), kr * vr))
 
-    kills = []
-    for (killer, victim), elapseds in by_pair.items():
-        es = sorted(set(elapseds))
-        if not es:
+    candidates = []
+    for (killer, victim), entries in by_pair.items():
+        entries.sort(key=lambda x: x[0])
+        if not entries:
             continue
-        cluster = [es[0]]
-        for e in es[1:]:
-            if e - cluster[-1] > window:
+        cluster = [entries[0]]
+        for e in entries[1:]:
+            if e[0] - cluster[-1][0] > window:
                 if len(cluster) >= min_observations:
-                    kills.append((cluster[0], killer, victim))
+                    candidates.append({
+                        'elapsed': cluster[0][0], 'killer': killer, 'victim': victim,
+                        'count': len(cluster), 'score': sum(c[1] for c in cluster),
+                    })
                 cluster = [e]
             else:
                 cluster.append(e)
         if len(cluster) >= min_observations:
-            kills.append((cluster[0], killer, victim))
+            candidates.append({
+                'elapsed': cluster[0][0], 'killer': killer, 'victim': victim,
+                'count': len(cluster), 'score': sum(c[1] for c in cluster),
+            })
 
-    kills.sort(key=lambda x: x[0])
-    return [{'elapsed': e, 'killer': k, 'victim': v} for e, k, v in kills]
+    # --- Étape 2 : dédup par victime sur la fenêtre de respawn ---
+    candidates.sort(key=lambda c: c['elapsed'])
+    by_victim = {}
+    for c in candidates:
+        by_victim.setdefault(c['victim'], []).append(c)
+
+    final = []
+    for victim, group in by_victim.items():
+        # Regroupe les events de cette victime qui sont à < respawn_window s
+        # → ils représentent le même kill physique malgré des OCR de killer
+        # potentiellement divergents.
+        i = 0
+        while i < len(group):
+            j = i
+            cluster_events = [group[i]]
+            while j + 1 < len(group) and group[j + 1]['elapsed'] - group[i]['elapsed'] < respawn_window:
+                cluster_events.append(group[j + 1])
+                j += 1
+            # Vote sur le killer : celui avec le score pondéré le plus haut
+            # gagne (= somme des ratios fuzzy match killer × victim sur les
+            # frames du cluster). Tie-break sur l'event le plus tôt.
+            best = max(cluster_events, key=lambda c: (c['score'], -c['elapsed']))
+            earliest = min(c['elapsed'] for c in cluster_events)
+            final.append({'elapsed': earliest, 'killer': best['killer'], 'victim': victim})
+            i = j + 1
+
+    final.sort(key=lambda k: k['elapsed'])
+    return final
 
 
 def _detect_kill_rows(frame: np.ndarray, kf_spec: dict, orange_color, blue_color,
@@ -2012,14 +2063,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR, user_words_path=USER_WORDS_PATH)
                     K_ROSTER = ROSTER_O_NAMES if KT == 'orange' else ROSTER_B_NAMES
                     V_ROSTER = ROSTER_O_NAMES if VT == 'orange' else ROSTER_B_NAMES
-                    KMATCH = _match_player(KRAW, K_ROSTER)
-                    VMATCH = _match_player(VRAW, V_ROSTER)
+                    KMATCH, KRATIO = _match_player(KRAW, K_ROSTER, with_ratio=True)
+                    VMATCH, VRATIO = _match_player(VRAW, V_ROSTER, with_ratio=True)
                     if KMATCH and VMATCH:
                         K_SLOT = K_ROSTER.index(KMATCH) + (1 if KT == 'orange' else 6)
                         V_SLOT = V_ROSTER.index(VMATCH) + (1 if VT == 'orange' else 6)
                         KILL_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append({
                             'killer': K_SLOT, 'victim': V_SLOT,
                             'killer_raw': KRAW, 'victim_raw': VRAW,
+                            'killer_ratio': KRATIO, 'victim_ratio': VRATIO,
                         })
 
         TIMESTAMP = float(START)
