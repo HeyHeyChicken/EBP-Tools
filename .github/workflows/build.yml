@@ -20,6 +20,14 @@ jobs:
         steps:
             # Clone the repository.
             - uses: actions/checkout@v4
+            # Verify that the tag matches the version in package.json.
+            - name: Verify tag matches package.json version
+              run: |
+                  PKG_VERSION=$(node -p "require('./package.json').version")
+                  if [ "$GITHUB_REF_NAME" != "$PKG_VERSION" ]; then
+                    echo "::error::Tag '$GITHUB_REF_NAME' does not match package.json version '$PKG_VERSION'."
+                    exit 1
+                  fi
             # Install Node.js.
             - name: Setup Node.js
               uses: actions/setup-node@v4
