@@ -100,6 +100,7 @@ def main() -> None:
     print(f"  {len(dylibs)} dylib(s) collected.")
 
     repo_tessdata = os.path.join(os.path.dirname(__file__), "tessdata")
+    repo_templates = os.path.join(os.path.dirname(__file__), "templates")
     args = [
         "--onedir",
         "--name", "darwin",
@@ -110,6 +111,9 @@ def main() -> None:
         "--add-data", f"{TESS_BIN}:tesseract",
         "--add-data", f"{TESS_DATA}/eng.traineddata:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
+        # Templates pour la détection d'arme et headshot (résolution dans
+        # analyze_video._analyze_chunks via sys._MEIPASS + 'templates/').
+        "--add-data", f"{repo_templates}:templates",
     ]
     for dylib in dylibs:
         args += ["--add-binary", f"{dylib}:tesseract"]

@@ -18,6 +18,7 @@ pyinstaller --onefile --name win32 ^
   --add-data "%TESS_DIR%\*.dll;tesseract" ^
   --add-data "%TESS_DIR%\tessdata\eng.traineddata;tesseract\tessdata" ^
   --add-data "tessdata\evadigits.traineddata;tesseract\tessdata" ^
+  --add-data "templates;templates" ^
   analyze_video.py
 
 call deactivate

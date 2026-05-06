@@ -29,11 +29,14 @@ def _find_system_eng_traineddata() -> str:
 def main() -> None:
     eng = _find_system_eng_traineddata()
     repo_tessdata = os.path.join(os.path.dirname(__file__), "tessdata")
+    repo_templates = os.path.join(os.path.dirname(__file__), "templates")
     args = [
         "--onedir",
         "--name", "linux",
         "--add-data", f"{eng}:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
+        # Templates pour la détection d'arme et headshot.
+        "--add-data", f"{repo_templates}:templates",
         "analyze_video.py",
     ]
     print("Running PyInstaller...")
