@@ -17,8 +17,8 @@ RPC.on('ready', () => {
         details: 'Working on my strategies...',
         state: 'https://ebp.gg',
         largeImageKey: 'logo',
-        largeImageText: 'EBP - Tools',
-        smallImageText: 'EBP - Tools',
+        largeImageText: 'EBP',
+        smallImageText: 'EBP',
         instance: false
     });
 });

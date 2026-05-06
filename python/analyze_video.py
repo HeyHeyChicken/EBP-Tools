@@ -1212,13 +1212,14 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
             # frame-level dans _finalize_cluster).
             n_hs = sum(1 for c in cluster_events if c['headshot'])
             headshot = n_hs * 2 > len(cluster_events)
-            final.append({
-                'elapsed': earliest, 'killer': best['killer'], 'victim': victim,
-                'weapon': weapon, 'headshot': headshot,
-            })
+            # Format V3 positional : [elapsed, killer, victim, weapon, headshot].
+            # ~3× plus compact en JSON que la version dict, ordre figé. Voir
+            # KillsTimelineV3 côté front (game-analysis.model.ts) pour la doc
+            # de l'ordre des champs.
+            final.append([earliest, best['killer'], victim, weapon, headshot])
             i = j + 1
 
-    final.sort(key=lambda k: k['elapsed'])
+    final.sort(key=lambda k: k[0])
     return final
 
 
@@ -2096,8 +2097,6 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         #_emit({'percent': 0, 'results': [], 'error': f'Cannot open video: {video_path}'})
         return
 
-    GENERATED_BY = 'analyze_video.py:chunks v1'
-
     TOTAL_SECONDS = sum(max(0, int(c['endSeconds']) - int(c['startSeconds'])) for c in CHUNKS)
     PROCESSED_SECONDS = 0
     LAST_PERCENT = -1
@@ -2411,17 +2410,29 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         BLUE_TL = _reconstruct_field(RAW_OBSERVATIONS, 'blue', MAX_BLUE)
         #_emit({'log': f'[_analyze_chunks] reconstruction: {len(ORANGE_TL)} pts orange, {len(BLUE_TL)} pts blue (sur {len(RAW_OBSERVATIONS)} elapsed observés)'})
 
-        # JSON keys must be string → str(K). Une entrée n'est émise que pour
-        # les K avec au moins une observation pour ce champ — l'absence
-        # signifie "pas de signal", pas "score à 0".
+        # Format V2 : { "<sec>": [orange, blue] }. On forward-fill côté
+        # producteur (chaque ligne contient l'état complet à cette seconde),
+        # et on n'émet QUE si le couple [orange, blue] a changé depuis la
+        # dernière ligne émise. Avantages vs V1 named-keys :
+        #   - JSON 2-3× plus compact (pas de "orange"/"blue" répétés)
+        #   - sparse en pratique (atlantis ~480 secs → ~50 lignes)
+        #   - sémantique simple : chaque ligne = snapshot complet
+        # Trade-off : on perd la distinction "0 par défaut" vs "OCR a raté",
+        # mais ça n'a pas de valeur métier (le score à 0 au début est implicite).
         SCORE_TIMELINE = {}
-        for K in sorted(set(ORANGE_TL) | set(BLUE_TL)):
-            ENTRY = {}
+        last_o = 0
+        last_b = 0
+        prev_pair = None
+        all_keys = sorted(set(ORANGE_TL) | set(BLUE_TL))
+        for K in all_keys:
             if K in ORANGE_TL:
-                ENTRY['orange'] = ORANGE_TL[K]
+                last_o = ORANGE_TL[K]
             if K in BLUE_TL:
-                ENTRY['blue'] = BLUE_TL[K]
-            SCORE_TIMELINE[str(K)] = ENTRY
+                last_b = BLUE_TL[K]
+            pair = [last_o, last_b]
+            if pair != prev_pair:
+                SCORE_TIMELINE[str(K)] = pair
+                prev_pair = pair
         # Killfeed : dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
         # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.
         KILLS_OUT = _dedup_kills(KILL_OBSERVATIONS)
@@ -2448,7 +2459,6 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             'percent': CHUNK_PERCENT,
             'results': [{
                 'gameID': GAME_ID,
-                'generated_by': GENERATED_BY,
                 'payload': {
                     'score_timeline': SCORE_TIMELINE,
                     'kills': KILLS_OUT,

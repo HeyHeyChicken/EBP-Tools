@@ -181,7 +181,7 @@ function identifyGames(payload) {
  * matchées via `/identify`. Le client envoie directement les `gameID` (pas de
  * re-matching côté back). Ownership re-vérifiée par game.
  *
- * @param {object} payload { analyses: [{ gameID, generated_by?, payload }] }
+ * @param {object} payload { analyses: [{ gameID, payload }] }
  * @returns {Promise<{ persisted: Array<string>, failed: Array<{gameID, reason}> }>}
  */
 function persistAnalysis(payload) {

@@ -244,10 +244,7 @@ async function processVideo(videoPath, deps) {
     }
     const ANALYSIS_BY_TEMP = {};
     for (const r of CHUNK_RES.results || []) {
-        ANALYSIS_BY_TEMP[r.gameID] = {
-            generated_by: r.generated_by,
-            payload: r.payload
-        };
+        ANALYSIS_BY_TEMP[r.gameID] = { payload: r.payload };
     }
     console.log(ANALYSIS_BY_TEMP);
 
@@ -257,11 +254,7 @@ async function processVideo(videoPath, deps) {
     for (const M of MATCHES) {
         const A = ANALYSIS_BY_TEMP[M.tempId];
         if (!A || A.payload === undefined) continue;
-        ANALYSES_TO_PERSIST.push({
-            gameID: M.gameID,
-            generated_by: A.generated_by,
-            payload: A.payload
-        });
+        ANALYSES_TO_PERSIST.push({ gameID: M.gameID, payload: A.payload });
     }
     if (ANALYSES_TO_PERSIST.length > 0) {
         const PERSIST_RES = await persistAnalysis({
