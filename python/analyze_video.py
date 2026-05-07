@@ -34,6 +34,8 @@ TEAM_BLUE   = [
     (55, 189, 218)  # Bleu fluo (pro league)
 ]
 
+DEBUG = False
+
 MODES = [
     #region Mode 0
     {
@@ -42,31 +44,17 @@ MODES = [
                 (78, 412, TEAM_ORANGE),  # orange team circle
                 (78, 745, TEAM_BLUE),    # blue team circle
             ],
-            # Le nom d'équipe est entouré d'une bordure colorée. On la cherche
-            # dynamiquement dans une zone large, on prend son bbox, on rentre
-            # de quelques px (inset) pour ne pas inclure le bord lui-même dans
-            # le crop OCR.
-            'orangeName': {
-                'colors': TEAM_ORANGE,
-                'search': ((70, 381), (192, 431)),
-                'inset': 4,    # rentre dans la bordure (texte à l'intérieur)
-            },
-            'blueName': {
-                'colors': TEAM_BLUE,
-                'search': ((70, 727), (192, 781)),
-                'inset': 4,
-            },
             # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
             # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
             # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
             'orangeScore': {
                 'colors': TEAM_ORANGE,
-                'search': ((30, 430), (356, 527)),
+                'search': ((30, 410), (358, 528)),
                 'inset': -10,
             },
             'blueScore': {
                 'colors': TEAM_BLUE,
-                'search': ((30, 626), (356, 728)),
+                'search': ((30, 599), (358, 731)),
                 'inset': -10,
             },
         },
@@ -76,20 +64,8 @@ MODES = [
         },
         'gameFrame': {
             'map': ((845, 124), (1072, 159)),
-            'orangeName': ((704, 58), (796, 97)),
-            'blueName': ((1121, 58), (1214, 97)),
             'timer': ((916, 50), (1004, 88)),
             'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
-            'orangeScore': {
-                'colors': TEAM_ORANGE,
-                'search': ((830, 65), (906, 107)),
-                'inset': -10,
-            },
-            'blueScore': {
-                'colors': TEAM_BLUE,
-                'search': ((1014, 65), (1095, 107)),
-                'inset': -10,
-            },
             # Killfeed top-right : on détecte des bandes de texte (couleur équipe
             # + picto arme blanc) par row-scan vertical. textHeight = hauteur de
             # la bande de texte coloré (≠ hauteur de la box visuelle ~30 px,
@@ -99,7 +75,7 @@ MODES = [
                 # sur fond noir) et le picto arme sont toujours dans cette
                 # zone même pour les pseudos très longs. La détection de row
                 # ne génère donc pas de faux positifs ici.
-                'region': ((1690, 140), (1920, 400)),
+                'region': ((1690, 140), (1920, 480)),
                 # Bord gauche d'extension dynamique du bbox : pour les
                 # pseudos longs (ex. TAESxJacquepastel = 17 chars), le killer
                 # peut commencer bien avant x=1690. Une fois la row détectée
@@ -140,26 +116,6 @@ MODES = [
                 (1858, 813, TEAM_ORANGE + TEAM_BLUE),  # player color
             ],
         },
-        'loadingFrames': [
-            {
-                'logoTop': (958, 427), 'logoLeft': (857, 653),
-                'logoRight': (1060, 653), 'logoMiddle': (958, 642),
-                'logoBlack1': (958, 463), 'logoBlack2': (880, 653),
-                'logoBlack3': (1037, 653), 'logoBlack4': (958, 610),
-            },
-            {
-                'logoTop': (959, 484), 'logoLeft': (908, 596),
-                'logoRight': (1010, 596), 'logoMiddle': (959, 589),
-                'logoBlack1': (959, 503), 'logoBlack2': (920, 596),
-                'logoBlack3': (996, 596), 'logoBlack4': (959, 573),
-            },
-            {
-                'logoTop': (959, 369), 'logoLeft': (808, 708),
-                'logoRight': (1110, 708), 'logoMiddle': (959, 708),
-                'logoBlack1': (959, 430), 'logoBlack2': (840, 708),
-                'logoBlack3': (1070, 708), 'logoBlack4': (959, 640),
-            },
-        ],
     },
     #endregion
 ]
@@ -345,7 +301,8 @@ def _ocr_region(
                     TEXT = FILTER_PATTERN.sub('', TEXT)
                 out.append(TEXT)
             except Exception as EXC:
-                #_emit({'log': f'[OCR][ERROR] lang={lang!r} cfg={cfg!r} cmd={pytesseract.pytesseract.tesseract_cmd!r} tessdata={os.environ.get("TESSDATA_PREFIX", "<unset>")} exc={type(EXC).__name__}: {EXC}'})
+                if DEBUG:
+                    _emit({'log': f'[OCR][ERROR] lang={lang!r} cfg={cfg!r} cmd={pytesseract.pytesseract.tesseract_cmd!r} tessdata={os.environ.get("TESSDATA_PREFIX", "<unset>")} exc={type(EXC).__name__}: {EXC}'})
                 out.append('')
         return out
 
@@ -399,7 +356,8 @@ def _ocr_region(
     #        F2.save(f'{BASE}_3gray.png')
     #except Exception:
     #    pass
-    #_emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
+    if DEBUG:
+        _emit({'log': f'[OCR] region=({x1},{y1})-({x2},{y2}) results={results} → {repr(RESULT)}'})
     return RESULT
 
 
@@ -455,7 +413,8 @@ def _ocr_color_masked(
             results.append('')
     NON_EMPTY = [r for r in results if r]
     RESULT = _most_frequent(NON_EMPTY) if NON_EMPTY else ''
-    #_emit({'log': f'[OCR/mask] region=({x1},{y1})-({x2},{y2}) target={target_color} results={results} → {repr(RESULT)}'})
+    if DEBUG:
+        _emit({'log': f'[OCR/mask] region=({x1},{y1})-({x2},{y2}) target={target_color} results={results} → {repr(RESULT)}'})
     return RESULT
 
 
@@ -463,7 +422,7 @@ def _ocr_color_masked(
 # Frame type detection — mirrors detect* functions from the TypeScript service
 # ---------------------------------------------------------------------------
 
-def _identify_offset(frame: np.ndarray, identify: list, tol_pos: int = 10, tol_color: int = 20):
+def _identify_offset(frame: np.ndarray, identify: list, tol_pos: int = 20, tol_color: int = 20):
     """
     Cherche l'offset (dx, dy) auquel les pixels d'identification matchent dans le frame.
     Pour chaque (x, y, colors), scanne une zone (2*tol_pos+1)² autour de (x, y) et
@@ -570,17 +529,20 @@ def _pick_dominant_color(frame: np.ndarray, search_region, candidates: list, tol
     return best if best_count >= min_pixels else None
 
 
-def _resolve_team_colors(frame: np.ndarray, mode_index: int):
+def _resolve_team_colors(frame: np.ndarray, anchor=None):
     """
     Détermine la couleur effective de chaque équipe sur la frame courante en
-    comptant les pixels matchant chaque candidat dans la search region du score
-    HUD. Retourne (orange_rgb, blue_rgb) — chaque élément peut être None si
-    la zone n'est pas assez peuplée (frame de transition, etc.).
+    comptant les pixels matchant chaque candidat dans la zone de score
+    (dérivée de la barre HUD haute). Retourne (orange_rgb, blue_rgb) — chaque
+    élément peut être None si la zone n'est pas assez peuplée.
     """
-    GF = MODES[mode_index]['gameFrame']
+    o_box = _find_orange_score_box(frame, anchor=anchor)
+    b_box = _find_blue_score_box(frame, anchor=anchor)
+    if o_box is None or b_box is None:
+        return (None, None)
     return (
-        _pick_dominant_color(frame, GF['orangeScore']['search'], TEAM_ORANGE),
-        _pick_dominant_color(frame, GF['blueScore']['search'], TEAM_BLUE),
+        _pick_dominant_color(frame, o_box, TEAM_ORANGE),
+        _pick_dominant_color(frame, b_box, TEAM_BLUE),
     )
 
 
@@ -1368,12 +1330,17 @@ def _resolve_region(spec, frame: np.ndarray, dx: float = 0, dy: float = 0):
     """
     Résout un spec de région en box absolu ((x1,y1),(x2,y2)).
     - spec tuple ((x1,y1),(x2,y2)) → région statique, on applique le shift HUD (dx, dy).
-    - spec dict {'colors', 'search', 'inset'} → région dynamique, on cherche la bordure colorée.
+    - spec dict {'colors', 'search', 'inset'} → on cherche le bbox des pixels
+      colorés dans `search`, on applique l'inset. Si `search` est None
+      (cas où une box dynamique n'a pas été trouvée en amont), retourne None.
     Retourne None si la détection dynamique échoue.
     """
     if isinstance(spec, dict):
+        search = spec.get('search')
+        if search is None:
+            return None
         return _find_text_border(
-            frame, spec['colors'], spec['search'],
+            frame, spec['colors'], search,
             tol_color=spec.get('tol_color', 20),
             min_pixels=spec.get('min_pixels', 50),
             inset=spec.get('inset', 0),
@@ -1407,23 +1374,179 @@ def _detect_game_end_frame(frame: np.ndarray) -> bool:
     )
 
 
-def _detect_game_loading_frame(frame: np.ndarray, mode_index: int) -> bool:
+_LOADING_LOGO_CACHE = None  # tuple (gray template) ou (None,) si pas chargeable
+
+def _get_loading_logo_template():
+    """Charge (et cache) le template grayscale du logo A de l'écran de loading.
+    L'image source `templates/loading_logo.png` est déjà cropée pour ne contenir
+    que le A (sans la barre de progression dont le point bouge), sur un large
+    fond noir qui pénalise les matchs sur autre fond (ex. menu post-game)."""
+    global _LOADING_LOGO_CACHE
+    if _LOADING_LOGO_CACHE is not None:
+        return _LOADING_LOGO_CACHE[0]
+    base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, 'templates', 'loading_logo.png')
+    bgr = cv2.imread(path) if os.path.isfile(path) else None
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr is not None else None
+    _LOADING_LOGO_CACHE = (gray,)
+    return gray
+
+
+def _detect_game_loading_frame(frame: np.ndarray) -> bool:
     """
-    Détecte l'écran de chargement (logo EVA blanc sur fond noir) pour un mode donné.
-    Teste chaque variante de position de logo définie dans loadingFrames du mode.
-    Miroir de detectGameLoadingFrame() en TypeScript.
+    Détecte l'écran de loading (logo EVA centré sur fond noir) via template
+    matching multi-scale du logo A. Robuste aux variations de cadrage et de
+    taille de logo entre les différents formats de capture.
     """
-    for LF in MODES[mode_index]['loadingFrames']:
-        if (_color_similar(_get_pixel(frame, LF['logoTop'][0],    LF['logoTop'][1]),    (255, 255, 255)) and
-                _color_similar(_get_pixel(frame, LF['logoLeft'][0],   LF['logoLeft'][1]),   (255, 255, 255)) and
-                _color_similar(_get_pixel(frame, LF['logoRight'][0],  LF['logoRight'][1]),  (255, 255, 255)) and
-                _color_similar(_get_pixel(frame, LF['logoMiddle'][0], LF['logoMiddle'][1]), (255, 255, 255)) and
-                _color_similar(_get_pixel(frame, LF['logoBlack1'][0], LF['logoBlack1'][1]), (0, 0, 0)) and
-                _color_similar(_get_pixel(frame, LF['logoBlack2'][0], LF['logoBlack2'][1]), (0, 0, 0)) and
-                _color_similar(_get_pixel(frame, LF['logoBlack3'][0], LF['logoBlack3'][1]), (0, 0, 0)) and
-                _color_similar(_get_pixel(frame, LF['logoBlack4'][0], LF['logoBlack4'][1]), (0, 0, 0))):
-            return True
-    return False
+    tpl = _get_loading_logo_template()
+    if tpl is None:
+        return False
+    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    # Recherche dans une zone centrale large.
+    sub = gray[80:1000, 200:1720]
+    best = 0.0
+    for scale in (0.7, 0.85, 1.0, 1.15, 1.3):
+        th = int(tpl.shape[0] * scale); tw = int(tpl.shape[1] * scale)
+        if th >= sub.shape[0] or tw >= sub.shape[1]:
+            continue
+        resized = cv2.resize(tpl, (tw, th), interpolation=cv2.INTER_AREA)
+        res = cv2.matchTemplate(sub, resized, cv2.TM_CCOEFF_NORMED)
+        _, mx, _, _ = cv2.minMaxLoc(res)
+        if mx > best:
+            best = mx
+    return best > 0.8
+
+
+_PLAYING_TOP_CACHE = None  # tuple (gray template) ou (None,) si pas chargeable
+
+def _get_playing_top_template():
+    """Charge (et cache) le template grayscale de la barre HUD haute (deux pills
+    de team name reliées). Sert d'ancre dynamique pour localiser le nom de map
+    en-dessous, sans dépendre du cadrage exact de la vidéo."""
+    global _PLAYING_TOP_CACHE
+    if _PLAYING_TOP_CACHE is not None:
+        return _PLAYING_TOP_CACHE[0]
+    base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, 'templates', 'playing_top.png')
+    bgr = cv2.imread(path) if os.path.isfile(path) else None
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr is not None else None
+    _PLAYING_TOP_CACHE = (gray,)
+    return gray
+
+
+def _find_playing_top_anchor(frame: np.ndarray):
+    """Localise la barre HUD haute (template `playing_top.png`) via template
+    matching multi-scale. Retourne (x, y, h, w) — coordonnées et dimensions
+    du match — ou None si la barre n'est pas trouvée.
+
+    Sert d'ancre commune aux dérivés (map name, timer) qui se positionnent
+    relativement à la barre, sans dépendre de coordonnées HUD codées en dur.
+    """
+    tpl = _get_playing_top_template()
+    if tpl is None:
+        return None
+    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    sub = gray[:250, :]   # la barre est toujours dans la bande haute
+    best = -1.0
+    best_loc = None
+    best_size = None
+    for scale in (0.7, 0.85, 1.0, 1.15, 1.3):
+        th = int(tpl.shape[0] * scale); tw = int(tpl.shape[1] * scale)
+        if th >= sub.shape[0] or tw >= sub.shape[1]:
+            continue
+        resized = cv2.resize(tpl, (tw, th), interpolation=cv2.INTER_AREA)
+        res = cv2.matchTemplate(sub, resized, cv2.TM_CCOEFF_NORMED)
+        _, mx, _, loc = cv2.minMaxLoc(res)
+        if mx > best:
+            best = mx; best_loc = loc; best_size = (th, tw)
+    # Seuil bas (0.4) : sur certaines frames le pill droit est occulté
+    # (kill cam, notification) et le score chute à ~0.45, mais la
+    # localisation reste correcte (le pill gauche guide le match).
+    if best < 0.4 or best_loc is None:
+        return None
+    th, tw = best_size
+    x, y = best_loc
+    return (x, y, th, tw)
+
+
+def _find_map_box(frame: np.ndarray, anchor=None):
+    """Boîte OCR du nom de map, ancrée sur la barre HUD haute. Le nom est
+    centré horizontalement, juste sous la barre, hauteur ≈ 0.6× hauteur de
+    la barre, largeur ≈ 0.4× largeur. Si `anchor` (tuple x,y,h,w) est
+    fourni, on saute le matchTemplate. Retourne None si pas d'ancre."""
+    if anchor is None:
+        anchor = _find_playing_top_anchor(frame)
+    if anchor is None:
+        return None
+    x, y, th, tw = anchor
+    cx = x + tw / 2
+    map_y1 = y + th
+    map_y2 = map_y1 + int(th * 0.6)
+    map_w = int(tw * 0.4)
+    map_x1 = int(cx - map_w / 2)
+    map_x2 = int(cx + map_w / 2)
+    return ((map_x1, map_y1), (map_x2, map_y2))
+
+
+def _find_timer_box(frame: np.ndarray, anchor=None):
+    """Boîte OCR du timer in-game, ancrée sur la barre HUD haute. Le timer
+    est centré horizontalement et placé DANS la barre : Y1 = 12 % de la
+    hauteur, Y2 = 55 %. Largeur ≈ 0.16× largeur de la barre. Si `anchor`
+    (tuple x,y,h,w) est fourni, on saute le matchTemplate."""
+    if anchor is None:
+        anchor = _find_playing_top_anchor(frame)
+    if anchor is None:
+        return None
+    x, y, th, tw = anchor
+    cx = x + tw / 2
+    timer_y1 = y + int(th * 0.12)
+    timer_y2 = y + int(th * 0.55)
+    timer_w = int(tw * 0.16)
+    timer_x1 = int(cx - timer_w / 2)
+    timer_x2 = int(cx + timer_w / 2)
+    return ((timer_x1, timer_y1), (timer_x2, timer_y2))
+
+
+# Score in-game : symétriques autour du centre de la barre HUD haute.
+# Y1 = 31 %, Y2 = 75 % de la hauteur. Centre offset = ±16.5 % de la largeur,
+# largeur de chaque score = 14 % (dérivé des positions historiques).
+_SCORE_Y1_RATIO     = 0.31
+_SCORE_Y2_RATIO     = 0.75
+_SCORE_CX_OFFSET    = 0.165  # distance du centre, en fraction de largeur du template
+_SCORE_WIDTH_RATIO  = 0.14
+
+
+def _find_score_box(anchor, side: str):
+    """Boîte de recherche du score in-game (orange = side 'left', bleu = 'right'),
+    dérivée de la barre HUD haute. Retourne ((x1,y1),(x2,y2)) ou None."""
+    if anchor is None:
+        return None
+    x, y, th, tw = anchor
+    cx = x + tw / 2
+    sign = -1 if side == 'left' else 1
+    score_cx = cx + sign * tw * _SCORE_CX_OFFSET
+    score_w = int(tw * _SCORE_WIDTH_RATIO)
+    score_y1 = y + int(th * _SCORE_Y1_RATIO)
+    score_y2 = y + int(th * _SCORE_Y2_RATIO)
+    score_x1 = int(score_cx - score_w / 2)
+    score_x2 = int(score_cx + score_w / 2)
+    return ((score_x1, score_y1), (score_x2, score_y2))
+
+
+def _find_orange_score_box(frame: np.ndarray, anchor=None):
+    """Boîte du score orange (côté gauche du HUD haut). Si `anchor` est fourni,
+    saute le matchTemplate."""
+    if anchor is None:
+        anchor = _find_playing_top_anchor(frame)
+    return _find_score_box(anchor, 'left')
+
+
+def _find_blue_score_box(frame: np.ndarray, anchor=None):
+    """Boîte du score bleu (côté droit du HUD haut). Si `anchor` est fourni,
+    saute le matchTemplate."""
+    if anchor is None:
+        anchor = _find_playing_top_anchor(frame)
+    return _find_score_box(anchor, 'right')
 
 
 def _detect_game_intro(frame: np.ndarray) -> bool:
@@ -1476,10 +1599,9 @@ def _get_frame(cap: cv2.VideoCapture, timestamp: float):
 # Game dict factory
 # ---------------------------------------------------------------------------
 
-def _new_game(mode: int, orange_override: str, blue_override: str) -> dict:
+def _new_game(mode: int) -> dict:
     """
     Crée et retourne un dict représentant un nouveau jeu en cours de détection.
-    orange_override / blue_override : noms d'équipe forcés par les settings utilisateur (peuvent être vides).
     __jumped__ : flag interne indiquant que le saut de timer a déjà été effectué pour ce jeu.
     """
     return {
@@ -1490,15 +1612,11 @@ def _new_game(mode: int, orange_override: str, blue_override: str) -> dict:
         'mapImage': None,
         '__jumped__': False,
         'orangeTeam': {
-            'name': orange_override.upper() if orange_override else '',
             'score': 0,
-            'nameImage': None,
             'scoreImage': None,
         },
         'blueTeam': {
-            'name': blue_override.upper() if blue_override else '',
             'score': 0,
-            'nameImage': None,
             'scoreImage': None,
         },
     }
@@ -1509,7 +1627,8 @@ def _set_score(game: dict, team: str, raw: str) -> None:
     try:
         V = int(raw)
         if 0 <= V <= 100:
-            #_emit({'log': team + ' score : ' + raw})
+            if DEBUG:
+                _emit({'log': team + ' score : ' + raw})
             game[team]['score'] = V
     except Exception:
         pass
@@ -1521,8 +1640,6 @@ def _set_score(game: dict, team: str, raw: str) -> None:
 def _analyze(
     video_path: str,
     ffmpeg_path: str,
-    orange_override: str,
-    blue_override: str,
     max_time_per_game: int = 10,
 ) -> None:
     """
@@ -1531,10 +1648,10 @@ def _analyze(
 
     Algorithme :
       - Démarre à TIMESTAMP = durée totale, recule de 1 s à chaque itération.
-      - Score frame  → crée CURRENT avec end = TIMESTAMP, OCR scores/noms.
+      - Score frame  → crée CURRENT avec end = TIMESTAMP, OCR scores.
       - End frame    → idem (écran post-match alternatif).
       - Loading/Intro → ferme CURRENT avec start = TIMESTAMP + 2.
-      - Playing frame → OCR map + noms d'équipes ; une fois les 3 collectés,
+      - Playing frame → OCR map ; une fois map collectée,
                         lit le timer OCR et saute en arrière de
                         (max_time - M) * 60 - S - 20 secondes pour éviter
                         de parcourir toute la durée du jeu seconde par seconde.
@@ -1557,6 +1674,11 @@ def _analyze(
     CURRENT: dict = None   # game with end set, start still pending
     TIMESTAMP: float = DURATION
     JUST_JUMPED: bool = False
+    # Position de la barre HUD haute (template `playing_top.png`). Trouvée à la
+    # 1ère playing frame du run et réutilisée pour toutes les frames suivantes :
+    # le HUD ne bouge pas dans une vidéo donnée même si plusieurs games s'y
+    # succèdent. Évite ~32 ms × N frames de matchTemplate redondant.
+    HUD_ANCHOR: tuple = None
 
     LAST_SEND_PERCENT: int = -1
     LAST_SEND_COMPLETED_COUNT: int = -1
@@ -1582,35 +1704,24 @@ def _analyze(
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             SCORE_MODE, SF_DX, SF_DY = _detect_game_score_frame(FRAME)
             if SCORE_MODE >= 0:
-                #_emit({'log': f'Score frame found {SCORE_MODE} (HUD offset dx={SF_DX:+.1f}, dy={SF_DY:+.1f})'})
+                if DEBUG:
+                    _emit({'log': f'Score frame found {SCORE_MODE} (HUD offset dx={SF_DX:+.1f}, dy={SF_DY:+.1f})'})
                 FOUND = True
                 JUST_JUMPED = False
-                GAME = _new_game(SCORE_MODE, orange_override, blue_override)
+                GAME = _new_game(SCORE_MODE)
                 GAME['end'] = TIMESTAMP - 1
                 _SF_RAW = MODES[SCORE_MODE]['scoreFrame']
-                # Noms d'équipe : bbox dynamique trouvé via la bordure colorée.
-                # Scores : bbox statique, juste translaté de l'offset HUD identifié.
-                ON = _resolve_region(_SF_RAW['orangeName'], FRAME, SF_DX, SF_DY)
-                BN = _resolve_region(_SF_RAW['blueName'],   FRAME, SF_DX, SF_DY)
+                # Scores : bbox dynamique trouvé via les chiffres colorés,
+                # translaté de l'offset HUD identifié.
                 OS = _resolve_region(_SF_RAW['orangeScore'], FRAME, SF_DX, SF_DY)
                 BS = _resolve_region(_SF_RAW['blueScore'],   FRAME, SF_DX, SF_DY)
-                #for label, box in (('orange name', ON), ('blue name', BN), ('orange score', OS), ('blue score', BS)):
-                    #if box is not None:
-                        #_emit({'log': f'{label} border: {box}'})
-                    #else:
-                        #_emit({'log': f'[border] {label} not found in search region'})
-
-                if ON is not None and not GAME['orangeTeam']['name']:
-                    T = _ocr_region(
-                        FRAME,
-                        ON[0][0], ON[0][1], ON[1][0], ON[1][1],
-                        psm=7,
-                        whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-                        luminance=100, apply_filter=True,
-                    )
-                    if T and len(T) >= 2:
-                        #_emit({'log': 'Orange team name : '+T.upper()})
-                        GAME['orangeTeam']['name'] = T.upper()
+                for label, box in (('orange score', OS), ('blue score', BS)):
+                    if box is not None:
+                        if DEBUG:
+                            _emit({'log': f'{label} border: {box}'})
+                    else:
+                        if DEBUG:
+                            _emit({'log': f'[border] {label} not found in search region'})
 
                 if OS is not None:
                     _set_score(GAME, 'orangeTeam', _ocr_region(
@@ -1620,18 +1731,6 @@ def _analyze(
                         checker=_score_checker,
                     ))
 
-                if BN is not None and not GAME['blueTeam']['name']:
-                    T = _ocr_region(
-                        FRAME,
-                        BN[0][0], BN[0][1], BN[1][0], BN[1][1],
-                        psm=7,
-                        whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-                        luminance=100, apply_filter=True,
-                    )
-                    if T and len(T) >= 2:
-                        #_emit({'log': 'Blue team name : '+T.upper()})
-                        GAME['blueTeam']['name'] = T.upper()
-
                 if BS is not None:
                     _set_score(GAME, 'blueTeam', _ocr_region(
                         FRAME,
@@ -1640,12 +1739,8 @@ def _analyze(
                         checker=_score_checker,
                     ))
 
-                if ON is not None:
-                    GAME['orangeTeam']['nameImage']  = _region_to_base64(FRAME, ON[0][0], ON[0][1], ON[1][0], ON[1][1])
                 if OS is not None:
                     GAME['orangeTeam']['scoreImage'] = _region_to_base64(FRAME, OS[0][0], OS[0][1], OS[1][0], OS[1][1])
-                if BN is not None:
-                    GAME['blueTeam']['nameImage']    = _region_to_base64(FRAME, BN[0][0], BN[0][1], BN[1][0], BN[1][1])
                 if BS is not None:
                     GAME['blueTeam']['scoreImage']   = _region_to_base64(FRAME, BS[0][0], BS[0][1], BS[1][0], BS[1][1])
 
@@ -1655,10 +1750,11 @@ def _analyze(
         # ── End frame ──────────────────────────────────────────────────────
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
             if _detect_game_end_frame(FRAME):
-                #_emit({'log': 'End frame found'})
+                if DEBUG:
+                    _emit({'log': 'End frame found'})
                 FOUND = True
                 JUST_JUMPED = False
-                GAME = _new_game(1, orange_override, blue_override)
+                GAME = _new_game(1)
                 GAME['end'] = TIMESTAMP
                 EF = MODES[1]['endFrame']
                 _set_score(GAME, 'orangeTeam', _ocr_region(
@@ -1678,8 +1774,9 @@ def _analyze(
 
         # ── Game start: loading screen ──────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
-            if _detect_game_loading_frame(FRAME, CURRENT['mode']):
-                #_emit({'log': 'Loading frame found'})
+            if _detect_game_loading_frame(FRAME):
+                if DEBUG:
+                    _emit({'log': 'Loading frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 # Scan forward to find the first actual gameplay frame.
@@ -1690,17 +1787,20 @@ def _analyze(
                     if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
                         GAME_START = PROBE
                         break
-                    #_emit({'log': 's'})
+                    if DEBUG:
+                        _emit({'log': 's'})
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
-                #_emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
+                if DEBUG:
+                    _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None   # game complete
 
         # ── Game start: map introduction ────────────────────────────────────
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_intro(FRAME):
-                #_emit({'log': 'Game intro frame found'})
+                if DEBUG:
+                    _emit({'log': 'Game intro frame found'})
                 FOUND = True
                 JUST_JUMPED = False
                 # Scan forward to find the first actual gameplay frame.
@@ -1713,7 +1813,8 @@ def _analyze(
                         break
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
-                #_emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
+                if DEBUG:
+                    _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None
 
@@ -1721,74 +1822,60 @@ def _analyze(
         if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
             if _detect_game_playing(FRAME):
                 FOUND = True
-                #_emit({'log': 'Playing frame found'})
+                if DEBUG:
+                    _emit({'log': 'Playing frame found'})
 
                 GF        = MODES[CURRENT['mode']]['gameFrame']
                 MAP_BOX   = GF['map']
-                ON_BOX    = GF['orangeName']
-                BN_BOX    = GF['blueName']
                 TIMER_BOX = GF['timer']
 
+                # Ancre HUD : une seule recherche par run, mise en cache.
+                if HUD_ANCHOR is None:
+                    HUD_ANCHOR = _find_playing_top_anchor(FRAME)
+
                 if not CURRENT['map']:
+                    # Ancrage dynamique : box du nom de map dérivée de la barre HUD.
+                    # Tombe sur la box statique si l'ancre n'a jamais été trouvée.
+                    DYN_BOX = _find_map_box(FRAME, anchor=HUD_ANCHOR)
+                    MB = DYN_BOX if DYN_BOX is not None else MAP_BOX
                     T = _ocr_color_masked(
                         FRAME,
-                        MAP_BOX[0][0], MAP_BOX[0][1], MAP_BOX[1][0], MAP_BOX[1][1],
+                        MB[0][0], MB[0][1], MB[1][0], MB[1][1],
                         target_color=(255, 255, 255),
                         whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
-                        tol_color=35
+                        tol_color=35,
                     )
                     if T:
                         MAP_NAME = _get_map_by_name(T)
                         if MAP_NAME:
-                            #_emit({'log': 'map name : ' + MAP_NAME})
+                            if DEBUG:
+                                _emit({'log': 'map name : ' + MAP_NAME})
                             CURRENT['map'] = MAP_NAME
                             CURRENT['mapImage'] = _region_to_base64(
                                 FRAME,
-                                MAP_BOX[0][0], MAP_BOX[0][1], MAP_BOX[1][0], MAP_BOX[1][1],
+                                MB[0][0], MB[0][1], MB[1][0], MB[1][1],
                             )
                         else:
                             _emit({"Can't find map name": T})
 
-                if not CURRENT['orangeTeam']['name']:
-                    T = _ocr_region(
-                        FRAME,
-                        ON_BOX[0][0], ON_BOX[0][1], ON_BOX[1][0], ON_BOX[1][1],
-                        psm=6,
-                        whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-                    )
-                    if T and len(T) >= 2:
-                        #_emit({'log': 'orange team name : ' + T.upper()})
-                        CURRENT['orangeTeam']['name'] = T.upper()
-
-                if not CURRENT['blueTeam']['name']:
-                    T = _ocr_region(
-                        FRAME,
-                        BN_BOX[0][0], BN_BOX[0][1], BN_BOX[1][0], BN_BOX[1][1],
-                        psm=6,
-                        whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-                    )
-                    if T and len(T) >= 2:
-                        #_emit({'log': 'blue team name : ' + T.upper()})
-                        CURRENT['blueTeam']['name'] = T.upper()
-
                 # Timer jump — mirrors the TS optimization exactly.
-                # When all game metadata is collected, read the game timer and
+                # When the map is collected, read the game timer and
                 # jump backward to just before the game start to find loading/intro
                 # faster, skipping the bulk of the gameplay footage.
                 if (CURRENT['map']
-                        and CURRENT['orangeTeam']['name']
-                        and CURRENT['blueTeam']['name']
                         and not CURRENT['__jumped__']
                         and not JUST_JUMPED):
+                    DYN_TIMER = _find_timer_box(FRAME, anchor=HUD_ANCHOR)
+                    TB = DYN_TIMER if DYN_TIMER is not None else TIMER_BOX
                     TIMER = _ocr_region(
                         FRAME,
-                        TIMER_BOX[0][0], TIMER_BOX[0][1], TIMER_BOX[1][0], TIMER_BOX[1][1],
+                        TB[0][0], TB[0][1], TB[1][0], TB[1][1],
                         psm=7, extra_psms=[8], whitelist='0123456789:',
                         luminance=100, apply_filter=True, lang='evadigits',
-                        #debug_save_bw='timer_',
                     )
                     if TIMER:
-                        #_emit({'log': 'timer : ' + TIMER})
+                        if DEBUG:
+                            _emit({'log': 'timer : ' + TIMER})
                         # Tesseract loupe parfois le ":" → "0205" au lieu de "02:05".
                         # On accepte 4 ou 5 caractères et on reconstruit MM:SS.
                         PARTS = None
@@ -1804,12 +1891,14 @@ def _analyze(
                                 # produit un DIFF négatif → TIMESTAMP saute en avant
                                 # dans la vidéo et l'algo backward boucle indéfiniment.
                                 VALID = 0 <= M <= max_time_per_game and 0 <= S < 60
-                                #_emit({'log': f'timer parsed m={M} s={S} valid={VALID} max_time_per_game={max_time_per_game}'})
+                                if DEBUG:
+                                    _emit({'log': f'timer parsed m={M} s={S} valid={VALID} max_time_per_game={max_time_per_game}'})
                                 if VALID:
                                     SECURITY = 20
                                     DIFF = (max_time_per_game - M) * 60 - S - SECURITY
                                     if DIFF > 0:
-                                        #_emit({'log': "Try to jump " + str(DIFF)})
+                                        if DEBUG:
+                                            _emit({'log': "Try to jump " + str(DIFF)})
                                         CURRENT['__jumped__'] = True
                                         JUST_JUMPED = True
                                         TIMESTAMP -= DIFF
@@ -1817,13 +1906,16 @@ def _analyze(
                             except Exception as e:
                                 print(e)
                                 pass
-        #if not FOUND:
-            #_emit({'log': "Can't identify frame"})
+        if not FOUND:
+            if DEBUG:
+                _emit({'log': "Can't identify frame"})
 
-        # Après un timer jump on est près du début du jeu → STEP=1 pour ne pas
-        # rater l'écran de chargement. Dans toutes les autres zones (post-game,
-        # stats, etc.) STEP=2 divise par 2 le nombre de seeks inutiles.
-        STEP = 1.0 if JUST_JUMPED else 2.0
+        # STEP=1 quand on cherche le début d'un game (CURRENT en attente de start)
+        # ou juste après un timer jump : on ne peut pas se permettre de rater une
+        # fenêtre de loading/intro étroite (~1-2 s). STEP=2 ailleurs (post-game,
+        # entre 2 games sans CURRENT) pour diviser par 2 les seeks inutiles.
+        SEARCHING_START = CURRENT is not None and CURRENT['start'] == -1
+        STEP = 1.0 if (JUST_JUMPED or SEARCHING_START) else 2.0
         TIMESTAMP -= STEP
 
     CAP.release()
@@ -2004,12 +2096,6 @@ def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = 
     rendus noirs, le reste blanc. Élimine les artefacts.
     `max_score` (optionnel) : borne supérieure connue (score final de la game).
     Tout résultat OCR > max_score est traité comme hallucination → None.
-
-    DEBUG : tout cas qui retourne None dump une image dans ~/Downloads/train pour
-    inspection. Préfixe de fichier distinct selon la cause :
-      - score_nobox_*  : pas assez de pixels colorés détectés (bbox introuvable)
-      - score_fail_*   : OCR n'a rien retourné de valide
-      - score_max_*    : OCR a retourné une valeur > max_score (hallucination)
     """
     BOX = _resolve_region(spec, frame)
     if BOX is None:
@@ -2086,7 +2172,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     # initialise MAX_TIME=13 et toute la timeline est shiftée. Avec cap, on
     # rejette et on attend une lecture cohérente.
     MAX_TIME_CAP = int(settings.get('maxTimePerGame', 10))
-    #_emit({'log': f'[_analyze_chunks] {settings}'})
+    if DEBUG:
+        _emit({'log': f'[_analyze_chunks] {settings}'})
 
     if not CHUNKS:
         #_emit({'percent': 100, 'results': []})
@@ -2111,7 +2198,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     WINDOW = max(1, min(CPU // 4, 4))
     MAX_WORKERS = max(3, WINDOW * 3)
     EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
-    #_emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
+    if DEBUG:
+        _emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
 
     # Templates pour identifier l'arme et le headshot icon dans chaque kill row.
     # Chargés une seule fois en début de run. Le dossier `templates/` est résolu
@@ -2120,7 +2208,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     TEMPLATE_DIR = os.path.join(TEMPLATE_BASE, 'templates')
     WEAPON_TEMPLATES = _load_weapon_templates(TEMPLATE_DIR)
     HEADSHOT_TEMPLATE = _load_headshot_template(TEMPLATE_DIR)
-    #_emit({'log': f'[_analyze_chunks] loaded {len(WEAPON_TEMPLATES)} weapon templates, headshot={HEADSHOT_TEMPLATE is not None}'})
+    if DEBUG:
+        _emit({'log': f'[_analyze_chunks] loaded {len(WEAPON_TEMPLATES)} weapon templates, headshot={HEADSHOT_TEMPLATE is not None}'})
 
     for CHUNK in CHUNKS:
         GAME_ID = CHUNK['gameID']
@@ -2139,8 +2228,9 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # la game n'a pas matché côté back, listes vides → fallback OCR-only.
         ORANGE_ROSTER = CHUNK.get('orangePlayers') or []
         BLUE_ROSTER = CHUNK.get('bluePlayers') or []
-        #if ORANGE_ROSTER or BLUE_ROSTER:
-            #_emit({'log': f'[_analyze_chunks] {GAME_ID} roster orange=' + str([p.get('name') for p in ORANGE_ROSTER]) + ' blue=' + str([p.get('name') for p in BLUE_ROSTER])})
+        if ORANGE_ROSTER or BLUE_ROSTER:
+            if DEBUG:
+                _emit({'log': f'[_analyze_chunks] {GAME_ID} roster orange=' + str([p.get('name') for p in ORANGE_ROSTER]) + ' blue=' + str([p.get('name') for p in BLUE_ROSTER])})
 
         # Fichier user_words pour Tesseract : biaise (faiblement) le LM vers
         # les pseudos roster connus. Effet modeste (~+1 kill / 80 sur LE TEST)
@@ -2164,8 +2254,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
 
         GF = MODES[MODE_INDEX]['gameFrame']
         TIMER_BOX = GF['timer']
-        ORANGE_SCORE_SPEC = GF['orangeScore']
-        BLUE_SCORE_SPEC = GF['blueScore']
+        # Ancre HUD haute (template playing_top.png) trouvée à la 1ère frame
+        # exploitable du chunk et réutilisée pour toutes les suivantes — le HUD
+        # ne bouge pas dans une vidéo donnée. Sert à dériver dynamiquement les
+        # boxes timer / scores au lieu des coordonnées en dur, robuste aux
+        # variations de cadrage entre vidéos.
+        HUD_ANCHOR = None
 
         # Toutes les lectures OCR brutes (orange/blue) indexées par elapsed.
         # Pas de filtrage à l'insertion : c'est `_reconstruct_field` qui tranche
@@ -2208,10 +2302,16 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
         # comportement bit-pour-bit (cf. sizing plus haut).
         def _submit_frame(ts):
-            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE
+            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR
             FRAME = _get_frame(CAP, ts)
             if FRAME is None or not _detect_game_playing(FRAME):
                 return ('skip', ts)
+
+            # Trouve l'ancre HUD une seule fois pour le chunk (matchTemplate
+            # est le call le plus cher après l'OCR, ~32ms — on évite de le
+            # refaire à chaque frame).
+            if HUD_ANCHOR is None:
+                HUD_ANCHOR = _find_playing_top_anchor(FRAME)
 
             # Verrouille la couleur d'équipe sur la 1ère frame exploitable du
             # chunk. On le fait ICI (avant les submit OCR) plutôt que dans
@@ -2220,13 +2320,20 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # contient des candidats "pro league" tels que jaune fluo / cyan
             # qui matchent du HUD parasite et faussent la détection du bbox).
             if RESOLVED_ORANGE is None or RESOLVED_BLUE is None:
-                ORG, BLU = _resolve_team_colors(FRAME, MODE_INDEX)
+                ORG, BLU = _resolve_team_colors(FRAME, anchor=HUD_ANCHOR)
                 if RESOLVED_ORANGE is None and ORG is not None:
                     RESOLVED_ORANGE = ORG
                 if RESOLVED_BLUE is None and BLU is not None:
                     RESOLVED_BLUE = BLU
-                #if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None:
-                    #_emit({'log': f'[_analyze_chunks] {GAME_ID} resolved colors: orange={RESOLVED_ORANGE} blue={RESOLVED_BLUE}'})
+                if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None:
+                    if DEBUG:
+                        _emit({'log': f'[_analyze_chunks] {GAME_ID} resolved colors: orange={RESOLVED_ORANGE} blue={RESOLVED_BLUE}'})
+
+            # Boxes scores et timer dérivées dynamiquement de l'ancre HUD haute,
+            # avec fallback sur la box statique si l'ancre n'est pas trouvée.
+            O_BOX = _find_orange_score_box(FRAME, anchor=HUD_ANCHOR)
+            B_BOX = _find_blue_score_box(FRAME, anchor=HUD_ANCHOR)
+            T_BOX = _find_timer_box(FRAME, anchor=HUD_ANCHOR) or TIMER_BOX
 
             # Spec dérivée avec la couleur résolue (override `colors` du spec
             # statique). Si la résolution n'a pas encore réussi, on retombe
@@ -2238,16 +2345,17 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # de couverture en élargissant la tolérance par couleur.
             O_COLORS = [RESOLVED_ORANGE] if RESOLVED_ORANGE else TEAM_ORANGE
             B_COLORS = [RESOLVED_BLUE]   if RESOLVED_BLUE   else TEAM_BLUE
-            O_SPEC = {**ORANGE_SCORE_SPEC, 'colors': O_COLORS, 'tol_color': 40}
-            B_SPEC = {**BLUE_SCORE_SPEC,   'colors': B_COLORS, 'tol_color': 40}
+            O_SPEC = {'colors': O_COLORS, 'search': O_BOX, 'inset': -10, 'tol_color': 40}
+            B_SPEC = {'colors': B_COLORS, 'search': B_BOX, 'inset': -10, 'tol_color': 40}
 
             return ('ocr', ts, FRAME,
-                    EXECUTOR.submit(_ocr_timer_fast, FRAME, TIMER_BOX),
+                    EXECUTOR.submit(_ocr_timer_fast, FRAME, T_BOX),
                     EXECUTOR.submit(_ocr_score_at, FRAME, O_SPEC, O_COLORS, MAX_ORANGE),
                     EXECUTOR.submit(_ocr_score_at, FRAME, B_SPEC, B_COLORS, MAX_BLUE))
 
         def _record_raw(elapsed, orange_raw, blue_raw, timer_text=''):
-            #_emit({'log': f'[_analyze_chunks] --------> {timer_text}: orange={orange_raw} blue={blue_raw}'})
+            if DEBUG:
+                _emit({'log': f'[_analyze_chunks] --------> {timer_text}: orange={orange_raw} blue={blue_raw}'})
             if orange_raw is None and blue_raw is None:
                 return
             BUCKET = RAW_OBSERVATIONS.setdefault(elapsed, {'orange': [], 'blue': []})
@@ -2315,24 +2423,28 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
 
             if RAW_ELAPSED > EXPECTED_MAX:
                 SUSPECT_BUFFER.append((ts, RAW_ELAPSED, ORANGE_RAW, BLUE_RAW))
-                #_emit({'log': f'[_analyze_chunks] SUSPECT {TIMER_TEXT}: ELAPSED={RAW_ELAPSED}s @ vid={VIDEO_ELAPSED:.0f}s (buffer {len(SUSPECT_BUFFER)}/{SUSPECT_CONFIRM_LEN})'})
+                if DEBUG:
+                    _emit({'log': f'[_analyze_chunks] SUSPECT {TIMER_TEXT}: ELAPSED={RAW_ELAPSED}s @ vid={VIDEO_ELAPSED:.0f}s (buffer {len(SUSPECT_BUFFER)}/{SUSPECT_CONFIRM_LEN})'})
                 if len(SUSPECT_BUFFER) >= SUSPECT_CONFIRM_LEN:
                     if _is_linear_progression(SUSPECT_BUFFER):
                         FIRST_TS, FIRST_RAW, _, _ = SUSPECT_BUFFER[0]
                         OLD_OFFSET = TIMELINE_OFFSET
                         TIMELINE_OFFSET = FIRST_RAW - (FIRST_TS - START)
-                        #_emit({'log': f'[_analyze_chunks] COUPE confirmée : offset {OLD_OFFSET}s → {TIMELINE_OFFSET}s, flush {len(SUSPECT_BUFFER)} samples'})
+                        if DEBUG:
+                            _emit({'log': f'[_analyze_chunks] COUPE confirmée : offset {OLD_OFFSET}s → {TIMELINE_OFFSET}s, flush {len(SUSPECT_BUFFER)} samples'})
                         for _, B_RAW, B_O, B_B in SUSPECT_BUFFER:
                             _record_raw(B_RAW, B_O, B_B, '(flush)')
                         SUSPECT_BUFFER.clear()
                     else:
                         DROPPED = SUSPECT_BUFFER.pop(0)
-                        #_emit({'log': f'[_analyze_chunks] SUSPECT drop @ ts={DROPPED[0]:.0f}s (non-linéaire)'})
+                        if DEBUG:
+                            _emit({'log': f'[_analyze_chunks] SUSPECT drop @ ts={DROPPED[0]:.0f}s (non-linéaire)'})
                 return
 
             # Sample dans la borne : tout suspect en attente était une hallucination isolée.
             if SUSPECT_BUFFER:
-                #_emit({'log': f'[_analyze_chunks] SUSPECT clear ({len(SUSPECT_BUFFER)} samples invalidés par sample normal)'})
+                if DEBUG:
+                    _emit({'log': f'[_analyze_chunks] SUSPECT clear ({len(SUSPECT_BUFFER)} samples invalidés par sample normal)'})
                 SUSPECT_BUFFER.clear()
 
             _record_raw(RAW_ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
@@ -2408,7 +2520,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # qui maximise l'accord avec les observations sous contraintes physiques.
         ORANGE_TL = _reconstruct_field(RAW_OBSERVATIONS, 'orange', MAX_ORANGE)
         BLUE_TL = _reconstruct_field(RAW_OBSERVATIONS, 'blue', MAX_BLUE)
-        #_emit({'log': f'[_analyze_chunks] reconstruction: {len(ORANGE_TL)} pts orange, {len(BLUE_TL)} pts blue (sur {len(RAW_OBSERVATIONS)} elapsed observés)'})
+        if DEBUG:
+            _emit({'log': f'[_analyze_chunks] reconstruction: {len(ORANGE_TL)} pts orange, {len(BLUE_TL)} pts blue (sur {len(RAW_OBSERVATIONS)} elapsed observés)'})
 
         # Format V2 : { "<sec>": [orange, blue] }. On forward-fill côté
         # producteur (chaque ligne contient l'état complet à cette seconde),
@@ -2532,7 +2645,7 @@ def main() -> None:
     Sous-commandes :
       detect <video> <ffmpeg> [tess] [settings_json]
         → phase 1 : détection inverse des games dans la vidéo.
-          settings : { orangeTeamName?, blueTeamName?, maxTimePerGame? }
+          settings : { maxTimePerGame? }
           stdout   : { type: 'progress'|'game'|'done'|'error', ... }
       chunks <video> <ffmpeg> [tess] [settings_json]
         → phase 2 : analyse approfondie des chunks pré-identifiés.
@@ -2581,7 +2694,8 @@ def main() -> None:
     if TESSERACT_CMD and not _tesseract_works(TESSERACT_CMD):
         FALLBACK = _find_system_tesseract()
         if FALLBACK and _tesseract_works(FALLBACK):
-            #_emit({'log': f'[tesseract] bundled SIGKILL → fallback to {FALLBACK}'})
+            if DEBUG:
+                _emit({'log': f'[tesseract] bundled SIGKILL → fallback to {FALLBACK}'})
             TESSERACT_CMD = FALLBACK
     if TESSERACT_CMD:
         pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
@@ -2595,11 +2709,9 @@ def main() -> None:
 
     START = time.time()
     if SUBCOMMAND == 'detect':
-        ORANGE   = SETTINGS.get('orangeTeamName', '').strip()
-        BLUE     = SETTINGS.get('blueTeamName', '').strip()
         MAX_TIME = int(SETTINGS.get('maxTimePerGame', 10))
         try:
-            _analyze(VIDEO_PATH, FFMPEG_PATH, ORANGE, BLUE, MAX_TIME)
+            _analyze(VIDEO_PATH, FFMPEG_PATH, MAX_TIME)
         except Exception as EXC:
             _emit({'type': 'error', 'message': str(EXC)})
             sys.exit(1)

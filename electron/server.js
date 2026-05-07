@@ -607,9 +607,9 @@ if (!APP_GOT_THE_LOCK) {
             ),
             (fileName
                 ? fileName
-                : `EBP - ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${
+                : `EBP - ${
                       game.map
-                  } ${customText ? '- ' + customText + ' ' : ''}(${new Date().getTime()})`) +
+                  } ${customText ? '- ' + customText + ' ' : ''}${game.orangeTeam.score} vs ${game.blueTeam.score} (${new Date().getTime()})`) +
                 `.${EXTENSION}`
         );
         unlinkSync(OUTPUT_FILE_PATH);

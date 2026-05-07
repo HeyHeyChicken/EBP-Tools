@@ -741,12 +741,10 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
       map: this.games[gameIndex].map,
       date: new Date().getTime(),
       orange: {
-        name: this.games[gameIndex].orangeTeam.name,
         score: this.games[gameIndex].orangeTeam.score,
         players: orangePlayersNames
       },
       blue: {
-        name: this.games[gameIndex].blueTeam.name,
         score: this.games[gameIndex].blueTeam.score,
         players: bluePlayersNames
       }
@@ -1811,11 +1809,9 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     GAME.end = data.end ?? 0;
     GAME.map = data.map ?? '';
     GAME.mapImage = data.mapImage ?? undefined;
-    GAME.orangeTeam.name = data.orangeTeam?.name ?? '';
     GAME.orangeTeam.score = data.orangeTeam?.score ?? 0;
     GAME.orangeTeam.nameImage = data.orangeTeam?.nameImage ?? undefined;
     GAME.orangeTeam.scoreImage = data.orangeTeam?.scoreImage ?? undefined;
-    GAME.blueTeam.name = data.blueTeam?.name ?? '';
     GAME.blueTeam.score = data.blueTeam?.score ?? 0;
     GAME.blueTeam.nameImage = data.blueTeam?.nameImage ?? undefined;
     GAME.blueTeam.scoreImage = data.blueTeam?.scoreImage ?? undefined;
@@ -1909,16 +1905,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
                         225,
                         true
                       );
-                    if (this.settings.orangeTeamName.trim()) {
-                      GAME.orangeTeam.name = this.settings.orangeTeamName
-                        .trim()
-                        .toUpperCase();
-                    } else if (
-                      ORANGE_TEAM_NAME &&
-                      ORANGE_TEAM_NAME.length >= 2
-                    ) {
-                      GAME.orangeTeam.name = ORANGE_TEAM_NAME.toUpperCase();
-                    }
 
                     const ORANGE_TEAM_SCORE: string =
                       await ReplayCutterService.getTextFromImage(
@@ -1958,14 +1944,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
                         false,
                         true
                       );
-
-                    if (this.settings.blueTeamName.trim()) {
-                      GAME.blueTeam.name = this.settings.blueTeamName
-                        .trim()
-                        .toUpperCase();
-                    } else if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
-                      GAME.blueTeam.name = BLUE_TEAM_NAME.toUpperCase();
-                    }
 
                     const BLUE_TEAM_SCORE: string =
                       await ReplayCutterService.getTextFromImage(
@@ -2197,51 +2175,7 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
                   }
                 }
 
-                // We are looking for the name of the orange team.
-                if (this._games[0].orangeTeam.name == '') {
-                  const TEXT: string =
-                    await ReplayCutterService.getTextFromImage(
-                      VIDEO,
-                      this.tesseractWorker_basic!,
-                      MODES[this._games[0].mode].gameFrame.orangeName[0].x,
-                      MODES[this._games[0].mode].gameFrame.orangeName[0].y,
-                      MODES[this._games[0].mode].gameFrame.orangeName[1].x,
-                      MODES[this._games[0].mode].gameFrame.orangeName[1].y,
-                      6
-                    );
-                  if (TEXT && TEXT.length >= 2) {
-                    found = true;
-                    if (this._games[0].orangeTeam.name == '') {
-                      this._games[0].orangeTeam.name = TEXT.toUpperCase();
-                    }
-                  }
-                }
-
-                // We are looking for the name of the blue team.
-                if (this._games[0].blueTeam.name == '') {
-                  const TEXT: string =
-                    await ReplayCutterService.getTextFromImage(
-                      VIDEO,
-                      this.tesseractWorker_basic!,
-                      MODES[this._games[0].mode].gameFrame.blueName[0].x,
-                      MODES[this._games[0].mode].gameFrame.blueName[0].y,
-                      MODES[this._games[0].mode].gameFrame.blueName[1].x,
-                      MODES[this._games[0].mode].gameFrame.blueName[1].y,
-                      6
-                    );
-                  if (TEXT && TEXT.length >= 2) {
-                    found = true;
-                    if (this._games[0].blueTeam.name == '') {
-                      this._games[0].blueTeam.name = TEXT.toUpperCase();
-                    }
-                  }
-                }
-
-                if (
-                  this._games[0].orangeTeam.name &&
-                  this._games[0].blueTeam.name &&
-                  this._games[0].map
-                ) {
+                if (this._games[0].map) {
                   if (!this._games[0].__debug__jumped) {
                     if (!this.justJumped) {
                       const TEXT: string =
@@ -2442,7 +2376,7 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     this._games
       .filter((game) => game.checked)
       .forEach((game) => {
-        result += `${game.readableStart} ${game.orangeTeam.name} vs ${game.blueTeam.name} - ${game.map}\n`;
+        result += `${game.readableStart} - ${game.map}\n`;
       });
     navigator.clipboard.writeText(result);
 
@@ -2536,32 +2470,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
         }
       );
     });
-  }
-
-  /**
-   * Opens a dialog to edit the name of a specific team for a given game.
-   * @param game The game object to modify.
-   * @param team The team whose name should be edited ('orange' or 'blue').
-   */
-  protected editTeamName(game: Game, team: 'orange' | 'blue'): void {
-    const CURRENT_NAME =
-      team === 'orange' ? game.orangeTeam.name : game.blueTeam.name;
-
-    this.dialogService
-      .open(ReplayCutterEditTeamNameDialog, {
-        data: CURRENT_NAME,
-        width: '400px'
-      })
-      .afterClosed()
-      .subscribe((newName: string | undefined) => {
-        if (newName) {
-          if (team === 'orange') {
-            game.orangeTeam.name = newName;
-          } else {
-            game.blueTeam.name = newName;
-          }
-        }
-      });
   }
 
   /**

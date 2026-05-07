@@ -11,7 +11,6 @@ import { Player } from './player';
 export class Team {
   //#region Attributes
 
-  public name: string = '';
   public score: number = 0;
   public players: Player[] = [];
 

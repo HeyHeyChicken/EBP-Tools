@@ -210,13 +210,6 @@ export class ReplayCutterService {
                                   .trim()
                                   .toUpperCase();
                             } else */
-                            if (
-                              ORANGE_TEAM_NAME &&
-                              ORANGE_TEAM_NAME.length >= 2
-                            ) {
-                              GAME.orangeTeam.name =
-                                ORANGE_TEAM_NAME.toUpperCase();
-                            }
 
                             const ORANGE_TEAM_SCORE: string =
                               await ReplayCutterService.getTextFromImage(
@@ -264,9 +257,6 @@ export class ReplayCutterService {
                                 .trim()
                                 .toUpperCase();
                             } else */
-                            if (BLUE_TEAM_NAME && BLUE_TEAM_NAME.length >= 2) {
-                              GAME.blueTeam.name = BLUE_TEAM_NAME.toUpperCase();
-                            }
 
                             const BLUE_TEAM_SCORE: string =
                               await ReplayCutterService.getTextFromImage(
@@ -446,7 +436,9 @@ export class ReplayCutterService {
                     }
 
                     if (!found) {
-                      if (ReplayCutterService.detectGameIntro(FRAME_DATA, games)) {
+                      if (
+                        ReplayCutterService.detectGameIntro(FRAME_DATA, games)
+                      ) {
                         found = true;
                         lastDetectedGamePlayingFrame = undefined;
                         games[0].start =
@@ -459,7 +451,9 @@ export class ReplayCutterService {
                     //#region Detecting card name during game.
 
                     if (!found) {
-                      if (ReplayCutterService.detectGamePlaying(FRAME_DATA, games)) {
+                      if (
+                        ReplayCutterService.detectGamePlaying(FRAME_DATA, games)
+                      ) {
                         lastDetectedGamePlayingFrame = NOW;
                         // We are looking for the name of the map.
                         if (games[0].map == '') {
@@ -500,51 +494,7 @@ export class ReplayCutterService {
                           }
                         }
 
-                        // We are looking for the name of the orange team.
-                        if (games[0].orangeTeam.name == '') {
-                          const TEXT: string =
-                            await ReplayCutterService.getTextFromImage(
-                              VIDEO,
-                              tesseractWorker_basic,
-                              MODES[games[0].mode].gameFrame.orangeName[0].x,
-                              MODES[games[0].mode].gameFrame.orangeName[0].y,
-                              MODES[games[0].mode].gameFrame.orangeName[1].x,
-                              MODES[games[0].mode].gameFrame.orangeName[1].y,
-                              6
-                            );
-                          if (TEXT && TEXT.length >= 2) {
-                            found = true;
-                            if (games[0].orangeTeam.name == '') {
-                              games[0].orangeTeam.name = TEXT.toUpperCase();
-                            }
-                          }
-                        }
-
-                        // We are looking for the name of the blue team.
-                        if (games[0].blueTeam.name == '') {
-                          const TEXT: string =
-                            await ReplayCutterService.getTextFromImage(
-                              VIDEO,
-                              tesseractWorker_basic,
-                              MODES[games[0].mode].gameFrame.blueName[0].x,
-                              MODES[games[0].mode].gameFrame.blueName[0].y,
-                              MODES[games[0].mode].gameFrame.blueName[1].x,
-                              MODES[games[0].mode].gameFrame.blueName[1].y,
-                              6
-                            );
-                          if (TEXT && TEXT.length >= 2) {
-                            found = true;
-                            if (games[0].blueTeam.name == '') {
-                              games[0].blueTeam.name = TEXT.toUpperCase();
-                            }
-                          }
-                        }
-
-                        if (
-                          games[0].orangeTeam.name &&
-                          games[0].blueTeam.name &&
-                          games[0].map
-                        ) {
+                        if (games[0].map) {
                           if (!games[0].__debug__jumped) {
                             if (!justJumped) {
                               const TEXT: string =

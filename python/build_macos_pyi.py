@@ -111,8 +111,9 @@ def main() -> None:
         "--add-data", f"{TESS_BIN}:tesseract",
         "--add-data", f"{TESS_DATA}/eng.traineddata:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
-        # Templates pour la détection d'arme et headshot (résolution dans
-        # analyze_video._analyze_chunks via sys._MEIPASS + 'templates/').
+        # Templates : détection d'arme + headshot (killfeed),
+        # loading_logo (écran de loading) et playing_top (ancre HUD haute).
+        # Résolution via sys._MEIPASS + 'templates/'.
         "--add-data", f"{repo_templates}:templates",
     ]
     for dylib in dylibs:
