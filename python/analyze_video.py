@@ -1732,40 +1732,61 @@ def _detect_capture_points(frame: np.ndarray, anchor=None,
 def _compute_point_fill(frame: np.ndarray, point: dict,
                         orange_color=(238, 120, 12),
                         blue_color=(43, 137, 237),
-                        tol: int = 20) -> tuple:
+                        tol: int = 45) -> tuple:
     """Renvoie (orange_pct, blue_pct) — le taux de remplissage par équipe d'un
     point donné, exprimé en pourcentage de hauteur (le point se remplit comme
     un verre, l'orange descendant depuis le haut et le bleu montant depuis le
     bas, ou inversement).
 
     Logique :
-      - Crop l'intérieur du cercle (drop la bordure blanche).
+      - Restreint le matching aux pixels de la BORDURE du point (canal alpha
+        du template `point.png` > 200). Le centre est transparent : sur les
+        maps avec arrière-plan coloré (Atlantis = eau bleue), l'intérieur
+        donnait des faux positifs bleus permanents. La bordure, elle, est
+        toujours opaque côté jeu — elle est blanche si neutre, ou prend la
+        couleur d'équipe au prorata de la capture. Aucun pixel de décor ne
+        peut la traverser.
       - Match RGB par distance L∞ sur les couleurs RÉSOLUES de l'équipe (passées
         par l'appelant via `RESOLVED_ORANGE` / `RESOLVED_BLUE`). Robuste aux
-        variantes pro league (vert fluo, violet, jaune, etc.) — ce qui ne serait
-        pas le cas avec des plages HSV hardcodées sur l'orange/bleu standard.
-      - Pour chaque ligne, on compte les pixels orange vs bleus ; majorité ⇒
-        ligne orange / ligne bleue (sinon ligne vide). Le ratio par hauteur
-        correspond à la jauge perceptuelle (% par volume du verre).
+        variantes pro league (vert fluo, violet, jaune, etc.).
+      - Pour chaque ligne, on compte les pixels orange vs bleus dans la bordure ;
+        majorité ⇒ ligne orange / ligne bleue (sinon ligne vide / blanche). Le
+        ratio par hauteur correspond à la jauge perceptuelle (% par volume du
+        verre).
     """
-    INSET = 3
-    x1 = point['x'] + INSET
-    y1 = point['y'] + INSET
-    x2 = point['x'] + point['w'] - INSET
-    y2 = point['y'] + point['h'] - INSET
+    x1 = point['x']; y1 = point['y']
+    x2 = x1 + point['w']; y2 = y1 + point['h']
     if x2 <= x1 or y2 <= y1:
         return 0, 0
     sub = frame[y1:y2, x1:x2]
     if sub.size == 0:
         return 0, 0
+    # Border mask via alpha du template. Resize si la box détectée n'est pas
+    # à la résolution native (ex. HUD à un scale ≠ 1.0).
+    _, tpl_alpha = _get_point_template()
+    if tpl_alpha is None:
+        return 0, 0
+    if tpl_alpha.shape != sub.shape[:2]:
+        tpl_alpha = cv2.resize(
+            tpl_alpha, (sub.shape[1], sub.shape[0]),
+            interpolation=cv2.INTER_NEAREST,
+        )
+    border_mask = tpl_alpha > 200
     sub_i = sub.astype(np.int16)
     org_target = np.array(orange_color, dtype=np.int16)
     blu_target = np.array(blue_color, dtype=np.int16)
-    org_mask = (np.abs(sub_i - org_target).max(axis=2) <= tol)
-    blu_mask = (np.abs(sub_i - blu_target).max(axis=2) <= tol)
+    org_mask = (np.abs(sub_i - org_target).max(axis=2) <= tol) & border_mask
+    blu_mask = (np.abs(sub_i - blu_target).max(axis=2) <= tol) & border_mask
+    # Normalisation par les rows qui contiennent effectivement de la bordure :
+    # les rows tout en haut/bas du bbox sont hors de l'hex (bbox rectangulaire,
+    # forme hexagonale) → alpha 0 partout → ne comptent ni dans le numérateur
+    # ni dans le dénominateur. Sans ça, un point 100 % capturé plafonne à ~92 %.
     rows = sub.shape[0]
-    o_rows = b_rows = 0
+    o_rows = b_rows = total_rows = 0
     for r in range(rows):
+        if not border_mask[r].any():
+            continue
+        total_rows += 1
         no = int(org_mask[r].sum()); nb = int(blu_mask[r].sum())
         if no + nb < 1:
             continue
@@ -1773,8 +1794,10 @@ def _compute_point_fill(frame: np.ndarray, point: dict,
             o_rows += 1
         elif nb > no:
             b_rows += 1
-    o_pct = int(round(o_rows / rows * 100))
-    b_pct = int(round(b_rows / rows * 100))
+    if total_rows == 0:
+        return 0, 0
+    o_pct = int(round(o_rows / total_rows * 100))
+    b_pct = int(round(b_rows / total_rows * 100))
     # Normalisation base 100 : quand les deux équipes sont présentes sur le
     # point, on rescale pour que orange + blue = 100. Les rangées "vides"
     # (intérieur transparent montrant le décor) n'ont pas de sens propre —
