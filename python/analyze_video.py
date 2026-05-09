@@ -1705,6 +1705,27 @@ def _detect_capture_points(frame: np.ndarray, anchor=None,
             'score': round(sc, 3),
             'letter': letter,
         })
+
+    # Contrainte EVA : pour N points, le set des lettres = {A, ..., N-ième}
+    # exactement. L'ordre VISUEL gauche→droite peut varier (ex. HELIOS = B-A-C),
+    # mais l'ensemble est toujours {A..N}. On corrige donc les lettres OCR
+    # invalides (hors plage attendue) ou dupliquées en réassignant les lettres
+    # manquantes en x-order. Ex. 3 points OCR = A-B-E → A-B-C (E remplacé par
+    # C, la lettre manquante du set attendu).
+    out.sort(key=lambda p: p['x'])
+    n = len(out)
+    if n > 0:
+        expected = {chr(ord('A') + i) for i in range(n)}
+        used: set = set()
+        for p in out:
+            if p['letter'] in expected and p['letter'] not in used:
+                used.add(p['letter'])
+            else:
+                p['letter'] = ''   # marqueur de réassignation
+        remaining = sorted(expected - used)
+        for p in out:
+            if not p['letter']:
+                p['letter'] = remaining.pop(0)
     return out
 
 
@@ -1767,6 +1788,75 @@ def _compute_point_fill(frame: np.ndarray, point: dict,
         b_norm = 100 - o_norm
         return o_norm, b_norm
     return o_pct, b_pct
+
+
+_HARDPOINT_MAPS = {'Outlaw'}
+
+
+def _smooth_points_timeline_domination(timeline: dict) -> dict:
+    """Filtre le bruit OCR sur le points_timeline en mode Domination.
+
+    Règle EVA Domination : un point peut décroître seul TANT QUE personne ne l'a
+    capturé à 100 %. Une fois qu'une équipe atteint 100 %, le point est "owned"
+    par cette équipe et ne peut plus que :
+      - rester owned (100/0 ou 0/100)
+      - être contesté par l'autre équipe (orange ET bleu présents simultanément)
+      - être reset (0/0, ex. fin de round)
+      - basculer chez l'adversaire (après contest complet)
+
+    Donc une fois owned, une transition `[100, 0] → [80, 0]` (décroissance solo
+    sans contest) est nécessairement du bruit OCR — on l'ignore et le state owned
+    persiste via la nature sparse du timeline (l'absence d'entrée = forward-fill).
+
+    Renvoie un nouveau dict {letter: {sec_str: [o, b]}} avec les entrées bruitées
+    supprimées. À NE PAS appliquer sur Outlaw (Hardpoint) où la décroissance solo
+    est physique : un joueur quitte le point, le score arrête de monter et le
+    point se vide selon la mécanique Hardpoint.
+    """
+    out = {}
+    for letter, tl in timeline.items():
+        owned_team = None  # 'orange' | 'blue' | None
+        cleaned = {}
+        last = None        # dernière entrée acceptée (o, b) ou None
+        keys = sorted(tl.keys(), key=lambda s: int(s))
+        for k in keys:
+            o, b = tl[k]
+            full_orange = (o == 100 and b == 0)
+            full_blue = (o == 0 and b == 100)
+            both = (o > 0 and b > 0)
+            empty = (o == 0 and b == 0)
+            if owned_team is None:
+                # Phase de capture initiale (jamais atteint 100 %) : tout passe.
+                cleaned[k] = [o, b]
+                last = (o, b)
+                if full_orange:
+                    owned_team = 'orange'
+                elif full_blue:
+                    owned_team = 'blue'
+                continue
+            # Owned : transitions valides
+            if both:
+                # Contest en cours : OK, owned_team reste valide.
+                cleaned[k] = [o, b]; last = (o, b)
+            elif empty:
+                # Reset (fin de round, etc.).
+                cleaned[k] = [o, b]; last = (o, b); owned_team = None
+            elif full_orange and owned_team == 'orange':
+                cleaned[k] = [o, b]; last = (o, b)   # stay owned
+            elif full_blue and owned_team == 'blue':
+                cleaned[k] = [o, b]; last = (o, b)   # stay owned
+            elif full_orange or full_blue:
+                # Swap demandé : valide UNIQUEMENT si la dernière entrée
+                # acceptée était un contest (présence simultanée des deux
+                # équipes). Sinon = swap direct impossible → bruit, on droppe
+                # et on conserve l'état owned précédent.
+                if last is not None and last[0] > 0 and last[1] > 0:
+                    cleaned[k] = [o, b]; last = (o, b)
+                    owned_team = 'orange' if full_orange else 'blue'
+                # else : drop silencieux (impossible physiquement)
+            # else : décroissance solo (100/0 → 80/0) → bruit, drop.
+        out[letter] = cleaned
+    return out
 
 
 def _detect_game_intro(frame: np.ndarray) -> bool:
@@ -2454,6 +2544,11 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # le score final — sinon c'est une hallucination.
         MAX_ORANGE = CHUNK.get('orangeScore')
         MAX_BLUE = CHUNK.get('blueScore')
+        # Map name : sert à choisir entre règle Domination (lissage anti-bruit
+        # une fois owned) et Hardpoint (toléré, le point se vide naturellement).
+        # Outlaw = Hardpoint, le reste = Domination.
+        MAP_NAME = CHUNK.get('map', '')
+        IS_HARDPOINT = MAP_NAME in _HARDPOINT_MAPS
 
         # Rosters trustés issus de l'API /games/identify (appelée AVANT phase 2
         # par le client). Format : [{name, K, D}, ...]. Sera utilisé à l'étape 4
@@ -2829,6 +2924,13 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     timeline[str(K)] = pair
                     prev = pair
             POINTS_TIMELINE[LETTER] = timeline
+
+        # Lissage Domination : une fois owned (100 %), un point ne peut décroître
+        # que par contest (orange ET bleu) ou reset à 0/0. Toute décroissance solo
+        # observée ensuite est du bruit OCR → drop. Skippé sur Outlaw (Hardpoint)
+        # où la décroissance solo est physique.
+        if not IS_HARDPOINT and POINTS_TIMELINE:
+            POINTS_TIMELINE = _smooth_points_timeline_domination(POINTS_TIMELINE)
 
         # Killfeed : dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
         # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.

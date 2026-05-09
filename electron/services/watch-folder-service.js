@@ -234,6 +234,10 @@ async function processVideo(videoPath, deps) {
             endSeconds: g.end,
             gameID: TEMP_ID,
             mode: g.mode,
+            // Nom de map (ex. "Outlaw", "Helios Station") — Python s'en sert
+            // pour appliquer la règle Domination/Hardpoint sur points_timeline
+            // (Outlaw = Hardpoint, le reste = Domination).
+            map: g.map || '',
             orangePlayers: M ? M.orangePlayers : [],
             bluePlayers: M ? M.bluePlayers : []
         };
