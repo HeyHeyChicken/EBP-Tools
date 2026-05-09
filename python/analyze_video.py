@@ -475,6 +475,16 @@ def _find_text_border(frame: np.ndarray, colors: list, search_region, tol_color:
     d'un nom d'équipe). On masque les pixels de la couleur de bordure, on prend le
     bbox englobant, on rentre de inset px pour ne pas inclure le bord lui-même.
 
+    On ne prend pas le bbox brut de tous les pixels matchant : sur l'écran de
+    score, le bandeau du nom d'équipe (ex: "ALLIANCE") est dans la même couleur
+    que les chiffres et tombe dans la search region → le bbox engloberait les
+    deux et l'OCR retournerait un mélange (les I/L de "ALLIANCE" lus comme des
+    1 par Tesseract en whitelist digits). On part donc de la plus grosse
+    composante connexe (forcément un chiffre, bien plus haut/épais que n'importe
+    quelle lettre du bandeau), puis on étend aux composantes qui chevauchent
+    verticalement (autres chiffres + %), ce qui exclut tout ce qui est sur une
+    autre bande y.
+
     Retourne ((x1, y1), (x2, y2)) ou None si pas assez de pixels matchent.
     """
     h, w = frame.shape[:2]
@@ -490,15 +500,40 @@ def _find_text_border(frame: np.ndarray, colors: list, search_region, tol_color:
         mask |= (np.abs(sub - target) <= tol_color).all(axis=2)
     if mask.sum() < min_pixels:
         return None
-    ys, xs = np.where(mask)
+
+    n_labels, _, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
+    if n_labels <= 1:
+        return None
+    # stats[0] = background, on ignore. Colonnes : LEFT, TOP, WIDTH, HEIGHT, AREA.
+    comp = stats[1:]
+    largest = int(np.argmax(comp[:, cv2.CC_STAT_AREA]))
+    ly = comp[largest, cv2.CC_STAT_TOP]
+    lh = comp[largest, cv2.CC_STAT_HEIGHT]
+    l_y1, l_y2 = ly, ly + lh
+
+    # On garde les composantes dont l'intervalle vertical chevauche la plus
+    # grosse → même bande de texte. Les autres bandes (nom d'équipe au-dessus,
+    # éventuels artefacts en-dessous) sont écartées.
+    cy1 = comp[:, cv2.CC_STAT_TOP]
+    cy2 = cy1 + comp[:, cv2.CC_STAT_HEIGHT]
+    keep = (cy2 > l_y1) & (cy1 < l_y2)
+    kept = comp[keep]
+    if kept.size == 0:
+        return None
+
+    bx1 = int(kept[:, cv2.CC_STAT_LEFT].min())
+    by1 = int(kept[:, cv2.CC_STAT_TOP].min())
+    bx2 = int((kept[:, cv2.CC_STAT_LEFT] + kept[:, cv2.CC_STAT_WIDTH]).max())
+    by2 = int((kept[:, cv2.CC_STAT_TOP] + kept[:, cv2.CC_STAT_HEIGHT]).max())
+
     # inset positif = rentre vers l'intérieur (utile quand la couleur cible est
     # une BORDURE entourant le texte). inset négatif = élargit autour (utile
     # quand la couleur cible est le TEXTE lui-même, ex: chiffres colorés du score).
     # On clamp aux bornes du frame pour éviter de sortir de l'image.
-    x1 = max(0, int(xs.min()) + sx1 + inset)
-    y1 = max(0, int(ys.min()) + sy1 + inset)
-    x2 = min(w, int(xs.max()) + sx1 + 1 - inset)
-    y2 = min(h, int(ys.max()) + sy1 + 1 - inset)
+    x1 = max(0, bx1 + sx1 + inset)
+    y1 = max(0, by1 + sy1 + inset)
+    x2 = min(w, bx2 + sx1 - inset)
+    y2 = min(h, by2 + sy1 - inset)
     if x2 <= x1 or y2 <= y1:
         return None
     return ((x1, y1), (x2, y2))
@@ -1732,7 +1767,7 @@ def _detect_capture_points(frame: np.ndarray, anchor=None,
 def _compute_point_fill(frame: np.ndarray, point: dict,
                         orange_color=(238, 120, 12),
                         blue_color=(43, 137, 237),
-                        tol: int = 45) -> tuple:
+                        tol: int = 30) -> tuple:
     """Renvoie (orange_pct, blue_pct) — le taux de remplissage par équipe d'un
     point donné, exprimé en pourcentage de hauteur (le point se remplit comme
     un verre, l'orange descendant depuis le haut et le bleu montant depuis le
