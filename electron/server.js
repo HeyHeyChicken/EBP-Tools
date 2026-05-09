@@ -480,6 +480,7 @@ if (!APP_GOT_THE_LOCK) {
             case 'analyzeVideoFile':
                 const FILES_PATHS = await openFiles(data.filesExtensions, true);
                 if (FILES_PATHS.length > 0) {
+                    const MAX_TIME_PER_GAME = data.maxTime ?? 10;
                     const DURATIONS = await Promise.all(
                         FILES_PATHS.map((p) =>
                             getVideoDuration(p).catch(() => 0)
@@ -496,9 +497,11 @@ if (!APP_GOT_THE_LOCK) {
                         fs.mkdirSync(WATCH_FOLDER, { recursive: true });
                     }
                     for (const SRC of FILES_PATHS) {
+                        const EXT = path.extname(SRC);
+                        const BASE = path.basename(SRC, EXT);
                         const DEST = path.join(
                             WATCH_FOLDER,
-                            path.basename(SRC)
+                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}${EXT}`
                         );
                         fs.copyFileSync(SRC, DEST);
                     }
@@ -781,11 +784,12 @@ if (!APP_GOT_THE_LOCK) {
         REQUEST.end();
     }
 
-    function runAnalyzer(videoPath, socket) {
+    function runAnalyzer(videoPath, socket, settings) {
         const HEADLESS = !socket;
 
         return new Promise((resolve, reject) => {
-            const ARGS = ['detect', videoPath, FFMPEG_PATH, '', '{}'];
+            const SETTINGS_JSON = JSON.stringify(settings || {});
+            const ARGS = ['detect', videoPath, FFMPEG_PATH, '', SETTINGS_JSON];
             const SPAWN_OPTIONS = {
                 stdio: ['ignore', 'pipe', 'pipe'],
                 cwd: path.dirname(ANALYZER_PATH),
@@ -892,7 +896,7 @@ if (!APP_GOT_THE_LOCK) {
      * @param {string} socket    Socket ID du front qui doit recevoir les events.
      * @param {Array}  chunks    [{startSeconds, endSeconds, gameID, mode}] — segments à analyser.
      */
-    function runChunkAnalyzer(videoPath, socket, chunks) {
+    function runChunkAnalyzer(videoPath, socket, chunks, settings) {
         const HEADLESS = !socket;
         const NOTIFICATION_DATA = {
             percent: 0,
@@ -907,7 +911,10 @@ if (!APP_GOT_THE_LOCK) {
         }
 
         return new Promise((resolve, reject) => {
-            const SETTINGS_JSON = JSON.stringify({ chunks: chunks });
+            const SETTINGS_JSON = JSON.stringify({
+                ...(settings || {}),
+                chunks: chunks
+            });
             const ARGS = ['chunks', videoPath, FFMPEG_PATH, '', SETTINGS_JSON];
             const SPAWN_OPTIONS = {
                 stdio: ['ignore', 'pipe', 'pipe'],

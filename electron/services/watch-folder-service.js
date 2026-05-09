@@ -28,6 +28,27 @@ const {
 const SETTINGS_KEY_FOLDER = 'replayWatchFolder';
 const SUPPORTED_EXT = new Set(['.mp4', '.mkv', '.mov', '.avi', '.webm']);
 const AUTH_RETRY_INTERVAL_MS = 30 * 1000;
+const META_RE = /__mtpg-(\d+)$/;
+
+/**
+ * Extrait la valeur `maxTimePerGame` encodée dans le nom du fichier par
+ * `analyzeVideoFile` (suffixe `__mtpg-N` avant l'extension), et renvoie
+ * un basename "propre" pour l'aval (cut filenames, sourceFilename API).
+ * Si pas de suffixe (fichier déposé manuellement), maxTimePerGame est
+ * undefined → fallback côté Python sur la valeur par défaut.
+ */
+function parseMeta(filePath) {
+    const EXT = path.extname(filePath);
+    const BASE = path.basename(filePath, EXT);
+    const M = BASE.match(META_RE);
+    if (!M) {
+        return { cleanBasename: BASE, maxTimePerGame: undefined };
+    }
+    return {
+        cleanBasename: BASE.slice(0, M.index),
+        maxTimePerGame: parseInt(M[1], 10)
+    };
+}
 
 let watcher = null;
 let workerRunning = false;
@@ -187,10 +208,16 @@ async function processVideo(videoPath, deps) {
     const FAILED_DIR = path.join(ROOT, 'failed');
     ensureSubfolders(ROOT);
 
+    const META = parseMeta(videoPath);
+    const SETTINGS =
+        META.maxTimePerGame !== undefined
+            ? { maxTimePerGame: META.maxTimePerGame }
+            : {};
+
     console.log('[watch-folder] processing', videoPath);
 
     // Phase 1: detect games
-    const DETECT = await deps.runAnalyzer(videoPath, null);
+    const DETECT = await deps.runAnalyzer(videoPath, null, SETTINGS);
     if (DETECT.type === 'error') {
         throw new Error(`Analyzer failed: ${DETECT.message}`);
     }
@@ -205,7 +232,7 @@ async function processVideo(videoPath, deps) {
     // pouvoir les passer en argument à l'analyse approfondie (utile au fuzzy
     // match du killfeed OCR).
     const IDENTIFY_RES = await identifyGames({
-        sourceFilename: path.basename(videoPath),
+        sourceFilename: META.cleanBasename + path.extname(videoPath),
         segments: toIdentifySegments(GAMES)
     });
     console.log('[watch-folder] identify response:', JSON.stringify(IDENTIFY_RES, null, 2));
@@ -242,7 +269,12 @@ async function processVideo(videoPath, deps) {
             bluePlayers: M ? M.bluePlayers : []
         };
     });
-    const CHUNK_RES = await deps.runChunkAnalyzer(videoPath, null, CHUNKS);
+    const CHUNK_RES = await deps.runChunkAnalyzer(
+        videoPath,
+        null,
+        CHUNKS,
+        SETTINGS
+    );
     if (CHUNK_RES.error) {
         throw new Error(`Chunk analyzer failed: ${CHUNK_RES.error}`);
     }
@@ -274,7 +306,7 @@ async function processVideo(videoPath, deps) {
 
     // Phase 4: cut every detected game into its own file (skip those qui ont déjà
     // une vidéo côté serveur — pas de découpage, pas de réencodage).
-    const VIDEO_BASENAME = path.basename(videoPath, path.extname(videoPath));
+    const VIDEO_BASENAME = META.cleanBasename;
     const CUT_FILES = [];
     for (let i = 0; i < GAMES.length; i++) {
         const G = GAMES[i];
