@@ -1851,6 +1851,54 @@ def _compute_point_fill(frame: np.ndarray, point: dict,
 _HARDPOINT_MAPS = {'Outlaw'}
 
 
+def _smooth_points_timeline_atlantis(timeline: dict) -> dict:
+    """Filtre Atlantis-spécifique : rotation des points par phases.
+
+    Atlantis est la seule map avec rotation des points. Mécanique :
+      - Phase 1, elapsed [0, 95)   : seul A actif (B et C lockés à 0/0).
+      - Phase 2, elapsed [95, 155) : seuls B et C actifs (A locké à 0/0).
+      - Phase 3, elapsed [155, ∞)  : tous actifs.
+
+    Un point inactif a son meter affiché à 0/0 — toute autre lecture est
+    du bruit OCR → drop. En phase 2 on injecte explicitement [0,0] sur A
+    si A avait été capturé en phase 1, sinon le forward-fill propagerait
+    cette ownership à tort sur la zone phase 2 + 3.
+
+    À appliquer AVANT _smooth_points_timeline_domination : sinon une
+    fausse capture en phase 1 sur B/C lock owned_team chez le smoother
+    Domination et corrompt tout le reste de la timeline.
+    """
+    PHASE_1_END = 95
+    PHASE_2_END = 155
+    out = {}
+    for letter, tl in timeline.items():
+        if letter not in ('A', 'B', 'C'):
+            out[letter] = dict(tl)
+            continue
+        cleaned = {}
+        last_phase_1 = [0, 0]
+        for k_str, pair in tl.items():
+            k = int(k_str)
+            if k < PHASE_1_END:
+                if letter in ('B', 'C'):
+                    if pair == [0, 0]:
+                        cleaned[k_str] = pair
+                    continue
+                # A actif en phase 1
+                cleaned[k_str] = pair
+                last_phase_1 = pair
+            elif k < PHASE_2_END:
+                if letter == 'A':
+                    continue   # locké à 0/0, [0,0] sera injecté à sec=95
+                cleaned[k_str] = pair
+            else:
+                cleaned[k_str] = pair
+        if letter == 'A' and last_phase_1 != [0, 0]:
+            cleaned[str(PHASE_1_END)] = [0, 0]
+        out[letter] = cleaned
+    return out
+
+
 def _smooth_points_timeline_domination(timeline: dict) -> dict:
     """Filtre le bruit OCR sur le points_timeline en mode Domination.
 
@@ -2982,6 +3030,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     timeline[str(K)] = pair
                     prev = pair
             POINTS_TIMELINE[LETTER] = timeline
+
+        # Atlantis : rotation des points (A actif phase 1, B/C actifs phase 2).
+        # À faire AVANT le lissage Domination — sinon une fausse capture en
+        # phase 1 sur B/C lock owned_team chez le smoother et corrompt tout.
+        if MAP_NAME == 'Atlantis' and POINTS_TIMELINE:
+            POINTS_TIMELINE = _smooth_points_timeline_atlantis(POINTS_TIMELINE)
 
         # Lissage Domination : une fois owned (100 %), un point ne peut décroître
         # que par contest (orange ET bleu) ou reset à 0/0. Toute décroissance solo
