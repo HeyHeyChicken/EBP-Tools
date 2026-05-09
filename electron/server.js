@@ -478,18 +478,34 @@ if (!APP_GOT_THE_LOCK) {
                 }
                 break;
             case 'analyzeVideoFile':
-                const FILES_PATHS = await openFiles(data.filesExtensions);
-                if (FILES_PATHS.length == 1) {
+                const FILES_PATHS = await openFiles(data.filesExtensions, true);
+                if (FILES_PATHS.length > 0) {
+                    const DURATIONS = await Promise.all(
+                        FILES_PATHS.map((p) =>
+                            getVideoDuration(p).catch(() => 0)
+                        )
+                    );
+                    const TOTAL_SECONDS = DURATIONS.reduce((a, b) => a + b, 0);
                     socketEmit(data.socket, 'analyzeVideoFileGames', {
-                        type: 'video_path',
-                        value: FILES_PATHS[0]
+                        type: 'length',
+                        value: TOTAL_SECONDS
                     });
 
-                    runAnalyzer(FILES_PATHS[0], data.socket);
+                    const WATCH_FOLDER = watchFolderService.getWatchFolder();
+                    if (!fs.existsSync(WATCH_FOLDER)) {
+                        fs.mkdirSync(WATCH_FOLDER, { recursive: true });
+                    }
+                    for (const SRC of FILES_PATHS) {
+                        const DEST = path.join(
+                            WATCH_FOLDER,
+                            path.basename(SRC)
+                        );
+                        fs.copyFileSync(SRC, DEST);
+                    }
                 } else {
                     socketEmit(data.socket, 'analyzeVideoFileGames', {
-                        type: 'video_path',
-                        value: ''
+                        type: 'length',
+                        value: 0
                     });
                 }
 
@@ -566,23 +582,22 @@ if (!APP_GOT_THE_LOCK) {
         }
     }
 
-    async function openFiles(extensions) {
+    async function openFiles(extensions, multiple = false) {
+        const PROPERTIES = ['openFile'];
+        if (multiple) PROPERTIES.push('multiSelections');
         const { canceled, filePaths } = await dialog.showOpenDialog({
-            properties: ['openFile'],
+            properties: PROPERTIES,
             filters: [{ extensions: extensions }]
         });
 
         if (canceled || filePaths.length == 0) {
-            getMainWindow().webContents.send('global-message', undefined);
-            getMainWindow().webContents.send(
-                'toast',
-                'error',
-                'view.replay_cutter.noFilesSelected'
-            );
             return [];
         }
 
-        return filePaths;
+        const ALLOWED = new Set(extensions.map((e) => e.toLowerCase()));
+        return filePaths.filter((p) =>
+            ALLOWED.has(path.extname(p).slice(1).toLowerCase())
+        );
     }
 
     /**

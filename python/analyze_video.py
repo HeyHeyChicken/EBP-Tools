@@ -768,26 +768,15 @@ def _load_template_image(path: str):
     return gray, mask
 
 
-def _resize_template_to_height(gray: np.ndarray, mask: np.ndarray, target_h: int):
-    """Redimensionne un template à `target_h` en hauteur, ratio préservé.
-    Le killfeed affiche les icônes à hauteur ~13 px ; les templates source
-    peuvent être à des résolutions variées (12-29 px), on les ramène tous
-    à la même échelle pour comparer."""
-    h, w = gray.shape
-    if h == target_h:
-        return gray, mask
-    new_w = max(1, int(round(w * target_h / h)))
-    interp = cv2.INTER_AREA if target_h < h else cv2.INTER_CUBIC
-    g = cv2.resize(gray, (new_w, target_h), interpolation=interp)
-    m = cv2.resize(mask, (new_w, target_h), interpolation=interp)
-    return g, m
-
-
-def _load_weapon_templates(template_dir: str, target_h: int = 13) -> dict:
+def _load_weapon_templates(template_dir: str) -> dict:
     """
     Charge tous les PNG du dossier `weapons/` comme templates {name: (gray, mask)},
-    redimensionnés à `target_h` px de haut (= hauteur typique d'une kill row).
-    `name` = stem du fichier (m12.png → "m12").
+    à leur résolution native. `name` = stem du fichier (m12.png → "m12").
+
+    Pas de resize à l'init : `_match_template_to_icon` resize ensuite à la
+    hauteur exacte de l'icône détectée dans la frame (scale-invariant), ratio
+    préservé. Resizer 2 fois (init + match) dégrade les détails sur les
+    sources fines (ex : admin 29 px → 13 px → 13 px).
 
     Retourne {} si le dossier n'existe pas — désactive proprement la détection
     d'arme sans casser le pipeline killfeed.
@@ -801,9 +790,7 @@ def _load_weapon_templates(template_dir: str, target_h: int = 13) -> dict:
             continue
         name = os.path.splitext(fname)[0]
         try:
-            gray, mask = _load_template_image(os.path.join(weapons_dir, fname))
-            gray, mask = _resize_template_to_height(gray, mask, target_h)
-            out[name] = (gray, mask)
+            out[name] = _load_template_image(os.path.join(weapons_dir, fname))
         except Exception:
             continue
     return out
@@ -1549,6 +1536,239 @@ def _find_blue_score_box(frame: np.ndarray, anchor=None):
     return _find_score_box(anchor, 'right')
 
 
+_POINT_TEMPLATE_CACHE = None  # tuple (gray, alpha_mask) ou (None, None)
+
+# Largeur native de `playing_top.png` à 1920×1080. Sert à dériver l'échelle
+# du template `point.png` proportionnellement à la taille du HUD détecté.
+_HUD_NATIVE_W = 553
+
+
+def _get_point_template():
+    """Charge (et cache) le template du point de capture en (gray, alpha).
+    Le canal alpha sert de mask pour `cv2.matchTemplate` : on ignore le centre
+    transparent (qui se remplit en couleur d'équipe pendant la capture) et on
+    matche uniquement le contour blanc circulaire."""
+    global _POINT_TEMPLATE_CACHE
+    if _POINT_TEMPLATE_CACHE is not None:
+        return _POINT_TEMPLATE_CACHE
+    base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, 'templates', 'point.png')
+    if not os.path.isfile(path):
+        _POINT_TEMPLATE_CACHE = (None, None)
+        return _POINT_TEMPLATE_CACHE
+    rgba = np.array(Image.open(path).convert('RGBA'))
+    gray = cv2.cvtColor(rgba[:, :, :3], cv2.COLOR_RGB2GRAY)
+    alpha = rgba[:, :, 3]
+    _POINT_TEMPLATE_CACHE = (gray, alpha)
+    return _POINT_TEMPLATE_CACHE
+
+
+def _ocr_point_letter(frame: np.ndarray, x: int, y: int, w: int, h: int) -> str:
+    """OCR la lettre identifiant un point de capture (A, B, C, ...).
+
+    La lettre est blanche, centrée dans le cercle, et bien lisible quand
+    le point est VIDE (état de début de game : fond transparent montrant
+    le HUD sombre). On crop l'intérieur, seuille en luminance, upscale,
+    puis vote sur PSMs × seuils. Whitelist A-E : éviter 'O' empêche la
+    confusion D↔O.
+
+    Note : appelé une seule fois par game depuis `_analyze_chunks`
+    (positions/lettres verrouillées sur la 1ère frame exploitable). Pas
+    d'OCR par seconde — seul le fill couleur est recalculé par frame.
+    """
+    WHITELIST = 'ABCDE'
+    votes = Counter()
+    for inset in (5, 6):
+        x1 = x + inset; y1 = y + inset
+        x2 = x + w - inset; y2 = y + h - inset
+        if x2 <= x1 or y2 <= y1: continue
+        crop = frame[y1:y2, x1:x2]
+        if crop.size == 0: continue
+        gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
+        for thr in (80, 90, 100):
+            bw = np.where(gray >= thr, 0, 255).astype(np.uint8)
+            pil = Image.fromarray(bw).resize(
+                (bw.shape[1] * 8, bw.shape[0] * 8), Image.BICUBIC)
+            pil = ImageOps.expand(pil, border=20, fill=255).convert('RGB')
+            for psm in (10, 8, 7, 6):
+                try:
+                    txt = pytesseract.image_to_string(
+                        pil, config=f'--psm {psm} -c "tessedit_char_whitelist={WHITELIST}"'
+                    ).strip()
+                except Exception:
+                    txt = ''
+                first = next((c for c in txt if c.isalpha()), '')
+                if first:
+                    votes[first] += 1
+    return votes.most_common(1)[0][0] if votes else ''
+
+
+def _detect_capture_points(frame: np.ndarray, anchor=None,
+                           threshold: float = 0.93) -> list:
+    """Localise les points de capture (cercles A/B/C/...) sous le nom de map
+    via template matching de `point.png`. Retourne une liste de dicts
+    `{'x','y','w','h','score'}` triés de gauche à droite, ou `[]` si rien
+    n'est trouvé. `anchor` = barre HUD (`_find_playing_top_anchor`) ; si
+    None, recalculé.
+
+    Algo :
+      1. Restreint la recherche à une bande étroite sous le nom de map
+         (centrée sur l'ancre HUD, ~45 % de sa largeur, ~1.6×–2.8× sa hauteur
+         en y). Filtre la quasi-totalité des faux positifs venant du décor.
+      2. Template matching multi-échelle (±8 % autour de l'échelle dérivée
+         de la largeur HUD), avec mask alpha pour ignorer le remplissage.
+      3. NMS par distance des centres.
+      4. Sélection de la row : on prend le détecteur le plus fort comme
+         ancre y, on garde tous les voisins dans ±2.5 px (les points sont
+         alignés au pixel près sur la même row).
+      5. Trim des extrémités si le gap au voisin > 1.5× la médiane des gaps
+         (élimine un faux positif latéral qui aurait passé l'étape 4).
+    """
+    tpl_gray, tpl_mask = _get_point_template()
+    if tpl_gray is None:
+        return []
+    if anchor is None:
+        anchor = _find_playing_top_anchor(frame)
+    if anchor is None:
+        return []
+    x, y, h, w = anchor
+    cx = x + w / 2.0
+    sy1 = y + int(h * 1.6)
+    sy2 = y + int(h * 2.8)
+    sw  = int(w * 0.45)
+    sx1 = max(0, int(cx - sw / 2))
+    sx2 = min(frame.shape[1], int(cx + sw / 2))
+    if sy2 <= sy1 or sx2 <= sx1:
+        return []
+    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    sub = gray[sy1:sy2, sx1:sx2]
+
+    base_scale = w / float(_HUD_NATIVE_W)
+    detections = []
+    for s in (base_scale * 0.92, base_scale * 1.00, base_scale * 1.08):
+        h_t = int(round(tpl_gray.shape[0] * s))
+        w_t = int(round(tpl_gray.shape[1] * s))
+        if h_t < 8 or w_t < 8 or h_t >= sub.shape[0] or w_t >= sub.shape[1]:
+            continue
+        rs_t = cv2.resize(tpl_gray, (w_t, h_t), interpolation=cv2.INTER_AREA)
+        rs_m = cv2.resize(tpl_mask, (w_t, h_t), interpolation=cv2.INTER_AREA)
+        try:
+            res = cv2.matchTemplate(sub, rs_t, cv2.TM_CCORR_NORMED, mask=rs_m)
+        except cv2.error:
+            continue
+        res = np.where(np.isfinite(res), res, 0)
+        ys, xs = np.where(res >= threshold)
+        for px, py in zip(xs, ys):
+            detections.append((float(res[py, px]),
+                               px + sx1 + w_t / 2.0,
+                               py + sy1 + h_t / 2.0,
+                               w_t, h_t))
+    if not detections:
+        return []
+
+    detections.sort(key=lambda d: -d[0])
+    nms = []
+    for sc, dcx, dcy, dw, dh in detections:
+        if any(abs(dcx - kx) < dw * 0.7 and abs(dcy - ky) < dh * 0.7
+               for _, kx, ky, _, _ in nms):
+            continue
+        nms.append((sc, dcx, dcy, dw, dh))
+
+    anchor_y = max(nms, key=lambda d: d[0])[2]
+    keep = [d for d in nms if abs(d[2] - anchor_y) <= 2.5]
+    keep.sort(key=lambda d: d[1])
+
+    while len(keep) >= 3:
+        gaps = [keep[i + 1][1] - keep[i][1] for i in range(len(keep) - 1)]
+        med = sorted(gaps)[len(gaps) // 2]
+        if gaps[0] > med * 1.5:
+            keep.pop(0); continue
+        if gaps[-1] > med * 1.5:
+            keep.pop(); continue
+        break
+
+    out = []
+    for sc, dcx, dcy, dw, dh in keep:
+        px = int(round(dcx - dw / 2))
+        py = int(round(dcy - dh / 2))
+        letter = _ocr_point_letter(frame, px, py, int(dw), int(dh))
+        # Filtre anti-FP : durant une frame de gameplay, le template peut matcher
+        # des cercles décoratifs du décor 3D. Un faux positif n'a pas de lettre
+        # A-E centrée → letter='' → on l'écarte.
+        if not letter:
+            continue
+        out.append({
+            'x': px,
+            'y': py,
+            'w': int(dw),
+            'h': int(dh),
+            'score': round(sc, 3),
+            'letter': letter,
+        })
+    return out
+
+
+def _compute_point_fill(frame: np.ndarray, point: dict,
+                        orange_color=(238, 120, 12),
+                        blue_color=(43, 137, 237),
+                        tol: int = 20) -> tuple:
+    """Renvoie (orange_pct, blue_pct) — le taux de remplissage par équipe d'un
+    point donné, exprimé en pourcentage de hauteur (le point se remplit comme
+    un verre, l'orange descendant depuis le haut et le bleu montant depuis le
+    bas, ou inversement).
+
+    Logique :
+      - Crop l'intérieur du cercle (drop la bordure blanche).
+      - Match RGB par distance L∞ sur les couleurs RÉSOLUES de l'équipe (passées
+        par l'appelant via `RESOLVED_ORANGE` / `RESOLVED_BLUE`). Robuste aux
+        variantes pro league (vert fluo, violet, jaune, etc.) — ce qui ne serait
+        pas le cas avec des plages HSV hardcodées sur l'orange/bleu standard.
+      - Pour chaque ligne, on compte les pixels orange vs bleus ; majorité ⇒
+        ligne orange / ligne bleue (sinon ligne vide). Le ratio par hauteur
+        correspond à la jauge perceptuelle (% par volume du verre).
+    """
+    INSET = 3
+    x1 = point['x'] + INSET
+    y1 = point['y'] + INSET
+    x2 = point['x'] + point['w'] - INSET
+    y2 = point['y'] + point['h'] - INSET
+    if x2 <= x1 or y2 <= y1:
+        return 0, 0
+    sub = frame[y1:y2, x1:x2]
+    if sub.size == 0:
+        return 0, 0
+    sub_i = sub.astype(np.int16)
+    org_target = np.array(orange_color, dtype=np.int16)
+    blu_target = np.array(blue_color, dtype=np.int16)
+    org_mask = (np.abs(sub_i - org_target).max(axis=2) <= tol)
+    blu_mask = (np.abs(sub_i - blu_target).max(axis=2) <= tol)
+    rows = sub.shape[0]
+    o_rows = b_rows = 0
+    for r in range(rows):
+        no = int(org_mask[r].sum()); nb = int(blu_mask[r].sum())
+        if no + nb < 1:
+            continue
+        if no > nb:
+            o_rows += 1
+        elif nb > no:
+            b_rows += 1
+    o_pct = int(round(o_rows / rows * 100))
+    b_pct = int(round(b_rows / rows * 100))
+    # Normalisation base 100 : quand les deux équipes sont présentes sur le
+    # point, on rescale pour que orange + blue = 100. Les rangées "vides"
+    # (intérieur transparent montrant le décor) n'ont pas de sens propre —
+    # elles correspondent juste à la lettre / l'anti-aliasing — donc on les
+    # absorbe en proportion. Si une seule équipe est présente, on laisse :
+    # un point 50 %/0 % reste à 50 (point en cours de capture, le reste est
+    # vide). 0/0 = point neutre.
+    if o_pct > 0 and b_pct > 0:
+        total = o_pct + b_pct
+        o_norm = int(round(o_pct / total * 100))
+        b_norm = 100 - o_norm
+        return o_norm, b_norm
+    return o_pct, b_pct
+
+
 def _detect_game_intro(frame: np.ndarray) -> bool:
     """
     Détecte l'écran d'introduction de map (lettre 'B' du logo EVA en bas à droite).
@@ -1610,6 +1830,7 @@ def _new_game(mode: int) -> dict:
         'end': -1,
         'map': '',
         'mapImage': None,
+        'points': None,  # list of {x,y,w,h,score} — détecté à la 1ère frame de gameplay
         '__jumped__': False,
         'orangeTeam': {
             'score': 0,
@@ -1782,15 +2003,21 @@ def _analyze(
                 # Scan forward to find the first actual gameplay frame.
                 PROBE = TIMESTAMP + 1
                 GAME_START = TIMESTAMP
+                FIRST_PLAYING_FRAME = None
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
                     if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
                         GAME_START = PROBE
+                        FIRST_PLAYING_FRAME = PROBE_FRAME
                         break
                     if DEBUG:
                         _emit({'log': 's'})
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
+                if FIRST_PLAYING_FRAME is not None:
+                    CURRENT['points'] = _detect_capture_points(FIRST_PLAYING_FRAME, anchor=HUD_ANCHOR)
+                    if DEBUG:
+                        _emit({'log': f'Capture points detected: {len(CURRENT["points"])}'})
                 if DEBUG:
                     _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
@@ -1806,13 +2033,19 @@ def _analyze(
                 # Scan forward to find the first actual gameplay frame.
                 PROBE = TIMESTAMP + 1
                 GAME_START = TIMESTAMP
+                FIRST_PLAYING_FRAME = None
                 while PROBE <= TIMESTAMP + 30:
                     PROBE_FRAME = _get_frame(CAP, PROBE)
                     if PROBE_FRAME is not None and _detect_game_playing(PROBE_FRAME):
                         GAME_START = PROBE
+                        FIRST_PLAYING_FRAME = PROBE_FRAME
                         break
                     PROBE += 0.5
                 CURRENT['start'] = GAME_START
+                if FIRST_PLAYING_FRAME is not None:
+                    CURRENT['points'] = _detect_capture_points(FIRST_PLAYING_FRAME, anchor=HUD_ANCHOR)
+                    if DEBUG:
+                        _emit({'log': f'Capture points detected: {len(CURRENT["points"])}'})
                 if DEBUG:
                     _emit({'log': f'First game frame detected at {GAME_START:.1f}s'})
                 _emit({'type': 'game', 'game': CURRENT})
@@ -2282,6 +2515,13 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         RESOLVED_ORANGE = None
         RESOLVED_BLUE = None
 
+        # Points de capture verrouillés sur la 1ère frame exploitable du chunk
+        # (positions fixes pendant toute la game). On detect une fois, puis à
+        # chaque seconde on calcule juste le taux de remplissage par équipe.
+        LOCKED_POINTS = None
+        # {letter: {elapsed: [(orange_pct, blue_pct), ...]}}
+        POINT_OBSERVATIONS = {}
+
         # Garde-fou anti-pollution timer : un timer OCR foireux (ex: "09:43" lu
         # "03:43") génère un ELAPSED aberrant qui décale toute la timeline.
         # Stratégie : borne dynamique sur ELAPSED, avec adoption d'un nouveau
@@ -2302,7 +2542,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
         # comportement bit-pour-bit (cf. sizing plus haut).
         def _submit_frame(ts):
-            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR
+            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR, LOCKED_POINTS
             FRAME = _get_frame(CAP, ts)
             if FRAME is None or not _detect_game_playing(FRAME):
                 return ('skip', ts)
@@ -2312,6 +2552,17 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # refaire à chaque frame).
             if HUD_ANCHOR is None:
                 HUD_ANCHOR = _find_playing_top_anchor(FRAME)
+
+            # Verrouille les points de capture sur la 1ère frame exploitable
+            # (les positions ne bougent pas pendant la game). Coût ponctuel
+            # ≈ 1 matchTemplate + 1 OCR par point ; après ça, le calcul du
+            # fill par seconde est gratuit (~400 ops par point).
+            if LOCKED_POINTS is None and HUD_ANCHOR is not None:
+                PTS = _detect_capture_points(FRAME, anchor=HUD_ANCHOR)
+                if PTS:
+                    LOCKED_POINTS = PTS
+                    if DEBUG:
+                        _emit({'log': f'[_analyze_chunks] {GAME_ID} locked {len(PTS)} points: ' + ' '.join(p['letter'] for p in PTS)})
 
             # Verrouille la couleur d'équipe sur la 1ère frame exploitable du
             # chunk. On le fait ICI (avant les submit OCR) plutôt que dans
@@ -2449,6 +2700,19 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
 
             _record_raw(RAW_ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
 
+            # Taux de remplissage par équipe pour chaque point de capture
+            # verrouillé. Couleurs résolues passées explicitement → robuste
+            # aux variantes pro league (vert fluo, violet, etc.). Si la
+            # résolution n'a pas encore réussi, fallback sur orange/bleu
+            # standard (les valeurs par défaut de `_compute_point_fill`).
+            if LOCKED_POINTS:
+                ORG_C = RESOLVED_ORANGE if RESOLVED_ORANGE is not None else (238, 120, 12)
+                BLU_C = RESOLVED_BLUE   if RESOLVED_BLUE   is not None else (43, 137, 237)
+                for PT in LOCKED_POINTS:
+                    O_PCT, B_PCT = _compute_point_fill(frame, PT, ORG_C, BLU_C)
+                    POINT_OBSERVATIONS.setdefault(PT['letter'], {}) \
+                        .setdefault(RAW_ELAPSED, []).append((O_PCT, B_PCT))
+
             # Killfeed : detect → split → OCR killer/victim → fuzzy match contre
             # le roster de l'équipe correspondante. Multi-frame consensus (kill
             # affiché 5 s) compense les misreads isolés. Skipped si rosters vides
@@ -2546,6 +2810,26 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             if pair != prev_pair:
                 SCORE_TIMELINE[str(K)] = pair
                 prev_pair = pair
+        # Points de capture : pour chaque lettre verrouillée, on prend la
+        # médiane des observations (orange, blue) à chaque seconde, puis on
+        # forward-fill et on émet sparse (uniquement les changements). Format
+        # mirror de score_timeline : { letter: { "<sec>": [orange, blue] } }.
+        POINTS_TIMELINE = {}
+        for LETTER, OBS in POINT_OBSERVATIONS.items():
+            timeline = {}
+            prev = None
+            for K in sorted(OBS):
+                vals = OBS[K]
+                # Médiane indépendante par dimension : robuste à un OCR isolé
+                # qui décalerait la teinte (ex. flash explosion → orange).
+                o_med = sorted(v[0] for v in vals)[len(vals) // 2]
+                b_med = sorted(v[1] for v in vals)[len(vals) // 2]
+                pair = [o_med, b_med]
+                if pair != prev:
+                    timeline[str(K)] = pair
+                    prev = pair
+            POINTS_TIMELINE[LETTER] = timeline
+
         # Killfeed : dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
         # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.
         KILLS_OUT = _dedup_kills(KILL_OBSERVATIONS)
@@ -2574,6 +2858,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 'gameID': GAME_ID,
                 'payload': {
                     'score_timeline': SCORE_TIMELINE,
+                    'points_timeline': POINTS_TIMELINE,
                     'kills': KILLS_OUT,
                     'end_non_gameplay_seconds': END_NON_GAMEPLAY,
                 },
