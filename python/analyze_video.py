@@ -1812,24 +1812,36 @@ def _compute_point_fill(frame: np.ndarray, point: dict,
     sub_i = sub.astype(np.int16)
     org_target = np.array(orange_color, dtype=np.int16)
     blu_target = np.array(blue_color, dtype=np.int16)
+    wht_target = np.array((255, 255, 255), dtype=np.int16)
     org_mask = (np.abs(sub_i - org_target).max(axis=2) <= tol) & border_mask
     blu_mask = (np.abs(sub_i - blu_target).max(axis=2) <= tol) & border_mask
-    # Normalisation par les rows qui contiennent effectivement de la bordure :
-    # les rows tout en haut/bas du bbox sont hors de l'hex (bbox rectangulaire,
-    # forme hexagonale) → alpha 0 partout → ne comptent ni dans le numérateur
-    # ni dans le dénominateur. Sans ça, un point 100 % capturé plafonne à ~92 %.
+    # Bordure blanche = zone non capturée. Permet de distinguer une row
+    # partiellement capturée (border orange + border blanche) d'une row
+    # anti-aliasée pure aux extrémités de l'hex (ni couleur ni blanc).
+    wht_mask = (np.abs(sub_i - wht_target).max(axis=2) <= tol) & border_mask
+    # Normalisation par les rows qui contribuent VRAIMENT au signal :
+    #   - row sans bordure (alpha 0 partout, bbox rectangulaire vs hex) → skip
+    #   - row avec bordure mais ni couleur d'équipe ni blanc (anti-aliasing pur
+    #     aux extrémités de l'hex, lettre A/B/C qui masque la bordure) → skip
+    #   - row avec bordure blanche = zone non capturée → compte dans total_rows
+    #     mais pas dans o_rows/b_rows (vraie partial fill du verre)
+    #   - row avec bordure colorée → compte dans la bonne équipe
+    # Sans le 2e filtrage, un point 100 % capturé plafonnait à 92-96 % (et
+    # le smoother Domination ne lockait jamais owned_team). Sans la détection
+    # blanc, un point partial à 95 % renvoyait 100 % au lieu de 95 %.
     rows = sub.shape[0]
     o_rows = b_rows = total_rows = 0
     for r in range(rows):
         if not border_mask[r].any():
             continue
-        total_rows += 1
         no = int(org_mask[r].sum()); nb = int(blu_mask[r].sum())
-        if no + nb < 1:
+        nw = int(wht_mask[r].sum())
+        if no + nb + nw < 1:
             continue
-        if no > nb:
+        total_rows += 1
+        if no > nb and no >= nw:
             o_rows += 1
-        elif nb > no:
+        elif nb > no and nb >= nw:
             b_rows += 1
     if total_rows == 0:
         return 0, 0
