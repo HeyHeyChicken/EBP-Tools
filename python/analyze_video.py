@@ -16,6 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
 
+import minimap as _minimap
+
 # ---------------------------------------------------------------------------
 # MODES
 # All positions are in 1920×1080 coordinate space.
@@ -1767,7 +1769,7 @@ def _detect_capture_points(frame: np.ndarray, anchor=None,
 def _compute_point_fill(frame: np.ndarray, point: dict,
                         orange_color=(238, 120, 12),
                         blue_color=(43, 137, 237),
-                        tol: int = 30) -> tuple:
+                        tol: int = 40) -> tuple:
     """Renvoie (orange_pct, blue_pct) — le taux de remplissage par équipe d'un
     point donné, exprimé en pourcentage de hauteur (le point se remplit comme
     un verre, l'orange descendant depuis le haut et le bleu montant depuis le
@@ -2011,6 +2013,49 @@ def _get_frame(cap: cv2.VideoCapture, timestamp: float):
         return None
     return cv2.cvtColor(FRAME_BGR, cv2.COLOR_BGR2RGB)
 
+
+# Score à partir duquel on considère la localisation suffisamment fiable
+# pour ne pas tester d'autres frames. La minimap étant statique pendant
+# toute la partie, on peut sonder plusieurs frames jusqu'à dépasser ce seuil.
+_MINIMAP_GOOD_SCORE = 0.55
+# Probes additionnels (offsets en secondes autour de la frame courante)
+# si la 1re tentative est faible. On reste dans la partie en cours (l'analyse
+# est backward, donc des décalages négatifs nous gardent côté gameplay).
+_MINIMAP_PROBE_OFFSETS = (-15.0, -45.0, -90.0, -180.0, 15.0, 45.0)
+
+
+def _locate_minimap(cap, current_timestamp: float, map_name: str, frame_rgb):
+    """Localise la minimap pour la partie courante.
+
+    Stratégie : on tente d'abord la frame fournie. Si le score dépasse
+    _MINIMAP_GOOD_SCORE on s'arrête. Sinon on sonde quelques frames
+    voisines et on garde la meilleure (la minimap ne bouge pas, seule
+    sa lisibilité change selon la scène derrière).
+    """
+    if not map_name:
+        return None
+    best = _minimap.find_minimap_box(
+        cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR),
+        map_name, min_score=0.0,
+    )
+    if best is not None and best['score'] >= _MINIMAP_GOOD_SCORE:
+        return best
+    for off in _MINIMAP_PROBE_OFFSETS:
+        probe = _get_frame(cap, current_timestamp + off)
+        if probe is None:
+            continue
+        res = _minimap.find_minimap_box(
+            cv2.cvtColor(probe, cv2.COLOR_RGB2BGR),
+            map_name, min_score=0.0,
+        )
+        if res is None:
+            continue
+        if best is None or res['score'] > best['score']:
+            best = res
+        if best['score'] >= _MINIMAP_GOOD_SCORE:
+            break
+    return best
+
 # ---------------------------------------------------------------------------
 # Game dict factory
 # ---------------------------------------------------------------------------
@@ -2026,6 +2071,7 @@ def _new_game(mode: int) -> dict:
         'end': -1,
         'map': '',
         'mapImage': None,
+        'minimap': None,  # {'box': ((x1,y1),(x2,y2)), 'score': float, 'scale': float}
         'points': None,  # list of {x,y,w,h,score} — détecté à la 1ère frame de gameplay
         '__jumped__': False,
         'orangeTeam': {
@@ -2284,6 +2330,13 @@ def _analyze(
                                 FRAME,
                                 MB[0][0], MB[0][1], MB[1][0], MB[1][1],
                             )
+                            CURRENT['minimap'] = _locate_minimap(
+                                CAP, TIMESTAMP, MAP_NAME, FRAME,
+                            )
+                            if DEBUG and CURRENT['minimap']:
+                                MM = CURRENT['minimap']
+                                _emit({'log': f'Minimap located: box={MM["box"]} '
+                                               f'score={MM["score"]:.2f} scale={MM["scale"]:.2f}'})
                         else:
                             _emit({"Can't find map name": T})
 

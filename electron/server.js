@@ -39,10 +39,6 @@ const http = require('http');
 const fs = require('fs');
 const ExcelJS = require('exceljs');
 require('./discord-rpc');
-const {
-    extractPublicPseudoGames,
-    extractPrivatePseudoGames
-} = require('./puppeteer.js');
 const util = require('util');
 const execAsync = util.promisify(exec);
 const {
@@ -53,7 +49,6 @@ const {
     FFMPEG_PATH,
     ANALYZER_PATH,
     PROTOCOL_NAME,
-    PUPPETEER_USER_DATA_PATH,
     getCurrentPort
 } = require('./config/constants');
 const {
@@ -378,105 +373,6 @@ if (!APP_GOT_THE_LOCK) {
                     );
                 }
                 break;
-            case 'exportGames':
-                if (data.publicPseudo) {
-                    extractPublicPseudoGames(
-                        app,
-                        data.publicPseudo,
-                        data.nbPages,
-                        data.seasonIndex,
-                        data.timeToWait,
-                        dialog,
-                        getMainWindow(),
-                        data.debug,
-                        async (games) => {
-                            console.log(
-                                '################################################'
-                            );
-                            console.log(games);
-                            console.log(
-                                '################################################'
-                            );
-
-                            const CHUNK_SIZE = 200;
-                            for (let i = 0; i < games.length; i += CHUNK_SIZE) {
-                                socketEmit(
-                                    data.socket,
-                                    'exportGames',
-                                    games.slice(i, i + CHUNK_SIZE)
-                                );
-                            }
-                            socketEmit(data.socket, 'exportGamesEnd', {
-                                games: games.length,
-                                fromExcel: false
-                            });
-
-                            StorageManager.setTemporarySettingsValue(
-                                'deeplink',
-                                undefined
-                            );
-
-                            if (
-                                games.length > 0 &&
-                                data.excelDestinationFolder
-                            ) {
-                                exportGamesToExcel(
-                                    games,
-                                    data.publicPseudo.split('#')[0],
-                                    data.excelDestinationFolder
-                                );
-                            }
-                        }
-                    );
-                } else {
-                    extractPrivatePseudoGames(
-                        app,
-                        data.nbPages,
-                        data.seasonIndex,
-                        data.timeToWait,
-                        dialog,
-                        getMainWindow(),
-                        data.debug,
-                        async (games) => {
-                            console.log(
-                                '################################################'
-                            );
-                            console.log(games);
-                            console.log(
-                                '################################################'
-                            );
-                            const CHUNK_SIZE = 200;
-                            for (let i = 0; i < games.length; i += CHUNK_SIZE) {
-                                socketEmit(
-                                    data.socket,
-                                    'exportGames',
-                                    games.slice(i, i + CHUNK_SIZE)
-                                );
-                            }
-                            socketEmit(data.socket, 'exportGamesEnd', {
-                                games: games.length,
-                                fromExcel: false
-                            });
-
-                            StorageManager.setTemporarySettingsValue(
-                                'deeplink',
-                                undefined
-                            );
-
-                            if (
-                                games.length > 0 &&
-                                data.excelDestinationFolder
-                            ) {
-                                exportGamesToExcel(
-                                    games,
-                                    'private',
-                                    data.excelDestinationFolder
-                                );
-                            }
-                        }
-                    );
-                }
-                break;
             case 'analyzeVideoFile':
                 const FILES_PATHS = await openFiles(data.filesExtensions, true);
                 if (FILES_PATHS.length > 0) {
@@ -523,9 +419,6 @@ if (!APP_GOT_THE_LOCK) {
                     runChunkAnalyzer(data.videoPath, data.socket, data.chunks);
                 }
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
-                break;
-            case 'clean_puppeteer_data':
-                unlinkSync(PUPPETEER_USER_DATA_PATH);
                 break;
         }
     }

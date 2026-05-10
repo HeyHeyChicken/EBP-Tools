@@ -68,10 +68,6 @@ const PERMANENT_SETTINGS_PATH = path.join(
 );
 const TEMPORARY_SETTINGS_PATH = path.join(ROOT_PATH, 'temporary_settings.json');
 const BROWSER_PATH = path.join(ROOT_PATH, 'browser');
-const PUPPETEER_USER_DATA_PATH = path.join(
-    app.getPath('userData'),
-    'puppeteer-data'
-);
 const PROTOCOL_NAME = 'tools';
 
 //#region Window Constants
@@ -128,7 +124,6 @@ module.exports = {
     PERMANENT_SETTINGS_PATH,
     TEMPORARY_SETTINGS_PATH,
     BROWSER_PATH,
-    PUPPETEER_USER_DATA_PATH,
     PROTOCOL_NAME,
 
     initializePort,
