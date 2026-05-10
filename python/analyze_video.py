@@ -2402,7 +2402,8 @@ def _analyze(
 
     CAP.release()
 
-    if len(GAMES) == 1:
+    if CURRENT is not None and CURRENT['start'] == -1:
+        CURRENT['start'] = 0
         _emit({'type': 'game', 'game': CURRENT})
 
     _emit({'type': 'done'})
