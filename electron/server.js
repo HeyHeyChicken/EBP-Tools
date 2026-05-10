@@ -179,7 +179,7 @@ if (!APP_GOT_THE_LOCK) {
                 });
                 break;
             case 'importGamesFromExcel':
-                const EXCEL_FILES = await openFiles('xlsx');
+                const EXCEL_FILES = await openFiles(['xlsx']);
                 if (EXCEL_FILES.length == 1) {
                     const WORKBOOK = new ExcelJS.Workbook();
                     await WORKBOOK.xlsx.readFile(EXCEL_FILES[0]);
