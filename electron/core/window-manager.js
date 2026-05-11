@@ -11,6 +11,7 @@ const {
     Tray,
     Menu,
     nativeImage,
+    nativeTheme,
     shell
 } = require('electron');
 const path = require('node:path');
@@ -221,7 +222,24 @@ function createWindow(updateService) {
         updateService.autoUpdate(true);
     });
 
-    const TRAY = new Tray(path.join(ROOT_PATH, 'assets', 'favicon.png'));
+    function getTrayIconPath() {
+        const STATUS = watchFolderService.getStatus();
+        let suffix = '';
+        if (STATUS.processing.length > 0) {
+            suffix = '-analyzing';
+        } else if (STATUS.failed.length > 0) {
+            suffix = '-error';
+        }
+        const THEME = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+        return path.join(
+            ROOT_PATH,
+            'assets',
+            'favicon',
+            `favicon${suffix}-${THEME}.png`
+        );
+    }
+
+    const TRAY = new Tray(getTrayIconPath());
 
     function buildReplaysSubmenu(status) {
         const ROOT = watchFolderService.getWatchFolder();
@@ -355,7 +373,12 @@ function createWindow(updateService) {
     TRAY.setContextMenu(buildContextMenu());
     setInterval(() => {
         TRAY.setContextMenu(buildContextMenu());
+        TRAY.setImage(getTrayIconPath());
     }, 3000);
+
+    nativeTheme.on('updated', () => {
+        TRAY.setImage(getTrayIconPath());
+    });
 
     // Double-click on the icon to reopen the window.
     TRAY.on('double-click', () => {

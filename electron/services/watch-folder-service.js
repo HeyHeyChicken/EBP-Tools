@@ -18,6 +18,7 @@ const {
     requestUploadUrl,
     confirmUpload,
     uploadFileToPresignedUrl,
+    pushWatcherStatus,
     getAuthCookie,
     NotAuthenticatedError,
     ApiError
@@ -174,6 +175,15 @@ function notifyQueueEmpty(processedCount) {
     } catch (e) {
         console.error('[watch-folder] notification error', e.message);
     }
+}
+
+/**
+ * Push l'état courant au backend (qui broadcast aux sockets du user). Appelé
+ * à chaque transition du worker — fire-and-forget : `pushWatcherStatus`
+ * swallow toute erreur réseau / auth pour ne pas perturber la pipeline.
+ */
+function notifyStatusChange() {
+    pushWatcherStatus(getStatus());
 }
 
 /**
@@ -392,11 +402,13 @@ async function workerLoop(deps) {
                 if (processedInSession > 0) {
                     notifyQueueEmpty(processedInSession);
                 }
+                notifyStatusChange();
                 workerRunning = false;
                 return;
             }
             if (!fs.existsSync(NEXT)) {
                 dequeue(NEXT);
+                notifyStatusChange();
                 continue;
             }
             if (!(await getAuthCookie())) {
@@ -405,6 +417,7 @@ async function workerLoop(deps) {
                 continue;
             }
             CURRENT_PATH = NEXT;
+            notifyStatusChange();
             try {
                 await processVideo(NEXT, deps);
                 dequeue(NEXT);
@@ -439,6 +452,7 @@ async function workerLoop(deps) {
                 }
             } finally {
                 CURRENT_PATH = null;
+                notifyStatusChange();
             }
         }
     } finally {
@@ -489,6 +503,7 @@ function start(deps) {
         if (!isInsideWatchRoot(p, ROOT)) return;
         console.log('[watch-folder] enqueue', p);
         enqueue(p);
+        notifyStatusChange();
         workerLoop(deps).catch((e) =>
             console.error('[watch-folder] worker crashed', e)
         );

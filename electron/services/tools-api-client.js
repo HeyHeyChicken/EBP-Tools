@@ -208,6 +208,26 @@ function confirmUpload(gameID, payload) {
 }
 
 /**
+ * POST /api/tools/watcher/status
+ * Push de l'état complet du watcher (queued/processing/failed). Le serveur
+ * stamp `updatedAt` lui-même et broadcast aux sockets du user.
+ *
+ * Tolérant aux échecs : appelé à chaque transition du worker, on ne veut
+ * surtout pas faire planter la pipeline si le back est momentanément down
+ * ou si le user n'est pas (encore) authentifié.
+ *
+ * @param {{queued:Array<{name,path}>, processing:Array<{name,path}>, failed:Array<{name,path}>}} status
+ */
+async function pushWatcherStatus(status) {
+    try {
+        await apiRequest('POST', '/watcher/status', status, { retries: 1 });
+    } catch (e) {
+        if (e instanceof NotAuthenticatedError) return;
+        console.warn('[tools-api] pushWatcherStatus failed:', e.message);
+    }
+}
+
+/**
  * Uploads a local file via HTTP PUT to a presigned URL with retry on
  * network/5xx errors. Resolves on 2xx, throws otherwise.
  */
@@ -283,6 +303,7 @@ module.exports = {
     requestUploadUrl,
     confirmUpload,
     uploadFileToPresignedUrl,
+    pushWatcherStatus,
     getAuthCookie,
     NotAuthenticatedError,
     ApiError
