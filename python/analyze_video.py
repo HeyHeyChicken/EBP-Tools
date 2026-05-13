@@ -622,24 +622,28 @@ def _validate_kill_row(frame: np.ndarray, bbox, kf_spec: dict) -> bool:
     return black_ratio >= kf_spec.get('minEdgeBlackRatio', 0.30)
 
 
-def _split_kill_row(frame: np.ndarray, bbox,
-                    hue_threshold: int = 30, min_brightness: int = 100):
+def _split_kill_row(frame: np.ndarray, bbox, orange_color, blue_color,
+                    cos_thresh: float = 0.75, min_chroma: float = 25.0,
+                    min_brightness: int = 100):
     """
     Découpe une bbox de kill row en killer / weapon / victim en localisant les
-    colonnes ayant des pixels orange-ish / blue-ish par dominance de hue. Le
-    killer et la victime ont chacun leur cluster (couleurs distinctes — kill
-    cross-team obligatoire), le picto arme tient entre les deux.
+    colonnes ayant des pixels matchant la couleur orange-team ou blue-team
+    résolue. Le killer et la victime ont chacun leur cluster (couleurs
+    distinctes — kill cross-team obligatoire), le picto arme tient entre les
+    deux.
 
     On NE peut PAS se fier aux pixels near-white pour localiser le picto : si
     le killer a un mur blanc derrière sa box transparente, tout le côté killer
     matche near-white et le picto "fuit" sur toute la bbox.
 
-    On utilise la dominance de hue plutôt qu'un match RGB exact car le texte
-    du killer (fond transparent) est alpha-blendé avec le décor : un pixel
-    orange peut s'afficher (225,154,100) sur un mur gris au lieu de
-    (238,120,12), |B-12|=88 hors tol_color=40 → match raté. Mais R reste
-    largement supérieur à B donc la dominance R-over-B subsiste. La couleur
-    exacte d'équipe (RESOLVED_ORANGE/BLUE) n'est donc pas utilisée ici.
+    On match par DIRECTION DE CHROMA (= couleur - moyenne RGB) plutôt que par
+    tol RGB stricte, car le texte du killer (fond transparent) est alpha-blendé
+    avec le décor : un pixel orange peut s'afficher (225,154,100) sur un mur
+    gris au lieu de (238,120,12), |B-12|=88 hors tol_color=40 → match raté.
+    Mais sa direction de chroma (R dominant, B le plus bas) reste alignée avec
+    celle de la cible quel que soit le niveau d'alpha. Cette formulation marche
+    aussi pour les palettes fluo (vert/violet) et pro-league (jaune/cyan) qui
+    ne respectent PAS la dominance R-vs-B implicite de la palette standard.
 
     Retourne dict {'killer': {'box', 'team'}, 'weapon': {'box'}, 'victim':
     {'box', 'team'}} ou None si :
@@ -648,11 +652,22 @@ def _split_kill_row(frame: np.ndarray, bbox,
     """
     (x1, y1), (x2, y2) = bbox
     sub = frame[y1:y2, x1:x2].astype(np.int16)
-    R, G, B = sub[:, :, 0], sub[:, :, 1], sub[:, :, 2]
+    sub_f = sub.astype(np.float32)
+    sub_mean = sub_f.mean(axis=2, keepdims=True)
+    sub_chroma = sub_f - sub_mean
+    sub_chroma_norm = np.linalg.norm(sub_chroma, axis=2)
+    sub_bright = sub.max(axis=2) >= min_brightness
 
-    # Dominance de hue + brightness mini pour ignorer les pixels sombres parasites.
-    m_o = (R > B + hue_threshold) & (R > G) & (R >= min_brightness)
-    m_b = (B > R + hue_threshold) & (B > G) & (B >= min_brightness)
+    def _chroma_mask(target_rgb):
+        target = np.array(target_rgb, dtype=np.float32)
+        t_chroma = target - target.mean()
+        t_norm = float(np.linalg.norm(t_chroma)) + 1e-6
+        dot = (sub_chroma * t_chroma).sum(axis=2)
+        cos_sim = dot / (sub_chroma_norm * t_norm + 1e-6)
+        return (cos_sim >= cos_thresh) & (sub_chroma_norm >= min_chroma) & sub_bright
+
+    m_o = _chroma_mask(orange_color)
+    m_b = _chroma_mask(blue_color)
 
     # ≥ 2 px par col : un pixel isolé (artéfact de scenery, anti-aliasing) ne
     # compte pas comme une col du cluster.
@@ -2991,7 +3006,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 # Slot mapping : orange[0..3] → 1..4, blue[0..3] → 6..9 (5 réservé).
                 # L'API /games/identify retourne les rosters dans le bon ordre slot.
                 for KILL_BBOX in _detect_kill_rows(frame, GF['killFeed'], RESOLVED_ORANGE, RESOLVED_BLUE):
-                    SPLIT = _split_kill_row(frame, KILL_BBOX)
+                    SPLIT = _split_kill_row(frame, KILL_BBOX, RESOLVED_ORANGE, RESOLVED_BLUE)
                     if SPLIT is None:
                         continue
                     KT, VT = SPLIT['killer']['team'], SPLIT['victim']['team']
