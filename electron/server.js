@@ -1457,7 +1457,7 @@ if (!APP_GOT_THE_LOCK) {
                 const YT_DLP_PATH = await ytDlpService.ensureYtDlp();
                 const { stdout } = await execAsync(
                     `"${YT_DLP_PATH}" -J "${url}"`,
-                    { timeout: 30000 }
+                    { timeout: 30000, maxBuffer: 100 * 1024 * 1024 }
                 );
                 const DATA = JSON.parse(stdout);
 
