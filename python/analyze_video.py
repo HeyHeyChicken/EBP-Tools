@@ -41,25 +41,48 @@ DEBUG = False
 MODES = [
     #region Mode 0
     {
-        'scoreFrame': {
-            'identify': [
-                (78, 412, TEAM_ORANGE),  # orange team circle
-                (78, 745, TEAM_BLUE),    # blue team circle
-            ],
-            # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
-            # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
-            # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
-            'orangeScore': {
-                'colors': TEAM_ORANGE,
-                'search': ((30, 410), (358, 528)),
-                'inset': -10,
+        'scoreFrame': [
+            # Variante 0 : score frame classique
+            {
+                'identify': [
+                    (78, 412, TEAM_ORANGE),  # orange team circle
+                    (78, 745, TEAM_BLUE),    # blue team circle
+                ],
+                # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
+                # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
+                # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
+                'orangeScore': {
+                    'colors': TEAM_ORANGE,
+                    'search': ((30, 410), (358, 528)),
+                    'inset': -10,
+                },
+                'blueScore': {
+                    'colors': TEAM_BLUE,
+                    'search': ((30, 599), (358, 731)),
+                    'inset': -10,
+                },
             },
-            'blueScore': {
-                'colors': TEAM_BLUE,
-                'search': ((30, 599), (358, 731)),
-                'inset': -10,
+            # Variante 1 : score frame compétitive
+            {
+                'identify': [
+                    (380, 459, TEAM_ORANGE),  # orange team circle
+                    (1540, 624, TEAM_BLUE),    # blue team circle
+                ],
+                # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
+                # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
+                # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
+                'orangeScore': {
+                    'colors': TEAM_ORANGE,
+                    'search': ((631, 501), (847, 573)),
+                    'inset': -10,
+                },
+                'blueScore': {
+                    'colors': TEAM_BLUE,
+                    'search': ((1082, 502), (1297, 574)),
+                    'inset': -10,
+                },
             },
-        },
+        ],
         'endFrame': {
             'orangeScore': ((636, 545), (903, 648)),
             'blueScore': ((996, 545), (1257, 648)),
@@ -1390,14 +1413,17 @@ def _resolve_region(spec, frame: np.ndarray, dx: float = 0, dy: float = 0):
 def _detect_game_score_frame(frame: np.ndarray):
     """
     Détecte un écran de score final (tableau des scores entre les équipes).
-    Retourne (mode_index, dx, dy) si détecté, (-1, 0.0, 0.0) sinon.
+    Retourne (mode_index, variant_index, dx, dy) si détecté, (-1, -1, 0.0, 0.0) sinon.
+    Chaque mode peut déclarer plusieurs variantes de score frame (classique,
+    competition, …) ; on les essaie dans l'ordre et on retourne la première qui matche.
     (dx, dy) = décalage du HUD à appliquer aux régions OCR pour recadrer correctement.
     """
     for i, mode in enumerate(MODES):
-        offset = _identify_offset(frame, mode['scoreFrame']['identify'])
-        if offset is not None:
-            return (i, offset[0], offset[1])
-    return (-1, 0.0, 0.0)
+        for j, variant in enumerate(mode['scoreFrame']):
+            offset = _identify_offset(frame, variant['identify'])
+            if offset is not None:
+                return (i, j, offset[0], offset[1])
+    return (-1, -1, 0.0, 0.0)
 
 
 def _detect_game_end_frame(frame: np.ndarray) -> bool:
@@ -2192,15 +2218,15 @@ def _analyze(
         # ── Score frame ────────────────────────────────────────────────────
         # Only create a new game when there is no pending one (start == -1).
         if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
-            SCORE_MODE, SF_DX, SF_DY = _detect_game_score_frame(FRAME)
+            SCORE_MODE, SF_VARIANT, SF_DX, SF_DY = _detect_game_score_frame(FRAME)
             if SCORE_MODE >= 0:
                 if DEBUG:
-                    _emit({'log': f'Score frame found {SCORE_MODE} (HUD offset dx={SF_DX:+.1f}, dy={SF_DY:+.1f})'})
+                    _emit({'log': f'Score frame found mode={SCORE_MODE} variant={SF_VARIANT} (HUD offset dx={SF_DX:+.1f}, dy={SF_DY:+.1f})'})
                 FOUND = True
                 JUST_JUMPED = False
                 GAME = _new_game(SCORE_MODE)
                 GAME['end'] = TIMESTAMP - 1
-                _SF_RAW = MODES[SCORE_MODE]['scoreFrame']
+                _SF_RAW = MODES[SCORE_MODE]['scoreFrame'][SF_VARIANT]
                 # Scores : bbox dynamique trouvé via les chiffres colorés,
                 # translaté de l'offset HUD identifié.
                 OS = _resolve_region(_SF_RAW['orangeScore'], FRAME, SF_DX, SF_DY)
