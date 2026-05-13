@@ -222,7 +222,9 @@ function createWindow(updateService) {
         updateService.autoUpdate(true);
     });
 
-    function getTrayIconPath() {
+    const IS_MACOS = process.platform === 'darwin';
+
+    function getTrayIcon() {
         const STATUS = watchFolderService.getStatus();
         let suffix = '';
         if (STATUS.processing.length > 0) {
@@ -230,16 +232,29 @@ function createWindow(updateService) {
         } else if (STATUS.failed.length > 0) {
             suffix = '-error';
         }
-        const THEME = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
-        return path.join(
-            ROOT_PATH,
-            'assets',
-            'favicon',
-            `favicon${suffix}-${THEME}.png`
+        // macOS: always load the black variant and mark it as a template
+        // image — the system handles inversion for dark mode and Liquid Glass.
+        // Other platforms: pick the variant that contrasts with the taskbar.
+        const COLOR = IS_MACOS
+            ? 'dark'
+            : nativeTheme.shouldUseDarkColors
+              ? 'light'
+              : 'dark';
+        const IMAGE = nativeImage.createFromPath(
+            path.join(
+                ROOT_PATH,
+                'assets',
+                'favicon',
+                `favicon-${COLOR}${suffix}.png`
+            )
         );
+        if (IS_MACOS) {
+            IMAGE.setTemplateImage(true);
+        }
+        return IMAGE;
     }
 
-    const TRAY = new Tray(getTrayIconPath());
+    const TRAY = new Tray(getTrayIcon());
 
     function buildReplaysSubmenu(status) {
         const ROOT = watchFolderService.getWatchFolder();
@@ -373,12 +388,14 @@ function createWindow(updateService) {
     TRAY.setContextMenu(buildContextMenu());
     setInterval(() => {
         TRAY.setContextMenu(buildContextMenu());
-        TRAY.setImage(getTrayIconPath());
+        TRAY.setImage(getTrayIcon());
     }, 3000);
 
-    nativeTheme.on('updated', () => {
-        TRAY.setImage(getTrayIconPath());
-    });
+    if (!IS_MACOS) {
+        nativeTheme.on('updated', () => {
+            TRAY.setImage(getTrayIcon());
+        });
+    }
 
     // Double-click on the icon to reopen the window.
     TRAY.on('double-click', () => {
