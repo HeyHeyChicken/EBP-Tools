@@ -12,7 +12,7 @@ import {
   QueryList,
   ElementRef
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import {
@@ -34,7 +34,6 @@ import { ReplayCutterComponent } from '../../replay_cutter.component';
   styleUrls: ['./check-players-order.dialog.scss'],
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatButtonModule,
     MatDialogModule,

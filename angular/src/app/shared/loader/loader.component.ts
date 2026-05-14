@@ -5,7 +5,6 @@
 //#region Import
 
 import { Component, Input, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 //#endregion
 
@@ -14,7 +13,7 @@ import { CommonModule } from '@angular/common';
   templateUrl: './loader.component.html',
   styleUrls: ['./loader.component.scss'],
   standalone: true,
-  imports: [CommonModule]
+  imports: []
 })
 export class LoaderComponent implements OnDestroy {
   //#region Attributes

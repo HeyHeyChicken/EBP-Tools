@@ -4,7 +4,6 @@
 
 //#region Imports
 
-import { CommonModule } from '@angular/common';
 import {
   Component,
   ElementRef,
@@ -64,7 +63,6 @@ import { ReplayCutterService } from './services/replay-cutter.service';
   imports: [
     GridModule,
     MatTooltipModule,
-    CommonModule,
     TranslateModule,
     LoaderComponent,
     MatInputModule,

@@ -8,7 +8,7 @@ import { Component, OnInit } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../shared/grid/grid.module';
 import { MessageComponent } from '../../shared/message/message.component';
-import { CommonModule } from '@angular/common';
+
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { GlobalService } from '../../core/services/global.service';
 
@@ -19,13 +19,7 @@ import { GlobalService } from '../../core/services/global.service';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
   standalone: true,
-  imports: [
-    GridModule,
-    TranslateModule,
-    MessageComponent,
-    CommonModule,
-    MatTooltipModule
-  ]
+  imports: [GridModule, TranslateModule, MessageComponent, MatTooltipModule]
 })
 export class HomeComponent implements OnInit {
   //#region Attributes

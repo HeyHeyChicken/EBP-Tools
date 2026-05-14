@@ -14,7 +14,7 @@ import {
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './shared/header/header.component';
 import { WizzComponent } from './shared/wizz/wizz.component';
-import { CommonModule } from '@angular/common';
+
 import { GlobalService } from './core/services/global.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Versions } from '../models/versions';
@@ -38,7 +38,6 @@ import { Message } from './views/notification/models/message.model';
     RouterOutlet,
     HeaderComponent,
     WizzComponent,
-    CommonModule,
     TranslateModule,
     ConsoleComponent,
     MatTooltipModule

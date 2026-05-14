@@ -11,7 +11,7 @@ import {
   OnInit,
   ViewChild
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
   MAT_DIALOG_DATA,
   MatDialogModule,
@@ -35,7 +35,6 @@ import { GlobalService } from '../../../../core/services/global.service';
   templateUrl: './crop.dialog.html',
   styleUrls: ['./crop.dialog.scss'],
   imports: [
-    CommonModule,
     MatDialogModule,
     TranslateModule,
     ImageCropperComponent,

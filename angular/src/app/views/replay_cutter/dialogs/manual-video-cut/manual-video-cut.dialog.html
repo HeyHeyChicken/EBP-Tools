@@ -75,8 +75,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
             [style.left]="(chunk.start / videoDuration * 100) + '%'"
             [style.width]="((chunk.end - chunk.start) / videoDuration * 100) + '%'"
           >
+            @if (chunks.length > 1) {
             <button
-              *ngIf="chunks.length > 1"
               class="squared"
               [class.green]="chunk.remove"
               [class.red]="!chunk.remove"
@@ -88,6 +88,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 [class.fa-trash]="!chunk.remove"
               ></i>
             </button>
+            }
           </div>
           }
         </div>

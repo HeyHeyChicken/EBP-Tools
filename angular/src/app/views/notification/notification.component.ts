@@ -6,7 +6,7 @@
 
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
-import { CommonModule } from '@angular/common';
+
 import { LoaderComponent } from '../../shared/loader/loader.component';
 import { MessageComponent } from '../../shared/message/message.component';
 import { NotificationService } from './services/notification.service';
@@ -22,7 +22,7 @@ import { ConsoleService } from '../../shared/console/services/console.service';
   templateUrl: './notification.component.html',
   styleUrls: ['./notification.component.scss'],
   standalone: true,
-  imports: [TranslateModule, CommonModule, LoaderComponent, MessageComponent]
+  imports: [TranslateModule, LoaderComponent, MessageComponent]
 })
 export class NotificationComponent implements OnInit, OnDestroy {
   //#region Attributes

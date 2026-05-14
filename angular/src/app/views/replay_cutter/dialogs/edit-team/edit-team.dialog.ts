@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component, Inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import {
@@ -26,7 +26,6 @@ import { GridModule } from '../../../../shared/grid/grid.module';
   styleUrls: ['./edit-team.dialog.scss'],
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatButtonModule,
     MatDialogModule,

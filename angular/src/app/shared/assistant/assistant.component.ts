@@ -5,7 +5,7 @@
 //#region Import
 
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslateModule } from '@ngx-translate/core';
 
@@ -16,7 +16,7 @@ import { TranslateModule } from '@ngx-translate/core';
   templateUrl: './assistant.component.html',
   styleUrls: ['./assistant.component.scss'],
   standalone: true,
-  imports: [CommonModule, MatTooltipModule, TranslateModule]
+  imports: [MatTooltipModule, TranslateModule]
 })
 export class AssistantComponent {
   //#region Attributes

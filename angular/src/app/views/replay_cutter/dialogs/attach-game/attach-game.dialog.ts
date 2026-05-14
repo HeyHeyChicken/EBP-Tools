@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component, Inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
   MAT_DIALOG_DATA,
   MatDialogModule,
@@ -24,13 +24,7 @@ import { Game } from '../../models/game';
   selector: 'replay-cutter-dialog-attach-game',
   templateUrl: './attach-game.dialog.html',
   styleUrls: ['./attach-game.dialog.scss'],
-  imports: [
-    CommonModule,
-    MatDialogModule,
-    TranslateModule,
-    GridModule,
-    MatTooltipModule
-  ],
+  imports: [MatDialogModule, TranslateModule, GridModule, MatTooltipModule],
   standalone: true
 })
 export class ReplayCutterAttachGameDialog {

@@ -4,7 +4,6 @@
 
 //#region Import
 
-import { CommonModule } from '@angular/common';
 import { Component, HostBinding, Input, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -15,7 +14,7 @@ import { FormsModule } from '@angular/forms';
   templateUrl: './message.component.html',
   styleUrls: ['./message.component.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule]
+  imports: [FormsModule]
 })
 export class MessageComponent implements OnInit {
   //#region Attributes

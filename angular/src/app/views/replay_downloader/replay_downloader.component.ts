@@ -10,7 +10,7 @@ import { GridModule } from '../../shared/grid/grid.module';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
+
 import { ToastrService } from 'ngx-toastr';
 import { GlobalService } from '../../core/services/global.service';
 import { MessageComponent } from '../../shared/message/message.component';
@@ -30,7 +30,6 @@ import { VideoPlatform } from './models/video-platform.enum';
     MatInputModule,
     MatSelectModule,
     FormsModule,
-    CommonModule,
     MessageComponent
   ]
 })

@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component, Inject, NgZone, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../../../shared/grid/grid.module';
@@ -22,7 +22,6 @@ import { Settings } from '../../models/settings';
   templateUrl: './settings.dialog.html',
   styleUrls: ['./settings.dialog.scss'],
   imports: [
-    CommonModule,
     MatDialogModule,
     TranslateModule,
     GridModule,

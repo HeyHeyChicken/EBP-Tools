@@ -110,12 +110,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 ].name
               }}
             </mat-select-trigger>
-            <mat-option
-              *ngFor="let team of identityService.teams; index as i"
-              [value]="i"
-            >
-              {{ team.name }}
-            </mat-option>
+            @for (team of identityService.teams; track team; let i = $index) {
+              <mat-option [value]="i">
+                {{ team.name }}
+              </mat-option>
+            }
           </mat-select>
         </mat-form-field>
       </div>

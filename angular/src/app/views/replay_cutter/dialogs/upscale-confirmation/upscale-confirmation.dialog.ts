@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component, Inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../../../shared/grid/grid.module';
@@ -15,7 +15,7 @@ import { GridModule } from '../../../../shared/grid/grid.module';
 @Component({
   selector: 'replay-cutter-dialog-upscale-confirmation',
   templateUrl: './upscale-confirmation.dialog.html',
-  imports: [CommonModule, MatDialogModule, TranslateModule, GridModule],
+  imports: [MatDialogModule, TranslateModule, GridModule],
   standalone: true
 })
 export class ReplayCutterUpscaleConfirmationDialog {

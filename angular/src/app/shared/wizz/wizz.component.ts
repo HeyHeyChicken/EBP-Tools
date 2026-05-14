@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component, HostListener, ViewEncapsulation } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 //#endregion
@@ -16,7 +16,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
   styleUrls: ['./wizz.component.scss'],
   encapsulation: ViewEncapsulation.None,
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule]
+  imports: [FormsModule, ReactiveFormsModule]
 })
 export class WizzComponent {
   //#region Attributes

@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../../../shared/grid/grid.module';
@@ -16,13 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 @Component({
   selector: 'replay-cutter-dialog-before-removing-borders',
   templateUrl: './before-removing-borders.dialog.html',
-  imports: [
-    CommonModule,
-    MatDialogModule,
-    TranslateModule,
-    GridModule,
-    MatTooltipModule
-  ],
+  imports: [MatDialogModule, TranslateModule, GridModule, MatTooltipModule],
   standalone: true
 })
 export class ReplayCutterBeforeRemovingBordersDialog {}

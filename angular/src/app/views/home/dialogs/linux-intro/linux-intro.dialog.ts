@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -16,7 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   selector: 'home-dialog-linux-intro',
   templateUrl: './linux-intro.dialog.html',
   styleUrls: ['./linux-intro.dialog.scss'],
-  imports: [CommonModule, MatDialogModule, TranslateModule, MatTooltipModule],
+  imports: [MatDialogModule, TranslateModule, MatTooltipModule],
   standalone: true
 })
 export class LinuxIntroDialog {}

@@ -6,7 +6,7 @@
 
 import { Component, isDevMode, OnInit } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { CommonModule, Location as CommonLocation } from '@angular/common';
+import { Location as CommonLocation } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,7 +25,6 @@ import { HeaderService } from './services/header.service';
   styleUrls: ['./header.component.scss'],
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     TranslateModule,
     MatFormFieldModule,
@@ -62,7 +61,9 @@ export class HeaderComponent implements OnInit {
 
   ngOnInit(): void {
     // List of languages supported by the application.
-    this.translateService.addLangs(['fr', 'de', 'en', 'es', 'it', 'ro', 'pt'].sort());
+    this.translateService.addLangs(
+      ['fr', 'de', 'en', 'es', 'it', 'ro', 'pt'].sort()
+    );
 
     this.translateService.setFallbackLang(HeaderComponent.DEFAULT_LANGUAGE);
 

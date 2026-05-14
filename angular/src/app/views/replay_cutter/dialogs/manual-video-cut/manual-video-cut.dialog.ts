@@ -11,7 +11,7 @@ import {
   Inject,
   ViewChild
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
   MAT_DIALOG_DATA,
   MatDialogContent,
@@ -32,7 +32,6 @@ import { AssistantComponent } from '../../../../shared/assistant/assistant.compo
   templateUrl: './manual-video-cut.dialog.html',
   styleUrls: ['./manual-video-cut.dialog.scss'],
   imports: [
-    CommonModule,
     MatDialogModule,
     TranslateModule,
     MatTooltipModule,

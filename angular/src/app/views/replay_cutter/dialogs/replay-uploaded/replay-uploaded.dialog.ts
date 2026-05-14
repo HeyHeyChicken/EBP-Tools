@@ -5,7 +5,7 @@
 //#region Imports
 
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
@@ -18,13 +18,7 @@ import { IdentityService } from '../../../../core/services/identity/identity.ser
   selector: 'replay-cutter-dialog-replay-uploaded',
   templateUrl: './replay-uploaded.dialog.html',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatDialogModule,
-    TranslateModule,
-    GridModule
-  ]
+  imports: [FormsModule, MatDialogModule, TranslateModule, GridModule]
 })
 export class ReplayCutterReplayUploadedDialog {
   constructor(protected readonly identityService: IdentityService) {}
