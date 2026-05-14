@@ -134,13 +134,6 @@ MODES = [
                                              # HUD) restent à ~0 % donc séparation reste nette.
             },
         },
-        'playingFrame': {
-            'identify': [
-                (1731, 811, [(238, 241, 238)]),  # top blanc
-                (1731, 990, [(238, 241, 238)]),  # bottom blanc
-                (1858, 813, TEAM_ORANGE + TEAM_BLUE),  # player color
-            ],
-        },
     },
     #endregion
 ]
@@ -1363,8 +1356,30 @@ def _detect_kill_rows(frame: np.ndarray, kf_spec: dict, orange_color, blue_color
             ext_x1 = max(0, int(left_limit))
             ext_x2 = bbox_x1
             ext_sub = frame[bbox_y1:bbox_y2, ext_x1:ext_x2].astype(np.int16)
-            ext_o = (np.abs(ext_sub - np.array(orange_color, dtype=np.int16)) <= tol_color).all(axis=2)
-            ext_b = (np.abs(ext_sub - np.array(blue_color,   dtype=np.int16)) <= tol_color).all(axis=2)
+            # Combine strict tol match (catches pure-color text pixels) avec
+            # direction de chroma (capture les pixels alpha-blendés où le strict
+            # rate). Le killer text est sur fond TRANSPARENT (décor visible
+            # derrière) ; sur palette fluo/pro ou décor coloré, beaucoup de
+            # pixels du killer text sortent du tol RGB strict mais conservent
+            # leur direction de chroma — sans cette extension on tronque le
+            # bbox killer et l'OCR ne lit que les dernières lettres.
+            ext_sub_f = ext_sub.astype(np.float32)
+            ext_sub_mean = ext_sub_f.mean(axis=2, keepdims=True)
+            ext_sub_chroma = ext_sub_f - ext_sub_mean
+            ext_sub_chroma_norm = np.linalg.norm(ext_sub_chroma, axis=2)
+            ext_sub_bright = ext_sub.max(axis=2) >= 100
+            def _ext_mask(target_rgb):
+                t_i = np.array(target_rgb, dtype=np.int16)
+                strict = (np.abs(ext_sub - t_i) <= tol_color).all(axis=2)
+                t_f = t_i.astype(np.float32)
+                t_chroma = t_f - t_f.mean()
+                t_norm = float(np.linalg.norm(t_chroma)) + 1e-6
+                dot = (ext_sub_chroma * t_chroma).sum(axis=2)
+                cos_sim = dot / (ext_sub_chroma_norm * t_norm + 1e-6)
+                chroma = (cos_sim >= 0.85) & (ext_sub_chroma_norm >= 40) & ext_sub_bright
+                return strict | chroma
+            ext_o = _ext_mask(orange_color)
+            ext_b = _ext_mask(blue_color)
             ext_team = (ext_o.any(axis=0) | ext_b.any(axis=0))
             # Parcours de droite à gauche : on s'arrête au 1er gap de N cols
             # consécutives sans team-color (= espace entre killer et HUD vide).
@@ -2032,14 +2047,56 @@ def _detect_game_intro(frame: np.ndarray) -> bool:
     return False
 
 
-def _detect_game_playing(frame: np.ndarray) -> bool:
+def _detect_game_playing(frame: np.ndarray, anchor=None, ncc_thresh: float = 0.4) -> bool:
     """
-    Détecte un frame de jeu en cours via les pixels d'identify du playingFrame.
+    Détecte un frame de jeu en cours via la barre HUD haute (template
+    `playing_top.png`). Si `anchor` est fourni (cachée par le chunks loop pour
+    tout le chunk), on fait un NCC à position FIXE sur ~553×73 px (~1-3 ms,
+    ~30× plus rapide que la recherche multi-scale). Sinon on retombe sur la
+    recherche complète via `_find_playing_top_anchor` (~50-100 ms).
+
+    Pourquoi pas un check single-pixel : le bandeau gris central du HUD
+    contient une barre de progression orange + bleu qui grandit avec le %
+    de capture des points. À mid-game cette barre couvre la zone "gris stable"
+    → un check pixel à position fixe vire False sur les vidéos Domination
+    (cliff/cliff2/...). Un NCC sur le template entier capture la STRUCTURE du
+    HUD (boxes + timer + map name) qui reste invariante, indépendamment des
+    valeurs de score/capture.
+
+    Présent pendant TOUT le gameplay — normal, intro, et spectator (joueur
+    enregistreur mort en cours de partie, la game continue côté serveur).
+    Bascule sur autre layout au score screen / menu → NCC s'effondre.
+
+    Variante historique : check des pixels d'identify du panel player en bas-
+    droit. Abandonnée car ce panel disparaît dès que le joueur meurt, alors que
+    la game et le killfeed continuent — on perdait jusqu'à 30s de gameplay
+    spectator par partie.
     """
-    for mode in MODES:
-        if _identify_offset(frame, mode['playingFrame']['identify']) is not None:
-            return True
-    return False
+    if anchor is None:
+        anchor = _find_playing_top_anchor(frame)
+        if anchor is None:
+            return False
+        # _find_playing_top_anchor a fait son propre seuil interne (≥0.4),
+        # donc trouver une ancre = déjà valider le gameplay.
+        return True
+
+    ax, ay, ah, aw = anchor
+    h, w = frame.shape[:2]
+    if ay < 0 or ax < 0 or ay + ah > h or ax + aw > w:
+        return False
+
+    tpl = _get_playing_top_template()
+    if tpl is None:
+        return False
+    if tpl.shape[0] != ah or tpl.shape[1] != aw:
+        tpl = cv2.resize(tpl, (aw, ah), interpolation=cv2.INTER_AREA)
+
+    region_gray = cv2.cvtColor(frame[ay:ay + ah, ax:ax + aw], cv2.COLOR_RGB2GRAY)
+    if region_gray.shape != tpl.shape:
+        return False
+    # Same-size inputs → matchTemplate retourne un scalaire 1×1.
+    score = float(cv2.matchTemplate(region_gray, tpl, cv2.TM_CCOEFF_NORMED)[0, 0])
+    return score >= ncc_thresh
 
 # ---------------------------------------------------------------------------
 # Video utilities
@@ -2852,14 +2909,17 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         def _submit_frame(ts):
             nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR, LOCKED_POINTS
             FRAME = _get_frame(CAP, ts)
-            if FRAME is None or not _detect_game_playing(FRAME):
+            if FRAME is None:
                 return ('skip', ts)
 
             # Trouve l'ancre HUD une seule fois pour le chunk (matchTemplate
             # est le call le plus cher après l'OCR, ~32ms — on évite de le
-            # refaire à chaque frame).
+            # refaire à chaque frame). L'ancre sert AUSSI au gate gameplay :
+            # _detect_game_playing sample un pixel anchor-relative.
             if HUD_ANCHOR is None:
                 HUD_ANCHOR = _find_playing_top_anchor(FRAME)
+            if not _detect_game_playing(FRAME, anchor=HUD_ANCHOR):
+                return ('skip', ts)
 
             # Verrouille les points de capture sur la 1ère frame exploitable
             # (les positions ne bougent pas pendant la game). Coût ponctuel
