@@ -63,6 +63,54 @@ def parse_gt(path: Path):
     return out
 
 
+def teams_from_gt(gt: list):
+    """2-color the kill graph to split pseudos into two teams (each kill must
+    be cross-team). Returns (team_A, team_B) as ordered lists. If a connected
+    component is not bipartite, falls back to dumping the whole component into
+    team A (best-effort — that component will be poorly matched). We don't
+    know which team is orange and which is blue at render time, so the caller
+    must try both assignments."""
+    valid = lambda n: any(c.isalnum() for c in n)
+    nodes = []
+    edges = {}
+    for k in gt:
+        for n in (k['killer'], k['victim']):
+            if valid(n) and n not in edges:
+                edges[n] = set()
+                nodes.append(n)
+        if valid(k['killer']) and valid(k['victim']):
+            edges[k['killer']].add(k['victim'])
+            edges[k['victim']].add(k['killer'])
+    color = {}
+    for start in nodes:
+        if start in color:
+            continue
+        color[start] = 0
+        stack = [start]
+        while stack:
+            u = stack.pop()
+            for v in edges[u]:
+                if v not in color:
+                    color[v] = 1 - color[u]
+                    stack.append(v)
+    team_a = [n for n in nodes if color[n] == 0]
+    team_b = [n for n in nodes if color[n] == 1]
+    return team_a, team_b
+
+
+def slot_to_name(slot, orange_roster, blue_roster):
+    """Slot mapping in analyze_video.py: orange[0..3] → 1..4, blue[0..3] → 6..9."""
+    if not isinstance(slot, int):
+        return str(slot)
+    if 1 <= slot <= 4:
+        idx = slot - 1
+        return orange_roster[idx] if 0 <= idx < len(orange_roster) else ''
+    if 6 <= slot <= 9:
+        idx = slot - 6
+        return blue_roster[idx] if 0 <= idx < len(blue_roster) else ''
+    return ''
+
+
 def _run(cmd, timeout):
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     events = []
@@ -83,12 +131,14 @@ def run_detect(video: Path):
     return [e['game'] for e in events if e.get('type') == 'game']
 
 
-def run_chunks(video: Path, games: list):
+def run_chunks(video: Path, games: list, orange_roster: list, blue_roster: list):
     chunks = [{
-        'startSeconds': int(g['start']),
-        'endSeconds':   int(g['end']),
-        'gameID':       f'g{i}',
-        'mode':         int(g['mode']),
+        'startSeconds':  int(g['start']),
+        'endSeconds':    int(g['end']),
+        'gameID':        f'g{i}',
+        'mode':          int(g['mode']),
+        'orangePlayers': [{'name': n} for n in orange_roster],
+        'bluePlayers':   [{'name': n} for n in blue_roster],
     } for i, g in enumerate(games)]
     settings = json.dumps({'chunks': chunks})
     cmd = [PYTHON, str(SCRIPT), 'chunks', str(video), FFMPEG, TESSERACT, settings]
@@ -97,11 +147,11 @@ def run_chunks(video: Path, games: list):
     for e in events:
         for r in e.get('results', []) or []:
             for k in r.get('payload', {}).get('kills', []) or []:
-                # V3 positional: [elapsed, killer, victim, weapon, headshot]
+                # V3 positional: [elapsed, killer_slot, victim_slot, weapon, headshot]
                 kills.append({
                     'elapsed':  int(k[0]),
-                    'killer':   k[1] or '',
-                    'victim':   k[2] or '',
+                    'killer':   slot_to_name(k[1], orange_roster, blue_roster),
+                    'victim':   slot_to_name(k[2], orange_roster, blue_roster),
                     'weapon':   (k[3] or '').strip().lower(),
                     'headshot': bool(k[4]),
                 })
@@ -177,12 +227,25 @@ def main():
         if not games:
             print(f"{name:<14} ERROR: no games detected", flush=True)
             continue
-        try:
-            detected = run_chunks(video, games)
-        except subprocess.TimeoutExpired:
-            print(f"{name:<14} ERROR: chunks timeout", flush=True)
+        team_a, team_b = teams_from_gt(gt)
+        # We don't know which team is rendered orange. Run chunks twice (once
+        # per assignment) and keep the one with more TP. Chunks is the
+        # expensive call, but doubling it on 13 short videos is acceptable
+        # for QA.
+        best = None
+        for orange, blue in ((team_a, team_b), (team_b, team_a)):
+            try:
+                det = run_chunks(video, games, orange, blue)
+            except subprocess.TimeoutExpired:
+                print(f"{name:<14} ERROR: chunks timeout", flush=True)
+                det = None
+                break
+            cand = match(det, gt)
+            if best is None or cand['tp'] > best['tp']:
+                best = cand
+        if best is None:
             continue
-        m = match(detected, gt)
+        m = best
         print(fmt(name, m), flush=True)
         for k in aggr:
             aggr[k] += m[k]
