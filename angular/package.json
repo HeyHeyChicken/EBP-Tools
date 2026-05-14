@@ -20,10 +20,10 @@
     "@ngx-translate/http-loader": "^17.0.0",
     "fastest-levenshtein": "^1.0.16",
     "ngx-image-cropper": "^9.1.5",
-    "ngx-toastr": "^19.1.0",
+    "ngx-toastr": "^20.0.5",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
-    "zone.js": "~0.15.0"
+    "zone.js": "^0.16.2"
   },
   "devDependencies": {
     "@angular/build": "^21.2.11",
@@ -31,13 +31,15 @@
     "@angular/cli": "^21.2.11",
     "@angular/compiler-cli": "^21.2.13",
     "@angular/material": "^21.2.11",
-    "@types/jest": "^29.5.0",
+    "@angular/platform-browser-dynamic": "^21.2.13",
+    "@types/jest": "^30.0.0",
     "jest": "^30.4.2",
-    "jest-preset-angular": "^14.6.0",
-    "jest-util": "^29.7.0",
-    "tesseract.js": "^6.0.1",
+    "jest-preset-angular": "^16.1.5",
+    "jest-util": "^30.4.1",
+    "jsdom": "^29.1.1",
+    "tesseract.js": "^7.0.0",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "~5.9.3"
   }
 }

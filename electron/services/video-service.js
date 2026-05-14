@@ -12,7 +12,6 @@ const {
 const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('node:path');
-const { getMainWindow } = require('../core/window-manager');
 const { unlinkSync } = require('./global-service');
 
 //#endregion
@@ -172,6 +171,7 @@ function removeBorders(inputPath, cropPosition) {
 
                 const PERCENT = Math.ceil((CURRENT / duration) * 100);
 
+                const { getMainWindow } = require('../core/window-manager');
                 getMainWindow().webContents.send(
                     'set-remove-borders-percent',
                     PERCENT

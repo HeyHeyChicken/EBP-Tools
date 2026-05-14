@@ -222,7 +222,7 @@ export class ReplayCutterManualVideoCutDialog {
   /**
    * Handle mouse up event to stop dragging and resume video playback if it was playing before.
    */
-  @HostListener('document:mouseup', ['$event'])
+  @HostListener('document:mouseup')
   handleMouseUpEvent() {
     this.frameCursorDragging = false;
 
