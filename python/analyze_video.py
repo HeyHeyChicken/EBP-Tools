@@ -3367,6 +3367,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     'points_timeline': POINTS_TIMELINE,
                     'kills': KILLS_OUT,
                     'end_non_gameplay_seconds': END_NON_GAMEPLAY,
+                    'orange_color': list(RESOLVED_ORANGE) if RESOLVED_ORANGE else None,
+                    'blue_color': list(RESOLVED_BLUE) if RESOLVED_BLUE else None,
                 },
             }],
         })
