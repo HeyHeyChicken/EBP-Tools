@@ -88,7 +88,6 @@ MODES = [
             'blueScore': ((996, 545), (1257, 648)),
         },
         'gameFrame': {
-            'map': ((845, 124), (1072, 159)),
             'timer': ((916, 50), (1004, 88)),
             'playersY': [[732, 755], [814, 838], [898, 921], [980, 1004]],
             # Killfeed top-right : on détecte des bandes de texte (couleur équipe
@@ -157,19 +156,22 @@ _A_PATTERNS = [
      (1612, 983,   0, 200), (1612, 1000,   0, 200)],
 ]
 
+# Pour chaque map : `aliases` = mots OCR reconnus (incluant erreurs fréquentes),
+# `points` = nombre attendu de capture points (garde-fou anti-FP dans
+# `_detect_capture_points_for_map`).
 _MAPS = {
-    'Artefact': ['artefact'],
-    'Atlantis': ['atlantis'],
-    'Ceres': ['ceres'],
-    'Engine': ['engine', 'enaine'],
-    'Helios Station': ['helios', 'station', 'hheliosstation', 'rheliosstation', 'heliosstation'],
-    'Lunar Outpost': ['lunar', 'outpost', 'lunaroutpost'],
-    'Outlaw': ['outlaw', 'qutlaw'],
-    'Polaris': ['polaris'],
-    'Silva': ['silva'],
-    'The Cliff': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt', 'theclife', 'the clife', 'theclifen'],
-    'The Rock': ['rock', 'therock'],
-    'Horizon': ['horizon'],
+    'Artefact':       {'aliases': ['artefact'], 'points': 1},
+    'Atlantis':       {'aliases': ['atlantis'], 'points': 3},
+    'Ceres':          {'aliases': ['ceres'], 'points': 1},
+    'Engine':         {'aliases': ['engine', 'enaine'], 'points': 3},
+    'Helios Station': {'aliases': ['helios', 'station', 'hheliosstation', 'rheliosstation', 'heliosstation'], 'points': 3},
+    'Lunar Outpost':  {'aliases': ['lunar', 'outpost', 'lunaroutpost'], 'points': 3},
+    'Outlaw':         {'aliases': ['outlaw', 'qutlaw'], 'points': 5},
+    'Polaris':        {'aliases': ['polaris'], 'points': 1},
+    'Silva':          {'aliases': ['silva'], 'points': 1},
+    'The Cliff':      {'aliases': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt', 'theclife', 'the clife', 'theclifen'], 'points': 1},
+    'The Rock':       {'aliases': ['rock', 'therock'], 'points': 1},
+    'Horizon':        {'aliases': ['horizon'], 'points': 2},
 }
 
 WIDTH  = 1920
@@ -263,8 +265,8 @@ def _score_checker(value: str) -> str:
 def _get_map_by_name(text: str) -> str:
     """Recherche un nom de map connu dans text et retourne le nom canonique, ou '' si non trouvé."""
     words = re.sub(r'[\r\n]', '', text).lower().split()
-    for MAP_NAME, keywords in _MAPS.items():
-        if any(w in keywords for w in words):
+    for MAP_NAME, info in _MAPS.items():
+        if any(w in info['aliases'] for w in words):
             return MAP_NAME
     return ''
 
@@ -1549,11 +1551,40 @@ def _find_playing_top_anchor(frame: np.ndarray):
     return (x, y, th, tw)
 
 
+def _find_hud_anchor_safely(cap: cv2.VideoCapture, start_ts: float, max_back: int = 60):
+    """Localise l'ancre HUD à partir d'une frame qu'on sait être du gameplay.
+    Part de `start_ts` (typiquement game.end - 30, soit ~30 s avant la fin
+    de game donc bien avant l'écran VICTOIRE/DEFAITE) et recule de 1 s
+    jusqu'à trouver un anchor valide ou épuiser `max_back` tentatives.
+
+    Pourquoi : sur les frames de transition (VICTOIRE, intro), le template
+    `playing_top.png` matche parfois ~0.4 à un mauvais emplacement (un seul
+    pill visible, le template trouve un demi-match aléatoire). Une fois
+    cet anchor erroné caché, toutes les boxes dérivées (map, timer, score)
+    sont décalées pour tout le reste du run. En cherchant sur une frame
+    de gameplay confirmée, on garantit un anchor correct."""
+    for OFFSET in range(max_back + 1):
+        TS = max(0.0, start_ts - OFFSET)
+        FRAME = _get_frame(cap, TS)
+        if FRAME is not None:
+            ANCHOR = _find_playing_top_anchor(FRAME)
+            if ANCHOR is not None:
+                if DEBUG:
+                    _emit({'log': f'[hud_anchor] locked at ts={TS:.1f}s (offset=-{OFFSET}s from start_ts={start_ts:.1f}s)'})
+                return ANCHOR
+        if TS <= 0:
+            break
+    if DEBUG:
+        _emit({'log': f'[hud_anchor] not found within {max_back}s of start_ts={start_ts:.1f}s'})
+    return None
+
+
 def _find_map_box(frame: np.ndarray, anchor=None):
     """Boîte OCR du nom de map, ancrée sur la barre HUD haute. Le nom est
-    centré horizontalement, juste sous la barre, hauteur ≈ 0.6× hauteur de
-    la barre, largeur ≈ 0.4× largeur. Si `anchor` (tuple x,y,h,w) est
-    fourni, on saute le matchTemplate. Retourne None si pas d'ancre."""
+    centré horizontalement sur le centre X de la barre, juste sous la barre,
+    hauteur = 0.6× hauteur de la barre, largeur = 0.5× largeur de la barre.
+    Si `anchor` (tuple x,y,h,w) est fourni, on saute le matchTemplate.
+    Retourne None si pas d'ancre."""
     if anchor is None:
         anchor = _find_playing_top_anchor(frame)
     if anchor is None:
@@ -1562,7 +1593,7 @@ def _find_map_box(frame: np.ndarray, anchor=None):
     cx = x + tw / 2
     map_y1 = y + th
     map_y2 = map_y1 + int(th * 0.6)
-    map_w = int(tw * 0.4)
+    map_w = int(tw * 0.5)
     map_x1 = int(cx - map_w / 2)
     map_x2 = int(cx + map_w / 2)
     return ((map_x1, map_y1), (map_x2, map_y2))
@@ -1820,6 +1851,34 @@ def _detect_capture_points(frame: np.ndarray, anchor=None,
             if not p['letter']:
                 p['letter'] = remaining.pop(0)
     return out
+
+
+def _detect_capture_points_for_map(cap: cv2.VideoCapture, hud_anchor,
+                                   game_start_ts: float,
+                                   map_name: str = '') -> list:
+    """Garde-fou anti-FP basé sur le nombre attendu de points pour la map.
+
+    Démarre le scan à `game_start_ts + 30s` (le HUD est stabilisé à ce moment,
+    transitions d'intro / animations terminées) puis avance par pas de 10 s
+    jusqu'à `+120s`. Retourne la première détection dont
+    `len(points) == _MAPS[map_name]['points']`. Si aucun essai ne matche,
+    retourne `[]` (le résultat est forcément faux — mieux vaut pas de points
+    que des FPs réassignés A/B/C qui pollueront la suite du pipeline).
+
+    Si `map_name` est inconnu ou absent de `_MAPS`, retourne la détection à
+    `game_start_ts + 30s` sans contrainte (compat. ascendante).
+    """
+    expected = _MAPS[map_name]['points'] if map_name in _MAPS else None
+    for offset in range(30, 130, 10):
+        frame = _get_frame(cap, game_start_ts + offset)
+        if frame is None:
+            continue
+        attempt = _detect_capture_points(frame, anchor=hud_anchor)
+        if expected is None:
+            return attempt
+        if len(attempt) == expected:
+            return attempt
+    return []
 
 
 def _compute_point_fill(frame: np.ndarray, point: dict,
@@ -2206,6 +2265,53 @@ def _set_score(game: dict, team: str, raw: str) -> None:
     except Exception:
         pass
 
+
+def _refine_game_start_with_timer(cap, base_ts: float, timer_box,
+                                  hud_anchor=None, max_search: int = 55) -> float:
+    """
+    Affine `game.start` en avançant seconde par seconde depuis `base_ts` et
+    en lisant le timer in-game jusqu'à voir un décrément (M:S avec S > 0).
+    Le start est alors back-computé : start = T - (60 - S), soit l'instant
+    où le timer était à (M+1):00. La minute de départ est inconnue (10 par
+    défaut, mais l'admin peut la régler de 4 à 13+) — on ne s'en sert pas,
+    seul S compte. Tant qu'on voit M:00 (timer figé en attente du go) ou des
+    lectures invalides, on continue. `new_start` est clampé à `base_ts` :
+    une back-compute antérieure au start initial serait nécessairement un
+    OCR erroné (le loading screen borne le début par le bas).
+    """
+    _emit({'log': f'[refine_start] START scan from base_ts={base_ts:.1f}s (max_search={max_search}s)'})
+    for OFFSET in range(0, max_search + 1):
+        TS = base_ts + OFFSET
+        FRAME = _get_frame(cap, TS)
+        if FRAME is None:
+            _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s → no frame (skip)'})
+            continue
+        DYN_BOX = _find_timer_box(FRAME, anchor=hud_anchor)
+        TB = DYN_BOX if DYN_BOX is not None else timer_box
+        BOX_KIND = 'dyn' if DYN_BOX is not None else 'static'
+        TIMER_TEXT = _ocr_region(
+            FRAME,
+            TB[0][0], TB[0][1], TB[1][0], TB[1][1],
+            psm=7, extra_psms=[8], whitelist='0123456789:',
+            luminance=100, apply_filter=True, lang='evadigits',
+        )
+        MS = _parse_timer_text(TIMER_TEXT)
+        if MS is None:
+            _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} → unparseable (skip)'})
+            continue
+        M, S = MS
+        if S == 0:
+            _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → S=0, timer figé ou pile minute (skip)'})
+            continue
+        BACK = TS - (60 - S)
+        REFINED = max(base_ts, BACK)
+        CLAMPED = ' [CLAMPED to base_ts]' if BACK < base_ts else ''
+        _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → back-compute={BACK:.1f}s → start={REFINED:.1f}s (from base_ts={base_ts:.1f}s){CLAMPED}'})
+        return REFINED
+    _emit({'log': f'[refine_start] DONE no decrement found within {max_search}s of {base_ts:.1f}s, keeping {base_ts:.1f}s'})
+    return base_ts
+
+
 # ---------------------------------------------------------------------------
 # Backward analysis — mirrors videoTimeUpdate() from the TypeScript component
 # ---------------------------------------------------------------------------
@@ -2365,6 +2471,11 @@ def _analyze(
                     if DEBUG:
                         _emit({'log': 's'})
                     PROBE += 0.5
+                GAME_START = _refine_game_start_with_timer(
+                    CAP, GAME_START,
+                    MODES[CURRENT['mode']]['gameFrame']['timer'],
+                    hud_anchor=HUD_ANCHOR,
+                )
                 CURRENT['start'] = GAME_START
                 if FIRST_PLAYING_FRAME is not None:
                     CURRENT['points'] = _detect_capture_points(FIRST_PLAYING_FRAME, anchor=HUD_ANCHOR)
@@ -2393,6 +2504,11 @@ def _analyze(
                         FIRST_PLAYING_FRAME = PROBE_FRAME
                         break
                     PROBE += 0.5
+                GAME_START = _refine_game_start_with_timer(
+                    CAP, GAME_START,
+                    MODES[CURRENT['mode']]['gameFrame']['timer'],
+                    hud_anchor=HUD_ANCHOR,
+                )
                 CURRENT['start'] = GAME_START
                 if FIRST_PLAYING_FRAME is not None:
                     CURRENT['points'] = _detect_capture_points(FIRST_PLAYING_FRAME, anchor=HUD_ANCHOR)
@@ -2411,18 +2527,19 @@ def _analyze(
                     _emit({'log': 'Playing frame found'})
 
                 GF        = MODES[CURRENT['mode']]['gameFrame']
-                MAP_BOX   = GF['map']
                 TIMER_BOX = GF['timer']
 
-                # Ancre HUD : une seule recherche par run, mise en cache.
+                # Ancre HUD : une seule recherche par game, mise en cache.
+                # On ne cherche PAS sur la FRAME courante (qui peut être une
+                # transition VICTOIRE → match accidentel sur un mauvais
+                # emplacement). On part de game.end - 30 s (~30 s avant la
+                # fin de game = sûrement en gameplay) et on recule.
                 if HUD_ANCHOR is None:
-                    HUD_ANCHOR = _find_playing_top_anchor(FRAME)
+                    HUD_ANCHOR = _find_hud_anchor_safely(CAP, CURRENT['end'] - 30)
 
-                if not CURRENT['map']:
-                    # Ancrage dynamique : box du nom de map dérivée de la barre HUD.
-                    # Tombe sur la box statique si l'ancre n'a jamais été trouvée.
-                    DYN_BOX = _find_map_box(FRAME, anchor=HUD_ANCHOR)
-                    MB = DYN_BOX if DYN_BOX is not None else MAP_BOX
+                if not CURRENT['map'] and HUD_ANCHOR is not None:
+                    # Box du nom de map dérivée de la barre HUD (anchor sûr).
+                    MB = _find_map_box(FRAME, anchor=HUD_ANCHOR)
                     T = _ocr_color_masked(
                         FRAME,
                         MB[0][0], MB[0][1], MB[1][0], MB[1][1],
@@ -2510,11 +2627,19 @@ def _analyze(
         STEP = 1.0 if (JUST_JUMPED or SEARCHING_START) else 2.0
         TIMESTAMP -= STEP
 
-    CAP.release()
-
+    # Fallback : pas de loading/intro screen détecté (vidéo déjà pré-coupée
+    # par exemple). Le start "brut" devient 0, mais on tente quand même
+    # d'affiner via le timer in-game à partir de t=0. CAP encore ouvert ici.
     if CURRENT is not None and CURRENT['start'] == -1:
-        CURRENT['start'] = 0
+        REFINED_START = _refine_game_start_with_timer(
+            CAP, 0.0,
+            MODES[CURRENT['mode']]['gameFrame']['timer'],
+            hud_anchor=HUD_ANCHOR,
+        )
+        CURRENT['start'] = REFINED_START
         _emit({'type': 'game', 'game': CURRENT})
+
+    CAP.release()
 
     _emit({'type': 'done'})
 
@@ -2926,7 +3051,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # ≈ 1 matchTemplate + 1 OCR par point ; après ça, le calcul du
             # fill par seconde est gratuit (~400 ops par point).
             if LOCKED_POINTS is None and HUD_ANCHOR is not None:
-                PTS = _detect_capture_points(FRAME, anchor=HUD_ANCHOR)
+                PTS = _detect_capture_points_for_map(CAP, HUD_ANCHOR, ts, MAP_NAME)
                 if PTS:
                     LOCKED_POINTS = PTS
                     if DEBUG:

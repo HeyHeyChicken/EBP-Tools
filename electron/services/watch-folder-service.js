@@ -241,10 +241,12 @@ async function processVideo(videoPath, deps) {
     // Identify : on demande au back les rosters trustés AVANT la phase 2 pour
     // pouvoir les passer en argument à l'analyse approfondie (utile au fuzzy
     // match du killfeed OCR).
-    const IDENTIFY_RES = await identifyGames({
+    const IDENTIFY_PAYLOAD = {
         sourceFilename: META.cleanBasename + path.extname(videoPath),
         segments: toIdentifySegments(GAMES)
-    });
+    };
+    console.log('[watch-folder] identify payload:', JSON.stringify(IDENTIFY_PAYLOAD, null, 2));
+    const IDENTIFY_RES = await identifyGames(IDENTIFY_PAYLOAD);
     console.log('[watch-folder] identify response:', JSON.stringify(IDENTIFY_RES, null, 2));
     const MATCHES = IDENTIFY_RES.matches || [];
     const MATCH_BY_TEMP = new Map(
