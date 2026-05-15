@@ -2130,9 +2130,9 @@ def _measure_cart_hp(frame: np.ndarray, x: int, w: int, color) -> int:
     fill = int((usable >= _HP_THRESHOLD).sum())
     pct = int(round(fill / len(usable) * 100))
     # Snap near-full readings to 100: the rounded-corner top of the cart costs
-    # us a few rows even at full HP, so genuine 100% reads as 97–99. Clamping
-    # ≥ 97 → 100 also makes the smoother's RESPAWN_MIN test reliable.
-    return 100 if pct >= 97 else pct
+    # us a few rows even at full HP, so genuine 100% reads as 90–99. Clamping
+    # ≥ 90 → 100 also makes the smoother's RESPAWN_MIN test reliable.
+    return 100 if pct >= 90 else pct
 
 
 def _compute_player_hp(frame: np.ndarray, n_orange: int, n_blue: int,
@@ -2194,18 +2194,18 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7) -> dict:
                 if i >= len(team_hps) or team_hps[i] != 0:
                     continue
                 # Look ahead up to regen_window seconds (sparse-safe).
-                # Patch only if the look-ahead value is in (0, 95]: a respawn
-                # lands at 100 HP (often read as 96–100 due to OCR noise on
-                # the cart edge), while a regen progresses from 0 and stays
-                # well below full within the window. Threshold 95 absorbs the
-                # OCR jitter at the top while still catching all realistic
-                # regen values.
+                # Patch only if the look-ahead value is in (0, 50]: a respawn
+                # lands at full HP (read as 90–100 depending on the fade-in
+                # animation timing), while passive regen accrues at ~1 HP/s
+                # and tops out around 5–7 HP within a 7 s window. Threshold
+                # 50 cleanly separates the two — anything above is a respawn,
+                # which the lockout phase below handles.
                 cutoff = s + regen_window
                 for jdx in range(idx + 1, len(secs)):
                     if secs[jdx] > cutoff:
                         break
                     next_hps = pairs[jdx].get(team) or []
-                    if i < len(next_hps) and 0 < next_hps[i] <= 95:
+                    if i < len(next_hps) and 0 < next_hps[i] <= 50:
                         pairs[idx] = dict(pairs[idx])
                         pairs[idx][team] = list(team_hps)
                         pairs[idx][team][i] = 1
@@ -2215,10 +2215,12 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7) -> dict:
     # use the shorter value as a safety floor — picking 17 would force HP=0 on
     # already-respawned players in 15-s lobbies, creating false negatives).
     # Any HP>0 reading inside that window is a misread → forced back to 0.
-    # We exit the lockout early only on a "real respawn" reading (HP ≥ 96,
-    # accounting for OCR jitter).
+    # We exit the lockout early only on a "real respawn" reading (HP ≥ 90).
+    # Threshold 90 (rather than 96) absorbs the fade-in animation: at the very
+    # frame of respawn the cart isn't fully filled yet, so the row-scan often
+    # reads 90–95 instead of 100 for a couple of seconds.
     DEATH_LOCKOUT = 15
-    RESPAWN_MIN = 96
+    RESPAWN_MIN = 90
     for team in ('orange', 'blue'):
         n_players = max((len(p.get(team) or []) for p in pairs), default=0)
         for i in range(n_players):
