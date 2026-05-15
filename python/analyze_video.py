@@ -2094,6 +2094,160 @@ def _smooth_points_timeline_domination(timeline: dict) -> dict:
     return out
 
 
+# Player HP cartouches in HUD top — pixel coords for a 1920×1080 frame.
+# Layout: orange[0..N-1] aligned left from x=8, blue[0..N-1] aligned right
+# to x=1908. Width depends only on team size N (linear extrapolation outside
+# 4/5). Each cart has rounded corners and a colored border (visible even at
+# 0% HP), so we measure on a narrow band offset 15 px from the right edge —
+# inside the avatar-free, icon-free zone — and trim 4/5 corner rows.
+_PLAYER_CART_W              = {4: 147, 5: 130}
+_PLAYER_CART_H              = 96
+_PLAYER_CART_Y              = 29
+_PLAYER_CART_X_FIRST_ORANGE = 8
+_PLAYER_CART_X_LAST_BLUE_RIGHT = 1908
+_PLAYER_CART_GAP            = 4
+_HP_BAND_OFFSET             = 15
+_HP_BAND_WIDTH              = 10
+_HP_TOP_SKIP, _HP_BOT_SKIP  = 4, 5
+_HP_TOL                     = 40
+_HP_THRESHOLD               = 0.3
+
+
+def _player_cart_x_left(team: str, idx: int, n: int) -> int:
+    w = _PLAYER_CART_W.get(n, 215 - 17 * n)
+    if team == 'orange':
+        return _PLAYER_CART_X_FIRST_ORANGE + idx * (w + _PLAYER_CART_GAP)
+    return _PLAYER_CART_X_LAST_BLUE_RIGHT - w - (n - 1 - idx) * (w + _PLAYER_CART_GAP)
+
+
+def _measure_cart_hp(frame: np.ndarray, x: int, w: int, color) -> int:
+    bx = x + w - _HP_BAND_OFFSET - _HP_BAND_WIDTH
+    band = frame[_PLAYER_CART_Y:_PLAYER_CART_Y + _PLAYER_CART_H,
+                 bx:bx + _HP_BAND_WIDTH].astype(int)
+    d = np.abs(band - np.array(color)).sum(axis=2)
+    row_frac = (d < _HP_TOL * 3).sum(axis=1) / _HP_BAND_WIDTH
+    usable = row_frac[_HP_TOP_SKIP:_PLAYER_CART_H - _HP_BOT_SKIP]
+    fill = int((usable >= _HP_THRESHOLD).sum())
+    pct = int(round(fill / len(usable) * 100))
+    # Snap near-full readings to 100: the rounded-corner top of the cart costs
+    # us a few rows even at full HP, so genuine 100% reads as 97–99. Clamping
+    # ≥ 97 → 100 also makes the smoother's RESPAWN_MIN test reliable.
+    return 100 if pct >= 97 else pct
+
+
+def _compute_player_hp(frame: np.ndarray, n_orange: int, n_blue: int,
+                       resolved_orange, resolved_blue) -> dict:
+    """Returns {'orange': [hp1, hp2, ...], 'blue': [...]}, each hp ∈ [0, 100].
+    A team with unresolved color or zero size yields []."""
+    out = {'orange': [], 'blue': []}
+    if resolved_orange is not None and n_orange > 0:
+        w = _PLAYER_CART_W.get(n_orange, 215 - 17 * n_orange)
+        for i in range(n_orange):
+            x = _player_cart_x_left('orange', i, n_orange)
+            out['orange'].append(_measure_cart_hp(frame, x, w, resolved_orange))
+    if resolved_blue is not None and n_blue > 0:
+        w = _PLAYER_CART_W.get(n_blue, 215 - 17 * n_blue)
+        for i in range(n_blue):
+            x = _player_cart_x_left('blue', i, n_blue)
+            out['blue'].append(_measure_cart_hp(frame, x, w, resolved_blue))
+    return out
+
+
+def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7) -> dict:
+    """Patche les faux "mort" en HP=1.
+
+    Règle EVA :
+      - regen passive après 5 s sans dégâts (1 HP → remonte)
+      - respawn 15–17 s après mort selon la partie
+
+    Si un joueur est détecté HP=0 puis remonte > 0 dans les `regen_window` sec
+    (par défaut 7 s = 5 s regen + 2 s marge), il n'était pas vraiment mort —
+    c'était un misread où 1 HP a été lu comme 0. On force la valeur à 1
+    (vivant minimum) pour que le calcul d'avantage numérique côté front ne
+    compte pas une mort fantôme. Le HP exact est perdu mais la sémantique
+    vivant/mort est conservée.
+
+    Le timeline d'entrée est sparse (change-only), on le ré-émet pareil
+    après correction.
+    """
+    if not timeline_sparse:
+        return timeline_sparse
+    secs = sorted(int(k) for k in timeline_sparse)
+    pairs = [timeline_sparse[str(s)] for s in secs]
+    # Au timer in-game 10:00 (elapsed=0) tout le monde a 100 HP par construction
+    # (frame du go avant le 1er kill). On force l'entrée pour absorber le
+    # bruit des toutes premières frames (couleurs pas encore résolues, OCR
+    # du timer en cours de stabilisation, animation d'intro).
+    n_o = max((len(p.get('orange') or []) for p in pairs), default=0)
+    n_b = max((len(p.get('blue') or []) for p in pairs), default=0)
+    initial = {'orange': [100] * n_o, 'blue': [100] * n_b}
+    if secs[0] == 0:
+        pairs[0] = initial
+    else:
+        secs.insert(0, 0)
+        pairs.insert(0, initial)
+    for team in ('orange', 'blue'):
+        n_players = max((len(p.get(team) or []) for p in pairs), default=0)
+        for i in range(n_players):
+            for idx, s in enumerate(secs):
+                team_hps = pairs[idx].get(team) or []
+                if i >= len(team_hps) or team_hps[i] != 0:
+                    continue
+                # Look ahead up to regen_window seconds (sparse-safe).
+                # Patch only if the look-ahead value is in (0, 95]: a respawn
+                # lands at 100 HP (often read as 96–100 due to OCR noise on
+                # the cart edge), while a regen progresses from 0 and stays
+                # well below full within the window. Threshold 95 absorbs the
+                # OCR jitter at the top while still catching all realistic
+                # regen values.
+                cutoff = s + regen_window
+                for jdx in range(idx + 1, len(secs)):
+                    if secs[jdx] > cutoff:
+                        break
+                    next_hps = pairs[jdx].get(team) or []
+                    if i < len(next_hps) and 0 < next_hps[i] <= 95:
+                        pairs[idx] = dict(pairs[idx])
+                        pairs[idx][team] = list(team_hps)
+                        pairs[idx][team][i] = 1
+                        break
+    # Death lockout: a confirmed dead player (HP=0 not regen-patched above)
+    # cannot revive before 15 s (EVA respawn delay; some lobbies use 17 s, we
+    # use the shorter value as a safety floor — picking 17 would force HP=0 on
+    # already-respawned players in 15-s lobbies, creating false negatives).
+    # Any HP>0 reading inside that window is a misread → forced back to 0.
+    # We exit the lockout early only on a "real respawn" reading (HP ≥ 96,
+    # accounting for OCR jitter).
+    DEATH_LOCKOUT = 15
+    RESPAWN_MIN = 96
+    for team in ('orange', 'blue'):
+        n_players = max((len(p.get(team) or []) for p in pairs), default=0)
+        for i in range(n_players):
+            lockout_until = -1
+            for idx, s in enumerate(secs):
+                team_hps = pairs[idx].get(team) or []
+                if i >= len(team_hps):
+                    continue
+                val = team_hps[i]
+                if val == 0:
+                    lockout_until = s + DEATH_LOCKOUT
+                elif s < lockout_until:
+                    if val >= RESPAWN_MIN:
+                        lockout_until = -1   # real respawn
+                    else:
+                        # Misread inside the dead window — overwrite with 0.
+                        pairs[idx] = dict(pairs[idx])
+                        pairs[idx][team] = list(team_hps)
+                        pairs[idx][team][i] = 0
+    # Re-sparse: collapse consecutive identical pairs.
+    out = {}
+    prev = None
+    for s, p in zip(secs, pairs):
+        if p != prev:
+            out[str(s)] = p
+            prev = p
+    return out
+
+
 def _detect_game_intro(frame: np.ndarray) -> bool:
     """
     Détecte l'écran d'introduction de map (lettre 'B' du logo EVA en bas à droite).
@@ -2995,6 +3149,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Le dédup post-process tranche pour ne garder qu'un kill par paire
         # (killer, victim) sur la fenêtre de 5-10 s.
         KILL_OBSERVATIONS = {}   # {elapsed_s: [{'killer': str, 'victim': str, 'killer_raw': str, 'victim_raw': str}, ...]}
+        # %HP par joueur lu sur les cartouches HUD haut. Une obs par frame
+        # gameplay; agrégé par median (per-player) en fin de chunk pour
+        # encaisser les frames de transition et les artefacts ponctuels.
+        HP_OBSERVATIONS = {}    # {elapsed_s: [{'orange': [hp...], 'blue': [hp...]}, ...]}
         MAX_TIME = None   # auto-détecté à la première lecture timer valide
 
         # Couleur effectivement utilisée par chaque équipe dans cette partie.
@@ -3247,6 +3405,16 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                             'weapon': WEAPON, 'headshot': HEADSHOT,
                         })
 
+            # %HP des joueurs : pixel-only (pas d'OCR), une obs par frame.
+            # Skip tant qu'une couleur d'équipe n'est pas résolue (sinon les
+            # mesures de la team manquante seraient toutes biaisées).
+            if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None:
+                HP = _compute_player_hp(
+                    frame, len(ORANGE_ROSTER), len(BLUE_ROSTER),
+                    RESOLVED_ORANGE, RESOLVED_BLUE,
+                )
+                HP_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append(HP)
+
         TIMESTAMP = float(START)
         INFLIGHT = deque()
 
@@ -3340,6 +3508,31 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.
         KILLS_OUT = _dedup_kills(KILL_OBSERVATIONS)
 
+        # %HP par joueur : médiane des observations par seconde, par joueur.
+        # Sparse comme score_timeline : on émet uniquement les sec où la
+        # paire (orange, blue) change. Le front forward-fill côté UI.
+        def _median_per_player(obs_list, team):
+            n = max(len(o[team]) for o in obs_list)
+            out = []
+            for i in range(n):
+                vals = sorted(o[team][i] for o in obs_list if i < len(o[team]))
+                out.append(vals[len(vals) // 2])
+            return out
+
+        HP_TIMELINE = {}
+        prev_hp = None
+        for K in sorted(HP_OBSERVATIONS):
+            obs_list = HP_OBSERVATIONS[K]
+            pair = {
+                'orange': _median_per_player(obs_list, 'orange'),
+                'blue':   _median_per_player(obs_list, 'blue'),
+            }
+            if pair != prev_hp:
+                HP_TIMELINE[str(K)] = pair
+                prev_hp = pair
+        # Faux "mort" détectés (HP=0 mais joueur en regen) → forcés à 1.
+        HP_TIMELINE = _smooth_hp_timeline(HP_TIMELINE)
+
         # Trailer non-gameplay : à la fin du chunk, l'écran de score final
         # s'affiche jusqu'à ~15 s (ou moins si la vidéo a été pré-coupée). On
         # remonte le chunk seconde par seconde depuis END, jusqu'à 20 s max,
@@ -3365,6 +3558,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 'payload': {
                     'score_timeline': SCORE_TIMELINE,
                     'points_timeline': POINTS_TIMELINE,
+                    'hp_timeline': HP_TIMELINE,
                     'kills': KILLS_OUT,
                     'end_non_gameplay_seconds': END_NON_GAMEPLAY,
                     'orange_color': list(RESOLVED_ORANGE) if RESOLVED_ORANGE else None,

@@ -63,51 +63,44 @@ def parse_gt(path: Path):
     return out
 
 
-def teams_from_gt(gt: list):
-    """2-color the kill graph to split pseudos into two teams (each kill must
-    be cross-team). Returns (team_A, team_B) as ordered lists. If a connected
-    component is not bipartite, falls back to dumping the whole component into
-    team A (best-effort — that component will be poorly matched). We don't
-    know which team is orange and which is blue at render time, so the caller
-    must try both assignments."""
-    valid = lambda n: any(c.isalnum() for c in n)
-    nodes = []
-    edges = {}
-    for k in gt:
-        for n in (k['killer'], k['victim']):
-            if valid(n) and n not in edges:
-                edges[n] = set()
-                nodes.append(n)
-        if valid(k['killer']) and valid(k['victim']):
-            edges[k['killer']].add(k['victim'])
-            edges[k['victim']].add(k['killer'])
-    color = {}
-    for start in nodes:
-        if start in color:
-            continue
-        color[start] = 0
-        stack = [start]
-        while stack:
-            u = stack.pop()
-            for v in edges[u]:
-                if v not in color:
-                    color[v] = 1 - color[u]
-                    stack.append(v)
-    team_a = [n for n in nodes if color[n] == 0]
-    team_b = [n for n in nodes if color[n] == 1]
-    return team_a, team_b
+def teams_from_file(path: Path):
+    """Parse a `teams.txt` file with two lines:
+        orange: pseudo1, pseudo2, pseudo3, pseudo4
+        blue:   pseudo1, pseudo2, pseudo3, pseudo4
+    Pseudos may be separated by whitespace and/or commas. Returns
+    (orange, blue) lists. Raises if the file is missing or both teams empty —
+    the orange/blue split must come from a hand-curated source (we used to
+    bipartition the kill graph as a fallback, but it required running chunks
+    twice per video to discover the correct color assignment)."""
+    if not path.exists():
+        raise FileNotFoundError(f'teams.txt not found at {path}')
+    o, b = [], []
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if line.startswith('orange:'):
+            o = line[len('orange:'):].replace(',', ' ').split()
+        elif line.startswith('blue:'):
+            b = line[len('blue:'):].replace(',', ' ').split()
+    if not o and not b:
+        raise ValueError(f'teams.txt at {path} has both teams empty')
+    return o, b
 
 
 def slot_to_name(slot, orange_roster, blue_roster):
-    """Slot mapping in analyze_video.py: orange[0..3] → 1..4, blue[0..3] → 6..9."""
+    """Slot mapping in analyze_video.py: orange[i] → i+1, blue[i] → i+6. The
+    canonical EVA roster is 4v4 (slots 1..4 and 6..9), but a ground-truth
+    file may include in-game subs, growing a team past 4 players. We don't
+    cap on the upper bound here — analyze_video.py itself just does
+    `roster.index(name) + offset` so it'll emit slot 5 (orange[4]) or slot
+    10+ (blue[4+]) when needed."""
     if not isinstance(slot, int):
         return str(slot)
-    if 1 <= slot <= 4:
+    if 1 <= slot < 6:
         idx = slot - 1
-        return orange_roster[idx] if 0 <= idx < len(orange_roster) else ''
-    if 6 <= slot <= 9:
+        return orange_roster[idx] if idx < len(orange_roster) else ''
+    if 6 <= slot:
         idx = slot - 6
-        return blue_roster[idx] if 0 <= idx < len(blue_roster) else ''
+        return blue_roster[idx] if idx < len(blue_roster) else ''
     return ''
 
 
@@ -132,6 +125,7 @@ def run_detect(video: Path):
 
 
 def run_chunks(video: Path, games: list, orange_roster: list, blue_roster: list):
+    """Returns (kills, hp_timeline). hp_timeline = {sec_int: {'orange':[...], 'blue':[...]}}."""
     chunks = [{
         'startSeconds':  int(g['start']),
         'endSeconds':    int(g['end']),
@@ -144,6 +138,7 @@ def run_chunks(video: Path, games: list, orange_roster: list, blue_roster: list)
     cmd = [PYTHON, str(SCRIPT), 'chunks', str(video), FFMPEG, TESSERACT, settings]
     events, _ = _run(cmd, timeout=2400)
     kills = []
+    hp_timeline = {}
     for e in events:
         for r in e.get('results', []) or []:
             for k in r.get('payload', {}).get('kills', []) or []:
@@ -155,7 +150,67 @@ def run_chunks(video: Path, games: list, orange_roster: list, blue_roster: list)
                     'weapon':   (k[3] or '').strip().lower(),
                     'headshot': bool(k[4]),
                 })
-    return kills
+            for sec_str, pair in (r.get('payload', {}).get('hp_timeline') or {}).items():
+                hp_timeline[int(sec_str)] = pair
+    return kills, hp_timeline
+
+
+def parse_hp_gt(path: Path, max_time_min: int = 10):
+    """Parse `MM:SS team h1 h2 h3 h4` (one snapshot per line, sparse).
+    Returns list of {'elapsed', 'team', 'hps'}. Lines starting with # are
+    ignored. The MM:SS column accepts two conventions, auto-detected from
+    the first non-comment line:
+      - elapsed (00:00 = start, like kills.txt) if the first MM is < max-1
+      - countdown timer in-game (max:00 = start, 00:00 = end) otherwise
+    Default max_time_min is 10 (EVA standard). `team` is 'orange' or 'blue'."""
+    raw_lines = []
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        raw_lines.append(line)
+    if not raw_lines:
+        return []
+    first_mm = int(raw_lines[0].split()[0].split(':')[0])
+    countdown = first_mm >= max_time_min - 1
+    out = []
+    for line in raw_lines:
+        parts = line.split()
+        mm, ss = parts[0].split(':')
+        ts = int(mm) * 60 + int(ss)
+        elapsed = max_time_min * 60 - ts if countdown else ts
+        team = parts[1].lower()
+        if team not in ('orange', 'blue'):
+            continue
+        hps = [int(p) for p in parts[2:]]
+        out.append({'elapsed': elapsed, 'team': team, 'hps': hps})
+    return out
+
+
+def match_hp(hp_timeline: dict, hp_gt: list):
+    """For each (sec, team, hps) in ground truth, look up the same sec in
+    hp_timeline (forward-fill: latest sec ≤ target). Compute per-player |Δ|
+    and aggregate as MAE + share of measurements within ±5pp. Returns dict
+    or None if there's no GT to compare."""
+    if not hp_gt:
+        return None
+    sorted_secs = sorted(hp_timeline)
+    diffs = []
+    for snap in hp_gt:
+        # Forward-fill: pick the most recent sec ≤ snap.elapsed
+        applicable = [s for s in sorted_secs if s <= snap['elapsed']]
+        if not applicable:
+            continue
+        det = hp_timeline[applicable[-1]].get(snap['team']) or []
+        for i, gt_hp in enumerate(snap['hps']):
+            if i >= len(det):
+                continue
+            diffs.append(abs(det[i] - gt_hp))
+    if not diffs:
+        return {'n': 0, 'mae': 0.0, 'within5': 0.0}
+    mae = sum(diffs) / len(diffs)
+    within5 = sum(1 for d in diffs if d <= 5) / len(diffs)
+    return {'n': len(diffs), 'mae': mae, 'within5': within5}
 
 
 def match(detected, gt):
@@ -217,8 +272,8 @@ def main():
     aggr = {k: 0 for k in
             ('ref', 'det', 'tp', 'fp', 'fn', 'weap_ok', 'weap_tot', 'hs_ok', 'hs_tot')}
     for name in names:
-        video = VIDEO_DIR / f'{name}.mp4'
-        gt    = parse_gt(VIDEO_DIR / f'{name}.txt')
+        video = VIDEO_DIR / name / 'replay.mp4'
+        gt    = parse_gt(VIDEO_DIR / name / 'kills.txt')
         try:
             games = run_detect(video)
         except subprocess.TimeoutExpired:
@@ -227,28 +282,28 @@ def main():
         if not games:
             print(f"{name:<14} ERROR: no games detected", flush=True)
             continue
-        team_a, team_b = teams_from_gt(gt)
-        # We don't know which team is rendered orange. Run chunks twice (once
-        # per assignment) and keep the one with more TP. Chunks is the
-        # expensive call, but doubling it on 13 short videos is acceptable
-        # for QA.
-        best = None
-        for orange, blue in ((team_a, team_b), (team_b, team_a)):
-            try:
-                det = run_chunks(video, games, orange, blue)
-            except subprocess.TimeoutExpired:
-                print(f"{name:<14} ERROR: chunks timeout", flush=True)
-                det = None
-                break
-            cand = match(det, gt)
-            if best is None or cand['tp'] > best['tp']:
-                best = cand
-        if best is None:
+        try:
+            orange, blue = teams_from_file(VIDEO_DIR / name / 'teams.txt')
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"{name:<14} ERROR: {exc}", flush=True)
             continue
-        m = best
+        try:
+            det, hp_timeline = run_chunks(video, games, orange, blue)
+        except subprocess.TimeoutExpired:
+            print(f"{name:<14} ERROR: chunks timeout", flush=True)
+            continue
+        m = match(det, gt)
         print(fmt(name, m), flush=True)
         for k in aggr:
             aggr[k] += m[k]
+        hp_path = VIDEO_DIR / name / 'hp.txt'
+        if hp_path.exists():
+            hp_metrics = match_hp(hp_timeline, parse_hp_gt(hp_path))
+            if hp_metrics and hp_metrics['n']:
+                print(f"{'  └─ HP:':<14} n={hp_metrics['n']:3d} "
+                      f"MAE={hp_metrics['mae']:5.1f}pp "
+                      f"within±5pp={hp_metrics['within5']*100:5.1f}%",
+                      flush=True)
     print()
     print(fmt('GLOBAL', aggr))
 
