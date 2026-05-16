@@ -87,20 +87,21 @@ def teams_from_file(path: Path):
 
 
 def slot_to_name(slot, orange_roster, blue_roster):
-    """Slot mapping in analyze_video.py: orange[i] → i+1, blue[i] → i+6. The
-    canonical EVA roster is 4v4 (slots 1..4 and 6..9), but a ground-truth
-    file may include in-game subs, growing a team past 4 players. We don't
-    cap on the upper bound here — analyze_video.py itself just does
-    `roster.index(name) + offset` so it'll emit slot 5 (orange[4]) or slot
-    10+ (blue[4+]) when needed."""
+    """Slot mapping (shared with analyze_video.py `_player_slot`):
+      orange[0..4] → 1..5
+      blue[0..3]   → 6..9
+      blue[4]      → 0  (10 wraps to 0 so slots stay single-digit)
+    `None` (or anything non-int) → empty string (unknown)."""
     if not isinstance(slot, int):
-        return str(slot)
-    if 1 <= slot < 6:
+        return ''
+    if 1 <= slot <= 5:
         idx = slot - 1
         return orange_roster[idx] if idx < len(orange_roster) else ''
-    if 6 <= slot:
+    if 6 <= slot <= 9:
         idx = slot - 6
         return blue_roster[idx] if idx < len(blue_roster) else ''
+    if slot == 0:
+        return blue_roster[4] if len(blue_roster) > 4 else ''
     return ''
 
 

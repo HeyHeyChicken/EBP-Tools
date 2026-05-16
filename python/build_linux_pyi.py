@@ -35,6 +35,7 @@ def main() -> None:
         "--name", "linux",
         "--add-data", f"{eng}:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
+        "--add-data", f"{repo_tessdata}/evapseudos.traineddata:tesseract/tessdata",
         # Templates : détection d'arme + headshot (killfeed),
         # loading_logo (écran de loading) et playing_top (ancre HUD haute).
         "--add-data", f"{repo_templates}:templates",

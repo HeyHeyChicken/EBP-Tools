@@ -2211,7 +2211,12 @@ def _ocr_cart_pseudo(frame: np.ndarray, cart_x: int, cart_w: int,
     sub = frame[y1:y2, cart_x:cart_x + cart_w]
     gray = cv2.cvtColor(sub, cv2.COLOR_RGB2GRAY)
     _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    bw = 255 - bw   # invert: text → black, bg → white (Tesseract polarity)
+    # Force Tesseract polarity: text=black (minority), bg=white. Otsu picks
+    # an optimal threshold but doesn't know which side is text — on team
+    # colours brighter than the text (pro-league cyan/green) it would
+    # produce the inverse without this fix.
+    if (bw == 0).sum() > (bw == 255).sum():
+        bw = 255 - bw
     pil = Image.fromarray(bw).resize(
         (bw.shape[1] * 4, bw.shape[0] * 4), Image.BICUBIC
     )
@@ -2233,15 +2238,25 @@ def _ocr_cart_pseudo(frame: np.ndarray, cart_x: int, cart_w: int,
     return candidates
 
 
+def _player_slot(team: str, idx: int) -> int:
+    """Slot encoding shared with kill rows: orange[0..4] → 1..5,
+    blue[0..3] → 6..9, blue[4] → 0 (10 wraps to 0 to keep slots single-digit).
+    `null` (None) means "unknown" for cart_assignment; never returned here."""
+    if team == 'orange':
+        return idx + 1
+    return idx + 6 if idx < 4 else 0
+
+
 def _identify_carts(frame: np.ndarray,
                     n_orange: int, n_blue: int,
                     orange_roster: list, blue_roster: list,
                     anchor=None) -> dict:
-    """Match each on-screen cart to a roster pseudo via top-banner OCR + fuzzy
-    match. Returns {'orange': [name_at_cart_0, name_at_cart_1, ...],
-                    'blue':   [...]}. Empty string if no roster match passes
-    the cutoff. Order of the returned lists follows the on-screen left-to-right
-    order, which is what the front needs to interpret hp_timeline."""
+    """Match each on-screen cart to a roster slot via top-banner OCR + fuzzy
+    match. Returns {'orange': [slot_at_cart_0, slot_at_cart_1, ...],
+                    'blue':   [...]}. Slot encoding matches kill rows (see
+    `_player_slot`); `null` when a cart could not be confidently identified.
+    Returning slots (not pseudos) keeps the assignment stable when a roster
+    pseudo is renamed without re-processing the video."""
     out = {'orange': [], 'blue': []}
     max_n = max(n_orange, n_blue)
     w     = _player_cart_w(max_n)
@@ -2252,7 +2267,7 @@ def _identify_carts(frame: np.ndarray,
         names = [p.get('name') if isinstance(p, dict) else p for p in roster]
         names = [n_ for n_ in names if n_]
         if not names:
-            out[team] = [''] * n
+            out[team] = [None] * n
             continue
         # Cart pseudos are always rendered uppercase. Build a whitelist of
         # only the characters present in this team's roster (uppercased) —
@@ -2276,12 +2291,23 @@ def _identify_carts(frame: np.ndarray,
                 _, ratio = _match_player(raws, [name], with_ratio=True)
                 cost[i, j] = 1.0 - ratio
         rows, cols = scipy_linear_sum_assignment(cost)
-        assignment = [''] * n
+        # `assignment[i]` = roster index (0..len(names)-1) picked for cart i,
+        # or -1 if rejected by the fuzzy cutoff.
+        assignment = [-1] * n
         for i, j in zip(rows, cols):
             # 0.5 fuzzy ratio = `_match_player`'s cutoff; reject below that.
             if cost[i, j] <= 0.5:
-                assignment[i] = names[j]
-        out[team] = assignment
+                assignment[i] = int(j)
+        # Single-missing inference: if exactly one cart is unassigned AND
+        # exactly one roster name wasn't picked, the missing cart must be
+        # that name (no ambiguity possible).
+        empties = [i for i, j in enumerate(assignment) if j < 0]
+        used = set(j for j in assignment if j >= 0)
+        unused = [j for j in range(len(names)) if j not in used]
+        if len(empties) == 1 and len(unused) == 1:
+            assignment[empties[0]] = unused[0]
+        out[team] = [_player_slot(team, j) if j >= 0 else None
+                     for j in assignment]
     return out
 
 
@@ -3526,8 +3552,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     KMATCH, KRATIO = _match_player(KRAW, K_ROSTER, with_ratio=True)
                     VMATCH, VRATIO = _match_player(VRAW, V_ROSTER, with_ratio=True)
                     if KMATCH and VMATCH:
-                        K_SLOT = K_ROSTER.index(KMATCH) + (1 if KT == 'orange' else 6)
-                        V_SLOT = V_ROSTER.index(VMATCH) + (1 if VT == 'orange' else 6)
+                        K_SLOT = _player_slot(KT, K_ROSTER.index(KMATCH))
+                        V_SLOT = _player_slot(VT, V_ROSTER.index(VMATCH))
                         # Identifie l'arme et le headshot via template matching.
                         # Stocké par observation (= par frame) pour que le dédup
                         # puisse voter sur l'arme la plus fréquemment matchée
@@ -3819,7 +3845,8 @@ def main() -> None:
     if BUNDLED_TESSDATA:
         BUNDLED_HAS_REQUIRED = all(
             os.path.isfile(os.path.join(BUNDLED_TESSDATA, f))
-            for f in ('eng.traineddata', 'evadigits.traineddata')
+            for f in ('eng.traineddata', 'evadigits.traineddata',
+                      'evapseudos.traineddata')
         )
         if BUNDLED_HAS_REQUIRED:
             os.environ['TESSDATA_PREFIX'] = BUNDLED_TESSDATA
