@@ -30,6 +30,11 @@ const SETTINGS_KEY_FOLDER = 'replayWatchFolder';
 const SUPPORTED_EXT = new Set(['.mp4', '.mkv', '.mov', '.avi', '.webm']);
 const AUTH_RETRY_INTERVAL_MS = 30 * 1000;
 const META_RE = /__mtpg-(\d+)$/;
+// Nombre de games analysées en profondeur en parallèle (un process Python par
+// game). Ajuster selon les retours terrain : plus on monte, plus on sature CPU
+// / mémoire (chaque process recharge tesseract, templates, ouvre sa propre
+// VideoCapture). 1 = comportement séquentiel d'avant.
+const DEEP_ANALYSIS_CONCURRENCY = 3;
 
 /**
  * Extrait la valeur `maxTimePerGame` encodée dans le nom du fichier par
@@ -149,6 +154,23 @@ function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
 }
 
+async function mapWithLimit(items, limit, fn) {
+    const RESULTS = new Array(items.length);
+    let next = 0;
+    const WORKERS = Array.from(
+        { length: Math.min(Math.max(1, limit), items.length) },
+        async () => {
+            while (true) {
+                const IDX = next++;
+                if (IDX >= items.length) return;
+                RESULTS[IDX] = await fn(items[IDX], IDX);
+            }
+        }
+    );
+    await Promise.all(WORKERS);
+    return RESULTS;
+}
+
 function moveTo(srcPath, destDir) {
     if (!fs.existsSync(srcPath)) return;
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
@@ -245,9 +267,15 @@ async function processVideo(videoPath, deps) {
         sourceFilename: META.cleanBasename + path.extname(videoPath),
         segments: toIdentifySegments(GAMES)
     };
-    console.log('[watch-folder] identify payload:', JSON.stringify(IDENTIFY_PAYLOAD, null, 2));
+    console.log(
+        '[watch-folder] identify payload:',
+        JSON.stringify(IDENTIFY_PAYLOAD, null, 2)
+    );
     const IDENTIFY_RES = await identifyGames(IDENTIFY_PAYLOAD);
-    console.log('[watch-folder] identify response:', JSON.stringify(IDENTIFY_RES, null, 2));
+    console.log(
+        '[watch-folder] identify response:',
+        JSON.stringify(IDENTIFY_RES, null, 2)
+    );
     const MATCHES = IDENTIFY_RES.matches || [];
     const MATCH_BY_TEMP = new Map(
         MATCHES.map((m) => [
@@ -281,18 +309,30 @@ async function processVideo(videoPath, deps) {
             bluePlayers: M ? M.bluePlayers : []
         };
     });
-    const CHUNK_RES = await deps.runChunkAnalyzer(
-        videoPath,
-        null,
+    // Un process Python par game, plafonné à DEEP_ANALYSIS_CONCURRENCY en vol.
+    // Chaque process est totalement indépendant (sa propre VideoCapture, son
+    // propre OCR) — vraie parallélisation, pas de GIL. Si l'un crashe (`error`),
+    // on remonte la première erreur rencontrée — semantics identiques au cas
+    // séquentiel d'avant.
+    const DEEP_T0 = Date.now();
+    const CHUNK_RESULTS = await mapWithLimit(
         CHUNKS,
-        SETTINGS
+        DEEP_ANALYSIS_CONCURRENCY,
+        (chunk) => deps.runChunkAnalyzer(videoPath, null, [chunk], SETTINGS)
     );
-    if (CHUNK_RES.error) {
-        throw new Error(`Chunk analyzer failed: ${CHUNK_RES.error}`);
+    const DEEP_ELAPSED_S = ((Date.now() - DEEP_T0) / 1000).toFixed(1);
+    console.log(
+        `[watch-folder] deep analysis for ${path.basename(videoPath)}: ${DEEP_ELAPSED_S}s (${CHUNKS.length} games, concurrency=${DEEP_ANALYSIS_CONCURRENCY})`
+    );
+    const FIRST_ERROR = CHUNK_RESULTS.find((r) => r && r.error);
+    if (FIRST_ERROR) {
+        throw new Error(`Chunk analyzer failed: ${FIRST_ERROR.error}`);
     }
     const ANALYSIS_BY_TEMP = {};
-    for (const r of CHUNK_RES.results || []) {
-        ANALYSIS_BY_TEMP[r.gameID] = { payload: r.payload };
+    for (const RES of CHUNK_RESULTS) {
+        for (const r of RES.results || []) {
+            ANALYSIS_BY_TEMP[r.gameID] = { payload: r.payload };
+        }
     }
     console.log(ANALYSIS_BY_TEMP);
 
