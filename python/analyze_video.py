@@ -15,6 +15,7 @@ from collections import deque, Counter
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
+from scipy.optimize import linear_sum_assignment as scipy_linear_sum_assignment
 
 import minimap as _minimap
 
@@ -746,7 +747,8 @@ def _split_kill_row(frame: np.ndarray, bbox, orange_color, blue_color,
 
 def _ocr_kill_name(frame: np.ndarray, box, target_color,
                    tol_color: int = 80, pad: int = 20,
-                   y_extend: int = 3, user_words_path: str = None) -> list:
+                   y_extend: int = 3, user_words_path: str = None,
+                   whitelist: str = None) -> list:
     """
     OCR un nom de joueur dans une bbox killfeed. Masque par couleur d'équipe
     (texte couleur cible → noir, fond → blanc, polarité standard Tesseract),
@@ -775,7 +777,9 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     mask = (np.abs(sub - target).max(axis=2) <= tol_color)
     bw = np.where(mask, 0, 255).astype(np.uint8)
 
-    cfg = '-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    if whitelist is None:
+        whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    cfg = f'-c tessedit_char_whitelist={whitelist}'
     if user_words_path:
         cfg += f' -c user_words_file={user_words_path}'
 
@@ -2102,7 +2106,10 @@ def _smooth_points_timeline_domination(timeline: dict) -> dict:
 # inside the avatar-free, icon-free zone — and trim 4/5 corner rows.
 _PLAYER_CART_W              = {4: 147, 5: 130}
 _PLAYER_CART_H              = 96
-_PLAYER_CART_Y              = 29
+# Cart Y is derived from the playing_top anchor (not hardcoded): the carts
+# sit `anchor.h * 0.12` px above the anchor's top. Resolution can vary
+# slightly across stream encodings, so anchoring it keeps the band stable.
+_PLAYER_CART_Y_ANCHOR_RATIO = 0.12
 _PLAYER_CART_X_FIRST_ORANGE = 8
 _PLAYER_CART_X_LAST_BLUE_RIGHT = 1908
 _PLAYER_CART_GAP            = 4
@@ -2113,16 +2120,33 @@ _HP_TOL                     = 40
 _HP_THRESHOLD               = 0.3
 
 
-def _player_cart_x_left(team: str, idx: int, n: int) -> int:
-    w = _PLAYER_CART_W.get(n, 215 - 17 * n)
+def _player_cart_w(max_team_size: int) -> int:
+    """All carts on the HUD share the same width, set by the larger team
+    (e.g. in 4v5 every cart — including the 4-player team's — uses the 5v5
+    width). Falls back to a linear interpolation outside the calibrated set."""
+    return _PLAYER_CART_W.get(max_team_size, 215 - 17 * max_team_size)
+
+
+def _player_cart_x_left(team: str, idx: int, n_team: int, max_team_size: int) -> int:
+    w = _player_cart_w(max_team_size)
     if team == 'orange':
         return _PLAYER_CART_X_FIRST_ORANGE + idx * (w + _PLAYER_CART_GAP)
-    return _PLAYER_CART_X_LAST_BLUE_RIGHT - w - (n - 1 - idx) * (w + _PLAYER_CART_GAP)
+    return _PLAYER_CART_X_LAST_BLUE_RIGHT - w - (n_team - 1 - idx) * (w + _PLAYER_CART_GAP)
 
 
-def _measure_cart_hp(frame: np.ndarray, x: int, w: int, color) -> int:
+def _player_cart_y(anchor) -> int:
+    """Top y of the player carts. Anchored to the playing_top template (which
+    `_find_playing_top_anchor` returns as (x, y, h, w)) so the band stays
+    locked when stream encodings shift the HUD by a few pixels."""
+    if anchor is None:
+        return 33   # last-known reasonable fallback
+    _x, y, h, _w = anchor
+    return int(round(y - h * _PLAYER_CART_Y_ANCHOR_RATIO))
+
+
+def _measure_cart_hp(frame: np.ndarray, x: int, w: int, color, cart_y: int) -> int:
     bx = x + w - _HP_BAND_OFFSET - _HP_BAND_WIDTH
-    band = frame[_PLAYER_CART_Y:_PLAYER_CART_Y + _PLAYER_CART_H,
+    band = frame[cart_y:cart_y + _PLAYER_CART_H,
                  bx:bx + _HP_BAND_WIDTH].astype(int)
     d = np.abs(band - np.array(color)).sum(axis=2)
     row_frac = (d < _HP_TOL * 3).sum(axis=1) / _HP_BAND_WIDTH
@@ -2136,20 +2160,128 @@ def _measure_cart_hp(frame: np.ndarray, x: int, w: int, color) -> int:
 
 
 def _compute_player_hp(frame: np.ndarray, n_orange: int, n_blue: int,
-                       resolved_orange, resolved_blue) -> dict:
+                       resolved_orange, resolved_blue, anchor=None) -> dict:
     """Returns {'orange': [hp1, hp2, ...], 'blue': [...]}, each hp ∈ [0, 100].
     A team with unresolved color or zero size yields []."""
+    cart_y = _player_cart_y(anchor)
+    max_n  = max(n_orange, n_blue)
+    w      = _player_cart_w(max_n)
     out = {'orange': [], 'blue': []}
     if resolved_orange is not None and n_orange > 0:
-        w = _PLAYER_CART_W.get(n_orange, 215 - 17 * n_orange)
         for i in range(n_orange):
-            x = _player_cart_x_left('orange', i, n_orange)
-            out['orange'].append(_measure_cart_hp(frame, x, w, resolved_orange))
+            x = _player_cart_x_left('orange', i, n_orange, max_n)
+            out['orange'].append(_measure_cart_hp(frame, x, w, resolved_orange, cart_y))
     if resolved_blue is not None and n_blue > 0:
-        w = _PLAYER_CART_W.get(n_blue, 215 - 17 * n_blue)
         for i in range(n_blue):
-            x = _player_cart_x_left('blue', i, n_blue)
-            out['blue'].append(_measure_cart_hp(frame, x, w, resolved_blue))
+            x = _player_cart_x_left('blue', i, n_blue, max_n)
+            out['blue'].append(_measure_cart_hp(frame, x, w, resolved_blue, cart_y))
+    return out
+
+
+# Pseudo banner inside each cart: light-grey text on a darker translucent
+# strip, hugging the top edge of the cart but starting a few px below the
+# rounded corner (which would otherwise be picked up as letter-like noise
+# by Tesseract). Both Y offset and height scale with the playing_top anchor
+# so the band tracks resolution variations.
+_PLAYER_PSEUDO_Y_OFFSET_RATIO = 0.05
+_PLAYER_PSEUDO_HEIGHT_RATIO   = 0.25
+
+
+def _player_pseudo_band(anchor) -> tuple:
+    """(y1, y2) of the pseudo band for the given playing_top anchor."""
+    cart_y = _player_cart_y(anchor)
+    if anchor is not None:
+        offset = int(round(anchor[2] * _PLAYER_PSEUDO_Y_OFFSET_RATIO))
+        h      = int(round(anchor[2] * _PLAYER_PSEUDO_HEIGHT_RATIO))
+    else:
+        offset, h = 6, 16   # fallback if the anchor wasn't located
+    y1 = cart_y + offset
+    return y1, y1 + h
+
+
+def _ocr_cart_pseudo(frame: np.ndarray, cart_x: int, cart_w: int,
+                     anchor, whitelist: str = None) -> list:
+    """OCR the player pseudo printed at the top of a cart. The text is light
+    grey (~150 luminance) on a darker translucent strip (~50), NOT pure white,
+    so a fixed colour mask whiffs. We use Otsu thresholding on the grayscale
+    band (auto-pick a per-band threshold), then upscale 4× BICUBIC and OCR
+    with multi-PSM. `whitelist` restricts Tesseract to roster characters.
+    Returns a list of candidate strings — `_match_player` picks the best fit."""
+    y1, y2 = _player_pseudo_band(anchor)
+    sub = frame[y1:y2, cart_x:cart_x + cart_w]
+    gray = cv2.cvtColor(sub, cv2.COLOR_RGB2GRAY)
+    _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    bw = 255 - bw   # invert: text → black, bg → white (Tesseract polarity)
+    pil = Image.fromarray(bw).resize(
+        (bw.shape[1] * 4, bw.shape[0] * 4), Image.BICUBIC
+    )
+    pil = ImageOps.expand(pil, border=20, fill=255).convert('RGB')
+    if whitelist is None:
+        whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    cfg = f'-c tessedit_char_whitelist={whitelist}'
+    candidates = []
+    for psm in (7, 8):
+        try:
+            txt = pytesseract.image_to_string(
+                pil, config=f'--psm {psm} {cfg}', lang='evapseudos',
+            )
+            txt = txt.replace('\r', '').replace('\n', '').strip()
+            if txt:
+                candidates.append(txt)
+        except Exception:
+            pass
+    return candidates
+
+
+def _identify_carts(frame: np.ndarray,
+                    n_orange: int, n_blue: int,
+                    orange_roster: list, blue_roster: list,
+                    anchor=None) -> dict:
+    """Match each on-screen cart to a roster pseudo via top-banner OCR + fuzzy
+    match. Returns {'orange': [name_at_cart_0, name_at_cart_1, ...],
+                    'blue':   [...]}. Empty string if no roster match passes
+    the cutoff. Order of the returned lists follows the on-screen left-to-right
+    order, which is what the front needs to interpret hp_timeline."""
+    out = {'orange': [], 'blue': []}
+    max_n = max(n_orange, n_blue)
+    w     = _player_cart_w(max_n)
+    for team, n, roster in (('orange', n_orange, orange_roster),
+                            ('blue',   n_blue,  blue_roster)):
+        if n <= 0 or not roster:
+            continue
+        names = [p.get('name') if isinstance(p, dict) else p for p in roster]
+        names = [n_ for n_ in names if n_]
+        if not names:
+            out[team] = [''] * n
+            continue
+        # Cart pseudos are always rendered uppercase. Build a whitelist of
+        # only the characters present in this team's roster (uppercased) —
+        # cuts Tesseract confusion like 0↔O, 8↔B, 1↔I.
+        chars = set()
+        for n_ in names:
+            chars.update(n_.upper())
+        whitelist = ''.join(sorted(chars))
+        # Build a cart × roster cost matrix from the best fuzzy ratio of
+        # each cart's OCR candidates against each roster name. We solve it
+        # globally with the Hungarian algorithm so a single pseudo cannot
+        # be assigned to two carts (greedy local matching would duplicate
+        # close-but-wrong reads, e.g. `lululh` matched twice when the
+        # second cart's OCR was garbled).
+        cost = np.zeros((n, len(names)), dtype=float)
+        for i in range(n):
+            x = _player_cart_x_left(team, i, n, max_n)
+            raws = _ocr_cart_pseudo(frame, x, w, anchor, whitelist=whitelist)
+            for j, name in enumerate(names):
+                # Hungarian minimises, so invert ratio (higher ratio → lower cost).
+                _, ratio = _match_player(raws, [name], with_ratio=True)
+                cost[i, j] = 1.0 - ratio
+        rows, cols = scipy_linear_sum_assignment(cost)
+        assignment = [''] * n
+        for i, j in zip(rows, cols):
+            # 0.5 fuzzy ratio = `_match_player`'s cutoff; reject below that.
+            if cost[i, j] <= 0.5:
+                assignment[i] = names[j]
+        out[team] = assignment
     return out
 
 
@@ -3155,6 +3287,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # gameplay; agrégé par median (per-player) en fin de chunk pour
         # encaisser les frames de transition et les artefacts ponctuels.
         HP_OBSERVATIONS = {}    # {elapsed_s: [{'orange': [hp...], 'blue': [hp...]}, ...]}
+        # Mapping cart-position → pseudo, calculé une seule fois par chunk
+        # à la première frame exploitable (HUD anchor + couleurs résolus).
+        # Format : {'orange': [name_at_cart_0, ...], 'blue': [...]}.
+        CART_ASSIGNMENT = None
         MAX_TIME = None   # auto-détecté à la première lecture timer valide
 
         # Couleur effectivement utilisée par chaque équipe dans cette partie.
@@ -3283,7 +3419,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             return True
 
         def _process_ocr_item(item):
-            nonlocal MAX_TIME, TIMELINE_OFFSET
+            nonlocal MAX_TIME, TIMELINE_OFFSET, CART_ASSIGNMENT
             _, ts, frame, fut_timer, fut_orange, fut_blue = item
             TIMER_TEXT = fut_timer.result()
             ORANGE_RAW = fut_orange.result()
@@ -3413,9 +3549,21 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None:
                 HP = _compute_player_hp(
                     frame, len(ORANGE_ROSTER), len(BLUE_ROSTER),
-                    RESOLVED_ORANGE, RESOLVED_BLUE,
+                    RESOLVED_ORANGE, RESOLVED_BLUE, anchor=HUD_ANCHOR,
                 )
                 HP_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append(HP)
+                # Identifier la cart→pseudo mapping une seule fois par chunk,
+                # à la première frame exploitable (couleurs résolues = HUD
+                # stabilisé). Utile au front pour interpréter hp_timeline
+                # (qui est indexé par position de cart à l'écran, pas par
+                # ordre du roster envoyé).
+                if CART_ASSIGNMENT is None:
+                    CART_ASSIGNMENT = _identify_carts(
+                        frame, len(ORANGE_ROSTER), len(BLUE_ROSTER),
+                        ORANGE_ROSTER, BLUE_ROSTER, anchor=HUD_ANCHOR,
+                    )
+                    if DEBUG:
+                        _emit({'log': f'[_analyze_chunks] {GAME_ID} cart_assignment={CART_ASSIGNMENT}'})
 
         TIMESTAMP = float(START)
         INFLIGHT = deque()
@@ -3561,6 +3709,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     'score_timeline': SCORE_TIMELINE,
                     'points_timeline': POINTS_TIMELINE,
                     'hp_timeline': HP_TIMELINE,
+                    'cart_assignment': CART_ASSIGNMENT,
                     'kills': KILLS_OUT,
                     'end_non_gameplay_seconds': END_NON_GAMEPLAY,
                     'orange_color': list(RESOLVED_ORANGE) if RESOLVED_ORANGE else None,
