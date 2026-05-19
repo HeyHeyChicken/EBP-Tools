@@ -21,8 +21,6 @@ import minimap as _minimap
 import blob_detector as _blob_detector
 import digit_classifier as _digit_classifier
 import map_metadata as _map_metadata
-import player_tracker as _player_tracker
-import player_identifier as _player_identifier
 
 # ---------------------------------------------------------------------------
 # MODES
@@ -2572,39 +2570,32 @@ def _track_players_on_minimap(
     start_ts: float,
     end_ts: float,
     map_name: str,
-    n_orange: int,
-    n_blue: int,
-    hp_timeline: dict,
-    cart_assignment: dict,
 ) -> list:
-    """Pipeline complet du player tracking sur un chunk.
+    """Détection per-frame des joueurs sur la minimap.
 
-    Étapes :
+    Pipeline simple, sans smoothing temporel :
       1. Charge map_metadata (spawns + TPs + capture points)
       2. Localise la minimap sur une frame mid-chunk
       3. Sample les couleurs d'équipe depuis les polygones de spawn
-      4. Loop 10 FPS : blob_detector → CNN classifier → tracker
-      5. Identification via hp_timeline (Layer 3)
-      6. Normalise les coordonnées en fraction (0..1) de la box template
+      4. Loop 10 FPS : blob_detector → CNN classifier (min_conf=0.5)
+      5. Agrège les détections par (team, number) → une history par joueur
+
+    Pas de tracker, pas d'identification Layer 3 : on fait confiance au CNN
+    pour identifier le digit à chaque frame, et chaque (team, number) reconnu
+    devient un joueur indépendant. Sortie cohérente avec benchmark_tracking.py.
 
     Args:
         cap, start_ts, end_ts : VideoCapture et bornes du chunk en secondes vidéo.
         map_name              : nom canonique de la map.
-        n_orange, n_blue      : nombre de joueurs par équipe.
-        hp_timeline           : timeline HP (sortie de l'OCR amont).
-        cart_assignment       : mapping cart_idx → slot.
 
     Returns:
-        Liste de dicts sérialisables, un par joueur :
+        Liste de dicts sérialisables, un par (team, number) détecté :
           {team, id, slot, number, history: [[t, x_pct, y_pct], ...]}
         Vide si la map metadata est absente ou si la pipeline échoue.
     """
     md = _map_metadata.load(map_name)
     if md is None:
         _emit({'log': f'[player_tracking] no map_metadata for {map_name!r}, skipping'})
-        return []
-    if n_orange <= 0 and n_blue <= 0:
-        _emit({'log': '[player_tracking] team sizes unknown, skipping'})
         return []
 
     classifier = _get_digit_classifier()
@@ -2638,8 +2629,8 @@ def _track_players_on_minimap(
     _emit({'log': f'[player_tracking] colors: orange={orange_rgb} '
                   f'blue={blue_rgb}'})
 
-    # 3. Tracker init + loop 10 FPS.
-    tracker = _player_tracker.PlayerTracker(n_orange, n_blue, md)
+    # 3. Loop 10 FPS : detect + classify, agrège par (team, number).
+    histories: dict = {}  # (team, number) → [(t_rel, x_frac, y_frac), ...]
     step = 1.0 / _PLAYER_TRACK_FPS
     total = int((end_ts - start_ts) * _PLAYER_TRACK_FPS) + 1
     last_pct = -1
@@ -2653,50 +2644,35 @@ def _track_players_on_minimap(
         if not ret:
             continue
         blobs_raw = _blob_detector.detect_blobs(frame, info, orange_rgb, blue_rgb)
-        filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.7, map_meta=md)
-        for_tracker = {
-            team: [{'x': b['x'], 'y': b['y']} for b in filtered[team]]
-            for team in ('orange', 'blue')
-        }
-        detections_total += sum(len(v) for v in for_tracker.values())
-        # Tracker en temps chunk-relatif → aligné avec elapsed_s de hp_timeline.
-        tracker.update(ts - start_ts, for_tracker)
+        filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.5, map_meta=md)
+        t_rel = ts - start_ts
+        for team in ('orange', 'blue'):
+            for b in filtered[team]:
+                num = int(b['digit'])
+                x_frac = max(0.0, min(1.0, float(b['x']) / tpl_w))
+                y_frac = max(0.0, min(1.0, float(b['y']) / tpl_h))
+                histories.setdefault((team, num), []).append(
+                    (round(t_rel, 2), round(x_frac, 4), round(y_frac, 4)))
+                detections_total += 1
         pct = int(100 * (i + 1) / total)
         if pct != last_pct and pct % 10 == 0:
             _emit({'log': f'[player_tracking] {pct}% '
                           f'({i + 1}/{total} frames, {detections_total} dets)'})
             last_pct = pct
 
-    # 4. Identification via hp_timeline (Layer 3).
-    exported = tracker.export()
-    identified = _player_identifier.identify(
-        exported, hp_timeline or {}, cart_assignment or {},
-        chunk_start_ts=0.0,
-    )
-
-    # 5. Format payload : coords en fraction (0..1) du template minimap.
+    # 4. Format payload. id séquentiel ; slot 10 si number = 0 (Blue 5v5).
     out = []
-    n_identified = 0
-    for team in ('orange', 'blue'):
-        for tr in identified[team]:
-            if tr['slot'] is not None:
-                n_identified += 1
-            # Clamp x/y dans [0, 1] : un track LOST peut dériver via vélocité
-            # hors de la box minimap, on évite de pourrir l'overlay frontend.
-            history_norm = [
-                (round(t, 2),
-                 round(max(0.0, min(1.0, x / tpl_w)), 4),
-                 round(max(0.0, min(1.0, y / tpl_h)), 4))
-                for (t, x, y, *_rest) in tr['history']
-            ]
-            out.append({
-                'team':    team,
-                'id':      tr['idx'],
-                'slot':    tr['slot'],
-                'number':  tr['number'],
-                'history': history_norm,
-            })
-    _emit({'log': f'[player_tracking] done: {n_identified}/{len(out)} tracks identified'})
+    for next_id, (team, num) in enumerate(sorted(histories.keys())):
+        slot = 10 if num == 0 else num
+        out.append({
+            'team':    team,
+            'id':      next_id,
+            'slot':    slot,
+            'number':  num,
+            'history': histories[(team, num)],
+        })
+    _emit({'log': f'[player_tracking] done: {len(out)} (team, number) tracks, '
+                  f'{detections_total} total detections'})
     return out
 
 
@@ -3939,8 +3915,6 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             PLAYER_TRACKS = _track_players_on_minimap(
                 CAP, float(START), float(END - END_NON_GAMEPLAY),
                 MAP_NAME,
-                len(ORANGE_ROSTER), len(BLUE_ROSTER),
-                HP_TIMELINE, CART_ASSIGNMENT,
             )
         except Exception as exc:
             _emit({'log': f'[player_tracking] FAILED: {exc}'})

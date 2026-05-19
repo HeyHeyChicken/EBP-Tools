@@ -486,7 +486,23 @@ class GroundTruthAnnotator:
     # ─── Actions ───────────────────────────────────────────────────────
 
     def _on_mouse(self, event, x, y, flags, param) -> None:
-        if event == cv2.EVENT_LBUTTONDOWN:
+        if event == cv2.EVENT_RBUTTONDOWN:
+            # Clic droit sur un marqueur existant → supprime cette annotation.
+            found = self._find_marker_at(x, y)
+            if found is None:
+                return
+            team, digit = found
+            history = self.tracks.get((team, digit), [])
+            for i, (t, _, _) in enumerate(history):
+                if abs(t - self.ts) < 1e-6:
+                    history.pop(i)
+                    if not history:
+                        self.tracks.pop((team, digit), None)
+                    self.last_label_msg = f'delete {team} #{digit}'
+                    self._save()
+                    self.dirty = True
+                    return
+        elif event == cv2.EVENT_LBUTTONDOWN:
             # 1) Si un marqueur existant est sous le curseur → drag start
             #    (peu importe le digit actif : on devine team/digit du marqueur).
             found = self._find_marker_at(x, y)
@@ -643,6 +659,7 @@ class GroundTruthAnnotator:
         print('             1 → 2 → 3 → 4 → 6 → 7 → 8 → 9 → 0 → (stop)')
         print('             Sans digit actif, demarre a 1.')
         print('  drag     : deplace un marqueur existant (cliquer dessus + bouger + lacher)')
+        print('  right-click : supprime le marqueur sous le curseur (a ce ts)')
         print('  z        : undo l entry du joueur actif au ts courant')
         print(f'  → / d    : frame +{self.step_s}s')
         print(f'  ← / a    : frame -{self.step_s}s')

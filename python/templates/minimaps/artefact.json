@@ -1,0 +1,174 @@
+{
+    "name": "Artefact",
+    "template": "artefact.png",
+    "size": [426, 257],
+    "spawns": {
+        "orange": [
+            {
+                "polygon": [
+                    [54, 10],
+                    [106, 10],
+                    [106, 46],
+                    [54, 46]
+                ]
+            },
+            {
+                "polygon": [
+                    [56, 207],
+                    [107, 207],
+                    [107, 245],
+                    [56, 245]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [318, 10],
+                    [371, 10],
+                    [371, 46],
+                    [318, 46]
+                ]
+            },
+            {
+                "polygon": [
+                    [310, 207],
+                    [368, 207],
+                    [368, 245],
+                    [310, 245]
+                ]
+            }
+        ]
+    },
+    "teleporters": [
+        {
+            "id": "tp_1_1",
+            "position": [89, 43],
+            "radius": 10,
+            "paired_with": "tp_1_2"
+        },
+        {
+            "id": "tp_1_2",
+            "position": [89, 88],
+            "radius": 10,
+            "paired_with": "tp_1_1"
+        },
+        {
+            "id": "tp_2_1",
+            "position": [171, 43],
+            "radius": 10,
+            "paired_with": "tp_2_2"
+        },
+        {
+            "id": "tp_2_2",
+            "position": [171, 88],
+            "radius": 10,
+            "paired_with": "tp_2_1"
+        },
+        {
+            "id": "tp_3_1",
+            "position": [254, 43],
+            "radius": 10,
+            "paired_with": "tp_3_2"
+        },
+        {
+            "id": "tp_3_2",
+            "position": [254, 88],
+            "radius": 10,
+            "paired_with": "tp_3_1"
+        },
+        {
+            "id": "tp_4_1",
+            "position": [355, 43],
+            "radius": 10,
+            "paired_with": "tp_4_2"
+        },
+        {
+            "id": "tp_4_2",
+            "position": [355, 88],
+            "radius": 10,
+            "paired_with": "tp_4_1"
+        },
+        {
+            "id": "tp_5_1",
+            "position": [90, 213],
+            "radius": 10,
+            "paired_with": "tp_5_2"
+        },
+        {
+            "id": "tp_5_2",
+            "position": [90, 168],
+            "radius": 10,
+            "paired_with": "tp_5_1"
+        },
+        {
+            "id": "tp_6_1",
+            "position": [150, 213],
+            "radius": 10,
+            "paired_with": "tp_6_2"
+        },
+        {
+            "id": "tp_6_2",
+            "position": [150, 168],
+            "radius": 10,
+            "paired_with": "tp_6_1"
+        },
+        {
+            "id": "tp_7_1",
+            "position": [275, 213],
+            "radius": 10,
+            "paired_with": "tp_7_2"
+        },
+        {
+            "id": "tp_7_2",
+            "position": [275, 168],
+            "radius": 10,
+            "paired_with": "tp_7_1"
+        },
+        {
+            "id": "tp_8_1",
+            "position": [335, 213],
+            "radius": 10,
+            "paired_with": "tp_8_2"
+        },
+        {
+            "id": "tp_8_2",
+            "position": [335, 168],
+            "radius": 10,
+            "paired_with": "tp_8_1"
+        },
+        {
+            "id": "tp_9_1",
+            "position": [11, 143],
+            "radius": 10,
+            "paired_with": "tp_9_2"
+        },
+        {
+            "id": "tp_9_2",
+            "position": [179, 236],
+            "radius": 10,
+            "paired_with": "tp_9_1"
+        },
+        {
+            "id": "tp_10_1",
+            "position": [415, 143],
+            "radius": 10,
+            "paired_with": "tp_10_2"
+        },
+        {
+            "id": "tp_10_2",
+            "position": [245, 236],
+            "radius": 10,
+            "paired_with": "tp_10_1"
+        }
+    ],
+    "capture_points": [
+        {
+            "letter": "A",
+            "position": [
+                [193, 127],
+                [232, 166]
+            ]
+        }
+    ]
+}
