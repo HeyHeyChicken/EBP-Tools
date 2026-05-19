@@ -54,22 +54,28 @@ SEED = 42
 # ─── Architecture CNN ──────────────────────────────────────────────────────
 
 class DigitCNN(nn.Module):
-    """Petit CNN, ~7k params. Conv 8 → Conv 16 → FC 32 → FC 11."""
+    """CNN ~38k params. Conv 16 → Conv 32 → Conv 64 → FC 128 → FC 11.
+
+    Capacité ~5× le précédent (8/16 → 16/32/64) pour absorber la diversité
+    cross-map (Cliff + Artefact + Atlantis +) sans saturer.
+    """
     def __init__(self):
         super().__init__()
         # Input: (B, 1, 21, 21)
-        self.conv1 = nn.Conv2d(1, 8, kernel_size=3, padding=1)   # → (B, 8, 21, 21)
-        self.pool1 = nn.MaxPool2d(2)                              # → (B, 8, 10, 10)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)   # → (B, 16, 10, 10)
-        self.pool2 = nn.MaxPool2d(2)                              # → (B, 16, 5, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 32)
-        self.fc2 = nn.Linear(32, N_CLASSES)
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)   # → (B, 16, 21, 21)
+        self.pool1 = nn.MaxPool2d(2)                               # → (B, 16, 10, 10)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)   # → (B, 32, 10, 10)
+        self.pool2 = nn.MaxPool2d(2)                               # → (B, 32, 5, 5)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)   # → (B, 64, 5, 5)
+        self.fc1 = nn.Linear(64 * 5 * 5, 128)
+        self.fc2 = nn.Linear(128, N_CLASSES)
         self.relu = nn.ReLU(inplace=True)
-        self.dropout = nn.Dropout(0.25)
+        self.dropout = nn.Dropout(0.3)
 
     def forward(self, x):
         x = self.pool1(self.relu(self.conv1(x)))
         x = self.pool2(self.relu(self.conv2(x)))
+        x = self.relu(self.conv3(x))
         x = x.flatten(1)
         x = self.relu(self.fc1(x))
         x = self.dropout(x)
