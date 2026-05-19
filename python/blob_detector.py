@@ -65,6 +65,18 @@ _DIGIT_AREA_MIN = 2
 _DIGIT_AREA_MAX = 100
 _DIGIT_DIM_MIN = 2
 _DIGIT_DIM_MAX = 14
+
+# --- Détection digit team-color ---
+# Sur certaines maps (ex: Atlantis), le digit lui-même est en team color
+# saturée, sans pastille de fond. On cherche les composants du color_mask
+# de la taille d'un digit. Les composants qui correspondent en fait à des
+# pastilles standard (disque rempli avec digit noir au centre) seront
+# fusionnés avec le digit noir déjà trouvé via _merge_close_holes (même
+# centroïde). Les FPs résiduels seront filtrés par le CNN.
+_TEAM_DIGIT_AREA_MIN = 30
+_TEAM_DIGIT_AREA_MAX = 600
+_TEAM_DIGIT_DIM_MIN = 5
+_TEAM_DIGIT_DIM_MAX = 35
 _DEDUP_PX = 6             # 2 candidats < 6 px d'écart = même digit
 
 
@@ -132,6 +144,26 @@ def _digit_centroids_in_zone(roi_bgr: np.ndarray,
                 continue
             cx, cy = centroids[i]
             raw.append((float(cx), float(cy), area))
+
+    # 3e détection : digit en team color saturée (cas Atlantis : pas de
+    # pastille de fond, le digit lui-même est entièrement en team color).
+    # On accepte tous les composants color_mask de taille range "digit team
+    # color". Les pastilles standard (Cliff/Artefact) seront aussi captées
+    # ici, mais leur centroïde coïncide avec le digit noir déjà détecté en
+    # phase dark → fusion par _merge_close_holes.
+    n_t, _, stats_t, centroids_t = cv2.connectedComponentsWithStats(
+        color_mask, connectivity=8)
+    for i in range(1, n_t):
+        area = int(stats_t[i, cv2.CC_STAT_AREA])
+        bw = int(stats_t[i, cv2.CC_STAT_WIDTH])
+        bh = int(stats_t[i, cv2.CC_STAT_HEIGHT])
+        if not (_TEAM_DIGIT_AREA_MIN <= area <= _TEAM_DIGIT_AREA_MAX):
+            continue
+        if not (_TEAM_DIGIT_DIM_MIN <= bw <= _TEAM_DIGIT_DIM_MAX
+                and _TEAM_DIGIT_DIM_MIN <= bh <= _TEAM_DIGIT_DIM_MAX):
+            continue
+        cx, cy = centroids_t[i]
+        raw.append((float(cx), float(cy), area))
 
     return _merge_close_holes(raw)
 
