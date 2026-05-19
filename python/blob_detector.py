@@ -55,7 +55,7 @@ _VAL_MIN = 80
 #     sur fond team color saturé
 # Et qui est dans la "zone team color" (proche d'au moins 1 pixel team color).
 # On dilate le mask team color pour définir cette zone.
-_DARK_V_MAX = 80
+_DARK_V_MAX = 120
 _BRIGHT_V_MIN = 200
 _BRIGHT_S_MAX = 60
 _TEAM_ZONE_DILATE = 11    # rayon ≈ 5 px → couvre pastille même patchy
@@ -103,28 +103,35 @@ def _digit_centroids_in_zone(roi_bgr: np.ndarray,
 
     dark = v < _DARK_V_MAX
     bright = (v > _BRIGHT_V_MIN) & (s < _BRIGHT_S_MAX)
-    digit_pixels = (dark | bright) & (color_mask == 0)
+    not_team = (color_mask == 0)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
                                         (_TEAM_ZONE_DILATE, _TEAM_ZONE_DILATE))
     team_zone = cv2.dilate(color_mask, kernel)
-    candidates = digit_pixels & (team_zone > 0)
-    candidates_mask = candidates.astype(np.uint8) * 255
+    in_zone = team_zone > 0
 
-    n, _, stats, centroids = cv2.connectedComponentsWithStats(
-        candidates_mask, connectivity=8)
+    # Important : on traite les masques `dark` et `bright` SÉPARÉMENT avant
+    # connected components, sinon en mode focus (fond blanc + chiffre noir,
+    # bordure team color) les pixels dark et bright sont adjacents et
+    # fusionnent en un seul gros blob qui dépasse _DIGIT_AREA_MAX.
+    dark_mask = (dark & not_team & in_zone).astype(np.uint8) * 255
+    bright_mask = (bright & not_team & in_zone).astype(np.uint8) * 255
+
     raw = []
-    for i in range(1, n):
-        area = int(stats[i, cv2.CC_STAT_AREA])
-        bw = int(stats[i, cv2.CC_STAT_WIDTH])
-        bh = int(stats[i, cv2.CC_STAT_HEIGHT])
-        if not (_DIGIT_AREA_MIN <= area <= _DIGIT_AREA_MAX):
-            continue
-        if not (_DIGIT_DIM_MIN <= bw <= _DIGIT_DIM_MAX
-                and _DIGIT_DIM_MIN <= bh <= _DIGIT_DIM_MAX):
-            continue
-        cx, cy = centroids[i]
-        raw.append((float(cx), float(cy), area))
+    for mask in (dark_mask, bright_mask):
+        n, _, stats, centroids = cv2.connectedComponentsWithStats(
+            mask, connectivity=8)
+        for i in range(1, n):
+            area = int(stats[i, cv2.CC_STAT_AREA])
+            bw = int(stats[i, cv2.CC_STAT_WIDTH])
+            bh = int(stats[i, cv2.CC_STAT_HEIGHT])
+            if not (_DIGIT_AREA_MIN <= area <= _DIGIT_AREA_MAX):
+                continue
+            if not (_DIGIT_DIM_MIN <= bw <= _DIGIT_DIM_MAX
+                    and _DIGIT_DIM_MIN <= bh <= _DIGIT_DIM_MAX):
+                continue
+            cx, cy = centroids[i]
+            raw.append((float(cx), float(cy), area))
 
     return _merge_close_holes(raw)
 
