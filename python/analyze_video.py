@@ -18,6 +18,11 @@ import pytesseract
 from scipy.optimize import linear_sum_assignment as scipy_linear_sum_assignment
 
 import minimap as _minimap
+import blob_detector as _blob_detector
+import digit_classifier as _digit_classifier
+import map_metadata as _map_metadata
+import player_tracker as _player_tracker
+import player_identifier as _player_identifier
 
 # ---------------------------------------------------------------------------
 # MODES
@@ -2497,6 +2502,204 @@ def _get_frame(cap: cv2.VideoCapture, timestamp: float):
     return cv2.cvtColor(FRAME_BGR, cv2.COLOR_BGR2RGB)
 
 
+# ─── Player tracking (Layer 1+2+3) ─────────────────────────────────────────
+
+# Singleton ONNX classifier : chargé 1× au premier appel et réutilisé pour
+# tous les chunks. Évite de payer le coût d'initialisation onnxruntime
+# (~50 ms) à chaque chunk.
+_DIGIT_CLASSIFIER = None
+
+
+def _get_digit_classifier():
+    """Lazy-load le classifier ONNX. Retourne None si le modèle est absent
+    (deployement minimal, ou rebuild en cours)."""
+    global _DIGIT_CLASSIFIER
+    if _DIGIT_CLASSIFIER is None:
+        try:
+            _DIGIT_CLASSIFIER = _digit_classifier.DigitClassifier()
+        except Exception as exc:
+            if DEBUG:
+                _emit({'log': f'[player_tracking] classifier load failed: {exc}'})
+            return None
+    return _DIGIT_CLASSIFIER
+
+
+def _sample_team_colors_from_spawns(roi_bgr: np.ndarray, map_meta: dict,
+                                     scale: float):
+    """Échantillonne les couleurs d'équipe depuis les polygones de spawn.
+
+    Beaucoup plus fiable que de sampler depuis le HUD (où le score est sur
+    un gradient orange/jaune dont la couleur dominante diverge de la team
+    color réelle de la pastille). On prend la médiane de hue (sat≥80, val≥80)
+    dans chaque polygone spawn.
+
+    Returns (orange_rgb, blue_rgb), avec None pour une équipe si pas assez
+    de pixels saturés.
+    """
+    h, w = roi_bgr.shape[:2]
+    hsv = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
+    hue, sat, val = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+    bright = (sat >= 80) & (val >= 80)
+
+    def _sample_polygon(spawn_list):
+        if not spawn_list:
+            return None
+        mask = np.zeros((h, w), dtype=np.uint8)
+        for sp in spawn_list:
+            poly = sp.get('polygon')
+            if not poly:
+                continue
+            pts = (np.array(poly, dtype=np.float32) * scale).astype(np.int32)
+            cv2.fillPoly(mask, [pts], 255)
+        sel = bright & (mask > 0)
+        if int(sel.sum()) < 50:
+            return None
+        h_med = int(np.median(hue[sel]))
+        hsv_px = np.uint8([[[h_med, 255, 220]]])
+        bgr_px = cv2.cvtColor(hsv_px, cv2.COLOR_HSV2BGR)[0, 0]
+        return (int(bgr_px[2]), int(bgr_px[1]), int(bgr_px[0]))
+
+    return (_sample_polygon(map_meta['spawns'].get('orange', [])),
+            _sample_polygon(map_meta['spawns'].get('blue', [])))
+
+
+# Échantillonnage temporel de la passe joueurs.
+_PLAYER_TRACK_FPS = 10
+
+
+def _track_players_on_minimap(
+    cap: cv2.VideoCapture,
+    start_ts: float,
+    end_ts: float,
+    map_name: str,
+    n_orange: int,
+    n_blue: int,
+    hp_timeline: dict,
+    cart_assignment: dict,
+) -> list:
+    """Pipeline complet du player tracking sur un chunk.
+
+    Étapes :
+      1. Charge map_metadata (spawns + TPs + capture points)
+      2. Localise la minimap sur une frame mid-chunk
+      3. Sample les couleurs d'équipe depuis les polygones de spawn
+      4. Loop 10 FPS : blob_detector → CNN classifier → tracker
+      5. Identification via hp_timeline (Layer 3)
+      6. Normalise les coordonnées en fraction (0..1) de la box template
+
+    Args:
+        cap, start_ts, end_ts : VideoCapture et bornes du chunk en secondes vidéo.
+        map_name              : nom canonique de la map.
+        n_orange, n_blue      : nombre de joueurs par équipe.
+        hp_timeline           : timeline HP (sortie de l'OCR amont).
+        cart_assignment       : mapping cart_idx → slot.
+
+    Returns:
+        Liste de dicts sérialisables, un par joueur :
+          {team, id, slot, number, history: [[t, x_pct, y_pct], ...]}
+        Vide si la map metadata est absente ou si la pipeline échoue.
+    """
+    md = _map_metadata.load(map_name)
+    if md is None:
+        _emit({'log': f'[player_tracking] no map_metadata for {map_name!r}, skipping'})
+        return []
+    if n_orange <= 0 and n_blue <= 0:
+        _emit({'log': '[player_tracking] team sizes unknown, skipping'})
+        return []
+
+    classifier = _get_digit_classifier()
+    if classifier is None:
+        _emit({'log': '[player_tracking] no classifier available, skipping'})
+        return []
+
+    # 1. Localisation minimap (seed mid-chunk).
+    seed_ts = (start_ts + end_ts) / 2.0
+    seed_rgb = _get_frame(cap, seed_ts)
+    if seed_rgb is None:
+        return []
+    seed_bgr = cv2.cvtColor(seed_rgb, cv2.COLOR_RGB2BGR)
+    info = _minimap.find_minimap_box(seed_bgr, map_name, min_score=0.0)
+    if info is None:
+        _emit({'log': '[player_tracking] minimap box not found, skipping'})
+        return []
+    (x1, y1), (x2, y2) = info['box']
+    scale = float(info.get('scale', 1.0)) or 1.0
+    tpl_w, tpl_h = md['size']
+    _emit({'log': f'[player_tracking] box=({x1},{y1})-({x2},{y2}) '
+                  f'score={info["score"]:.2f} scale={scale:.2f}'})
+
+    # 2. Sample couleurs d'équipe depuis les spawns.
+    roi = seed_bgr[y1:y2, x1:x2]
+    orange_rgb, blue_rgb = _sample_team_colors_from_spawns(roi, md, scale)
+    if orange_rgb is None or blue_rgb is None:
+        _emit({'log': f'[player_tracking] team colors unresolved '
+                       f'(orange={orange_rgb} blue={blue_rgb}), skipping'})
+        return []
+    _emit({'log': f'[player_tracking] colors: orange={orange_rgb} '
+                  f'blue={blue_rgb}'})
+
+    # 3. Tracker init + loop 10 FPS.
+    tracker = _player_tracker.PlayerTracker(n_orange, n_blue, md)
+    step = 1.0 / _PLAYER_TRACK_FPS
+    total = int((end_ts - start_ts) * _PLAYER_TRACK_FPS) + 1
+    last_pct = -1
+    detections_total = 0
+    for i in range(total):
+        ts = start_ts + i * step
+        if ts > end_ts:
+            break
+        cap.set(cv2.CAP_PROP_POS_MSEC, ts * 1000)
+        ret, frame = cap.read()
+        if not ret:
+            continue
+        blobs_raw = _blob_detector.detect_blobs(frame, info, orange_rgb, blue_rgb)
+        filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.7, map_meta=md)
+        for_tracker = {
+            team: [{'x': b['x'], 'y': b['y']} for b in filtered[team]]
+            for team in ('orange', 'blue')
+        }
+        detections_total += sum(len(v) for v in for_tracker.values())
+        # Tracker en temps chunk-relatif → aligné avec elapsed_s de hp_timeline.
+        tracker.update(ts - start_ts, for_tracker)
+        pct = int(100 * (i + 1) / total)
+        if pct != last_pct and pct % 10 == 0:
+            _emit({'log': f'[player_tracking] {pct}% '
+                          f'({i + 1}/{total} frames, {detections_total} dets)'})
+            last_pct = pct
+
+    # 4. Identification via hp_timeline (Layer 3).
+    exported = tracker.export()
+    identified = _player_identifier.identify(
+        exported, hp_timeline or {}, cart_assignment or {},
+        chunk_start_ts=0.0,
+    )
+
+    # 5. Format payload : coords en fraction (0..1) du template minimap.
+    out = []
+    n_identified = 0
+    for team in ('orange', 'blue'):
+        for tr in identified[team]:
+            if tr['slot'] is not None:
+                n_identified += 1
+            # Clamp x/y dans [0, 1] : un track LOST peut dériver via vélocité
+            # hors de la box minimap, on évite de pourrir l'overlay frontend.
+            history_norm = [
+                (round(t, 2),
+                 round(max(0.0, min(1.0, x / tpl_w)), 4),
+                 round(max(0.0, min(1.0, y / tpl_h)), 4))
+                for (t, x, y, *_rest) in tr['history']
+            ]
+            out.append({
+                'team':    team,
+                'id':      tr['idx'],
+                'slot':    tr['slot'],
+                'number':  tr['number'],
+                'history': history_norm,
+            })
+    _emit({'log': f'[player_tracking] done: {n_identified}/{len(out)} tracks identified'})
+    return out
+
+
 # Score à partir duquel on considère la localisation suffisamment fiable
 # pour ne pas tester d'autres frames. La minimap étant statique pendant
 # toute la partie, on peut sonder plusieurs frames jusqu'à dépasser ce seuil.
@@ -2538,6 +2741,7 @@ def _locate_minimap(cap, current_timestamp: float, map_name: str, frame_rgb):
         if best['score'] >= _MINIMAP_GOOD_SCORE:
             break
     return best
+
 
 # ---------------------------------------------------------------------------
 # Game dict factory
@@ -3726,6 +3930,22 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 break
             END_NON_GAMEPLAY = OFFSET
 
+        # Player tracking sur la minimap (Layer 1 blob detection + Layer 2 MOT
+        # + Layer 3 identification via hp_timeline). Bornée à
+        # [START, END - END_NON_GAMEPLAY] pour éviter de scanner l'écran de
+        # score final. Encapsulée dans try/except : si ça plante, on continue
+        # l'analyse OCR (player_tracks reste vide dans le payload).
+        try:
+            PLAYER_TRACKS = _track_players_on_minimap(
+                CAP, float(START), float(END - END_NON_GAMEPLAY),
+                MAP_NAME,
+                len(ORANGE_ROSTER), len(BLUE_ROSTER),
+                HP_TIMELINE, CART_ASSIGNMENT,
+            )
+        except Exception as exc:
+            _emit({'log': f'[player_tracking] FAILED: {exc}'})
+            PLAYER_TRACKS = []
+
         CHUNK_PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 100
         _emit({
             'percent': CHUNK_PERCENT,
@@ -3740,6 +3960,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     'end_non_gameplay_seconds': END_NON_GAMEPLAY,
                     'orange_color': list(RESOLVED_ORANGE) if RESOLVED_ORANGE else None,
                     'blue_color': list(RESOLVED_BLUE) if RESOLVED_BLUE else None,
+                    'players_tracks': PLAYER_TRACKS,
                 },
             }],
         })

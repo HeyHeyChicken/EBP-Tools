@@ -2,242 +2,263 @@
 # This file is part of a source-visible project.
 # See LICENSE for terms. Unauthorized use is prohibited.
 
-"""Tracker temporel pour suivre les joueurs entre frames.
+"""Tracker multi-objet contraint pour les blobs joueurs sur la minimap.
 
-Étape 2.4 : agrège les détections par-frame de `players.find_players`
-en tracks stables. Bénéfices :
+Maintient EXACTEMENT N_orange + N_blue tracks sur toute la game. Pas de
+tracks fantômes (la contrainte dure absorbe le bruit du détecteur), pas de
+tracks manquants (on conserve une position estimée pour chaque joueur).
 
-  - Lisse les erreurs ponctuelles d'identification : un track vu 28 fois
-    "9" et 2 fois "0" reste "9" (vote majoritaire).
-  - Persiste un joueur qui disparaît temporairement (passe derrière un
-    mur ou sortie momentanée du modèle).
-  - Permet d'extraire des trajectoires (positions au cours du temps),
-    nécessaires aux analyses dérivées (heatmap, distance parcourue, etc.).
+Hypothèses fortes exploitées :
+  - Nombre de joueurs par équipe connu à l'avance
+  - Un (team, number) = unique joueur sur toute la game (l'identité ne change
+    pas, gérée par Layer 3 séparément — ici on tracke des index anonymes)
+  - Téléporteurs par paire : un saut > seuil de distance entre frames qui
+    correspond à une paire connue est attribué au même track, pas un nouveau
+  - Spawns = positions de départ + respawn (tracks init au centroïde)
+  - Vitesse joueur bornée → un track non détecté UNE frame ne peut pas
+    sauter loin entre temps (on prédit via vélocité au lieu de stagner)
 
-Algorithme :
-  1. À chaque frame, on reçoit les détections {team, number, x_pct, y_pct}.
-  2. Pour chaque détection :
-       a. Cherche un track existant de MÊME équipe ET MÊME numéro à
-          distance < _MATCH_DIST_SAME (large : ~ déplacement max par
-          frame). Si trouvé → association.
-       b. Sinon, cherche un track de même équipe (peu importe son numéro
-          dominant) à distance < _MATCH_DIST_PROX (étroit : doit être
-          quasi à la même position) → association (vote pour le nouveau
-          numéro, qui pourrait corriger une erreur passée).
-       c. Sinon → nouveau track.
-  3. Update du track : position lissée (EMA), vote pour le numéro,
-     compteur de frames vues, dernier timestamp.
-  4. Tracks non vus depuis > _MAX_FRAMES_UNSEEN → archivés (toujours
-     accessibles via `archived_tracks`).
+Algorithme par frame :
+  1. Pour chaque track, prédit sa position via la vélocité récente (EMA)
+  2. Cost matrix (track × blob) basée sur la position PRÉDITE → Hungarian
+     préfère assigner aux blobs cohérents avec le mouvement précédent
+  3. TPs : un saut p→q expliqué par une paire connue est gratuit
+  4. Tracks assignés → update position + recompute vélocité
+  5. Tracks non assignés → glissent via vélocité (au lieu de figer) +
+     incrémentent leur compteur `frames_since_match`
+  6. État `LOST` après N frames sans match → rayon de matching élargi,
+     vélocité décroît pour ne pas dériver indéfiniment
 
-API :
-    tracker = PlayerTracker(box_w, box_h)
-    for frame_idx, frame in enumerate(...):
-        detections = players.find_players(frame, ...)
-        active_players = tracker.update(detections, t=frame_idx)
+L'identité (team, number) n'est pas gérée ici. Sortie : tracks anonymes
+indexés par (team, idx ∈ 0..N_team-1).
 """
 
-from collections import Counter
-from typing import List, Optional
+import math
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple
+
+import cv2
+import numpy as np
+from scipy.optimize import linear_sum_assignment
 
 
-# Distance max (px de la box minimap) pour associer une détection à un
-# track DE MÊME numéro. Permet à un joueur de bouger jusqu'à ~30 px
-# entre deux frames consécutives (typique : course rapide).
-_MATCH_DIST_SAME = 30.0
-# Distance max pour associer à un track de même équipe MAIS numéro
-# différent (ex : modèle a flanché et lu "0" au lieu de "9"). Plus
-# étroit : on exige une quasi-superposition pour faire confiance au
-# match d'équipe seul.
-_MATCH_DIST_PROX = 12.0
-# Nombre de frames sans détection avant de considérer un track comme
-# "perdu" et de l'archiver.
-_MAX_FRAMES_UNSEEN = 60
-# Fraction du nouveau (x, y) dans la position lissée. 0.3 → réactif sans
-# chasing du bruit, 0.5 → plus de réactivité, 0.1 → très lisse.
-_EMA_ALPHA = 0.4
-# Fraction min de votes pour considérer l'identité "stable" (utile pour
-# les consommateurs qui veulent ignorer les tracks ambigus).
-_STABLE_IDENTITY_FRAC = 0.6
+# Distance max plausible track → blob entre 2 frames consécutives (en
+# pixels du template minimap). À 10 FPS, joueur en course ~5 m/s → ~25 px.
+# Marge confortable à 40 px.
+_MAX_FRAME_JUMP = 40.0
+
+# Rayon élargi pour les tracks LOST (= sans match depuis _LOST_AFTER frames).
+# Permet la re-capture après une absence prolongée du blob.
+_MAX_FRAME_JUMP_LOST = 80.0
+
+# Nombre de frames consécutives sans match → état LOST.
+_LOST_AFTER = 5
+
+# Rayon de tolérance autour d'une icône TP : track proche d'un TP source ET
+# blob proche du TP partenaire → saut gratuit.
+_TP_RADIUS = 18.0
+
+# Vélocité : EMA exponentielle, alpha = poids du sample courant.
+# 0.4 → réactif sans suivre le bruit ; 0.2 → plus lisse mais lag.
+_VEL_ALPHA = 0.4
+
+# Décroissance de la vélocité d'un track LOST : à chaque frame sans match,
+# vélocité *= ce coef. 0.85 → décroît à ~22 % après 10 frames sans match.
+_LOST_VEL_DECAY = 0.85
+
+# Sentinelle "pas de match possible" : assez grand pour que Hungarian
+# préfère un track non assigné plutôt qu'un mauvais match.
+_NO_MATCH_COST = 1e6
+
+
+@dataclass
+class Track:
+    team: str
+    idx: int
+    x: float
+    y: float
+    vx: float = 0.0
+    vy: float = 0.0
+    # Timestamp précédent (pour calculer dt et v).
+    last_t: Optional[float] = None
+    # Nombre de frames consécutives sans match (0 = matché à la frame courante).
+    frames_since_match: int = 0
+    history: List[Tuple[float, float, float, bool]] = field(default_factory=list)
+    # history entry = (t, x, y, matched) — `matched` permet à l'overlay
+    # de distinguer position observée vs prédite.
+
+    @property
+    def is_lost(self) -> bool:
+        return self.frames_since_match >= _LOST_AFTER
+
+    def predict(self, t: float) -> Tuple[float, float]:
+        """Position prédite à `t` via la dernière vélocité connue."""
+        if self.last_t is None:
+            return (self.x, self.y)
+        dt = t - self.last_t
+        return (self.x + self.vx * dt, self.y + self.vy * dt)
+
+    def match(self, t: float, x: float, y: float) -> None:
+        """Track matché à un blob : update position + recompute vélocité."""
+        if self.last_t is not None:
+            dt = t - self.last_t
+            if dt > 1e-6:
+                vx_new = (x - self.x) / dt
+                vy_new = (y - self.y) / dt
+                self.vx = (1 - _VEL_ALPHA) * self.vx + _VEL_ALPHA * vx_new
+                self.vy = (1 - _VEL_ALPHA) * self.vy + _VEL_ALPHA * vy_new
+        self.x = x
+        self.y = y
+        self.last_t = t
+        self.frames_since_match = 0
+        self.history.append((t, x, y, True))
+
+    def skip(self, t: float) -> None:
+        """Pas de match : glisse via vélocité + décroît vélocité si LOST."""
+        if self.last_t is None:
+            self.last_t = t
+            self.history.append((t, self.x, self.y, False))
+            self.frames_since_match += 1
+            return
+        dt = t - self.last_t
+        # Position projetée — limitée à _MAX_FRAME_JUMP / frame pour éviter
+        # qu'un track perdu ne dérive trop loin sur un grand dt.
+        step = math.hypot(self.vx * dt, self.vy * dt)
+        if step > _MAX_FRAME_JUMP_LOST:
+            scale = _MAX_FRAME_JUMP_LOST / step
+            self.x += self.vx * dt * scale
+            self.y += self.vy * dt * scale
+        else:
+            self.x += self.vx * dt
+            self.y += self.vy * dt
+        self.last_t = t
+        self.frames_since_match += 1
+        if self.frames_since_match >= _LOST_AFTER:
+            self.vx *= _LOST_VEL_DECAY
+            self.vy *= _LOST_VEL_DECAY
+        self.history.append((t, self.x, self.y, False))
+
+
+def _spawn_centroid(spawn_list: list) -> Tuple[float, float]:
+    """Centroïde du 1er spawn de la liste (cas multi-spawn : on prend
+    le 1er ; tous les tracks démarrent au même point, le tracker
+    dispatchera quand des blobs distincts apparaissent)."""
+    if not spawn_list:
+        return (0.0, 0.0)
+    poly = spawn_list[0].get('polygon', [])
+    if not poly:
+        return (0.0, 0.0)
+    xs = [float(p[0]) for p in poly]
+    ys = [float(p[1]) for p in poly]
+    return (sum(xs) / len(xs), sum(ys) / len(ys))
+
+
+def _build_tp_partners(teleporters: list) -> dict:
+    """{tp_id → position du partenaire (x, y)}. Cache de lookup."""
+    by_id = {tp['id']: tp for tp in teleporters}
+    out = {}
+    for tp in teleporters:
+        partner_id = tp.get('paired_with')
+        if partner_id and partner_id in by_id:
+            out[tp['id']] = tuple(by_id[partner_id]['position'])
+    return out
+
+
+def _explained_by_tp(p: Tuple[float, float], q: Tuple[float, float],
+                      teleporters: list, tp_partners: dict) -> bool:
+    """True si le saut p→q correspond à l'utilisation d'un TP connu.
+
+    Critère : p à proximité d'un TP, q à proximité du TP partenaire.
+    """
+    for tp in teleporters:
+        tp_pos = tuple(tp['position'])
+        partner_pos = tp_partners.get(tp['id'])
+        if partner_pos is None:
+            continue
+        if (math.hypot(p[0] - tp_pos[0], p[1] - tp_pos[1]) <= _TP_RADIUS and
+                math.hypot(q[0] - partner_pos[0], q[1] - partner_pos[1]) <= _TP_RADIUS):
+            return True
+    return False
 
 
 class PlayerTracker:
-    """Tracker à mémoire courte, sans dépendance externe."""
+    """Multi-Object Tracker contraint à N_team tracks par équipe."""
 
-    def __init__(self, box_w: float, box_h: float,
-                  match_dist_same: float = _MATCH_DIST_SAME,
-                  match_dist_prox: float = _MATCH_DIST_PROX,
-                  max_frames_unseen: int = _MAX_FRAMES_UNSEEN,
-                  ema_alpha: float = _EMA_ALPHA):
-        self.box_w = float(box_w)
-        self.box_h = float(box_h)
-        self.match_dist_same = match_dist_same
-        self.match_dist_prox = match_dist_prox
-        self.max_frames_unseen = max_frames_unseen
-        self.ema_alpha = ema_alpha
+    def __init__(self, n_orange: int, n_blue: int, map_meta: dict):
+        self.n_orange = n_orange
+        self.n_blue = n_blue
+        self.map_meta = map_meta
+        self.teleporters = map_meta.get('teleporters', [])
+        self._tp_partners = _build_tp_partners(self.teleporters)
 
-        self.tracks: list = []          # tracks actifs
-        self.archived_tracks: list = [] # tracks perdus (≥ max_frames_unseen)
-        self._next_id: int = 0
+        # Init tracks au centroïde du spawn de chaque équipe.
+        self.tracks: dict = {'orange': [], 'blue': []}
+        for team, n in (('orange', n_orange), ('blue', n_blue)):
+            cx, cy = _spawn_centroid(map_meta['spawns'][team])
+            for i in range(n):
+                self.tracks[team].append(Track(team=team, idx=i, x=cx, y=cy))
 
-    # ─── Internals ─────────────────────────────────────────────────────
+    # ─── Update ───────────────────────────────────────────────────────────
 
-    def _new_track(self, det: dict, t) -> dict:
-        x = det['x_pct'] * self.box_w
-        y = det['y_pct'] * self.box_h
-        tr = {
-            'id':            self._next_id,
-            'team':          det['team'],
-            'number_votes':  Counter([det['number']]),
-            'x_px':          x,
-            'y_px':          y,
-            'first_seen':    t,
-            'last_seen':     t,
-            'frames_seen':   1,
-            'conf_sum':      det['confidence'],
-            'history':       [(t, x, y, det['number'])],
-        }
-        self._next_id += 1
-        self.tracks.append(tr)
-        return tr
+    def update(self, t: float, blobs: dict) -> None:
+        """Intègre les détections de la frame `t` (template px coords)."""
+        for team in ('orange', 'blue'):
+            self._update_team(t, team, blobs.get(team, []))
 
-    def _update_track(self, tr: dict, det: dict, t) -> None:
-        x = det['x_pct'] * self.box_w
-        y = det['y_pct'] * self.box_h
-        a = self.ema_alpha
-        tr['x_px'] = (1 - a) * tr['x_px'] + a * x
-        tr['y_px'] = (1 - a) * tr['y_px'] + a * y
-        tr['number_votes'][det['number']] += 1
-        tr['last_seen'] = t
-        tr['frames_seen'] += 1
-        tr['conf_sum'] += det['confidence']
-        tr['history'].append((t, x, y, det['number']))
+    def _update_team(self, t: float, team: str, blobs: list) -> None:
+        tracks = self.tracks[team]
+        n_t = len(tracks)
+        if n_t == 0:
+            return
+        if not blobs:
+            for tr in tracks:
+                tr.skip(t)
+            return
 
-    def _find_match(self, det: dict) -> Optional[dict]:
-        """Cherche le track existant le mieux assorti à det (None sinon)."""
-        x = det['x_pct'] * self.box_w
-        y = det['y_pct'] * self.box_h
-        team = det['team']
-        number = det['number']
+        n_b = len(blobs)
+        cost = np.full((n_t, n_b), _NO_MATCH_COST, dtype=np.float64)
+        for i, tr in enumerate(tracks):
+            # Position prédite via vélocité (cohérence du mouvement).
+            px, py = tr.predict(t)
+            max_jump = _MAX_FRAME_JUMP_LOST if tr.is_lost else _MAX_FRAME_JUMP
+            for j, b in enumerate(blobs):
+                qx, qy = b['x'], b['y']
+                d = math.hypot(px - qx, py - qy)
+                if d <= max_jump:
+                    cost[i, j] = d
+                elif _explained_by_tp((tr.x, tr.y), (qx, qy),
+                                       self.teleporters, self._tp_partners):
+                    cost[i, j] = 0.0
+                # sinon : _NO_MATCH_COST
 
-        # Priorité 1 : même équipe + même numéro déjà voté, dans rayon large.
-        best_same: Optional[dict] = None
-        best_same_d2 = self.match_dist_same ** 2
-        for tr in self.tracks:
-            if tr['team'] != team:
-                continue
-            if number not in tr['number_votes']:
-                continue
-            d2 = (tr['x_px'] - x) ** 2 + (tr['y_px'] - y) ** 2
-            if d2 < best_same_d2:
-                best_same_d2 = d2
-                best_same = tr
-        if best_same is not None:
-            return best_same
+        row_ind, col_ind = linear_sum_assignment(cost)
+        assigned = set()
+        for i, j in zip(row_ind, col_ind):
+            if cost[i, j] < _NO_MATCH_COST:
+                tracks[i].match(t, blobs[j]['x'], blobs[j]['y'])
+                assigned.add(i)
+        for i, tr in enumerate(tracks):
+            if i not in assigned:
+                tr.skip(t)
 
-        # Priorité 2 : même équipe (numéro différent), rayon étroit.
-        # Permet de corriger les erreurs : modèle lit "0" au lieu de "9"
-        # → si le track le plus proche reste à <12 px, on l'associe et
-        # on ajoute le vote (le "9" reste majoritaire).
-        best_prox: Optional[dict] = None
-        best_prox_d2 = self.match_dist_prox ** 2
-        for tr in self.tracks:
-            if tr['team'] != team:
-                continue
-            d2 = (tr['x_px'] - x) ** 2 + (tr['y_px'] - y) ** 2
-            if d2 < best_prox_d2:
-                best_prox_d2 = d2
-                best_prox = tr
-        return best_prox
+    # ─── Export ───────────────────────────────────────────────────────────
 
-    def _archive_stale(self, t) -> None:
-        still_active = []
-        for tr in self.tracks:
-            if (t - tr['last_seen']) > self.max_frames_unseen:
-                self.archived_tracks.append(tr)
-            else:
-                still_active.append(tr)
-        self.tracks = still_active
+    def export(self) -> dict:
+        """Renvoie les trajectoires sérialisables.
 
-    def _merge_duplicates(self) -> None:
-        """Fusionne les tracks actifs partageant un (team, number) dominant.
-
-        Hypothèse forte du jeu : un (team, number) identifie UN unique
-        joueur pour toute la partie. Donc tout track partageant (team,
-        number) avec un autre est forcément un doublon (erreur de
-        détection, faux positif éphémère, etc.).
-
-        Stratégie : on garde le track le plus actif (frames_seen max)
-        comme principal et on lui transfère les votes des autres. Les
-        tracks absorbés sont déplacés vers `archived_tracks` (utile pour
-        debug). La position du principal est conservée — c'est la plus
-        représentative puisqu'il a accumulé le plus de samples.
+        Sortie : { 'orange': [{idx, history:[(t, x, y, matched), ...]}, ...],
+                   'blue':   [...] }
+        `matched` est un bool indiquant si la position vient d'une détection
+        (True) ou d'une prédiction par vélocité (False).
         """
-        groups: dict = {}
-        for tr in self.tracks:
-            number = tr['number_votes'].most_common(1)[0][0]
-            key = (tr['team'], number)
-            groups.setdefault(key, []).append(tr)
-        survivors = []
-        for group in groups.values():
-            if len(group) == 1:
-                survivors.append(group[0])
-                continue
-            group.sort(key=lambda t: -t['frames_seen'])
-            main, others = group[0], group[1:]
-            for tr in others:
-                for num, count in tr['number_votes'].items():
-                    main['number_votes'][num] += count
-                main['frames_seen'] += tr['frames_seen']
-                main['conf_sum'] += tr['conf_sum']
-                # last_seen conserve le max — un doublon récent prolonge
-                # la "vivacité" du principal.
-                if tr['last_seen'] > main['last_seen']:
-                    main['last_seen'] = tr['last_seen']
-                self.archived_tracks.append(tr)
-            survivors.append(main)
-        self.tracks = survivors
-
-    # ─── Public API ────────────────────────────────────────────────────
-
-    def update(self, detections: List[dict], t) -> List[dict]:
-        """Intègre les détections de la frame t et renvoie l'état stable.
-
-        Args:
-            detections: liste de dicts {team, number, x_pct, y_pct, confidence}
-                        — sortie typique de players.find_players.
-            t:          identifiant temporel (entier de frame ou float secondes).
-
-        Returns:
-            Liste de dicts par track actif :
-              { 'id', 'team', 'number', 'x_pct', 'y_pct',
-                'identity_strength', 'frames_seen', 'conf_avg', 'last_seen' }
-        """
-        for det in detections:
-            tr = self._find_match(det)
-            if tr is None:
-                self._new_track(det, t)
-            else:
-                self._update_track(tr, det, t)
-        self._archive_stale(t)
-        self._merge_duplicates()
-        return self.get_active_state()
-
-    def get_active_state(self) -> List[dict]:
-        out = []
-        for tr in self.tracks:
-            number, votes = tr['number_votes'].most_common(1)[0]
-            total = sum(tr['number_votes'].values())
-            out.append({
-                'id':                tr['id'],
-                'team':              tr['team'],
-                'number':            number,
-                'x_pct':             tr['x_px'] / self.box_w,
-                'y_pct':             tr['y_px'] / self.box_h,
-                'identity_strength': votes / total,
-                'frames_seen':       tr['frames_seen'],
-                'conf_avg':          tr['conf_sum'] / tr['frames_seen'],
-                'last_seen':         tr['last_seen'],
-                'is_stable':         (votes / total) >= _STABLE_IDENTITY_FRAC,
-            })
+        out = {'orange': [], 'blue': []}
+        for team in ('orange', 'blue'):
+            for tr in self.tracks[team]:
+                out[team].append({
+                    'idx': tr.idx,
+                    'history': [
+                        (round(t, 2), round(x, 2), round(y, 2), bool(m))
+                        for t, x, y, m in tr.history
+                    ],
+                })
         return out

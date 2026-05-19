@@ -14,12 +14,16 @@ set TESS_DIR=C:\Program Files\Tesseract-OCR
 
 echo Building Windows binary with PyInstaller (embedding Tesseract)...
 pyinstaller --onefile --name win32 ^
+  --collect-all onnxruntime ^
+  --exclude-module torch ^
+  --exclude-module torchvision ^
   --add-data "%TESS_DIR%\tesseract.exe;tesseract" ^
   --add-data "%TESS_DIR%\*.dll;tesseract" ^
   --add-data "%TESS_DIR%\tessdata\eng.traineddata;tesseract\tessdata" ^
   --add-data "tessdata\evadigits.traineddata;tesseract\tessdata" ^
   --add-data "tessdata\evapseudos.traineddata;tesseract\tessdata" ^
   --add-data "templates;templates" ^
+  --add-data "models;models" ^
   analyze_video.py
 
 call deactivate

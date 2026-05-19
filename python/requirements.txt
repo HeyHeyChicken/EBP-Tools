@@ -3,4 +3,5 @@ Pillow
 pytesseract
 opencv-python
 pyinstaller
-scikit-learn
+scipy
+onnxruntime

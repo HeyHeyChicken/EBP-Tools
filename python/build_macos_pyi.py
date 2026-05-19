@@ -101,6 +101,7 @@ def main() -> None:
 
     repo_tessdata = os.path.join(os.path.dirname(__file__), "tessdata")
     repo_templates = os.path.join(os.path.dirname(__file__), "templates")
+    repo_models = os.path.join(os.path.dirname(__file__), "models")
     args = [
         "--onedir",
         "--name", "darwin",
@@ -108,14 +109,30 @@ def main() -> None:
         # extracted at build time into a directory, so they can be individually
         # code-signed before packaging. --onefile extracts to /tmp at runtime,
         # making pre-signing impossible.
+        #
+        # onnxruntime : utilisé par digit_classifier.py via la session
+        # `ort.InferenceSession(digit_cnn.onnx)`. Comme PyInstaller ne suit
+        # pas les chargements dynamiques, on doit collect-all pour bundler
+        # toutes les libs natives (.dylib) qu'il chargera au runtime.
+        "--collect-all", "onnxruntime",
+        # Exclusions : torch/torchvision sont uniquement utilisés par
+        # train_cnn.py (training sur machine dev). Le binaire n'a besoin
+        # que d'onnxruntime pour l'inference. Sans cette exclusion,
+        # PyInstaller ramène ~275 MB de PyTorch inutilement.
+        "--exclude-module", "torch",
+        "--exclude-module", "torchvision",
         "--add-data", f"{TESS_BIN}:tesseract",
         "--add-data", f"{TESS_DATA}/eng.traineddata:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evapseudos.traineddata:tesseract/tessdata",
         # Templates : détection d'arme + headshot (killfeed),
-        # loading_logo (écran de loading) et playing_top (ancre HUD haute).
+        # loading_logo (écran de loading), playing_top (ancre HUD haute),
+        # minimaps (templates + JSON metadata par map).
         # Résolution via sys._MEIPASS + 'templates/'.
         "--add-data", f"{repo_templates}:templates",
+        # Modèles ML : digit_cnn.onnx pour la classification des chiffres
+        # joueurs sur la minimap (player tracking). Chargé par digit_classifier.
+        "--add-data", f"{repo_models}:models",
     ]
     for dylib in dylibs:
         args += ["--add-binary", f"{dylib}:tesseract"]

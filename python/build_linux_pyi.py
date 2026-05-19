@@ -30,15 +30,28 @@ def main() -> None:
     eng = _find_system_eng_traineddata()
     repo_tessdata = os.path.join(os.path.dirname(__file__), "tessdata")
     repo_templates = os.path.join(os.path.dirname(__file__), "templates")
+    repo_models = os.path.join(os.path.dirname(__file__), "models")
     args = [
         "--onedir",
         "--name", "linux",
+        # onnxruntime : utilisé par digit_classifier.py via une session
+        # `InferenceSession(digit_cnn.onnx)`. Collect-all pour bundler
+        # les libs natives chargées dynamiquement au runtime.
+        "--collect-all", "onnxruntime",
+        # Exclusions : torch/torchvision uniquement pour train_cnn.py
+        # (training dev). Évite ~275 MB de PyTorch dans le bundle.
+        "--exclude-module", "torch",
+        "--exclude-module", "torchvision",
         "--add-data", f"{eng}:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evapseudos.traineddata:tesseract/tessdata",
         # Templates : détection d'arme + headshot (killfeed),
-        # loading_logo (écran de loading) et playing_top (ancre HUD haute).
+        # loading_logo (écran de loading), playing_top (ancre HUD haute),
+        # minimaps (templates + JSON metadata par map).
         "--add-data", f"{repo_templates}:templates",
+        # Modèles ML : digit_cnn.onnx pour la classification des chiffres
+        # joueurs sur la minimap (player tracking).
+        "--add-data", f"{repo_models}:models",
         "analyze_video.py",
     ]
     print("Running PyInstaller...")

@@ -1,0 +1,74 @@
+{
+    "name": "The Cliff",
+    "template": "the_cliff.png",
+    "size": [375, 202],
+    "spawns": {
+        "orange": [
+            {
+                "polygon": [
+                    [16, 58],
+                    [36, 58],
+                    [36, 93],
+                    [41, 93],
+                    [41, 114],
+                    [36, 114],
+                    [36, 152],
+                    [13, 152],
+                    [13, 64],
+                    [16, 64]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [357, 58],
+                    [338, 58],
+                    [338, 93],
+                    [333, 93],
+                    [333, 114],
+                    [338, 114],
+                    [338, 152],
+                    [361, 152],
+                    [361, 64],
+                    [357, 64]
+                ]
+            }
+        ]
+    },
+    "teleporters": [
+        {
+            "id": "tp_orange_base",
+            "position": [65, 70],
+            "radius": 10,
+            "paired_with": "tp_orange_top"
+        },
+        {
+            "id": "tp_orange_top",
+            "position": [36, 53],
+            "radius": 10,
+            "paired_with": "tp_orange_base"
+        },
+        {
+            "id": "tp_blue_base",
+            "position": [309, 70],
+            "radius": 10,
+            "paired_with": "tp_blue_top"
+        },
+        {
+            "id": "tp_blue_top",
+            "position": [337, 53],
+            "radius": 10,
+            "paired_with": "tp_blue_base"
+        }
+    ],
+    "capture_points": [
+        {
+            "letter": "A",
+            "position": [
+                [162, 17],
+                [210, 52]
+            ]
+        }
+    ]
+}
