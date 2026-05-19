@@ -1,0 +1,76 @@
+{
+    "name": "Atlantis",
+    "template": "atlantis.png",
+    "size": [463, 270],
+    "spawns": {
+        "orange": [
+            {
+                "polygon": [
+                    [10, 103],
+                    [69, 103],
+                    [69, 176],
+                    [10, 176]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [393, 103],
+                    [452, 103],
+                    [452, 176],
+                    [393, 176]
+                ]
+            }
+        ]
+    },
+    "teleporters": [
+        {
+            "id": "tp_1_1",
+            "position": [59, 176],
+            "radius": 8,
+            "paired_with": "tp_1_2"
+        },
+        {
+            "id": "tp_1_2",
+            "position": [126, 177],
+            "radius": 8,
+            "paired_with": "tp_1_1"
+        },
+        {
+            "id": "tp_2_1",
+            "position": [403, 176],
+            "radius": 8,
+            "paired_with": "tp_2_2"
+        },
+        {
+            "id": "tp_2_2",
+            "position": [337, 177],
+            "radius": 8,
+            "paired_with": "tp_2_1"
+        }
+    ],
+    "capture_points": [
+        {
+            "letter": "A",
+            "position": [
+                [209, 115],
+                [253, 162]
+            ]
+        },
+        {
+            "letter": "B",
+            "position": [
+                [209, 13],
+                [253, 38]
+            ]
+        },
+        {
+            "letter": "C",
+            "position": [
+                [209, 234],
+                [253, 258]
+            ]
+        }
+    ]
+}

@@ -61,7 +61,7 @@ _BRIGHT_S_MAX = 60
 _TEAM_ZONE_DILATE = 11    # rayon ≈ 5 px → couvre pastille même patchy
 
 # --- Filtre composante digit ---
-_DIGIT_AREA_MIN = 6
+_DIGIT_AREA_MIN = 2
 _DIGIT_AREA_MAX = 100
 _DIGIT_DIM_MIN = 2
 _DIGIT_DIM_MAX = 14

@@ -405,7 +405,6 @@ function createWindow(updateService) {
 
     mainWindow.webContents.on('did-navigate', async (event, url) => {
         if (url.startsWith(ROOT_URL)) {
-            checkJwtToken(getMainWindow, true);
         } else {
             console.log(`Main window > did-navigate : ${url} - ${HOME_URL}`);
         }
