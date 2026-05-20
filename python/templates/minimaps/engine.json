@@ -1,0 +1,51 @@
+{
+    "name": "Engine",
+    "template": "engine.png",
+    "size": [461, 241],
+    "spawns": {
+        "orange": [
+            {
+                "polygon": [
+                    [9, 9],
+                    [75, 9],
+                    [75, 68],
+                    [9, 68]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [384, 173],
+                    [451, 173],
+                    [451, 231],
+                    [384, 231]
+                ]
+            }
+        ]
+    },
+    "teleporters": [],
+    "capture_points": [
+        {
+            "letter": "A",
+            "position": [
+                [212, 103],
+                [247, 138]
+            ]
+        },
+        {
+            "letter": "B",
+            "position": [
+                [30, 181],
+                [63, 214]
+            ]
+        },
+        {
+            "letter": "C",
+            "position": [
+                [397, 28],
+                [429, 61]
+            ]
+        }
+    ]
+}
