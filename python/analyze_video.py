@@ -2565,11 +2565,31 @@ def _sample_team_colors_from_spawns(roi_bgr: np.ndarray, map_meta: dict,
 _PLAYER_TRACK_FPS = 10
 
 
+def _valid_numbers_from_roster(n_orange: int, n_blue: int) -> dict:
+    """Convertit les tailles de roster en sets de numéros valides EVA.
+
+    EVA standard :
+      - Orange : numéros 1..n_orange
+      - Blue   : 6..9 (4 joueurs), ou {0, 6..9} (5 joueurs)
+    """
+    valid = {'orange': set(), 'blue': set()}
+    if n_orange > 0:
+        valid['orange'] = set(range(1, min(n_orange, 5) + 1))
+    if n_blue > 0:
+        if n_blue >= 5:
+            valid['blue'] = {0, 6, 7, 8, 9}
+        else:
+            valid['blue'] = set(range(10 - n_blue, 10))
+    return valid
+
+
 def _track_players_on_minimap(
     cap: cv2.VideoCapture,
     start_ts: float,
     end_ts: float,
     map_name: str,
+    n_orange: int = 0,
+    n_blue: int = 0,
 ) -> list:
     """Détection per-frame des joueurs sur la minimap.
 
@@ -2602,6 +2622,12 @@ def _track_players_on_minimap(
     if classifier is None:
         _emit({'log': '[player_tracking] no classifier available, skipping'})
         return []
+
+    valid_numbers = _valid_numbers_from_roster(n_orange, n_blue) if (n_orange or n_blue) else None
+    if valid_numbers:
+        _emit({'log': f'[player_tracking] valid numbers: '
+                      f'orange={sorted(valid_numbers["orange"])} '
+                      f'blue={sorted(valid_numbers["blue"])}'})
 
     # 1. Localisation minimap (seed mid-chunk).
     seed_ts = (start_ts + end_ts) / 2.0
@@ -2644,7 +2670,8 @@ def _track_players_on_minimap(
         if not ret:
             continue
         blobs_raw = _blob_detector.detect_blobs(frame, info, orange_rgb, blue_rgb)
-        filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.5, map_meta=md)
+        filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.5, map_meta=md,
+                                            valid_numbers=valid_numbers)
         t_rel = ts - start_ts
         for team in ('orange', 'blue'):
             for b in filtered[team]:
@@ -3915,6 +3942,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             PLAYER_TRACKS = _track_players_on_minimap(
                 CAP, float(START), float(END - END_NON_GAMEPLAY),
                 MAP_NAME,
+                n_orange=len(ORANGE_ROSTER),
+                n_blue=len(BLUE_ROSTER),
             )
         except Exception as exc:
             _emit({'log': f'[player_tracking] FAILED: {exc}'})

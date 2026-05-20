@@ -87,7 +87,8 @@ class DigitClassifier:
 
     def filter_blobs(self, frame_bgr: np.ndarray, minimap_info: dict,
                       blobs: dict, min_conf: float = _DEFAULT_MIN_CONF,
-                      map_meta: Optional[dict] = None) -> dict:
+                      map_meta: Optional[dict] = None,
+                      valid_numbers: Optional[dict] = None) -> dict:
         """Filtre les blobs détectés en gardant ceux classifiés comme digit.
 
         Pour chaque candidate de `blobs[team]`, on extrait le crop 21×21
@@ -177,8 +178,11 @@ class DigitClassifier:
 
         results = self.classify_crops(all_crops)
 
-        # Numéros valides par équipe (cf. règles EVA standard)
-        valid_by_team = {
+        # Numéros valides par équipe. Si `valid_numbers` est fourni (par
+        # ex. depuis le roster réel de la game), on l'utilise — sinon on
+        # tombe sur le superset 5v5 (règles EVA standard) ce qui peut
+        # accepter des digits impossibles (ex: blue #0 en 4v4).
+        valid_by_team = valid_numbers if valid_numbers else {
             'orange': {1, 2, 3, 4, 5},
             'blue':   {0, 6, 7, 8, 9},
         }

@@ -22,7 +22,7 @@ Usage :
 import json
 import os
 import sys
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -42,6 +42,14 @@ _MATCH_THRESHOLD = 0.05
 # Min confidence pour le CNN. Plus permissif que la prod (0.7) pour benchmark.
 _CNN_MIN_CONF = 0.5
 
+# --- Post-processing : extrapolation temporelle des trous ---
+# Si un (team, number) est détecté à t et à t+K secs sans détection
+# intermédiaire, et que la transition est cohérente en vitesse, on remplit
+# les K-1 frames manquantes par interpolation linéaire.
+_INTERP_MAX_GAP_FRAMES = 3       # max nb de frames consécutives interpolées
+_INTERP_MAX_SPEED_PER_S = 0.20   # vitesse max pour considérer la trajectoire cohérente
+_INTERP_STEP_S = 1.0             # step du benchmark (1 Hz)
+
 
 def _load_ground_truth(path: str) -> Tuple[Dict, str, list]:
     """Charge le JSON ground truth.
@@ -50,21 +58,25 @@ def _load_ground_truth(path: str) -> Tuple[Dict, str, list]:
       - gt: dict {(ts, team) -> [(number, x_frac, y_frac), ...]}
       - map_name
       - template_size [w, h]
+      - valid_numbers: {'orange': {nums}, 'blue': {nums}} déduit du roster GT
     """
     with open(path) as f:
         data = json.load(f)
     gt: Dict = {}
+    valid_numbers: Dict = {'orange': set(), 'blue': set()}
     for tr in data['players_tracks']:
         team, num = tr['team'], int(tr['number'])
+        valid_numbers[team].add(num)
         for entry in tr['history']:
             t = round(float(entry[0]), 3)
             gt.setdefault((t, team), []).append(
                 (num, float(entry[1]), float(entry[2])))
-    return gt, data['map'], data['template_size']
+    return gt, data['map'], data['template_size'], valid_numbers
 
 
 def _run_detection(video_path: str, map_name: str, gt_ts_list: list,
-                   template_size: list) -> Dict:
+                   template_size: list,
+                   valid_numbers: Optional[Dict] = None) -> Dict:
     """Pour chaque ts du GT, lance blob_detector + CNN.
 
     Retourne dict {(ts, team) -> [(number, x_frac, y_frac, conf), ...]}.
@@ -105,7 +117,8 @@ def _run_detection(video_path: str, map_name: str, gt_ts_list: list,
             continue
         blobs = _bd.detect_blobs(frame, info, orange_rgb, blue_rgb)
         filtered = classifier.filter_blobs(
-            frame, info, blobs, min_conf=_CNN_MIN_CONF, map_meta=md)
+            frame, info, blobs, min_conf=_CNN_MIN_CONF, map_meta=md,
+            valid_numbers=valid_numbers)
         for team in ('orange', 'blue'):
             out[(ts, team)] = [
                 (int(b['digit']),
@@ -120,6 +133,44 @@ def _run_detection(video_path: str, map_name: str, gt_ts_list: list,
             last_pct = pct
     cap.release()
     return out
+
+
+def _fill_temporal_gaps(algo: Dict) -> int:
+    """Pour chaque (team, number) détecté, interpole linéairement les frames
+    manquantes quand le trou est court (≤ _INTERP_MAX_GAP_FRAMES) et la
+    vitesse entre les 2 endpoints cohérente (≤ _INTERP_MAX_SPEED_PER_S).
+
+    Modifie `algo` en place. Retourne le nb de détections interpolées ajoutées.
+    """
+    # Regroupe par (team, num) → seq triée par ts.
+    by_player: dict = {}
+    for (ts, team), dets in algo.items():
+        for (num, x, y, conf) in dets:
+            by_player.setdefault((team, num), []).append((ts, x, y, conf))
+    for key in by_player:
+        by_player[key].sort(key=lambda e: e[0])
+
+    n_added = 0
+    for (team, num), seq in by_player.items():
+        for i in range(len(seq) - 1):
+            t0, x0, y0, _ = seq[i]
+            t1, x1, y1, _ = seq[i + 1]
+            dt = t1 - t0
+            gap_frames = int(round(dt / _INTERP_STEP_S)) - 1
+            if gap_frames < 1 or gap_frames > _INTERP_MAX_GAP_FRAMES:
+                continue
+            d = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
+            if d / max(dt, 1e-9) > _INTERP_MAX_SPEED_PER_S:
+                continue
+            for k in range(1, gap_frames + 1):
+                frac = k / (gap_frames + 1)
+                t_interp = round(t0 + k * _INTERP_STEP_S, 3)
+                x_interp = x0 + frac * (x1 - x0)
+                y_interp = y0 + frac * (y1 - y0)
+                algo.setdefault((t_interp, team), []).append(
+                    (num, x_interp, y_interp, 1.0))
+                n_added += 1
+    return n_added
 
 
 def _hungarian_distances(gt_pts: list, algo_pts: list) -> list:
@@ -234,11 +285,16 @@ def main():
         print('Usage: benchmark_tracking.py <ground_truth.json> <video.mp4>')
         sys.exit(1)
     gt_path, video_path = sys.argv[1], sys.argv[2]
-    gt, map_name, template_size = _load_ground_truth(gt_path)
+    gt, map_name, template_size, valid_numbers = _load_ground_truth(gt_path)
     gt_ts_list = sorted({t for (t, _) in gt.keys()})
-    print(f'Ground truth : {len(gt_ts_list)} ts uniques, map={map_name}')
+    print(f'Ground truth : {len(gt_ts_list)} ts uniques, map={map_name}, '
+          f'roster orange={sorted(valid_numbers["orange"])} '
+          f'blue={sorted(valid_numbers["blue"])}')
 
-    algo = _run_detection(video_path, map_name, gt_ts_list, template_size)
+    algo = _run_detection(video_path, map_name, gt_ts_list, template_size,
+                          valid_numbers=valid_numbers)
+    n_added = _fill_temporal_gaps(algo)
+    print(f'\n[temporal interp] +{n_added} detections interpolees')
     _evaluate(gt, algo)
 
 
