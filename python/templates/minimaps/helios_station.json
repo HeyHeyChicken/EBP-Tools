@@ -2,6 +2,12 @@
     "name": "Helios Station",
     "template": "helios_station.png",
     "size": [458, 239],
+    "margins": {
+        "top": 8,
+        "right": 8,
+        "bottom": 8,
+        "left": 8
+    },
     "spawns": {
         "orange": [
             {

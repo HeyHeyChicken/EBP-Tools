@@ -2,6 +2,12 @@
     "name": "Atlantis",
     "template": "atlantis.png",
     "size": [463, 270],
+    "margins": {
+        "top": 10,
+        "right": 10,
+        "bottom": 10,
+        "left": 10
+    },
     "spawns": {
         "orange": [
             {

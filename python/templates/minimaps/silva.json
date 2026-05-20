@@ -1,0 +1,17 @@
+{
+    "name": "Silva",
+    "template": "silva.png",
+    "size": [370, 288],
+    "margins": {
+        "top": 9,
+        "right": 9,
+        "bottom": 9,
+        "left": 9
+    },
+    "spawns": {
+        "orange": [],
+        "blue": []
+    },
+    "teleporters": [],
+    "capture_points": []
+}

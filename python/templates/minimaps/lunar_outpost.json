@@ -1,0 +1,17 @@
+{
+    "name": "Lunar Outpost",
+    "template": "lunar_outpost.png",
+    "size": [611, 319],
+    "margins": {
+        "top": 0,
+        "right": 7,
+        "bottom": 0,
+        "left": 7
+    },
+    "spawns": {
+        "orange": [],
+        "blue": []
+    },
+    "teleporters": [],
+    "capture_points": []
+}

@@ -2,6 +2,12 @@
     "name": "Artefact",
     "template": "artefact.png",
     "size": [426, 257],
+    "margins": {
+        "top": 7,
+        "right": 0,
+        "bottom": 4,
+        "left": 0
+    },
     "spawns": {
         "orange": [
             {

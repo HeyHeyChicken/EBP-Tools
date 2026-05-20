@@ -2,6 +2,12 @@
     "name": "Engine",
     "template": "engine.png",
     "size": [461, 241],
+    "margins": {
+        "top": 9,
+        "right": 9,
+        "bottom": 9,
+        "left": 9
+    },
     "spawns": {
         "orange": [
             {

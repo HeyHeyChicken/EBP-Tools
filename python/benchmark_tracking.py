@@ -56,12 +56,34 @@ def _load_ground_truth(path: str) -> Tuple[Dict, str, list]:
 
     Retourne :
       - gt: dict {(ts, team) -> [(number, x_frac, y_frac), ...]}
+        Si le map_metadata déclare des margins, les coords GT (sauvées en
+        coord template-frac par manual_crop) sont re-normalisées en
+        coord INNER-frac pour matcher la convention de la pipeline prod.
       - map_name
       - template_size [w, h]
       - valid_numbers: {'orange': {nums}, 'blue': {nums}} déduit du roster GT
     """
     with open(path) as f:
         data = json.load(f)
+    map_name = data['map']
+    md = _map_metadata.load(map_name)
+    margins = md.get('margins') if md else None
+    tpl_w, tpl_h = data['template_size']
+
+    def _to_inner(xf: float, yf: float) -> tuple:
+        if not margins:
+            return (xf, yf)
+        left = float(margins.get('left', 0))
+        right = float(margins.get('right', 0))
+        top = float(margins.get('top', 0))
+        bottom = float(margins.get('bottom', 0))
+        inner_w = max(1.0, tpl_w - left - right)
+        inner_h = max(1.0, tpl_h - top - bottom)
+        x_inner = (xf * tpl_w - left) / inner_w
+        y_inner = (yf * tpl_h - top) / inner_h
+        return (max(0.0, min(1.0, x_inner)),
+                max(0.0, min(1.0, y_inner)))
+
     gt: Dict = {}
     valid_numbers: Dict = {'orange': set(), 'blue': set()}
     for tr in data['players_tracks']:
@@ -69,9 +91,9 @@ def _load_ground_truth(path: str) -> Tuple[Dict, str, list]:
         valid_numbers[team].add(num)
         for entry in tr['history']:
             t = round(float(entry[0]), 3)
-            gt.setdefault((t, team), []).append(
-                (num, float(entry[1]), float(entry[2])))
-    return gt, data['map'], data['template_size'], valid_numbers
+            xf, yf = _to_inner(float(entry[1]), float(entry[2]))
+            gt.setdefault((t, team), []).append((num, xf, yf))
+    return gt, map_name, data['template_size'], valid_numbers
 
 
 def _run_detection(video_path: str, map_name: str, gt_ts_list: list,

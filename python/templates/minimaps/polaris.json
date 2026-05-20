@@ -1,0 +1,17 @@
+{
+    "name": "Polaris",
+    "template": "polaris.png",
+    "size": [450, 254],
+    "margins": {
+        "top": 5,
+        "right": 8,
+        "bottom": 8,
+        "left": 8
+    },
+    "spawns": {
+        "orange": [],
+        "blue": []
+    },
+    "teleporters": [],
+    "capture_points": []
+}

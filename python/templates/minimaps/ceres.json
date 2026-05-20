@@ -2,6 +2,12 @@
     "name": "Ceres",
     "template": "ceres.png",
     "size": [455, 240],
+    "margins": {
+        "top": 8,
+        "right": 7,
+        "bottom": 8,
+        "left": 7
+    },
     "spawns": {
         "orange": [
             {

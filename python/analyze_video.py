@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
 from scipy.optimize import linear_sum_assignment as scipy_linear_sum_assignment
+from typing import Optional
 
 import minimap as _minimap
 import blob_detector as _blob_detector
@@ -30,14 +31,18 @@ import map_metadata as _map_metadata
 # Couleurs des équipes — partagées entre l'identify (matching pixel) et la
 # détection de bordure (find_text_border). Une seule source de vérité par couleur.
 TEAM_ORANGE = [
-    (238, 120, 12), # Orange
-    (40, 255, 119), # Vert fluo
-    (169, 220, 83)  # Jaune fluo (pro league)
+    (255, 128, 0),   # Classic
+    (170, 220, 80),  # Pro League
+    (255, 220, 0),   # Challenger League
+    (40, 255, 120),  # Local League
+    (51, 188, 255),  # Summit
 ]
-TEAM_BLUE   = [
-    (43, 137, 237), # Bleu
-    (180, 0, 244),  # Violet
-    (55, 189, 218)  # Bleu fluo (pro league)
+TEAM_BLUE = [
+    (51, 151, 254),  # Classic
+    (55, 190, 220),  # Pro League
+    (50, 185, 255),  # Challenger League
+    (180, 0, 245),   # Local League
+    (179, 0, 243),   # Summit
 ]
 
 DEBUG = False
@@ -565,27 +570,33 @@ def _find_text_border(frame: np.ndarray, colors: list, search_region, tol_color:
 
 def _pick_dominant_color(frame: np.ndarray, search_region, candidates: list, tol_color: int = 20, min_pixels: int = 30):
     """
-    Parmi une liste de couleurs candidates, retourne celle qui matche le plus
-    de pixels dans search_region (ou None si aucune ne dépasse min_pixels).
-    Utilisé pour verrouiller la couleur d'équipe réellement présente dans la
-    partie courante (TEAM_ORANGE et TEAM_BLUE listent plusieurs valeurs possibles).
+    Parmi une liste de couleurs candidates, retourne (couleur, index) du
+    meilleur match dans search_region — ou (None, -1) si aucune ne dépasse
+    min_pixels. Utilisé pour verrouiller la couleur d'équipe réellement
+    présente (TEAM_ORANGE et TEAM_BLUE listent plusieurs valeurs possibles).
+    L'index permet à l'appelant d'imposer un appairage orange/bleu sur le
+    même slot (TEAM_ORANGE[i] joue contre TEAM_BLUE[i]).
     """
     h, w = frame.shape[:2]
     (sx1, sy1), (sx2, sy2) = search_region
     sx1 = max(0, int(sx1)); sy1 = max(0, int(sy1))
     sx2 = min(w, int(sx2)); sy2 = min(h, int(sy2))
     if sx1 >= sx2 or sy1 >= sy2:
-        return None
+        return (None, -1)
     sub = frame[sy1:sy2, sx1:sx2].astype(np.int16)
     best = None
+    best_idx = -1
     best_count = 0
-    for c in candidates:
+    for i, c in enumerate(candidates):
         target = np.array(c, dtype=np.int16)
         count = int(((np.abs(sub - target) <= tol_color).all(axis=2)).sum())
         if count > best_count:
             best_count = count
             best = c
-    return best if best_count >= min_pixels else None
+            best_idx = i
+    if best_count >= min_pixels:
+        return (best, best_idx)
+    return (None, -1)
 
 
 def _resolve_team_colors(frame: np.ndarray, anchor=None):
@@ -599,10 +610,14 @@ def _resolve_team_colors(frame: np.ndarray, anchor=None):
     b_box = _find_blue_score_box(frame, anchor=anchor)
     if o_box is None or b_box is None:
         return (None, None)
-    return (
-        _pick_dominant_color(frame, o_box, TEAM_ORANGE),
-        _pick_dominant_color(frame, b_box, TEAM_BLUE),
-    )
+    o_color, o_idx = _pick_dominant_color(frame, o_box, TEAM_ORANGE)
+    b_color, b_idx = _pick_dominant_color(frame, b_box, TEAM_BLUE)
+    # TEAM_ORANGE[i] et TEAM_BLUE[i] vont par paire (un seul "thème" de partie
+    # peut être actif). Si les meilleurs candidats ne tombent pas sur le même
+    # slot, on rejette la frame et l'algo réessaiera plus loin.
+    if o_idx != b_idx or o_color is None or b_color is None:
+        return (None, None)
+    return (o_color, b_color)
 
 
 def _validate_kill_row(frame: np.ndarray, bbox, kf_spec: dict) -> bool:
@@ -2583,6 +2598,134 @@ def _valid_numbers_from_roster(n_orange: int, n_blue: int) -> dict:
     return valid
 
 
+def _blue_slot_to_number(slot_idx: int, n_blue: int) -> int:
+    """Mapping index slot blue → numéro affiché (EVA standard)."""
+    if n_blue >= 5 and slot_idx == 4:
+        return 0
+    return 6 + slot_idx
+
+
+def _build_dead_lookup(hp_timeline: dict, n_orange: int, n_blue: int):
+    """Précompute un lookup (sorted_ts, dead_per_ts) pour les joueurs morts
+    à chaque ts du hp_timeline (chunk-relative).
+
+    Retourne None si hp_timeline est vide. `dead_per_ts[i]` = set de (team, num)
+    morts à `sorted_ts[i]`. Le forward-fill se fait à l'intérieur.
+    """
+    if not hp_timeline:
+        return None
+    sorted_keys = sorted(hp_timeline.keys(), key=lambda k: float(k))
+    sorted_ts = [int(float(k)) for k in sorted_keys]
+    cur_orange = [100] * max(n_orange, 1)
+    cur_blue = [100] * max(n_blue, 1)
+    dead_per_ts = []
+    for k in sorted_keys:
+        entry = hp_timeline.get(k, {})
+        if 'orange' in entry:
+            cur_orange = entry['orange']
+        if 'blue' in entry:
+            cur_blue = entry['blue']
+        dead = set()
+        for i, hp in enumerate(cur_orange):
+            if hp <= 0:
+                dead.add(('orange', i + 1))
+        for i, hp in enumerate(cur_blue):
+            if hp <= 0:
+                dead.add(('blue', _blue_slot_to_number(i, n_blue)))
+        dead_per_ts.append(dead)
+    return (sorted_ts, dead_per_ts)
+
+
+def _dead_at(lookup, elapsed_s: float) -> set:
+    """Retourne le set de (team, num) morts à l'instant elapsed_s."""
+    if lookup is None:
+        return set()
+    sorted_ts, dead_per_ts = lookup
+    import bisect
+    idx = bisect.bisect_right(sorted_ts, elapsed_s) - 1
+    if idx < 0:
+        return set()
+    return dead_per_ts[idx]
+
+
+# Vitesse max plausible d'un joueur (fraction de map / seconde).
+# Calibré pour rejeter les détections aberrantes (CNN qui hallucine sur un
+# X de mort en attendant que hp_timeline confirme HP=0) sans toucher aux
+# sprints (~20 %/s) ni aux TPs courts. Un saut au-dessus n'est gardé que
+# s'il est confirmé par un voisin temporel proche.
+_OUTLIER_MAX_SPEED_PER_S = 0.50
+# Fenêtre de voisins consultés pour valider qu'un saut n'est pas isolé.
+_OUTLIER_NEIGHBOR_WINDOW = 2
+
+
+def _template_px_to_inner_frac(x_tpl: float, y_tpl: float,
+                                tpl_w: int, tpl_h: int,
+                                margins: Optional[dict]) -> tuple:
+    """Convertit une position template-px en fraction [0..1] de la zone INNER
+    (zone jouable, marges transparentes du template exclues).
+
+    Sans `margins`, équivaut à `x_tpl / tpl_w` (fraction du template entier).
+    Avec margins {top, right, bottom, left}, normalise dans la zone interne :
+        inner_w = tpl_w - left - right
+        x_frac = (x_tpl - left) / inner_w   (clampé [0,1])
+    Un joueur "débordant" dans la marge (centre dans la zone transparente) est
+    clampé au bord de la zone jouable.
+    """
+    if not margins:
+        return (max(0.0, min(1.0, x_tpl / tpl_w)),
+                max(0.0, min(1.0, y_tpl / tpl_h)))
+    left   = float(margins.get('left', 0))
+    right  = float(margins.get('right', 0))
+    top    = float(margins.get('top', 0))
+    bottom = float(margins.get('bottom', 0))
+    inner_w = max(1.0, tpl_w - left - right)
+    inner_h = max(1.0, tpl_h - top - bottom)
+    x_frac = (x_tpl - left) / inner_w
+    y_frac = (y_tpl - top) / inner_h
+    return (max(0.0, min(1.0, x_frac)),
+            max(0.0, min(1.0, y_frac)))
+
+
+def _remove_outlier_detections(histories: dict) -> int:
+    """Pour chaque (team, num), supprime les détections isolées dont la
+    transition vers les voisins immédiats dépasse `_OUTLIER_MAX_SPEED_PER_S`
+    ET qui n'ont aucun voisin cohérent dans une fenêtre de ± N points.
+
+    Couvre le cas où le détecteur trouve une position aberrante pendant le
+    délai entre la mort visuelle (X sur minimap) et la confirmation par
+    `hp_timeline` (~0.5-1s).
+
+    Modifie `histories` en place. Retourne le nb retiré.
+    """
+    n_removed = 0
+    for key, seq in histories.items():
+        if len(seq) < 3:
+            continue
+        # Marque les outliers SANS les retirer (sinon on perturbe les indexs)
+        to_remove = set()
+        for i in range(1, len(seq) - 1):
+            t_i, x_i, y_i = seq[i]
+            # Y a-t-il un voisin proche dans la fenêtre ±N ?
+            has_coherent_neighbor = False
+            lo = max(0, i - _OUTLIER_NEIGHBOR_WINDOW)
+            hi = min(len(seq), i + _OUTLIER_NEIGHBOR_WINDOW + 1)
+            for j in range(lo, hi):
+                if j == i:
+                    continue
+                t_j, x_j, y_j = seq[j]
+                dt = max(abs(t_j - t_i), 1e-9)
+                d = ((x_i - x_j) ** 2 + (y_i - y_j) ** 2) ** 0.5
+                if d <= _OUTLIER_MAX_SPEED_PER_S * dt:
+                    has_coherent_neighbor = True
+                    break
+            if not has_coherent_neighbor:
+                to_remove.add(i)
+        if to_remove:
+            seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
+            n_removed += len(to_remove)
+    return n_removed
+
+
 def _track_players_on_minimap(
     cap: cv2.VideoCapture,
     start_ts: float,
@@ -2590,6 +2733,7 @@ def _track_players_on_minimap(
     map_name: str,
     n_orange: int = 0,
     n_blue: int = 0,
+    hp_timeline: Optional[dict] = None,
 ) -> list:
     """Détection per-frame des joueurs sur la minimap.
 
@@ -2655,12 +2799,27 @@ def _track_players_on_minimap(
     _emit({'log': f'[player_tracking] colors: orange={orange_rgb} '
                   f'blue={blue_rgb}'})
 
+    # Marges transparentes du template (px). Si présentes, on normalise les
+    # positions dans la zone INNER (jouable) plutôt que dans le template
+    # entier — élimine le décalage quand un joueur s'approche du bord et
+    # déborde dans la marge transparente.
+    margins = md.get('margins')
+
+    # Précompute le lookup des joueurs morts par instant (forward-filled).
+    # Si fourni, on rejette toute détection (team, num) pour un joueur HP=0
+    # à ce ts — c'est forcément du bruit (le joueur n'est pas affiché).
+    dead_lookup = _build_dead_lookup(hp_timeline, n_orange, n_blue)
+    if dead_lookup is not None:
+        _emit({'log': f'[player_tracking] hp_timeline avec '
+                      f'{len(dead_lookup[0])} entries → filtre morts actif'})
+
     # 3. Loop 10 FPS : detect + classify, agrège par (team, number).
     histories: dict = {}  # (team, number) → [(t_rel, x_frac, y_frac), ...]
     step = 1.0 / _PLAYER_TRACK_FPS
     total = int((end_ts - start_ts) * _PLAYER_TRACK_FPS) + 1
     last_pct = -1
     detections_total = 0
+    detections_rejected_dead = 0
     for i in range(total):
         ts = start_ts + i * step
         if ts > end_ts:
@@ -2673,11 +2832,16 @@ def _track_players_on_minimap(
         filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.5, map_meta=md,
                                             valid_numbers=valid_numbers)
         t_rel = ts - start_ts
+        dead_set = _dead_at(dead_lookup, t_rel)
         for team in ('orange', 'blue'):
             for b in filtered[team]:
                 num = int(b['digit'])
-                x_frac = max(0.0, min(1.0, float(b['x']) / tpl_w))
-                y_frac = max(0.0, min(1.0, float(b['y']) / tpl_h))
+                if (team, num) in dead_set:
+                    detections_rejected_dead += 1
+                    continue
+                x_frac, y_frac = _template_px_to_inner_frac(
+                    float(b['x']), float(b['y']),
+                    tpl_w, tpl_h, margins)
                 histories.setdefault((team, num), []).append(
                     (round(t_rel, 2), round(x_frac, 4), round(y_frac, 4)))
                 detections_total += 1
@@ -2687,7 +2851,15 @@ def _track_players_on_minimap(
                           f'({i + 1}/{total} frames, {detections_total} dets)'})
             last_pct = pct
 
-    # 4. Format payload. id séquentiel ; slot 10 si number = 0 (Blue 5v5).
+    # 4. Post-process : retire les détections isolées trop éloignées de leurs
+    # voisins temporels (typiquement le fantôme entre la mort visuelle et
+    # la confirmation hp_timeline).
+    n_outliers = _remove_outlier_detections(histories)
+    if n_outliers:
+        _emit({'log': f'[player_tracking] retire {n_outliers} detections '
+                      f'aberrantes (saut isole > {_OUTLIER_MAX_SPEED_PER_S}/s)'})
+
+    # 5. Format payload. id séquentiel ; slot 10 si number = 0 (Blue 5v5).
     out = []
     for next_id, (team, num) in enumerate(sorted(histories.keys())):
         slot = 10 if num == 0 else num
@@ -2699,7 +2871,8 @@ def _track_players_on_minimap(
             'history': histories[(team, num)],
         })
     _emit({'log': f'[player_tracking] done: {len(out)} (team, number) tracks, '
-                  f'{detections_total} total detections'})
+                  f'{detections_total} total detections, '
+                  f'{detections_rejected_dead} rejetees (joueur mort)'})
     return out
 
 
@@ -3944,6 +4117,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 MAP_NAME,
                 n_orange=len(ORANGE_ROSTER),
                 n_blue=len(BLUE_ROSTER),
+                hp_timeline=HP_TIMELINE,
             )
         except Exception as exc:
             _emit({'log': f'[player_tracking] FAILED: {exc}'})

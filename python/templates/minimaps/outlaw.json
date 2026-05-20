@@ -1,0 +1,17 @@
+{
+    "name": "Outlaw",
+    "template": "outlaw.png",
+    "size": [384, 385],
+    "margins": {
+        "top": 8,
+        "right": 8,
+        "bottom": 8,
+        "left": 8
+    },
+    "spawns": {
+        "orange": [],
+        "blue": []
+    },
+    "teleporters": [],
+    "capture_points": []
+}

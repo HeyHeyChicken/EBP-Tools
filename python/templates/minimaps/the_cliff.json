@@ -2,6 +2,12 @@
     "name": "The Cliff",
     "template": "the_cliff.png",
     "size": [375, 202],
+    "margins": {
+        "top": 10,
+        "right": 10,
+        "bottom": 10,
+        "left": 10
+    },
     "spawns": {
         "orange": [
             {
