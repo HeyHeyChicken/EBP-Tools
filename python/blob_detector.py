@@ -115,7 +115,6 @@ def _digit_centroids_in_zone(roi_bgr: np.ndarray,
 
     dark = v < _DARK_V_MAX
     bright = (v > _BRIGHT_V_MIN) & (s < _BRIGHT_S_MAX)
-    not_team = (color_mask == 0)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
                                         (_TEAM_ZONE_DILATE, _TEAM_ZONE_DILATE))
@@ -126,8 +125,13 @@ def _digit_centroids_in_zone(roi_bgr: np.ndarray,
     # connected components, sinon en mode focus (fond blanc + chiffre noir,
     # bordure team color) les pixels dark et bright sont adjacents et
     # fusionnent en un seul gros blob qui dépasse _DIGIT_AREA_MAX.
-    dark_mask = (dark & not_team & in_zone).astype(np.uint8) * 255
-    bright_mask = (bright & not_team & in_zone).astype(np.uint8) * 255
+    # NOTE : on ne filtre PAS par `not team_color` ici. Sur certaines maps
+    # (Atlantis), le digit "noir" anti-aliasé garde une saturation élevée
+    # et tombe dans color_mask. L'exclure du dark_mask le ferait disparaître.
+    # Le filtre par taille (_DIGIT_AREA_MAX=100) suffit à écarter le disque
+    # team-color entier qui est beaucoup plus gros.
+    dark_mask = (dark & in_zone).astype(np.uint8) * 255
+    bright_mask = (bright & in_zone).astype(np.uint8) * 255
 
     raw = []
     for mask in (dark_mask, bright_mask):

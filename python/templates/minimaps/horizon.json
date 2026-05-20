@@ -1,0 +1,70 @@
+{
+    "name": "Horizon",
+    "template": "horizon.png",
+    "size": [423, 271],
+    "spawns": {
+        "orange": [
+            {
+                "polygon": [
+                    [9, 9],
+                    [35, 9],
+                    [35, 131],
+                    [9, 131]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [387, 9],
+                    [413, 9],
+                    [413, 131],
+                    [387, 131]
+                ]
+            }
+        ]
+    },
+    "teleporters": [
+        {
+            "id": "tp_1_1",
+            "position": [46, 183],
+            "radius": 8,
+            "paired_with": "tp_1_2"
+        },
+        {
+            "id": "tp_1_2",
+            "position": [46, 234],
+            "radius": 8,
+            "paired_with": "tp_1_1"
+        },
+
+        {
+            "id": "tp_2_1",
+            "position": [375, 183],
+            "radius": 8,
+            "paired_with": "tp_2_2"
+        },
+        {
+            "id": "tp_2_2",
+            "position": [375, 234],
+            "radius": 8,
+            "paired_with": "tp_2_1"
+        }
+    ],
+    "capture_points": [
+        {
+            "letter": "A",
+            "position": [
+                [189, 145],
+                [232, 188]
+            ]
+        },
+        {
+            "letter": "B",
+            "position": [
+                [189, 38],
+                [232, 81]
+            ]
+        }
+    ]
+}

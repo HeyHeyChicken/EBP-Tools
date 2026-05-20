@@ -118,16 +118,11 @@ class DigitClassifier:
                 forbidden_points.append((float(tp['position'][0]),
                                           float(tp['position'][1]),
                                           float(tp.get('radius', _STATIC_ELEMENT_RADIUS))))
-            for cp in map_meta.get('capture_points', []):
-                # Bbox [[x1,y1],[x2,y2]] → centre + rayon ~ demi-diagonale
-                pos = cp.get('position') or []
-                if (len(pos) == 2 and isinstance(pos[0], (list, tuple))):
-                    (cx1, cy1), (cx2, cy2) = pos
-                    ccx = (float(cx1) + float(cx2)) / 2.0
-                    ccy = (float(cy1) + float(cy2)) / 2.0
-                    crad = max(abs(float(cx2) - float(cx1)),
-                                abs(float(cy2) - float(cy1))) / 2.0
-                    forbidden_points.append((ccx, ccy, crad))
+            # NOTE : on n'exclut PLUS les capture points. À l'origine on
+            # voulait rejeter la lettre A/B/C du point (confondue avec un digit
+            # par le CNN), mais ça filtrait aussi les vrais joueurs qui passent
+            # SUR le point. Le CNN entraîné avec hard negatives gère désormais
+            # la lettre comme garbage.
             spawns = map_meta.get('spawns', {})
             for team in ('orange', 'blue'):
                 other = 'blue' if team == 'orange' else 'orange'

@@ -1,0 +1,37 @@
+{
+    "name": "Ceres",
+    "template": "ceres.png",
+    "size": [455, 240],
+    "spawns": {
+        "orange": [
+            {
+                "polygon": [
+                    [7, 80],
+                    [81, 80],
+                    [81, 159],
+                    [7, 159]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [373, 80],
+                    [447, 80],
+                    [447, 159],
+                    [373, 159]
+                ]
+            }
+        ]
+    },
+    "teleporters": [],
+    "capture_points": [
+        {
+            "letter": "A",
+            "position": [
+                [206, 86],
+                [248, 129]
+            ]
+        }
+    ]
+}
