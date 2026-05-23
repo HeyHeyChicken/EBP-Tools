@@ -220,13 +220,23 @@ def detect_blobs(
         strength = aire du chiffre détecté (proxy de confiance).
     """
     (x1, y1), (x2, y2) = minimap_info['box']
+    # Clamp aux bornes de la frame (le matching peut renvoyer x1<0 si le
+    # contenu visible deborde a gauche). numpy traite les index negatifs
+    # comme "depuis la fin" → ROI vide → crash silencieux.
+    h, w = frame_bgr.shape[:2]
+    x1c, y1c = max(0, x1), max(0, y1)
+    x2c, y2c = min(w, x2), min(h, y2)
     # Support du stretch X≠Y. Fallback sur 'scale' uniforme si scale_x/y absents.
     sx = float(minimap_info.get('scale_x', minimap_info.get('scale', 1.0))) or 1.0
     sy = float(minimap_info.get('scale_y', minimap_info.get('scale', 1.0))) or 1.0
-    roi = frame_bgr[y1:y2, x1:x2]
+    roi = frame_bgr[y1c:y2c, x1c:x2c]
     out = {'orange': [], 'blue': []}
     if roi.size == 0:
         return out
+    # Decalage en pixels frame entre top-left "theorique" et top-left
+    # reellement utilise. Il faut le re-ajouter aux centroids pour rester
+    # coherent avec les coordonnees template (sinon shift de quelques px).
+    dx, dy = x1c - x1, y1c - y1
 
     for team, color in (('orange', orange_rgb), ('blue', blue_rgb)):
         if color is None:
@@ -234,8 +244,8 @@ def detect_blobs(
         cmask = _color_mask(roi, color)
         for cx, cy, area in _digit_centroids_in_zone(roi, cmask):
             out[team].append({
-                'x':        cx / sx,
-                'y':        cy / sy,
+                'x':        (cx + dx) / sx,
+                'y':        (cy + dy) / sy,
                 'strength': area,
             })
     return out

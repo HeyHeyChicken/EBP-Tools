@@ -148,12 +148,19 @@ class DigitClassifier:
             return False
 
         (x1, y1), (x2, y2) = minimap_info['box']
+        # Clamp aux bornes de la frame (le matching peut renvoyer x1<0).
+        fh, fw = frame_bgr.shape[:2]
+        x1c, y1c = max(0, x1), max(0, y1)
+        x2c, y2c = min(fw, x2), min(fh, y2)
         sx = float(minimap_info.get('scale_x', minimap_info.get('scale', 1.0))) or 1.0
         sy = float(minimap_info.get('scale_y', minimap_info.get('scale', 1.0))) or 1.0
-        roi = frame_bgr[y1:y2, x1:x2]
+        roi = frame_bgr[y1c:y2c, x1c:x2c]
         if roi.size == 0:
             return {'orange': [], 'blue': []}
         h, w = roi.shape[:2]
+        # Offset cohérent avec blob_detector : si la ROI a été clampée,
+        # on doit retrancher dx/dy lors du convert template-px → ROI-px.
+        dx, dy = x1c - x1, y1c - y1
 
         # Collecte tous les crops d'un coup pour batch inference.
         all_meta: List[Tuple[str, dict]] = []  # (team, blob)
@@ -161,8 +168,8 @@ class DigitClassifier:
         for team, candidates in blobs.items():
             for b in candidates:
                 # Convert template-px → ROI-px pour cropping (scale par axe).
-                cx = int(round(b['x'] * sx))
-                cy = int(round(b['y'] * sy))
+                cx = int(round(b['x'] * sx)) - dx
+                cy = int(round(b['y'] * sy)) - dy
                 xa = max(0, cx - _CROP_HALF)
                 ya = max(0, cy - _CROP_HALF)
                 xb = min(w, cx + _CROP_HALF + 1)

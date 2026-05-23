@@ -2664,8 +2664,13 @@ def _dead_at(lookup, elapsed_s: float) -> set:
 # sprints (~20 %/s) ni aux TPs courts. Un saut au-dessus n'est gardé que
 # s'il est confirmé par un voisin temporel proche.
 _OUTLIER_MAX_SPEED_PER_S = 0.50
-# Fenêtre de voisins consultés pour valider qu'un saut n'est pas isolé.
-_OUTLIER_NEIGHBOR_WINDOW = 2
+# Demi-fenêtre TEMPORELLE (secondes) pour chercher un voisin cohérent.
+# Fenêtre en TEMPS (pas en index) : quand le joueur est obscurci/mort qq
+# secondes, la sequence devient sparse → une fenêtre par index couvre plusieurs
+# secondes, dt explose, le seuil de vitesse (d ≤ 0.5·dt) devient trivial et les
+# outliers survivent. En temps, le seuil reste strict (max 0.5·0.5=0.25 de map)
+# quelle que soit la densité de détections.
+_OUTLIER_NEIGHBOR_WINDOW_S = 0.5
 
 
 def _template_px_to_inner_frac(x_tpl: float, y_tpl: float,
@@ -2697,13 +2702,14 @@ def _template_px_to_inner_frac(x_tpl: float, y_tpl: float,
 
 
 def _remove_outlier_detections(histories: dict) -> int:
-    """Pour chaque (team, num), supprime les détections isolées dont la
-    transition vers les voisins immédiats dépasse `_OUTLIER_MAX_SPEED_PER_S`
-    ET qui n'ont aucun voisin cohérent dans une fenêtre de ± N points.
+    """Pour chaque (team, num), supprime les détections dont aucune des
+    positions voisines (dans une fenêtre temporelle ±_OUTLIER_NEIGHBOR_WINDOW_S)
+    n'est compatible avec `_OUTLIER_MAX_SPEED_PER_S`.
 
     Couvre le cas où le détecteur trouve une position aberrante pendant le
     délai entre la mort visuelle (X sur minimap) et la confirmation par
-    `hp_timeline` (~0.5-1s).
+    `hp_timeline` (~0.5-1s), ainsi que les blinks isolés qui faisaient
+    apparaître des lignes droites traversant la map dans le rendu front.
 
     Modifie `histories` en place. Retourne le nb retiré.
     """
@@ -2711,23 +2717,32 @@ def _remove_outlier_detections(histories: dict) -> int:
     for key, seq in histories.items():
         if len(seq) < 3:
             continue
-        # Marque les outliers SANS les retirer (sinon on perturbe les indexs)
+        # Marque les outliers SANS les retirer (sinon on perturbe les indexs).
+        # seq est trié par t (append dans l'ordre du loop frame) → on peut
+        # étendre depuis i jusqu'à sortir de la fenêtre temporelle.
         to_remove = set()
         for i in range(1, len(seq) - 1):
             t_i, x_i, y_i = seq[i]
-            # Y a-t-il un voisin proche dans la fenêtre ±N ?
             has_coherent_neighbor = False
-            lo = max(0, i - _OUTLIER_NEIGHBOR_WINDOW)
-            hi = min(len(seq), i + _OUTLIER_NEIGHBOR_WINDOW + 1)
-            for j in range(lo, hi):
-                if j == i:
-                    continue
+            j = i - 1
+            while j >= 0 and (t_i - seq[j][0]) <= _OUTLIER_NEIGHBOR_WINDOW_S:
                 t_j, x_j, y_j = seq[j]
                 dt = max(abs(t_j - t_i), 1e-9)
                 d = ((x_i - x_j) ** 2 + (y_i - y_j) ** 2) ** 0.5
                 if d <= _OUTLIER_MAX_SPEED_PER_S * dt:
                     has_coherent_neighbor = True
                     break
+                j -= 1
+            if not has_coherent_neighbor:
+                j = i + 1
+                while j < len(seq) and (seq[j][0] - t_i) <= _OUTLIER_NEIGHBOR_WINDOW_S:
+                    t_j, x_j, y_j = seq[j]
+                    dt = max(abs(t_j - t_i), 1e-9)
+                    d = ((x_i - x_j) ** 2 + (y_i - y_j) ** 2) ** 0.5
+                    if d <= _OUTLIER_MAX_SPEED_PER_S * dt:
+                        has_coherent_neighbor = True
+                        break
+                    j += 1
             if not has_coherent_neighbor:
                 to_remove.add(i)
         if to_remove:
@@ -2812,10 +2827,15 @@ def _track_players_on_minimap(
             tried.append((seed_ts, 'no_box'))
             continue
         (cx1, cy1), (cx2, cy2) = candidate['box']
+        # Clamp aux bornes de la frame : numpy traite les index negatifs
+        # comme "depuis la fin", donc bgr[..., -2:461] est vide → crash.
+        h, w = bgr.shape[:2]
+        cx1c, cy1c = max(0, cx1), max(0, cy1)
+        cx2c, cy2c = min(w, cx2), min(h, cy2)
         csx = float(candidate.get('scale_x', candidate.get('scale', 1.0))) or 1.0
         csy = float(candidate.get('scale_y', candidate.get('scale', 1.0))) or 1.0
         o, b = _sample_team_colors_from_spawns(
-            bgr[cy1:cy2, cx1:cx2], md, csx, scale_y=csy)
+            bgr[cy1c:cy2c, cx1c:cx2c], md, csx, scale_y=csy)
         if o is None or b is None:
             tried.append((seed_ts, f'colors=({o},{b})'))
             continue
