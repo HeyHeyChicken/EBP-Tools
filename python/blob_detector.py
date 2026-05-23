@@ -220,7 +220,9 @@ def detect_blobs(
         strength = aire du chiffre détecté (proxy de confiance).
     """
     (x1, y1), (x2, y2) = minimap_info['box']
-    scale = float(minimap_info.get('scale', 1.0)) or 1.0
+    # Support du stretch X≠Y. Fallback sur 'scale' uniforme si scale_x/y absents.
+    sx = float(minimap_info.get('scale_x', minimap_info.get('scale', 1.0))) or 1.0
+    sy = float(minimap_info.get('scale_y', minimap_info.get('scale', 1.0))) or 1.0
     roi = frame_bgr[y1:y2, x1:x2]
     out = {'orange': [], 'blue': []}
     if roi.size == 0:
@@ -232,8 +234,8 @@ def detect_blobs(
         cmask = _color_mask(roi, color)
         for cx, cy, area in _digit_centroids_in_zone(roi, cmask):
             out[team].append({
-                'x':        cx / scale,
-                'y':        cy / scale,
+                'x':        cx / sx,
+                'y':        cy / sy,
                 'strength': area,
             })
     return out
@@ -245,7 +247,8 @@ def _render_debug(frame_bgr: np.ndarray, minimap_info: dict,
                    blobs: dict, out_path: str) -> None:
     """Overlay des blobs détectés sur le crop minimap, upscale ×3."""
     (x1, y1), (x2, y2) = minimap_info['box']
-    scale = float(minimap_info.get('scale', 1.0)) or 1.0
+    sx = float(minimap_info.get('scale_x', minimap_info.get('scale', 1.0))) or 1.0
+    sy = float(minimap_info.get('scale_y', minimap_info.get('scale', 1.0))) or 1.0
     roi = frame_bgr[y1:y2, x1:x2].copy()
     up = 3
     big = cv2.resize(roi, (roi.shape[1] * up, roi.shape[0] * up),
@@ -254,8 +257,8 @@ def _render_debug(frame_bgr: np.ndarray, minimap_info: dict,
                             ('blue',   (255, 165, 0))):
         for b in blobs[team]:
             # blob coords sont en template px → re-scale en ROI px → x up
-            px = int(b['x'] * scale * up)
-            py = int(b['y'] * scale * up)
+            px = int(b['x'] * sx * up)
+            py = int(b['y'] * sy * up)
             cv2.circle(big, (px, py), 10, color_bgr, 2)
             cv2.putText(big, f'{int(b["strength"])}',
                         (px + 12, py + 4),

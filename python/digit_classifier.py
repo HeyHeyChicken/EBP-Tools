@@ -148,7 +148,8 @@ class DigitClassifier:
             return False
 
         (x1, y1), (x2, y2) = minimap_info['box']
-        scale = float(minimap_info.get('scale', 1.0)) or 1.0
+        sx = float(minimap_info.get('scale_x', minimap_info.get('scale', 1.0))) or 1.0
+        sy = float(minimap_info.get('scale_y', minimap_info.get('scale', 1.0))) or 1.0
         roi = frame_bgr[y1:y2, x1:x2]
         if roi.size == 0:
             return {'orange': [], 'blue': []}
@@ -159,9 +160,9 @@ class DigitClassifier:
         all_crops: List[np.ndarray] = []
         for team, candidates in blobs.items():
             for b in candidates:
-                # Convert template-px → ROI-px pour cropping
-                cx = int(round(b['x'] * scale))
-                cy = int(round(b['y'] * scale))
+                # Convert template-px → ROI-px pour cropping (scale par axe).
+                cx = int(round(b['x'] * sx))
+                cy = int(round(b['y'] * sy))
                 xa = max(0, cx - _CROP_HALF)
                 ya = max(0, cy - _CROP_HALF)
                 xb = min(w, cx + _CROP_HALF + 1)

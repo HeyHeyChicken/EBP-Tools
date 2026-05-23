@@ -19,6 +19,7 @@ Usage :
     python3 benchmark_tracking.py <ground_truth.json> <video.mp4>
 """
 
+import datetime as _dt
 import json
 import os
 import sys
@@ -219,8 +220,8 @@ def _hungarian_distances(gt_pts: list, algo_pts: list) -> list:
     return distances
 
 
-def _evaluate(gt: Dict, algo: Dict) -> None:
-    """Calcule et affiche les métriques."""
+def _evaluate(gt: Dict, algo: Dict) -> Dict:
+    """Calcule et affiche les métriques. Retourne un dict sérialisable."""
     pos_distances: list = []           # distances de matching position-only
     pos_missed = 0                      # GT players sans match algo
     pos_extra = 0                       # algo detections sans GT
@@ -267,24 +268,49 @@ def _evaluate(gt: Dict, algo: Dict) -> None:
                 per_player.setdefault(key, []).append(-1.0)  # marqueur "wrong id"
 
     # ─── Affichage ────────────────────────────────────────────────────
+    pos_summary: Dict = {
+        'matches': 0,
+        'mean': None, 'median': None, 'p95': None,
+        'within_threshold_pct': None,
+        'threshold': _MATCH_THRESHOLD,
+        'gt_missed': pos_missed,
+        'algo_extra': pos_extra,
+    }
     print('\n=== Position-only (Hungarian par frame/team) ===')
     if pos_distances:
         arr = np.array(pos_distances)
+        within = float((arr <= _MATCH_THRESHOLD).sum() / len(arr) * 100)
+        pos_summary.update({
+            'matches': int(len(arr)),
+            'mean': float(arr.mean()),
+            'median': float(np.median(arr)),
+            'p95': float(np.percentile(arr, 95)),
+            'within_threshold_pct': within,
+        })
         print(f'  Matches : {len(arr)}')
         print(f'  Distance mean   : {arr.mean():.4f}')
         print(f'  Distance median : {np.median(arr):.4f}')
         print(f'  Distance p95    : {np.percentile(arr, 95):.4f}')
-        within = (arr <= _MATCH_THRESHOLD).sum() / len(arr) * 100
         print(f'  ≤ {_MATCH_THRESHOLD:.0%} threshold : {within:.1f}%')
     print(f'  GT sans match (joueurs ratés) : {pos_missed}')
     print(f'  Algo sans GT (faux positifs)  : {pos_extra}')
 
+    id_summary = {
+        'total': id_total,
+        'correct': id_correct,
+        'correct_pct': (100 * id_correct / id_total) if id_total else 0.0,
+        'wrong': id_wrong,
+        'wrong_pct': (100 * id_wrong / id_total) if id_total else 0.0,
+        'missed': id_missed,
+        'missed_pct': (100 * id_missed / id_total) if id_total else 0.0,
+    }
     print('\n=== Identification (team + number) ===')
     print(f'  Total GT entries : {id_total}')
-    print(f'  Correct          : {id_correct} ({100*id_correct/id_total:.1f}%)')
-    print(f'  Wrong number     : {id_wrong} ({100*id_wrong/id_total:.1f}%)')
-    print(f'  Missed           : {id_missed} ({100*id_missed/id_total:.1f}%)')
+    print(f'  Correct          : {id_correct} ({id_summary["correct_pct"]:.1f}%)')
+    print(f'  Wrong number     : {id_wrong} ({id_summary["wrong_pct"]:.1f}%)')
+    print(f'  Missed           : {id_missed} ({id_summary["missed_pct"]:.1f}%)')
 
+    per_player_out = []
     print('\n=== Par joueur (% correct / wrong / missed) ===')
     for key in sorted(per_player.keys()):
         team, num = key
@@ -296,10 +322,20 @@ def _evaluate(gt: Dict, algo: Dict) -> None:
         dists = [v for v in vals if v is not None and v >= 0]
         mean_d = (sum(dists) / len(dists)) if dists else None
         mean_s = f'mean_dist={mean_d:.4f}' if mean_d is not None else 'mean_dist=N/A'
+        per_player_out.append({
+            'team': team, 'number': num, 'frames': n,
+            'correct_pct': 100 * correct / n,
+            'wrong_pct': 100 * wrong / n,
+            'missed_pct': 100 * missed / n,
+            'mean_dist': mean_d,
+        })
         print(f'  {team} #{num}: {n} frames | '
               f'correct={100*correct/n:.1f}% '
               f'wrong={100*wrong/n:.1f}% '
               f'missed={100*missed/n:.1f}% | {mean_s}')
+
+    return {'position': pos_summary, 'identification': id_summary,
+            'per_player': per_player_out}
 
 
 def main():
@@ -317,7 +353,22 @@ def main():
                           valid_numbers=valid_numbers)
     n_added = _fill_temporal_gaps(algo)
     print(f'\n[temporal interp] +{n_added} detections interpolees')
-    _evaluate(gt, algo)
+    metrics = _evaluate(gt, algo)
+
+    out_path = os.path.join(os.path.dirname(os.path.abspath(gt_path)),
+                            'benchmark_result.json')
+    result = {
+        'map': map_name,
+        'video': os.path.basename(video_path),
+        'ground_truth': os.path.basename(gt_path),
+        'timestamp': _dt.datetime.now().isoformat(timespec='seconds'),
+        'n_timestamps': len(gt_ts_list),
+        'interpolated_detections': n_added,
+        **metrics,
+    }
+    with open(out_path, 'w') as f:
+        json.dump(result, f, indent=2)
+    print(f'\n[saved] {out_path}')
 
 
 if __name__ == '__main__':

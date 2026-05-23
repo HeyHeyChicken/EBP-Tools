@@ -2538,7 +2538,7 @@ def _get_digit_classifier():
 
 
 def _sample_team_colors_from_spawns(roi_bgr: np.ndarray, map_meta: dict,
-                                     scale: float):
+                                     scale, scale_y: Optional[float] = None):
     """Échantillonne les couleurs d'équipe depuis les polygones de spawn.
 
     Beaucoup plus fiable que de sampler depuis le HUD (où le score est sur
@@ -2546,9 +2546,16 @@ def _sample_team_colors_from_spawns(roi_bgr: np.ndarray, map_meta: dict,
     color réelle de la pastille). On prend la médiane de hue (sat≥80, val≥80)
     dans chaque polygone spawn.
 
+    Args:
+        scale: scale_x si scale_y est fourni. Sinon scale uniforme.
+        scale_y: scale Y independant (cas minimap etiree en Y). None →
+                 utilise `scale` pour les deux axes.
+
     Returns (orange_rgb, blue_rgb), avec None pour une équipe si pas assez
     de pixels saturés.
     """
+    sx = float(scale)
+    sy = float(scale_y) if scale_y is not None else sx
     h, w = roi_bgr.shape[:2]
     hsv = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
     hue, sat, val = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
@@ -2562,7 +2569,10 @@ def _sample_team_colors_from_spawns(roi_bgr: np.ndarray, map_meta: dict,
             poly = sp.get('polygon')
             if not poly:
                 continue
-            pts = (np.array(poly, dtype=np.float32) * scale).astype(np.int32)
+            arr = np.array(poly, dtype=np.float32)
+            arr[:, 0] *= sx
+            arr[:, 1] *= sy
+            pts = arr.astype(np.int32)
             cv2.fillPoly(mask, [pts], 255)
         sel = bright & (mask > 0)
         if int(sel.sum()) < 50:
@@ -2773,29 +2783,53 @@ def _track_players_on_minimap(
                       f'orange={sorted(valid_numbers["orange"])} '
                       f'blue={sorted(valid_numbers["blue"])}'})
 
-    # 1. Localisation minimap (seed mid-chunk).
-    seed_ts = (start_ts + end_ts) / 2.0
-    seed_rgb = _get_frame(cap, seed_ts)
-    if seed_rgb is None:
-        return []
-    seed_bgr = cv2.cvtColor(seed_rgb, cv2.COLOR_RGB2BGR)
-    info = _minimap.find_minimap_box(seed_bgr, map_name, min_score=0.0)
+    # 1+2. Localisation minimap + couleurs d'équipe, avec retry sur des seeds
+    # multiples. Une seed peut échouer pour 3 raisons :
+    #   (a) find_minimap_box ne trouve aucun match (filets de sécurité)
+    #   (b) la box trouvée est valide mais les spawns ne contiennent pas
+    #       assez de pixels saturés → couleurs None
+    #   (c) la frame n'est pas lisible (scène coupée)
+    # On essaie d'abord le milieu du chunk, puis on s'écarte par paliers.
+    tpl_w, tpl_h = md['size']
+    info = None
+    orange_rgb = blue_rgb = None
+    seed_bgr = None
+    mid = (start_ts + end_ts) / 2.0
+    span = end_ts - start_ts
+    offsets = (0.0, -30.0, 30.0, -60.0, 60.0, -120.0, 120.0,
+               -span * 0.25, span * 0.25, -span * 0.40, span * 0.40)
+    tried = []
+    for offset in offsets:
+        seed_ts = mid + offset
+        if seed_ts < start_ts or seed_ts > end_ts:
+            continue
+        rgb = _get_frame(cap, seed_ts)
+        if rgb is None:
+            continue
+        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        candidate = _minimap.find_minimap_box(bgr, map_name,  .0)
+        if candidate is None:
+            tried.append((seed_ts, 'no_box'))
+            continue
+        (cx1, cy1), (cx2, cy2) = candidate['box']
+        csx = float(candidate.get('scale_x', candidate.get('scale', 1.0))) or 1.0
+        csy = float(candidate.get('scale_y', candidate.get('scale', 1.0))) or 1.0
+        o, b = _sample_team_colors_from_spawns(
+            bgr[cy1:cy2, cx1:cx2], md, csx, scale_y=csy)
+        if o is None or b is None:
+            tried.append((seed_ts, f'colors=({o},{b})'))
+            continue
+        info, orange_rgb, blue_rgb, seed_bgr = candidate, o, b, bgr
+        break
     if info is None:
-        _emit({'log': '[player_tracking] minimap box not found, skipping'})
+        _emit({'log': f'[player_tracking] minimap+colors unresolved after '
+                      f'{len(tried)} seeds, skipping'})
         return []
     (x1, y1), (x2, y2) = info['box']
-    scale = float(info.get('scale', 1.0)) or 1.0
-    tpl_w, tpl_h = md['size']
+    sx = float(info.get('scale_x', info.get('scale', 1.0))) or 1.0
+    sy = float(info.get('scale_y', info.get('scale', 1.0))) or 1.0
     _emit({'log': f'[player_tracking] box=({x1},{y1})-({x2},{y2}) '
-                  f'score={info["score"]:.2f} scale={scale:.2f}'})
-
-    # 2. Sample couleurs d'équipe depuis les spawns.
-    roi = seed_bgr[y1:y2, x1:x2]
-    orange_rgb, blue_rgb = _sample_team_colors_from_spawns(roi, md, scale)
-    if orange_rgb is None or blue_rgb is None:
-        _emit({'log': f'[player_tracking] team colors unresolved '
-                       f'(orange={orange_rgb} blue={blue_rgb}), skipping'})
-        return []
+                  f'score={info["score"]:.2f} sx={sx:.3f} sy={sy:.3f}'})
     _emit({'log': f'[player_tracking] colors: orange={orange_rgb} '
                   f'blue={blue_rgb}'})
 

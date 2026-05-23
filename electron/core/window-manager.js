@@ -410,6 +410,15 @@ function createWindow(updateService) {
         }
     });
 
+    const langRootPattern = new RegExp(
+        `^https://${EBP_DOMAIN.replace(/\./g, '\\.')}/[a-z]{2}/?$`
+    );
+    mainWindow.webContents.on('did-navigate-in-page', async (event, url) => {
+        if (langRootPattern.test(url)) {
+            mainWindow.loadURL(HOME_URL);
+        }
+    });
+
     // Hides the menu bar displayed in the top left corner on Windows.
     mainWindow.setMenuBarVisibility(false);
 

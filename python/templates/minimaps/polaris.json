@@ -9,9 +9,76 @@
         "left": 8
     },
     "spawns": {
-        "orange": [],
-        "blue": []
+        "orange": [
+            {
+                "polygon": [
+                    [63, 128],
+                    [96, 128],
+                    [96, 182],
+                    [63, 182]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [354, 128],
+                    [388, 128],
+                    [388, 182],
+                    [354, 182]
+                ]
+            }
+        ]
     },
-    "teleporters": [],
+    "teleporters": [
+        {
+            "id": "tp_1_1",
+            "position": [172, 12],
+            "radius": 8,
+            "paired_with": "tp_1_2"
+        },
+        {
+            "id": "tp_1_2",
+            "position": [170, 174],
+            "radius": 8,
+            "paired_with": "tp_1_1"
+        },
+        {
+            "id": "tp_2_1",
+            "position": [280, 12],
+            "radius": 8,
+            "paired_with": "tp_2_2"
+        },
+        {
+            "id": "tp_2_2",
+            "position": [281, 174],
+            "radius": 8,
+            "paired_with": "tp_2_1"
+        },
+        {
+            "id": "tp_3_1",
+            "position": [20, 95],
+            "radius": 8,
+            "paired_with": "tp_3_2"
+        },
+        {
+            "id": "tp_3_2",
+            "position": [110, 215],
+            "radius": 8,
+            "paired_with": "tp_3_1"
+        },
+        {
+            "id": "tp_4_1",
+            "position": [430, 95],
+            "radius": 8,
+            "paired_with": "tp_4_2"
+        },
+        {
+            "id": "tp_4_2",
+            "position": [341, 215],
+            "radius": 8,
+            "paired_with": "tp_4_1"
+        }
+    ],
     "capture_points": []
 }

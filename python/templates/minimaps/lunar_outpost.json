@@ -9,9 +9,100 @@
         "left": 7
     },
     "spawns": {
-        "orange": [],
-        "blue": []
+        "orange": [
+            {
+                "polygon": [
+                    [37, 289],
+                    [110, 289],
+                    [110, 311],
+                    [37, 311]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [500, 7],
+                    [574, 7],
+                    [574, 29],
+                    [500, 29]
+                ]
+            }
+        ]
     },
-    "teleporters": [],
+    "teleporters": [
+        {
+            "id": "tp_1_1",
+            "position": [453, 53],
+            "radius": 10,
+            "paired_with": "tp_1_2"
+        },
+        {
+            "id": "tp_1_2",
+            "position": [403, 92],
+            "radius": 10,
+            "paired_with": "tp_1_1"
+        },
+        {
+            "id": "tp_2_1",
+            "position": [598, 128],
+            "radius": 10,
+            "paired_with": "tp_2_2"
+        },
+        {
+            "id": "tp_2_2",
+            "position": [329, 237],
+            "radius": 10,
+            "paired_with": "tp_2_1"
+        },
+        {
+            "id": "tp_3_1",
+            "position": [493, 148],
+            "radius": 10,
+            "paired_with": "tp_3_2"
+        },
+        {
+            "id": "tp_3_2",
+            "position": [54, 169],
+            "radius": 10,
+            "paired_with": "tp_3_1"
+        },
+        {
+            "id": "tp_4_1",
+            "position": [558, 149],
+            "radius": 10,
+            "paired_with": "tp_4_2"
+        },
+        {
+            "id": "tp_4_2",
+            "position": [119, 170],
+            "radius": 10,
+            "paired_with": "tp_4_1"
+        },
+        {
+            "id": "tp_5_1",
+            "position": [14, 190],
+            "radius": 10,
+            "paired_with": "tp_5_2"
+        },
+        {
+            "id": "tp_5_2",
+            "position": [285, 91],
+            "radius": 10,
+            "paired_with": "tp_5_1"
+        },
+        {
+            "id": "tp_6_1",
+            "position": [159, 265],
+            "radius": 10,
+            "paired_with": "tp_6_2"
+        },
+        {
+            "id": "tp_6_2",
+            "position": [210, 236],
+            "radius": 10,
+            "paired_with": "tp_6_1"
+        }
+    ],
     "capture_points": []
 }
