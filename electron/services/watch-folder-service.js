@@ -29,30 +29,43 @@ const {
 const SETTINGS_KEY_FOLDER = 'replayWatchFolder';
 const SUPPORTED_EXT = new Set(['.mp4', '.mkv', '.mov', '.avi', '.webm']);
 const AUTH_RETRY_INTERVAL_MS = 30 * 1000;
-const META_RE = /__mtpg-(\d+)$/;
+const MTPG_RE = /__mtpg-(\d+)/;
+const MGAST_RE = /__mgast-(\d+)/;
 // Nombre de games analysées en profondeur en parallèle (un process Python par
 // game). Ajuster selon les retours terrain : plus on monte, plus on sature CPU
 // / mémoire (chaque process recharge tesseract, templates, ouvre sa propre
-// VideoCapture). 1 = comportement séquentiel d'avant.
+// VideoCapture). 1 = comportement séquentiel d'avant. Surchargeable par fichier
+// via le suffixe `__mgast-N` (voir parseMeta).
 const DEEP_ANALYSIS_CONCURRENCY = 3;
 
 /**
- * Extrait la valeur `maxTimePerGame` encodée dans le nom du fichier par
- * `analyzeVideoFile` (suffixe `__mtpg-N` avant l'extension), et renvoie
- * un basename "propre" pour l'aval (cut filenames, sourceFilename API).
- * Si pas de suffixe (fichier déposé manuellement), maxTimePerGame est
- * undefined → fallback côté Python sur la valeur par défaut.
+ * Extrait les valeurs `maxTimePerGame` et `maxGamesAtSameTime` encodées dans le
+ * nom du fichier par `analyzeVideoFile` (suffixes `__mtpg-N` et `__mgast-M`
+ * avant l'extension), et renvoie un basename "propre" pour l'aval (cut
+ * filenames, sourceFilename API). Si un suffixe est absent (fichier déposé
+ * manuellement), la valeur correspondante est undefined → fallback sur la
+ * valeur par défaut côté Python / DEEP_ANALYSIS_CONCURRENCY.
  */
 function parseMeta(filePath) {
     const EXT = path.extname(filePath);
     const BASE = path.basename(filePath, EXT);
-    const M = BASE.match(META_RE);
-    if (!M) {
-        return { cleanBasename: BASE, maxTimePerGame: undefined };
+    const MTPG = BASE.match(MTPG_RE);
+    const MGAST = BASE.match(MGAST_RE);
+    if (!MTPG && !MGAST) {
+        return {
+            cleanBasename: BASE,
+            maxTimePerGame: undefined,
+            maxGamesAtSameTime: undefined
+        };
     }
+    const FIRST_IDX = Math.min(
+        MTPG ? MTPG.index : Infinity,
+        MGAST ? MGAST.index : Infinity
+    );
     return {
-        cleanBasename: BASE.slice(0, M.index),
-        maxTimePerGame: parseInt(M[1], 10)
+        cleanBasename: BASE.slice(0, FIRST_IDX),
+        maxTimePerGame: MTPG ? parseInt(MTPG[1], 10) : undefined,
+        maxGamesAtSameTime: MGAST ? parseInt(MGAST[1], 10) : undefined
     };
 }
 
@@ -309,20 +322,19 @@ async function processVideo(videoPath, deps) {
             bluePlayers: M ? M.bluePlayers : []
         };
     });
-    // Un process Python par game, plafonné à DEEP_ANALYSIS_CONCURRENCY en vol.
-    // Chaque process est totalement indépendant (sa propre VideoCapture, son
-    // propre OCR) — vraie parallélisation, pas de GIL. Si l'un crashe (`error`),
-    // on remonte la première erreur rencontrée — semantics identiques au cas
-    // séquentiel d'avant.
+    // Un process Python par game, plafonné à CONCURRENCY en vol. Chaque process
+    // est totalement indépendant (sa propre VideoCapture, son propre OCR) —
+    // vraie parallélisation, pas de GIL. Si l'un crashe (`error`), on remonte
+    // la première erreur rencontrée — semantics identiques au cas séquentiel
+    // d'avant.
+    const CONCURRENCY = META.maxGamesAtSameTime ?? DEEP_ANALYSIS_CONCURRENCY;
     const DEEP_T0 = Date.now();
-    const CHUNK_RESULTS = await mapWithLimit(
-        CHUNKS,
-        DEEP_ANALYSIS_CONCURRENCY,
-        (chunk) => deps.runChunkAnalyzer(videoPath, null, [chunk], SETTINGS)
+    const CHUNK_RESULTS = await mapWithLimit(CHUNKS, CONCURRENCY, (chunk) =>
+        deps.runChunkAnalyzer(videoPath, null, [chunk], SETTINGS)
     );
     const DEEP_ELAPSED_S = ((Date.now() - DEEP_T0) / 1000).toFixed(1);
     console.log(
-        `[watch-folder] deep analysis for ${path.basename(videoPath)}: ${DEEP_ELAPSED_S}s (${CHUNKS.length} games, concurrency=${DEEP_ANALYSIS_CONCURRENCY})`
+        `[watch-folder] deep analysis for ${path.basename(videoPath)}: ${DEEP_ELAPSED_S}s (${CHUNKS.length} games, concurrency=${CONCURRENCY})`
     );
     const FIRST_ERROR = CHUNK_RESULTS.find((r) => r && r.error);
     if (FIRST_ERROR) {
