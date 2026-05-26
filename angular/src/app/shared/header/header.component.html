@@ -35,23 +35,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
 <!-- #endregion -->
 <!-- #region RIGHT -->
 <div class="right">
-  <div>
-    <div
-      class="coins"
-      (click)="headerService.showCoinsPopup = !headerService.showCoinsPopup"
-    >
-      <ebp-coin></ebp-coin>
-      {{ identityService.coins ?? '...' }}
-      @if (headerService.showCoinsPopup) {
-        <div class="shadow"></div>
-        <div class="popup">
-          <button (click)="getMoreCoins()">
-            {{ 'shared.header.getMoreCoins' | translate }}
-          </button>
-        </div>
-      }
-    </div>
-  </div>
   <div class="language_selector">
     <img
       alt="Language flag"

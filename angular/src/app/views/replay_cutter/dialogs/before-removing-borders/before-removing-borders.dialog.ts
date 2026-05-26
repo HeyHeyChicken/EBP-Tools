@@ -5,7 +5,6 @@
 //#region Imports
 
 import { Component } from '@angular/core';
-
 import { MatDialogModule } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { GridModule } from '../../../../shared/grid/grid.module';

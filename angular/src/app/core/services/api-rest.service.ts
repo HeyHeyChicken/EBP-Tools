@@ -76,17 +76,6 @@ export class APIRestService {
   }
 
   /**
-   * Retrieves the number of tokens available in the current user's account.
-   * @returns An Observable emitting the token count as a number.
-   */
-  public getMyCoins(): Observable<number> {
-    const PARAMS = new HttpParams().set('r', 'coins');
-    return this.httpClient.get<number>(APIRestService.serverURL, {
-      params: PARAMS
-    });
-  }
-
-  /**
    * Fetches the list of teams managed by the current user.
    * @returns An Observable emitting an array of Team objects.
    */

@@ -164,28 +164,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
                       >
                         <i class="fa-solid fa-floppy-disk"></i>
                       </button>
-                      <button
-                        class="squared"
-                        [class.disabled]="
-                          disableUploadButton(game.map) || game.sentForAnalysis
-                        "
-                        (click)="selectWhichGameToAttachMinimap($index)"
-                        matTooltip="{{
-                          'view.replay_cutter.upload' | translate
-                        }}"
-                      >
-                        <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
-                      </button>
-                      @if (isDevMode) {
-                        <button
-                          class="squared"
-                          (click)="
-                            killFeedService.scan(videoPath!, games[$index])
-                          "
-                        >
-                          <i class="fa-sharp fa-solid fa-cloud-arrow-up"></i>
-                        </button>
-                      }
                     </div>
                   </td>
                 </tr>

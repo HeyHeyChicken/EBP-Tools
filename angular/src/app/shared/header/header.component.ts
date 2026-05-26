@@ -14,7 +14,6 @@ import { MatSelectChange, MatSelectModule } from '@angular/material/select';
 import { IdentityService } from '../../core/services/identity/identity.service';
 import { GlobalService } from '../../core/services/global.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { CoinComponent } from '../coin/coin.component';
 import { HeaderService } from './services/header.service';
 
 //#endregion
@@ -30,8 +29,7 @@ import { HeaderService } from './services/header.service';
     MatFormFieldModule,
     MatSelectModule,
     MatTooltipModule,
-    RouterModule,
-    CoinComponent
+    RouterModule
   ]
 })
 export class HeaderComponent implements OnInit {
@@ -124,14 +122,6 @@ export class HeaderComponent implements OnInit {
     this.router.navigate([
       `/${this.translateService.getCurrentLang()}/${event.value}`
     ]);
-  }
-
-  /**
-   * Initiates a coins checking loop and opens the external website page for acquiring more coins.
-   */
-  protected getMoreCoins(): void {
-    this.headerService.coinsCheckerLoop();
-    this.openURLExternalBrowser(this.globalService.webSiteURL + '/tokens');
   }
 
   /**

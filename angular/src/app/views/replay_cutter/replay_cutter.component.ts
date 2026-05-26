@@ -7,18 +7,15 @@
 import {
   Component,
   ElementRef,
-  HostListener,
   isDevMode,
   NgZone,
-  OnDestroy,
-  OnInit,
   ViewChild
 } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { GridModule } from '../../shared/grid/grid.module';
 import { LoaderComponent } from '../../shared/loader/loader.component';
-import Tesseract, { createWorker, PSM } from 'tesseract.js';
+import Tesseract, { createWorker } from 'tesseract.js';
 import { ToastrService } from 'ngx-toastr';
 import { Map } from './models/map';
 import { Game } from './models/game';
@@ -39,18 +36,11 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { MODES } from './models/mode';
 import { ReplayCutterEditTeamScoreDialog } from './dialogs/edit-score/edit-score.dialog';
-import { ReplayCutterAttachGameDialog } from './dialogs/attach-game/attach-game.dialog';
-import { ReplayCutterEditTeamNameDialog } from './dialogs/edit-team/edit-team.dialog';
 import { distance } from 'fastest-levenshtein';
-import { ReplayCutterCheckPlayersOrderDialog } from './dialogs/check-players-order/check-players-order.dialog';
-import { ReplayCutterReplayUploadedDialog } from './dialogs/replay-uploaded/replay-uploaded.dialog';
 import { ReplayCutterManualVideoCutDialog } from './dialogs/manual-video-cut/manual-video-cut.dialog';
 import { VideoChunk } from './models/video-chunk';
-import { KillFeedService } from './services/kill-feed.service';
 import { ReplayCutterEditMapDialog } from './dialogs/edit-map/edit-map.dialog';
 import { NotificationService } from '../notification/services/notification.service';
-import { HeaderService } from '../../shared/header/services/header.service';
-import { CropperPositionAndFrame } from './models/CropperPosition';
 import { ReplayCutterBeforeRemovingBordersDialog } from './dialogs/before-removing-borders/before-removing-borders.dialog';
 import { ReplayCutterService } from './services/replay-cutter.service';
 
@@ -70,14 +60,12 @@ import { ReplayCutterService } from './services/replay-cutter.service';
     FormsModule
   ]
 })
-export class ReplayCutterComponent implements OnInit, OnDestroy {
+export class ReplayCutterComponent {
   //#region Attributes
 
   @ViewChild('debug') debug?: ElementRef<HTMLDivElement>;
   public debugPause: boolean = false;
   private settings: Settings = new Settings();
-
-  private creatingAGame: number | undefined;
 
   protected percent: number = -1;
   protected inputFileDisabled: boolean = true;
@@ -165,15 +153,13 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
   constructor(
     protected readonly identityService: IdentityService,
     protected readonly globalService: GlobalService,
-    protected readonly killFeedService: KillFeedService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
     private readonly translateService: TranslateService,
     private readonly openCVService: OpenCVService,
     private readonly dialogService: MatDialog,
     private readonly apiRestService: APIRestService,
-    private readonly notificationService: NotificationService,
-    private readonly headerService: HeaderService
+    private readonly notificationService: NotificationService
   ) {}
 
   //#region Functions
@@ -184,9 +170,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
 
     this.initServices();
 
-    this.visibilityChangeHandler = this.visibilityChangeHandler.bind(this);
-    document.addEventListener('visibilitychange', this.visibilityChangeHandler);
-
     window.electronAPI.globalMessage(
       (i18nPath: string, i18nVariables: object) => {
         this.ngZone.run(() => {
@@ -196,55 +179,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
         });
       }
     );
-
-    window.electronAPI.gameIsUploaded((gameIndex) => {
-      this.ngZone.run(() => {
-        this.games[gameIndex].sentForAnalysis = true;
-        this.globalService.loading = undefined;
-        this.dialogService.open(ReplayCutterReplayUploadedDialog);
-        this.apiRestService.getMyCoins().subscribe((coins: number) => {
-          this.identityService.coins = coins;
-        });
-      });
-    });
-
-    window.electronAPI.analyzeVideoFile(
-      (
-        socket: string,
-        filePath: string,
-        forcedTraining: boolean | undefined
-      ) => {
-        this.ngZone.run(() => {
-          let training = forcedTraining;
-          if (!forcedTraining) {
-            training = this.training;
-          }
-          if (training) {
-            this.analyzeVideoFile(training, filePath);
-          }
-        });
-      }
-    );
-
-    // The server send the upscaling process percent to the font-end.
-    window.electronAPI.setUpscalePercent((percent: number) => {
-      this.ngZone.run(() => {
-        this.globalService.loading = '';
-
-        this.translateService
-          .get('view.notification.upscaling.description')
-          .subscribe((translated: string) => {
-            this.notificationService.sendMessage({
-              percent: percent,
-              infinite: false,
-              icon: undefined,
-              text: translated,
-              leftRounded: true,
-              state: 'info'
-            });
-          });
-      });
-    });
 
     // The server send the border removing process percent to the font-end.
     window.electronAPI.setRemoveBordersPercent((percent: number) => {
@@ -394,18 +328,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy(): void {
-    document.removeEventListener(
-      'visibilitychange',
-      this.visibilityChangeHandler
-    );
-  }
-
-  @HostListener('document:mousedown', ['$event'])
-  onDocumentClick(event: MouseEvent) {
-    this.visibilityChangeHandler();
-  }
-
   /**
    * Determines whether the upload button should be disabled based on video path and map configuration.
    * The button is disabled if no video is loaded or if the map has no configured margins.
@@ -492,214 +414,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * This function allows the user to select which game to attach the video to.
-   * @param gameIndex Index of the game to attach.
-   */
-  protected selectWhichGameToAttachMinimap(gameIndex: number): void {
-    if (
-      !this.disableUploadButton(this.games[gameIndex].map) &&
-      !this.games[gameIndex].sentForAnalysis
-    ) {
-      console.log(
-        `The user wants to analyze his game with EBP's AI... (game index: ${gameIndex})`
-      );
-      if (this.identityService.coins && this.identityService.coins > 0) {
-        console.log(
-          `The user has enough tokens.\nDetecting the start and end of gameplay...`
-        );
-        this.globalService.loading = '';
-        this.getGamePlayingBounds(this.games[gameIndex]).then((game) => {
-          if (game) {
-            console.log(
-              `We pick up the game on the EBP website on the "${game.map}" map and with the score ${game.orangeTeam.score}/${game.blueTeam.score}...`
-            );
-            this.apiRestService
-              .getGames(game.map, game.orangeTeam.score, game.blueTeam.score)
-              .subscribe({
-                next: (games: RestGame[]) => {
-                  this.sortPlayersFromGameFrame(
-                    gameIndex,
-                    {
-                      ID: 0,
-                      tags: [],
-                      date: new Date().toString(),
-                      orangePlayers: [],
-                      bluePlayers: []
-                    },
-                    (
-                      orangePlayersNames: string[],
-                      bluePlayersNames: string[]
-                    ) => {
-                      // We get the coordinates of the orange team's information.
-                      this.globalService.loading =
-                        this.translateService.instant(
-                          'view.replay_cutter.detectingOrangeInfoZone'
-                        );
-                      this.getTeamInfosPosition(
-                        gameIndex,
-                        new RGB(235, 121, 0),
-                        (orangeTeamInfosPosition: CropperPositionAndFrame) => {
-                          // We get the coordinates of the blue team's information.
-                          this.globalService.loading =
-                            this.translateService.instant(
-                              'view.replay_cutter.detectingBlueInfoZone'
-                            );
-                          this.getTeamInfosPosition(
-                            gameIndex,
-                            new RGB(29, 127, 255),
-                            (
-                              blueTeamInfosPosition: CropperPositionAndFrame
-                            ) => {
-                              const ORANGE_BLOC_IMAGE =
-                                ReplayCutterService.cropImage(
-                                  orangeTeamInfosPosition.frame!,
-                                  orangeTeamInfosPosition.x1,
-                                  orangeTeamInfosPosition.y1,
-                                  orangeTeamInfosPosition.x2,
-                                  orangeTeamInfosPosition.y2
-                                );
-
-                              const BLUE_BLOC_IMAGE =
-                                ReplayCutterService.cropImage(
-                                  blueTeamInfosPosition.frame!,
-                                  blueTeamInfosPosition.x1,
-                                  blueTeamInfosPosition.y1,
-                                  blueTeamInfosPosition.x2,
-                                  blueTeamInfosPosition.y2
-                                );
-
-                              if (ORANGE_BLOC_IMAGE && BLUE_BLOC_IMAGE) {
-                                const ORANGE_NAMES_IMAGE =
-                                  this.getPlayersNamesAsImage(
-                                    4,
-                                    ORANGE_BLOC_IMAGE,
-                                    true
-                                  ).toDataURL();
-                                const BLUE_NAMES_IMAGE =
-                                  this.getPlayersNamesAsImage(
-                                    4,
-                                    BLUE_BLOC_IMAGE,
-                                    false
-                                  ).toDataURL();
-
-                                if (ORANGE_BLOC_IMAGE && BLUE_BLOC_IMAGE) {
-                                  if (games && games.length > 0) {
-                                    const DIALOG_WIDTH: string =
-                                      'calc(100vw - 12px * 4)';
-                                    this.dialogService
-                                      .open(ReplayCutterAttachGameDialog, {
-                                        data: {
-                                          game: this.games[gameIndex],
-                                          games: games,
-                                          images: [
-                                            ORANGE_NAMES_IMAGE,
-                                            BLUE_NAMES_IMAGE
-                                          ],
-
-                                          orangePlayersNames:
-                                            orangePlayersNames,
-                                          bluePlayersNames: bluePlayersNames
-                                        },
-                                        autoFocus: false,
-                                        width: DIALOG_WIDTH,
-                                        maxWidth: '922px'
-                                      })
-                                      .afterClosed()
-                                      .subscribe(
-                                        (gameID: number | undefined | null) => {
-                                          if (gameID === undefined) {
-                                            this.globalService.loading =
-                                              undefined;
-                                          } else if (gameID === null) {
-                                            this.createGame(
-                                              gameIndex,
-                                              orangePlayersNames,
-                                              bluePlayersNames,
-                                              [
-                                                ORANGE_NAMES_IMAGE,
-                                                BLUE_NAMES_IMAGE
-                                              ]
-                                            );
-                                          } else {
-                                            this.cropGameMinimap(
-                                              gameIndex,
-                                              games.find(
-                                                (game) => game.ID == gameID
-                                              )!,
-                                              orangeTeamInfosPosition,
-                                              blueTeamInfosPosition,
-                                              ORANGE_NAMES_IMAGE,
-                                              BLUE_NAMES_IMAGE
-                                            );
-                                          }
-                                        }
-                                      );
-                                  } else {
-                                    this.globalService.loading = undefined;
-                                    this.translateService
-                                      .get(
-                                        'view.replay_cutter.toast.noGamesFoundInStatistics',
-                                        {
-                                          map: game.map,
-                                          orangeScore: game.orangeTeam.score,
-                                          blueScore: game.blueTeam.score
-                                        }
-                                      )
-                                      .subscribe((translated: string) => {
-                                        this.globalService.loading = undefined;
-                                        this.toastrService
-                                          .error(translated, undefined, {
-                                            enableHtml: true,
-                                            timeOut: 20 * 1000
-                                          })
-                                          .onTap.subscribe(() => {
-                                            localStorage.setItem(
-                                              'notification_images',
-                                              JSON.stringify([
-                                                ORANGE_NAMES_IMAGE,
-                                                BLUE_NAMES_IMAGE
-                                              ])
-                                            );
-
-                                            this.createGame(
-                                              gameIndex,
-                                              orangePlayersNames,
-                                              bluePlayersNames,
-                                              [
-                                                ORANGE_NAMES_IMAGE,
-                                                BLUE_NAMES_IMAGE
-                                              ]
-                                            );
-                                          });
-                                      });
-                                  }
-                                } else {
-                                  console.error(
-                                    "'selectWhichGameToAttachMinimap': Team images are missing."
-                                  );
-                                }
-                              }
-                            },
-                            orangeTeamInfosPosition.frame
-                          );
-                        }
-                      );
-                    }
-                  );
-                }
-              });
-          } else {
-            console.error(`"selectWhichGameToAttachMinimap", no game found.`);
-          }
-        });
-      } else {
-        console.error(`The user does not have enough tokens.`);
-        this.headerService.showCoinsPopup = true;
-      }
-    }
-  }
-
-  /**
    * Opens the browser's default browser to create a new game with the specified players.
    * - Stores player images in localStorage for the notifications
    * - Sets the current game as being created.
@@ -717,7 +431,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     playersImages: string[]
   ): void {
     localStorage.setItem('notification_images', JSON.stringify(playersImages));
-    this.creatingAGame = gameIndex;
     this.translateService
       .get('view.replay_cutter.toast.createGameOnEBPHelper')
       .subscribe((translated: string) => {
@@ -954,124 +667,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
     } else {
       console.error('Error: "detectMinimap", this._videoPath is undefined.');
     }
-  }
-
-  /**
-   * This function allows the user to set the game mini map position.
-   * @param gameIndex Index of the game to upload.
-   * @param gameFromStatistics Game infos from EBP's API.
-   */
-  protected cropGameMinimap(
-    gameIndex: number,
-    gameFromStatistics: RestGame,
-    orangeTeamInfosPosition: CropperPosition,
-    blueTeamInfosPosition: CropperPosition,
-    orangeNamesAsImage: string,
-    blueNamesAsImage: string
-  ): void {
-    const MAP_NAME = this._games[gameIndex].map;
-
-    // If the positions are already defined for this map, use them directly.
-    if (this.miniMapPositionsByMap[MAP_NAME]) {
-      this.uploadGameMiniMap(
-        gameIndex,
-        this.miniMapPositionsByMap[MAP_NAME][0],
-        this.miniMapPositionsByMap[MAP_NAME][1],
-        gameFromStatistics,
-        orangeTeamInfosPosition,
-        blueTeamInfosPosition,
-        orangeNamesAsImage,
-        blueNamesAsImage
-      );
-      return;
-    }
-
-    this.detectMinimap(
-      this._games[gameIndex],
-      (position: CropperPosition, videoFrame: HTMLCanvasElement) => {
-        const DIALOG_WIDTH: string = 'calc(100vw - 12px * 4)';
-        const DIALOG_HEIGHT: string = 'calc(100vh - 12px * 4)';
-        this.dialogService
-          .open(ReplayCutterCropDialog, {
-            data: {
-              imgBase64: videoFrame.toDataURL('image/png'),
-              initialCropperPosition: position,
-              component: this,
-              gameIndex: gameIndex
-            },
-            maxWidth: DIALOG_WIDTH,
-            maxHeight: DIALOG_HEIGHT,
-            width: DIALOG_WIDTH,
-            height: DIALOG_HEIGHT,
-            autoFocus: false
-          })
-          .afterClosed()
-          .subscribe((miniMapPositions: CropperPosition | undefined) => {
-            window.electronAPI.setWindowSize();
-            this.globalService.loading = undefined;
-            if (miniMapPositions) {
-              const MAP = this.maps.find(
-                (x) => x.name == this.games[gameIndex].map
-              );
-
-              if (MAP) {
-                let margedMiniMapPositions = JSON.parse(
-                  JSON.stringify(miniMapPositions)
-                );
-                if (MAP.mapMargins) {
-                  const HEIGHT = miniMapPositions.y2 - miniMapPositions.y1;
-                  const WIDTH = miniMapPositions.x2 - miniMapPositions.x1;
-                  const X = Math.min(
-                    miniMapPositions.x1,
-                    (WIDTH * MAP.mapMargins[3]) / 100
-                  );
-                  const Y = Math.min(
-                    miniMapPositions.y1,
-                    (HEIGHT * MAP.mapMargins[0]) / 100
-                  );
-
-                  margedMiniMapPositions = {
-                    x1: miniMapPositions.x1 - X,
-                    x2:
-                      miniMapPositions.x2 +
-                      (MAP.mapMargins[1] == MAP.mapMargins[3]
-                        ? X
-                        : (WIDTH * MAP.mapMargins[1]) / 100),
-                    y1: miniMapPositions.y1 - Y,
-                    y2:
-                      miniMapPositions.y2 +
-                      (MAP.mapMargins[0] == MAP.mapMargins[2]
-                        ? Y
-                        : (HEIGHT * MAP.mapMargins[2]) / 100)
-                  };
-                }
-
-                miniMapPositions = {
-                  x1: Math.round(miniMapPositions.x1),
-                  x2: Math.round(miniMapPositions.x2),
-                  y1: Math.round(miniMapPositions.y1),
-                  y2: Math.round(miniMapPositions.y2)
-                };
-
-                this.miniMapPositionsByMap[MAP_NAME] = [
-                  miniMapPositions,
-                  margedMiniMapPositions
-                ];
-                this.uploadGameMiniMap(
-                  gameIndex,
-                  miniMapPositions,
-                  margedMiniMapPositions,
-                  gameFromStatistics,
-                  orangeTeamInfosPosition,
-                  blueTeamInfosPosition,
-                  orangeNamesAsImage,
-                  blueNamesAsImage
-                );
-              }
-            }
-          });
-      }
-    );
   }
 
   /**
@@ -1437,117 +1032,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
         }
       );
     }
-  }
-
-  /**
-   * This function allows the user to upload their cut game.
-   * @param gameIndex Index of the game to upload.
-   * @param miniMapPositions Position of the minimap.
-   * @param gameID ID of the game.
-   */
-  private uploadGameMiniMap(
-    gameIndex: number,
-    miniMapPositions: CropperPosition,
-    margedMiniMapPositions: CropperPosition,
-    gameFromStatistics: RestGame,
-    orangeTeamInfosPosition: CropperPosition,
-    blueTeamInfosPosition: CropperPosition,
-    orangeNamesAsImage: string,
-    blueNamesAsImage: string
-  ): void {
-    if (this._videoPath) {
-      // We sort the list of players in the correct order.
-      this.globalService.loading = this.translateService.instant(
-        'view.replay_cutter.detectingPlayerNicknames'
-      );
-      this.sortPlayersFromGameFrame(
-        gameIndex,
-        gameFromStatistics,
-        (
-          sortedOrangePlayersNames: string[],
-          sortedBluePlayersNames: string[]
-        ) => {
-          this.dialogService
-            .open(ReplayCutterCheckPlayersOrderDialog, {
-              data: {
-                orangePlayersNames: sortedOrangePlayersNames,
-                bluePlayersNames: sortedBluePlayersNames,
-                orangeNamesAsImage: orangeNamesAsImage,
-                blueNamesAsImage: blueNamesAsImage,
-                replayCutterComponent: this,
-                gameIndex: gameIndex
-              },
-              autoFocus: false,
-              width: '500px'
-            })
-            .afterClosed()
-            .subscribe(
-              (newData: {
-                orangePlayersNames: string[];
-                bluePlayersNames: string[];
-              }) => {
-                if (newData) {
-                  const TOP_INFOS_WIDTH: number = 556;
-                  const TOP_INFOS_HEIGHT: number = 78;
-                  const TOP_INFOS_POSITION: CropperPosition = {
-                    x1: (1920 - TOP_INFOS_WIDTH) / 2,
-                    y1: 0,
-                    x2: (1920 + TOP_INFOS_WIDTH) / 2,
-                    y2: TOP_INFOS_HEIGHT
-                  };
-                  window.electronAPI.uploadGameMiniMap(
-                    gameIndex,
-                    this._games[gameIndex],
-                    miniMapPositions,
-                    margedMiniMapPositions,
-                    decodeURIComponent(this._videoPath!),
-                    gameFromStatistics.ID,
-                    orangeTeamInfosPosition,
-                    blueTeamInfosPosition,
-                    TOP_INFOS_POSITION,
-                    newData.orangePlayersNames,
-                    newData.bluePlayersNames
-                  );
-                } else {
-                  this.globalService.loading = undefined;
-                }
-              }
-            );
-        }
-      );
-    }
-  }
-
-  /**
-   * Determines the actual start and end times when a game is playing within a video.
-   * It checks both the start and end bounds by analyzing the video frames.
-   * @param game The game object containing initial start and end times.
-   * @returns A promise resolving to the updated game with corrected bounds, or null if not found.
-   */
-  private getGamePlayingBounds(game: Game): Promise<Game | null> {
-    return new Promise((resolve) => {
-      const GAME = new Game(game.mode);
-      const URL: string = `http://localhost:${this.globalService.serverPort}/file?path=${this.videoPath}`;
-
-      //console.log('Getting game start...');
-      //this.getGamePlayingBound(URL, GAME, game.start, 1).then((start) => {
-      //if (start !== null) {
-      //game.start = start;
-
-      console.log('Getting game end...');
-      this.getGamePlayingBound(URL, GAME, game.end, -1).then((end) => {
-        if (end !== null) {
-          game.end = end;
-          resolve(game);
-        } else {
-          resolve(null);
-        }
-      });
-      //} else {
-      //  resolve(null);
-      //}
-      //});
-    });
   }
 
   /**
@@ -2468,20 +1952,6 @@ export class ReplayCutterComponent implements OnInit, OnDestroy {
         }
       );
     });
-  }
-
-  /**
-   * Handler called when the page visibility changes.
-   * If the page becomes visible and a game is being created, it removes any notification via the Electron API.
-   */
-  private visibilityChangeHandler(): void {
-    if (!document.hidden) {
-      if (this.creatingAGame !== undefined) {
-        window.electronAPI.removeNotification(true);
-        this.selectWhichGameToAttachMinimap(this.creatingAGame);
-        this.creatingAGame = undefined;
-      }
-    }
   }
 
   protected openRemoveBorderDialog(): void {

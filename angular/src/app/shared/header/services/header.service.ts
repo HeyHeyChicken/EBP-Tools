@@ -25,27 +25,4 @@ export class HeaderService {
     private readonly identityService: IdentityService,
     private readonly apiRestService: APIRestService
   ) {}
-
-  //#region Functions
-
-  public coinsCheckerLoop(
-    loopIndex: number = 0,
-    maxLoop: number = (60 * 5) / 3
-  ): void {
-    const OLD_COINS_VALUE = this.identityService.coins;
-    this.apiRestService.getMyCoins().subscribe((coins: number) => {
-      this.identityService.coins = coins;
-      if (OLD_COINS_VALUE == coins) {
-        if (loopIndex < maxLoop) {
-          setTimeout(() => {
-            this.coinsCheckerLoop(loopIndex + 1);
-          }, 1000 * 3);
-        }
-      }
-
-      this.identityService.coins = coins;
-    });
-  }
-
-  //#endregion
 }

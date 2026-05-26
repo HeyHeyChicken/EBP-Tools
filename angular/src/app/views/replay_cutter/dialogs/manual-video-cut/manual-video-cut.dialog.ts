@@ -11,7 +11,6 @@ import {
   Inject,
   ViewChild
 } from '@angular/core';
-
 import {
   MAT_DIALOG_DATA,
   MatDialogContent,

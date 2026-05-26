@@ -161,18 +161,6 @@ export class App implements OnInit {
                       }
                     }
                   );
-
-                // Get account coins
-                this.apiRestService.getMyCoins().subscribe((coins: number) => {
-                  this.identityService.coins = coins;
-                });
-                setInterval(() => {
-                  this.apiRestService
-                    .getMyCoins()
-                    .subscribe((coins: number) => {
-                      this.identityService.coins = coins;
-                    });
-                }, 60 * 1000);
               });
           }
         });
