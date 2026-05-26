@@ -2958,19 +2958,24 @@ def _track_players_on_minimap(
         map_name              : nom canonique de la map.
 
     Returns:
-        Liste de dicts sérialisables, un par (team, number) détecté :
-          {team, id, slot, number, history: [[t, x_pct, y_pct], ...]}
-        Vide si la map metadata est absente ou si la pipeline échoue.
+        Tuple (tracks, minimap_position) :
+          - tracks : liste de dicts sérialisables, un par (team, number) détecté :
+              {team, id, slot, number, history: [[t, x_pct, y_pct], ...]}
+            Vide si la map metadata est absente ou si la pipeline échoue.
+          - minimap_position : [x1, y1, x2, y2] en fractions [0,1] du frame
+            (WIDTH×HEIGHT), ou None si la localisation a échoué. Permet au
+            front de positionner l'overlay minimap pile sur la zone détectée
+            (le placement HUD varie d'une partie à l'autre même sur la même map).
     """
     md = _map_metadata.load(map_name)
     if md is None:
         _emit({'log': f'[player_tracking] no map_metadata for {map_name!r}, skipping'})
-        return []
+        return [], None
 
     classifier = _get_digit_classifier()
     if classifier is None:
         _emit({'log': '[player_tracking] no classifier available, skipping'})
-        return []
+        return [], None
 
     valid_numbers = _valid_numbers_from_roster(n_orange, n_blue) if (n_orange or n_blue) else None
     if valid_numbers:
@@ -3024,10 +3029,21 @@ def _track_players_on_minimap(
     if info is None:
         _emit({'log': f'[player_tracking] minimap+colors unresolved after '
                       f'{len(tried)} seeds, skipping'})
-        return []
+        return [], None
     (x1, y1), (x2, y2) = info['box']
     sx = float(info.get('scale_x', info.get('scale', 1.0))) or 1.0
     sy = float(info.get('scale_y', info.get('scale', 1.0))) or 1.0
+    # `info['box']` couvre le template COMPLET, marges transparentes incluses
+    # (utile au tracker pour capter les joueurs qui débordent au bord). Pour le
+    # front on veut la zone INNER visible : inset des marges × scale. Sans
+    # marges déclarées, inset = 0 → fallback sur la box brute.
+    _m = md.get('margins') or {}
+    inner_x1 = x1 + float(_m.get('left',   0)) * sx
+    inner_y1 = y1 + float(_m.get('top',    0)) * sy
+    inner_x2 = x2 - float(_m.get('right',  0)) * sx
+    inner_y2 = y2 - float(_m.get('bottom', 0)) * sy
+    minimap_position = [inner_x1 / WIDTH, inner_y1 / HEIGHT,
+                        inner_x2 / WIDTH, inner_y2 / HEIGHT]
     _emit({'log': f'[player_tracking] box=({x1},{y1})-({x2},{y2}) '
                   f'score={info["score"]:.2f} sx={sx:.3f} sy={sy:.3f}'})
     _emit({'log': f'[player_tracking] colors: orange={orange_rgb} '
@@ -3107,7 +3123,7 @@ def _track_players_on_minimap(
     _emit({'log': f'[player_tracking] done: {len(out)} (team, number) tracks, '
                   f'{detections_total} total detections, '
                   f'{detections_rejected_dead} rejetees (joueur mort)'})
-    return out
+    return out, minimap_position
 
 
 # Score à partir duquel on considère la localisation suffisamment fiable
@@ -4346,7 +4362,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # score final. Encapsulée dans try/except : si ça plante, on continue
         # l'analyse OCR (player_tracks reste vide dans le payload).
         try:
-            PLAYER_TRACKS = _track_players_on_minimap(
+            PLAYER_TRACKS, MINIMAP_POSITION = _track_players_on_minimap(
                 CAP, float(START), float(END - END_NON_GAMEPLAY),
                 MAP_NAME,
                 n_orange=len(ORANGE_ROSTER),
@@ -4356,6 +4372,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         except Exception as exc:
             _emit({'log': f'[player_tracking] FAILED: {exc}'})
             PLAYER_TRACKS = []
+            MINIMAP_POSITION = None
 
         CHUNK_PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 100
         _emit({
@@ -4372,6 +4389,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     'orange_color': list(RESOLVED_ORANGE) if RESOLVED_ORANGE else None,
                     'blue_color': list(RESOLVED_BLUE) if RESOLVED_BLUE else None,
                     'players_tracks': PLAYER_TRACKS,
+                    'minimap_position': MINIMAP_POSITION,
                 },
             }],
         })
