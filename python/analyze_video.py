@@ -53,10 +53,16 @@ MODES = [
         'scoreFrame': [
             # Variante 0 : score frame classique
             {
-                'identify': [
-                    (78, 412, TEAM_ORANGE),  # orange team circle
-                    (78, 745, TEAM_BLUE),    # blue team circle
-                ],
+                # Détection par silhouette des pills (templates/score/classic.png).
+                # Robuste aux couleurs d'équipe (Classic, Pro, Local League,
+                # Summit) et au décodeur vidéo (D3D11 décale les RGB sur Windows,
+                # ce qui cassait l'ancienne détection par pixels colorés).
+                # anchor = position (x, y) attendue du coin top-left du
+                # template dans le frame quand le HUD n'est pas décalé.
+                'template': {
+                    'name': 'score/classic.png',
+                    'anchor': (72, 390),
+                },
                 # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
                 # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
                 # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
@@ -73,10 +79,40 @@ MODES = [
             },
             # Variante 1 : score frame compétitive
             {
-                'identify': [
-                    (380, 459, TEAM_ORANGE),  # orange team circle
-                    (1540, 624, TEAM_BLUE),    # blue team circle
-                ],
+                # Détection par silhouette des pills (templates/score/pro_league.png).
+                # Layout horizontal : pill orange à gauche, pill bleu à droite,
+                # avec "EVA PRO LEAGUE" branding au centre. Couleurs d'équipe
+                # tournoi (vert/teal) → seuils HSV plus permissifs car V<150.
+                'template': {
+                    'name': 'score/pro_league.png',
+                    'anchor': (323, 455),
+                    # Le branding "EVA PRO LEAGUE" au centre est gris/blanc
+                    # (saturation faible). On binarise par luminance V seule
+                    # (sat_min=0) pour capter à la fois les pills colorés et
+                    # le texte clair. La zone de recherche restreinte
+                    # (anchor ± max_shift) limite les faux positifs.
+                    'sat_min': 0,
+                    'val_min': 100,
+                    # Score seuil élevé et scales limités : vrais matchs à
+                    # 0.97 scale=1.0, faux positifs à 0.82-0.89 scales 0.95/1.05.
+                    'min_score': 0.93,
+                    'scales': (0.98, 1.0, 1.02),
+                    'max_shift': 15,
+                    # Layout horizontal (pills gauche/droite, pas top/bottom)
+                    # → la validation pill_top/middle/pill_bot ne s'applique pas.
+                    'skip_post_validation': True,
+                    # Validation par régions sur la saturation HSV. Un vrai
+                    # score frame pro_league a :
+                    # - left pill colorée (sat >= 100 dans >50% de la zone)
+                    # - right pill colorée (sat >= 100 dans >40% de la zone)
+                    # - texte EVA PRO LEAGUE gris/blanc (sat >= 100 dans <30%)
+                    # Coords (x1, y1, x2, y2, sat_min, min_ratio, max_ratio).
+                    'validate_regions': [
+                        (5, 0, 106, 34, 100, 0.4, 1.0),       # left pill saturated
+                        (1166, 135, 1267, 168, 100, 0.4, 1.0),  # right pill saturated
+                        (556, 64, 717, 104, 100, 0.0, 0.3),    # EVA text gray
+                    ],
+                },
                 # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
                 # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
                 # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
@@ -450,46 +486,6 @@ def _ocr_color_masked(
 # ---------------------------------------------------------------------------
 # Frame type detection — mirrors detect* functions from the TypeScript service
 # ---------------------------------------------------------------------------
-
-def _identify_offset(frame: np.ndarray, identify: list, tol_pos: int = 20, tol_color: int = 20):
-    """
-    Cherche l'offset (dx, dy) auquel les pixels d'identification matchent dans le frame.
-    Pour chaque (x, y, colors), scanne une zone (2*tol_pos+1)² autour de (x, y) et
-    note le centroïde des pixels matchant l'une des couleurs autorisées (tol_color
-    par canal). Si tous les points matchent, retourne la moyenne des décalages — un
-    seul (dx, dy) qui représente le glissement global du HUD.
-
-    Retourne None si au moins un point d'identify ne matche aucune couleur dans sa zone.
-    """
-    h, w = frame.shape[:2]
-    offsets = []
-    for (x, y, colors) in identify:
-        x = int(x); y = int(y)
-        x1 = max(0, x - tol_pos)
-        x2 = min(w, x + tol_pos + 1)
-        y1 = max(0, y - tol_pos)
-        y2 = min(h, y + tol_pos + 1)
-        roi = frame[y1:y2, x1:x2].astype(np.int16)
-        matched = False
-        for c in colors:
-            target = np.array(c, dtype=np.int16)
-            mask = (np.abs(roi - target) <= tol_color).all(axis=2)
-            if mask.any():
-                ys, xs = np.where(mask)
-                # Centroïde des pixels matchants → position absolue dans le frame
-                cx = xs.mean() + x1
-                cy = ys.mean() + y1
-                offsets.append((cx - x, cy - y))
-                matched = True
-                break
-        if not matched:
-            return None
-    if not offsets:
-        return None
-    dx = sum(o[0] for o in offsets) / len(offsets)
-    dy = sum(o[1] for o in offsets) / len(offsets)
-    return (dx, dy)
-
 
 def _shift_box(box, dx, dy):
     """Translate une région ((x1,y1), (x2,y2)) par (dx, dy)."""
@@ -1449,6 +1445,171 @@ def _resolve_region(spec, frame: np.ndarray, dx: float = 0, dy: float = 0):
     return _shift_box(spec, dx, dy)
 
 
+_SCORE_FRAME_TEMPLATE_CACHE: dict = {}
+
+
+def _get_score_frame_template(name: str):
+    """Charge (et cache) un template score frame depuis `templates/{name}`.
+    Le PNG doit être RGBA : pixels opaques = silhouette des éléments d'équipe
+    à matcher (saturés dans le frame), pixels transparents = ignorés (zone où
+    le contenu peut varier — texte de score, fond, etc.). La distance entre
+    les éléments opaques sert d'ancre géométrique anti-faux-positif.
+
+    Retourne (tpl_bw, mask) en uint8, ou (None, None) si pas trouvé.
+    """
+    if name in _SCORE_FRAME_TEMPLATE_CACHE:
+        return _SCORE_FRAME_TEMPLATE_CACHE[name]
+    base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, 'templates', name)
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED) if os.path.isfile(path) else None
+    if img is None or img.ndim != 3 or img.shape[2] != 4:
+        _SCORE_FRAME_TEMPLATE_CACHE[name] = (None, None)
+        return (None, None)
+    alpha = img[:, :, 3]
+    opaque = alpha > 100
+    tpl_bw = np.where(opaque, 255, 0).astype(np.uint8)
+    mask = opaque.astype(np.uint8) * 255
+    _SCORE_FRAME_TEMPLATE_CACHE[name] = (tpl_bw, mask)
+    return (tpl_bw, mask)
+
+
+def _frame_to_saturation_bw(frame: np.ndarray, sat_min: int = 150, val_min: int = 150) -> np.ndarray:
+    """Binarise un frame RGB : pixels saturés (= couleurs d'équipe) → blanc,
+    fond sombre / neutre → noir. Indépendant de la teinte → robuste aux
+    variations de couleurs entre ligues (Classic orange, Local League violet,
+    Summit pink, …) et aux décalages YUV→RGB des décodeurs (D3D11 vs AVFoundation).
+
+    Seuils ajustés pour rejeter les fonds de map saturés (cyan d'Artefact,
+    teintes vives diverses). Les pills d'équipe ont S>=200 et V>=240, donc
+    150/150 garde un large marge tout en excluant les backgrounds typiques.
+    """
+    hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+    s = hsv[:, :, 1]
+    v = hsv[:, :, 2]
+    return np.where((s >= sat_min) & (v >= val_min), 255, 0).astype(np.uint8)
+
+
+def _match_score_frame_template(frame: np.ndarray, name: str,
+                                anchor=None, max_shift: int = 30,
+                                scales=(0.95, 0.98, 1.0, 1.02, 1.05),
+                                min_score: float = 0.82,
+                                sat_min: int = 150, val_min: int = 150,
+                                skip_post_validation: bool = False,
+                                validate_regions=None):
+    """Cherche le template score frame dans le frame via matchTemplate masqué.
+    Le frame est binarisé par saturation HSV (couleur indépendante). Le
+    template fournit (silhouette, mask) — le mask cantonne le calcul aux
+    pixels opaques (pills d'équipe uniquement), ignorant tout ce qu'il y a
+    entre les pills (chiffres de score, fond, etc.).
+
+    `anchor` (x, y) : position canonique attendue du coin top-left du
+    template dans le frame quand le HUD est aligné. `max_shift` borne le
+    décalage HUD acceptable — un match plus loin qu'`anchor ± max_shift`
+    indique un faux positif (autre zone saturée du gameplay).
+
+    On exige aussi que le match ne soit pas collé au bord de la fenêtre de
+    recherche : un match au bord signale souvent que le vrai pic est hors
+    fenêtre (signal de faux positif fuyant).
+
+    Retourne (match_x, match_y, best_score, best_scale) ou None.
+    """
+    tpl_bw, mask = _get_score_frame_template(name)
+    if tpl_bw is None:
+        return None
+    frame_bw = _frame_to_saturation_bw(frame, sat_min=sat_min, val_min=val_min)
+    fh, fw = frame_bw.shape
+
+    if anchor is None:
+        return None  # template matching sans ancre = risque trop élevé de FP
+    ax, ay = anchor
+    # On élargit la fenêtre de search de quelques px au-delà de max_shift pour
+    # détecter (et rejeter) les matchs collés au bord.
+    border = 5
+    pad = max_shift + border
+    sx1 = max(0, int(ax - pad))
+    sy1 = max(0, int(ay - pad))
+    sx2 = min(fw, int(ax + pad + tpl_bw.shape[1]))
+    sy2 = min(fh, int(ay + pad + tpl_bw.shape[0]))
+    if sx2 <= sx1 or sy2 <= sy1:
+        return None
+    sub = frame_bw[sy1:sy2, sx1:sx2]
+
+    best_score = -1.0
+    best_loc = None
+    best_scale = None
+    for scale in scales:
+        th = int(tpl_bw.shape[0] * scale)
+        tw = int(tpl_bw.shape[1] * scale)
+        if th < 10 or tw < 10 or th >= sub.shape[0] or tw >= sub.shape[1]:
+            continue
+        rtpl = cv2.resize(tpl_bw, (tw, th), interpolation=cv2.INTER_NEAREST)
+        rmask = cv2.resize(mask, (tw, th), interpolation=cv2.INTER_NEAREST)
+        try:
+            res = cv2.matchTemplate(sub, rtpl, cv2.TM_CCORR_NORMED, mask=rmask)
+        except cv2.error:
+            continue
+        res = np.nan_to_num(res, nan=-1.0, posinf=-1.0, neginf=-1.0)
+        _, mx, _, loc = cv2.minMaxLoc(res)
+        if mx > best_score:
+            best_score = mx
+            best_loc = loc
+            best_scale = scale
+    if best_score < min_score or best_loc is None:
+        return None
+    abs_x = best_loc[0] + sx1
+    abs_y = best_loc[1] + sy1
+    # Rejette si décalage hors max_shift (le match a fui dans la zone de bordure)
+    if abs(abs_x - ax) > max_shift or abs(abs_y - ay) > max_shift:
+        return None
+    # Validation post-match : un vrai score frame a une saturation MODÉRÉE et
+    # UNIFORME (~0.20-0.40) dans les 3 bandes : pill_top, milieu (chiffres),
+    # pill_bot. Un faux positif (élément HUD saturé qui matche par hasard la
+    # silhouette des pills) montre une saturation extrême (>0.55 ou <0.10)
+    # dans au moins une bande. Skip si demandé (templates dont le layout
+    # n'a pas la structure pill_top/middle/pill_bot — ex. pro_league
+    # horizontal au lieu de vertical).
+    if not skip_post_validation:
+        s_scale = best_scale
+        th = int(tpl_bw.shape[0] * s_scale)
+        tw = int(tpl_bw.shape[1] * s_scale)
+        pill_h = int(34 * s_scale)
+        bbox = frame_bw[abs_y:abs_y + th, abs_x:abs_x + tw]
+        if bbox.shape[0] < th or bbox.shape[1] < tw:
+            return None
+        band_top = bbox[:pill_h]
+        band_bot = bbox[th - pill_h:]
+        band_mid = bbox[pill_h:th - pill_h]
+        if band_top.size == 0 or band_bot.size == 0 or band_mid.size == 0:
+            return None
+        r_top = (band_top > 0).mean()
+        r_bot = (band_bot > 0).mean()
+        r_mid = (band_mid > 0).mean()
+        SAT_MIN, SAT_MAX = 0.10, 0.55
+        if not (SAT_MIN <= r_top <= SAT_MAX and
+                SAT_MIN <= r_bot <= SAT_MAX and
+                SAT_MIN <= r_mid <= SAT_MAX):
+            return None
+    # Validation par régions (ex: pro_league — pills doivent être colorés,
+    # texte EVA doit être gris). Chaque règle = (x1, y1, x2, y2, s_min, s_max,
+    # min_ratio, max_ratio) en coordonnées template. La fenêtre est rescalée
+    # par best_scale et offset par le match. On binarise avec saturation
+    # (cv2.COLOR_RGB2HSV.S) et on compare le ratio.
+    if validate_regions:
+        hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+        for x1, y1, x2, y2, s_min_r, min_ratio, max_ratio in validate_regions:
+            rx1 = abs_x + int(x1 * best_scale)
+            ry1 = abs_y + int(y1 * best_scale)
+            rx2 = abs_x + int(x2 * best_scale)
+            ry2 = abs_y + int(y2 * best_scale)
+            if rx2 > hsv.shape[1] or ry2 > hsv.shape[0] or rx1 < 0 or ry1 < 0:
+                return None
+            region = hsv[ry1:ry2, rx1:rx2]
+            sat_ratio = (region[:, :, 1] >= s_min_r).mean()
+            if not (min_ratio <= sat_ratio <= max_ratio):
+                return None
+    return (abs_x, abs_y, float(best_score), float(best_scale))
+
+
 def _detect_game_score_frame(frame: np.ndarray):
     """
     Détecte un écran de score final (tableau des scores entre les équipes).
@@ -1456,12 +1617,31 @@ def _detect_game_score_frame(frame: np.ndarray):
     Chaque mode peut déclarer plusieurs variantes de score frame (classique,
     competition, …) ; on les essaie dans l'ordre et on retourne la première qui matche.
     (dx, dy) = décalage du HUD à appliquer aux régions OCR pour recadrer correctement.
+
+    Détection par matchTemplate masqué sur la silhouette des pills d'équipe
+    (cf. `_match_score_frame_template`) — robuste aux couleurs d'équipe
+    et au décodeur vidéo.
     """
     for i, mode in enumerate(MODES):
         for j, variant in enumerate(mode['scoreFrame']):
-            offset = _identify_offset(frame, variant['identify'])
-            if offset is not None:
-                return (i, j, offset[0], offset[1])
+            tpl_cfg = variant['template']
+            kwargs = dict(
+                anchor=tpl_cfg.get('anchor'),
+                sat_min=tpl_cfg.get('sat_min', 150),
+                val_min=tpl_cfg.get('val_min', 150),
+                skip_post_validation=tpl_cfg.get('skip_post_validation', False),
+            )
+            if 'min_score' in tpl_cfg: kwargs['min_score'] = tpl_cfg['min_score']
+            if 'scales' in tpl_cfg: kwargs['scales'] = tpl_cfg['scales']
+            if 'max_shift' in tpl_cfg: kwargs['max_shift'] = tpl_cfg['max_shift']
+            if 'validate_regions' in tpl_cfg: kwargs['validate_regions'] = tpl_cfg['validate_regions']
+            match = _match_score_frame_template(frame, tpl_cfg['name'], **kwargs)
+            if match is not None:
+                mx, my, score, scale = match
+                ax, ay = tpl_cfg['anchor']
+                if DEBUG:
+                    _emit({'log': f'[score_frame] template={tpl_cfg["name"]} match=({mx},{my}) score={score:.3f} scale={scale}'})
+                return (i, j, mx - ax, my - ay)
     return (-1, -1, 0.0, 0.0)
 
 
