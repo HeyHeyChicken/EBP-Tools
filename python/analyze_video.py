@@ -212,7 +212,7 @@ _MAPS = {
     'Helios Station': {'aliases': ['helios', 'station', 'hheliosstation', 'rheliosstation', 'heliosstation'], 'points': 3},
     'Lunar Outpost':  {'aliases': ['lunar', 'outpost', 'lunaroutpost'], 'points': 3},
     'Outlaw':         {'aliases': ['outlaw', 'qutlaw'], 'points': 5},
-    'Polaris':        {'aliases': ['polaris'], 'points': 1},
+    'Polaris':        {'aliases': ['polaris', 'polarkg', 'polarg'], 'points': 1},
     'Silva':          {'aliases': ['silva'], 'points': 1},
     'The Cliff':      {'aliases': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt', 'theclife', 'the clife', 'theclifen'], 'points': 1},
     'The Rock':       {'aliases': ['rock', 'therock'], 'points': 1},
