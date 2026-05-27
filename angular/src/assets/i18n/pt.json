@@ -142,7 +142,7 @@
       "intro": "Transfira aqui os seus replays do YouTube ou Twitch.",
       "quality": "Qualidade",
       "noFormats": "Nenhum formato disponível",
-      "urlLabel": "URL do vídeo"
+      "urlLabel": "URL do YouTube / Twitch"
     }
   },
   "shared": {

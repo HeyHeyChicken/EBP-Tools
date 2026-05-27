@@ -45,7 +45,7 @@ TEAM_BLUE = [
     (179, 0, 243),   # Summit
 ]
 
-DEBUG = True
+DEBUG = False
 
 MODES = [
     #region Mode 0

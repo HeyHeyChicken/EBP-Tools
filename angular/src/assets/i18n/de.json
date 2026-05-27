@@ -142,7 +142,7 @@
       "intro": "Laden Sie hier Ihre Replays von YouTube oder Twitch herunter.",
       "quality": "Qualität",
       "noFormats": "Keine Formate verfügbar",
-      "urlLabel": "URL des Videos"
+      "urlLabel": "YouTube- / Twitch-URL"
     }
   },
   "shared": {
