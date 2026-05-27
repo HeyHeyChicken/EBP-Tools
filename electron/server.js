@@ -377,6 +377,7 @@ if (!APP_GOT_THE_LOCK) {
                 const FILES_PATHS = await openFiles(data.filesExtensions, true);
                 if (FILES_PATHS.length > 0) {
                     const MAX_TIME_PER_GAME = data.maxTime ?? 10;
+                    const MAX_GAMES_AT_SAME_TIME = data.maxGames ?? 3;
                     const DURATIONS = await Promise.all(
                         FILES_PATHS.map((p) =>
                             getVideoDuration(p).catch(() => 0)
@@ -397,7 +398,7 @@ if (!APP_GOT_THE_LOCK) {
                         const BASE = path.basename(SRC, EXT);
                         const DEST = path.join(
                             WATCH_FOLDER,
-                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}${EXT}`
+                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${EXT}`
                         );
                         fs.copyFileSync(SRC, DEST);
                     }
