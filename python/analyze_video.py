@@ -3084,20 +3084,51 @@ def _track_players_on_minimap(
                       f'{len(dead_lookup[0])} entries → filtre morts actif'})
 
     # 3. Loop 10 FPS : detect + classify, agrège par (team, number).
+    # Lecture séquentielle quand FPS connu : 1 seul seek au début, puis read()
+    # pour la frame samplée + grab() pour skip les intermédiaires (cheap : pas
+    # de BGR convert). Évite N×6000 seeks coûteux sur Windows où chaque
+    # cap.set(POS_MSEC) reseek-to-keyframe + decode-forward (~50-200 ms).
+    # Fallback sur l'ancien comportement seek-per-frame si FPS indisponible.
     histories: dict = {}  # (team, number) → [(t_rel, x_frac, y_frac), ...]
-    step = 1.0 / _PLAYER_TRACK_FPS
     total = int((end_ts - start_ts) * _PLAYER_TRACK_FPS) + 1
+    native_fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    use_sequential = native_fps > 0
+    if use_sequential:
+        skip = max(1, int(round(native_fps / _PLAYER_TRACK_FPS)))
+        cap.set(cv2.CAP_PROP_POS_MSEC, start_ts * 1000)
+        _emit({'log': f'[player_tracking] sequential read: native_fps={native_fps:.2f} '
+                      f'skip={skip} (effective={native_fps / skip:.2f} FPS)'})
+    else:
+        skip = 1
+        _emit({'log': f'[player_tracking] seek-per-frame fallback (FPS unknown)'})
+
     last_pct = -1
     detections_total = 0
     detections_rejected_dead = 0
-    for i in range(total):
-        ts = start_ts + i * step
+    processed = 0
+    frame_idx = 0
+    step = 1.0 / _PLAYER_TRACK_FPS
+
+    while True:
+        if use_sequential:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            ts = start_ts + frame_idx / native_fps
+            frame_idx += 1
+        else:
+            if processed >= total:
+                break
+            ts = start_ts + processed * step
+            cap.set(cv2.CAP_PROP_POS_MSEC, ts * 1000)
+            ret, frame = cap.read()
+            if not ret:
+                processed += 1
+                continue
+
         if ts > end_ts:
             break
-        cap.set(cv2.CAP_PROP_POS_MSEC, ts * 1000)
-        ret, frame = cap.read()
-        if not ret:
-            continue
+
         blobs_raw = _blob_detector.detect_blobs(frame, info, orange_rgb, blue_rgb)
         filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.5, map_meta=md,
                                             valid_numbers=valid_numbers)
@@ -3115,10 +3146,22 @@ def _track_players_on_minimap(
                 histories.setdefault((team, num), []).append(
                     (round(t_rel, 2), round(x_frac, 4), round(y_frac, 4)))
                 detections_total += 1
-        pct = int(100 * (i + 1) / total)
+
+        processed += 1
+
+        # Skip les frames intermédiaires via grab() : décode mais saute la
+        # conversion BGR→numpy (gain ~5-10 ms par frame skipée sur 1920×1080).
+        if use_sequential and skip > 1:
+            for _ in range(skip - 1):
+                if cap.grab():
+                    frame_idx += 1
+                else:
+                    break
+
+        pct = int(100 * processed / total) if total > 0 else 0
         if pct != last_pct and pct % 10 == 0:
             _emit({'log': f'[player_tracking] {pct}% '
-                          f'({i + 1}/{total} frames, {detections_total} dets)'})
+                          f'({processed}/{total} frames, {detections_total} dets)'})
             last_pct = pct
 
     # 4. Post-process : retire les détections isolées trop éloignées de leurs
@@ -3995,6 +4038,52 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         SUSPECT_CONFIRM_LEN = 5    # samples consécutifs requis pour confirmer une coupe
         SUSPECT_DRIFT_TOL = 2      # |Δelapsed - Δts| toléré pour "linéaire"
 
+        # Lecture séquentielle quand FPS connu : 1 seul seek au début du chunk
+        # puis read() pour la frame samplée + grab() pour skip les intermédiaires
+        # (cheap : décode sans BGR convert). Évite N seeks coûteux sur Windows
+        # (chaque cap.set(POS_MSEC) reseek-to-keyframe + decode-forward ~50-200 ms).
+        # Fallback sur _get_frame (seek) si FPS indisponible ou retour arrière.
+        NATIVE_FPS = CAP.get(cv2.CAP_PROP_FPS) or 0.0
+        USE_SEQ = NATIVE_FPS > 0
+        NEXT_FRAME_IDX = 0   # nb de frames consommées depuis le seek initial
+        if USE_SEQ:
+            CAP.set(cv2.CAP_PROP_POS_MSEC, START * 1000)
+            if DEBUG:
+                _emit({'log': f'[_analyze_chunks] {GAME_ID} sequential read: native_fps={NATIVE_FPS:.2f}'})
+
+        def _decode_for_ts(ts):
+            """Décode la frame à l'approx ts (sec vidéo). Lecture séquentielle
+            avec grab() pour avancer entre les ts échantillonnés ; fallback seek
+            si NATIVE_FPS indisponible, retour arrière, ou si le compteur a été
+            invalidé (sentinel < 0)."""
+            nonlocal NEXT_FRAME_IDX
+            if not USE_SEQ:
+                return _get_frame(CAP, ts)
+            target_idx = int(round((ts - START) * NATIVE_FPS))
+            # Retour arrière ou compteur invalidé : seek explicite, reset compteur.
+            # Ne devrait pas arriver dans la boucle principale (TIMESTAMP monotone)
+            # mais couvre le cas où LOCKED_POINTS fallback a bougé le main CAP.
+            if NEXT_FRAME_IDX < 0 or target_idx < NEXT_FRAME_IDX:
+                FRAME = _get_frame(CAP, ts)
+                if FRAME is None:
+                    NEXT_FRAME_IDX = -1
+                    return None
+                # _get_frame a fait set+read → cap est positionné après target_idx
+                NEXT_FRAME_IDX = target_idx + 1
+                return FRAME
+            # Skip vers target_idx via grab() (pas de BGR convert).
+            while NEXT_FRAME_IDX < target_idx:
+                if not CAP.grab():
+                    NEXT_FRAME_IDX = -1
+                    return None
+                NEXT_FRAME_IDX += 1
+            ret, frame_bgr = CAP.read()
+            if not ret:
+                NEXT_FRAME_IDX = -1
+                return None
+            NEXT_FRAME_IDX += 1
+            return cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+
         # Pipeline : on garde WINDOW frames en vol simultanées dans le pool.
         # `_submit_frame` décode + lance les 3 OCR speculatif ; `_process_ocr_item`
         # drain les futures en ordre FIFO (critique pour MAX_TIME et la borne
@@ -4004,8 +4093,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
         # comportement bit-pour-bit (cf. sizing plus haut).
         def _submit_frame(ts):
-            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR, LOCKED_POINTS
-            FRAME = _get_frame(CAP, ts)
+            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR, LOCKED_POINTS, NEXT_FRAME_IDX
+            FRAME = _decode_for_ts(ts)
             if FRAME is None:
                 return ('skip', ts)
 
@@ -4040,6 +4129,9 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     if DEBUG:
                         _emit({'log': f'[_analyze_chunks] {GAME_ID} detect_points via main CAP fallback (scan_cap KO, ts={ts:.0f})'})
                     PTS = _detect_capture_points_for_map(CAP, HUD_ANCHOR, ts, MAP_NAME)
+                    # Le fallback a seek'd le main CAP : invalide le compteur
+                    # pour forcer un re-seek au prochain _decode_for_ts.
+                    NEXT_FRAME_IDX = -1
                 if PTS:
                     LOCKED_POINTS = PTS
                     if DEBUG:
