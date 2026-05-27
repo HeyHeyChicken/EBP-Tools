@@ -45,7 +45,7 @@ TEAM_BLUE = [
     (179, 0, 243),   # Summit
 ]
 
-DEBUG = False
+DEBUG = True
 
 MODES = [
     #region Mode 0
@@ -1999,6 +1999,26 @@ def _detect_capture_points(frame: np.ndarray, anchor=None,
                for _, kx, ky, _, _ in nms):
             continue
         nms.append((sc, dcx, dcy, dw, dh))
+
+    # Rejet des faux positifs sombres : TM_CCORR_NORMED est invariant à la
+    # luminosité, donc un anneau sombre (décor 3D) peut scorer ≥ threshold.
+    # Un vrai point de capture est toujours visible (blanc, orange, ou bleu) ;
+    # la luminosité moyenne de ses pixels d'anneau est toujours ≥ 80.
+    bright_nms = []
+    for sc, dcx, dcy, dw, dh in nms:
+        px0 = max(0, int(round(dcx - dw / 2)))
+        py0 = max(0, int(round(dcy - dh / 2)))
+        px1 = min(gray.shape[1], px0 + int(dw))
+        py1 = min(gray.shape[0], py0 + int(dh))
+        ring_crop = gray[py0:py1, px0:px1]
+        m = cv2.resize(tpl_mask, (ring_crop.shape[1], ring_crop.shape[0]),
+                       interpolation=cv2.INTER_NEAREST)
+        ring_px = ring_crop[m > 200]
+        if len(ring_px) > 0 and ring_px.mean() >= 80:
+            bright_nms.append((sc, dcx, dcy, dw, dh))
+    if not bright_nms:
+        return []
+    nms = bright_nms
 
     anchor_y = max(nms, key=lambda d: d[0])[2]
     keep = [d for d in nms if abs(d[2] - anchor_y) <= 2.5]
@@ -3986,8 +4006,24 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # (les positions ne bougent pas pendant la game). Coût ponctuel
             # ≈ 1 matchTemplate + 1 OCR par point ; après ça, le calcul du
             # fill par seconde est gratuit (~400 ops par point).
+            # IMPORTANT : on utilise un VideoCapture séparé pour le scan de
+            # détection afin de ne pas déplacer la position du CAP principal.
+            # Sur Windows (FFmpeg + D3D11), les seeks en arrière après un seek
+            # en avant retournent systématiquement la première keyframe, ce qui
+            # fait que toutes les frames suivantes ont RAW_ELAPSED=0 et la
+            # points_timeline reste vide. Avec un CAP dédié au scan, le CAP
+            # principal avance toujours en séquentiel et les seeks restent fiables.
             if LOCKED_POINTS is None and HUD_ANCHOR is not None:
-                PTS = _detect_capture_points_for_map(CAP, HUD_ANCHOR, ts, MAP_NAME)
+                _scan_cap = _open_video(video_path)
+                if _scan_cap is not None:
+                    if DEBUG:
+                        _emit({'log': f'[_analyze_chunks] {GAME_ID} detect_points via scan_cap (ts={ts:.0f})'})
+                    PTS = _detect_capture_points_for_map(_scan_cap, HUD_ANCHOR, ts, MAP_NAME)
+                    _scan_cap.release()
+                else:
+                    if DEBUG:
+                        _emit({'log': f'[_analyze_chunks] {GAME_ID} detect_points via main CAP fallback (scan_cap KO, ts={ts:.0f})'})
+                    PTS = _detect_capture_points_for_map(CAP, HUD_ANCHOR, ts, MAP_NAME)
                 if PTS:
                     LOCKED_POINTS = PTS
                     if DEBUG:
