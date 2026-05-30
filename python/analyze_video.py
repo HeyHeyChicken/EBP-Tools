@@ -8,6 +8,7 @@ import json
 import io
 import re
 import base64
+import statistics
 import time
 import numpy as np
 import cv2
@@ -2591,12 +2592,17 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7) -> dict:
     # use the shorter value as a safety floor — picking 17 would force HP=0 on
     # already-respawned players in 15-s lobbies, creating false negatives).
     # Any HP>0 reading inside that window is a misread → forced back to 0.
-    # We exit the lockout early only on a "real respawn" reading (HP ≥ 90).
-    # Threshold 90 (rather than 96) absorbs the fade-in animation: at the very
-    # frame of respawn the cart isn't fully filled yet, so the row-scan often
-    # reads 90–95 instead of 100 for a couple of seconds.
+    # We exit the lockout early only on a "real respawn" reading (HP ≥ 85).
+    # Threshold 85 (rather than 96 or 90) absorbs the fade-in animation. Certains
+    # slots de carts (observé sur le 4e cart orange/Ceres) rendent à 87-89 % le
+    # premier instant du respawn — quelques rangées du haut ne matchent pas
+    # encore la couleur d'équipe à cause d'un overlay UI ou de l'opacité de
+    # l'animation. À 90, on rate ces respawns et le lockout se ré-étend à
+    # chaque nouvelle lecture HP=0, bloquant la timeline 5-15 s. À 85, on capte.
+    # Les misreads pendant lockout sont typiquement entre 30 et 60 — bien sous
+    # 85 — donc on garde la robustesse anti-misread.
     DEATH_LOCKOUT = 15
-    RESPAWN_MIN = 90
+    RESPAWN_MIN = 85
     for team in ('orange', 'blue'):
         n_players = max((len(p.get(team) or []) for p in pairs), default=0)
         for i in range(n_players):
@@ -2858,6 +2864,71 @@ def _dead_at(lookup, elapsed_s: float) -> set:
     return dead_per_ts[idx]
 
 
+def _compute_death_times(hp_timeline: dict, n_orange: int, n_blue: int) -> dict:
+    """Pour chaque (team, num), liste triée des instants (s, chunk-relative) où le
+    HP transite de >0 à ≤0 = mort confirmée.
+
+    Convention EVA standard (identique à `_build_dead_lookup` et à la convention
+    appliquée côté front pour les jetons live) :
+      orange num=1..5 → orange[num-1]
+      blue   num=6..9 → blue[num-6]
+      blue   num=0 (5v5) → blue[n_blue-1]
+    Retourne {} si `hp_timeline` est vide.
+    """
+    if not hp_timeline:
+        return {}
+    sorted_keys = sorted(hp_timeline.keys(), key=lambda k: float(k))
+    deaths: dict = {}
+    prev_orange: list = []
+    prev_blue: list = []
+    for k in sorted_keys:
+        t = float(k)
+        entry = hp_timeline.get(k, {})
+        cur_orange = entry.get('orange', prev_orange)
+        cur_blue = entry.get('blue', prev_blue)
+        for i, hp in enumerate(cur_orange):
+            if i < len(prev_orange) and prev_orange[i] > 0 and hp <= 0:
+                deaths.setdefault(('orange', i + 1), []).append(t)
+        for i, hp in enumerate(cur_blue):
+            if i < len(prev_blue) and prev_blue[i] > 0 and hp <= 0:
+                deaths.setdefault(('blue', _blue_slot_to_number(i, n_blue)), []).append(t)
+        prev_orange = list(cur_orange)
+        prev_blue = list(cur_blue)
+    return deaths
+
+
+def _split_history_into_lives(history: list, deaths: list) -> list:
+    """Découpe `history` (triée par t) aux instants `deaths` (triés).
+
+    Une vie = sous-liste contigüe de `history` dont tous les t sont ≤ au prochain
+    deathTime. Le point au temps exact de la mort reste dans la vie qui meurt
+    (mirror du front : la frame qui touche t_death conclut la vie).
+    `died=True` ssi un deathTime est passé après le dernier point de la vie
+    (au moins une mort à attribuer).
+    Vies vides (deathTime sans détection préalable) sautées.
+
+    Retourne `[{'history': [...], 'died': bool}, ...]`.
+    """
+    if not history:
+        return []
+    deaths_sorted = sorted(deaths)
+    lives = []
+    cur: list = []
+    deaths_iter = iter(deaths_sorted)
+    next_death = next(deaths_iter, None)
+    for entry in history:
+        t = entry[0]
+        while next_death is not None and next_death < t:
+            if cur:
+                lives.append({'history': cur, 'died': True})
+                cur = []
+            next_death = next(deaths_iter, None)
+        cur.append(entry)
+    if cur:
+        lives.append({'history': cur, 'died': next_death is not None})
+    return lives
+
+
 # Vitesse max plausible d'un joueur (fraction de map / seconde).
 # Calibré pour rejeter les détections aberrantes (CNN qui hallucine sur un
 # X de mort en attendant que hp_timeline confirme HP=0) sans toucher aux
@@ -2871,6 +2942,21 @@ _OUTLIER_MAX_SPEED_PER_S = 0.50
 # outliers survivent. En temps, le seuil reste strict (max 0.5·0.5=0.25 de map)
 # quelle que soit la densité de détections.
 _OUTLIER_NEIGHBOR_WINDOW_S = 0.5
+# Durée max (s) qu'un "run aberrant" peut avoir pour être supprimé. Au-delà,
+# on considère que c'est un vrai changement de trajectoire (TP réel suivi
+# d'un retour, sprint long) et on laisse intact, même si la trajectoire
+# revient ensuite à l'ancienne position. Calibré sur les vrais clusters
+# observés (1-3 frames consécutives à 10 FPS = 0.1-0.3s) avec marge ×3.
+# Un round-trip légitime en jeu (sortie → action → retour) prend > 1s.
+_OUTLIER_MAX_RUN_DURATION_S = 1.0
+# Vitesse au-dessus de laquelle un PAS cohérent isolé devient suspect.
+# Sert au Fix D : quand un seul pas à haute vitesse mène vers une position
+# dont la trajectoire ne suit pas (resync forcé), on considère ce pas comme
+# une fausse détection « tout juste sous la barre des 0.5/s ». Les vrais
+# mouvements rapides (sprints) tiennent plusieurs pas consécutifs → streak ≥ 2
+# → le filtre ne se déclenche pas. Calibré sur les vrais mouvements observés
+# dans les replays EVA (la plupart sous 0.3/s).
+_OUTLIER_HIGH_SPEED_PER_S = 0.35
 
 
 def _template_px_to_inner_frac(x_tpl: float, y_tpl: float,
@@ -2901,54 +2987,482 @@ def _template_px_to_inner_frac(x_tpl: float, y_tpl: float,
             max(0.0, min(1.0, y_frac)))
 
 
-def _remove_outlier_detections(histories: dict) -> int:
-    """Pour chaque (team, num), supprime les détections dont aucune des
-    positions voisines (dans une fenêtre temporelle ±_OUTLIER_NEIGHBOR_WINDOW_S)
-    n'est compatible avec `_OUTLIER_MAX_SPEED_PER_S`.
+def _find_aberrant_runs(seq: list) -> set:
+    """Identifie les indices à supprimer : groupes contigus de points qui
+    s'écartent de la trajectoire (vitesse > `_OUTLIER_MAX_SPEED_PER_S`) puis
+    y reviennent en moins de `_OUTLIER_MAX_RUN_DURATION_S`.
 
-    Couvre le cas où le détecteur trouve une position aberrante pendant le
-    délai entre la mort visuelle (X sur minimap) et la confirmation par
-    `hp_timeline` (~0.5-1s), ainsi que les blinks isolés qui faisaient
-    apparaître des lignes droites traversant la map dans le rendu front.
+    Algo "anchor" : on garde le dernier point cohérent (`anchor`). Quand
+    `seq[i]` devient incohérent, on cherche en avant le 1er `j` tel que
+    `seq[j]` redevient cohérent avec l'anchor. Trouvé → tout `[i..j-1]` est
+    un run aberrant et est marqué pour suppression. Pas trouvé → 2 sous-cas :
+      - **Fix C** : run atteint la fin de seq (`j >= n`). Les points en
+        traîne sont une "vie qui s'arrête au mauvais endroit" (cluster de
+        fausses détections juste avant la mort). On supprime tout le run.
+      - **Fix D** : le pas qui a mené à l'anchor courant était à haute
+        vitesse (> _OUTLIER_HIGH_SPEED_PER_S) ET solitaire (streak == 1).
+        Un seul pas rapide qui ne mène nulle part est presque sûrement une
+        fausse détection à peine sous la barre du seuil de cohérence. On
+        rétrograde l'anchor. Un vrai sprint enchaîne plusieurs pas → streak
+        ≥ 2 → Fix D ne se déclenche pas.
+      - Sinon : vrai changement de trajectoire (TP, gap de tracking), on
+        resynchronise l'anchor sans rien effacer.
 
-    Modifie `histories` en place. Retourne le nb retiré.
+    Couvre les *clusters* d'aberrations qui se validaient mutuellement et
+    passaient à travers la logique « ≥ 1 voisin cohérent » historique.
     """
-    n_removed = 0
-    for key, seq in histories.items():
-        if len(seq) < 3:
+    n = len(seq)
+    if n < 3:
+        return set()
+    to_remove: set = set()
+    anchor = 0
+    last_step_speed = 0.0   # vitesse réelle (non capée) du dernier pas cohérent
+    high_speed_streak = 0   # nb de pas cohérents consécutifs à > _OUTLIER_HIGH_SPEED_PER_S
+    i = 1
+    while i < n:
+        t_a, x_a, y_a = seq[anchor]
+        t_i, x_i, y_i = seq[i]
+        # On plafonne dt à `_OUTLIER_NEIGHBOR_WINDOW_S` AUSSI pour le check
+        # anchor→i. Sans ça, après un long trou de tracking (ex. joueur perdu
+        # pendant 3s), `max_speed * dt` devient si grand qu'un point situé
+        # n'importe où sur la map passe pour "atteignable depuis l'anchor"
+        # — une fausse détection de fin de vie au spawn se ferait absorber
+        # comme nouvel anchor au lieu d'être flaggée. Avec le cap, le seuil
+        # reste borné à 0.25 fraction de map dès que dt > 0.5s. Effet sur
+        # les vrais sprints/TPs : ils tomberont dans la branche "pas de
+        # retour" → resync anchor (rien retiré), comportement inchangé.
+        dt_ai = t_i - t_a
+        dt_ai_capped = max(min(dt_ai, _OUTLIER_NEIGHBOR_WINDOW_S), 1e-9)
+        d = ((x_i - x_a) ** 2 + (y_i - y_a) ** 2) ** 0.5
+        if d <= _OUTLIER_MAX_SPEED_PER_S * dt_ai_capped:
+            # Pas cohérent : mémorise la vitesse réelle (non capée) pour Fix D.
+            speed = d / max(dt_ai, 1e-9)
+            if speed > _OUTLIER_HIGH_SPEED_PER_S:
+                high_speed_streak += 1
+            else:
+                high_speed_streak = 0
+            last_step_speed = speed
+            anchor = i
+            i += 1
             continue
-        # Marque les outliers SANS les retirer (sinon on perturbe les indexs).
-        # seq est trié par t (append dans l'ordre du loop frame) → on peut
-        # étendre depuis i jusqu'à sortir de la fenêtre temporelle.
-        to_remove = set()
-        for i in range(1, len(seq) - 1):
-            t_i, x_i, y_i = seq[i]
-            has_coherent_neighbor = False
-            j = i - 1
-            while j >= 0 and (t_i - seq[j][0]) <= _OUTLIER_NEIGHBOR_WINDOW_S:
+        # seq[i] incohérent : on cherche un retour géométriquement proche de
+        # l'anchor. Même cap sur dt_aj que ci-dessus, et pour la même raison.
+        j = i + 1
+        run_resolved = False
+        while j < n and (seq[j][0] - t_i) <= _OUTLIER_MAX_RUN_DURATION_S:
+            t_j, x_j, y_j = seq[j]
+            dt_aj_capped = max(min(t_j - t_a, _OUTLIER_NEIGHBOR_WINDOW_S), 1e-9)
+            d_aj = ((x_j - x_a) ** 2 + (y_j - y_a) ** 2) ** 0.5
+            if d_aj <= _OUTLIER_MAX_SPEED_PER_S * dt_aj_capped:
+                run_resolved = True
+                break
+            j += 1
+        if run_resolved:
+            for k in range(i, j):
+                to_remove.add(k)
+            anchor = j
+            last_step_speed = 0.0
+            high_speed_streak = 0
+            i = j + 1
+        else:
+            # Fix C : run en traîne. Le run [i..fin] est aberrant si :
+            #   - "loin" de l'anchor (saut significatif, pas juste un drift
+            #     d'accélération qui passe juste la barre)
+            #   - "majoritairement statique" — la majorité des points est
+            #     tightly clusterée. On utilise la DISTANCE MÉDIANE au centroïde
+            #     médian (pas le diamètre brut) pour rester robuste à 1-2 points
+            #     de transition divergents (ex : J6 vie 4 = 1 frame à (0.92,0.40)
+            #     en transit + 70 frames statiques à (0.96,0.58)) ou à plusieurs
+            #     mini-clusters trailing (ex : J2 vie 0 = cluster A + cluster B
+            #     dont le plus gros emporte la médiane). Un vrai TP avec
+            #     walking-around ferait diverger la médiane.
+            if i < n:
+                first_d = ((seq[i][1] - x_a) ** 2 + (seq[i][2] - y_a) ** 2) ** 0.5
+                xs = [seq[k][1] for k in range(i, n)]
+                ys = [seq[k][2] for k in range(i, n)]
+                cx = statistics.median(xs)
+                cy = statistics.median(ys)
+                dists = [((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+                         for x, y in zip(xs, ys)]
+                median_dist = statistics.median(dists)
+                jump_threshold = _OUTLIER_NEIGHBOR_WINDOW_S * _OUTLIER_MAX_SPEED_PER_S
+                if first_d > jump_threshold and median_dist < 0.005:
+                    for k in range(i, n):
+                        to_remove.add(k)
+                    break
+            # Fix D : le pas qui a porté l'anchor à sa position actuelle était
+            # solitaire ET à haute vitesse. Le fait qu'on doive resync (rien
+            # ne suit cet anchor) prouve qu'il ne tenait qu'à un fil — c'est
+            # la fausse détection « à peine sous la barre des 0.5/s ».
+            if high_speed_streak == 1 and last_step_speed > _OUTLIER_HIGH_SPEED_PER_S:
+                to_remove.add(anchor)
+            # Pas de retour : vrai changement de trajectoire. On resynchronise
+            # sur seq[i] pour ne pas marquer toute la suite comme incohérente.
+            anchor = i
+            last_step_speed = 0.0
+            high_speed_streak = 0
+            i += 1
+    return to_remove
+
+
+def _find_leading_aberration(seq: list) -> set:
+    """Détecte un cluster aberrant en TÊTE de seq : peu de points (≤ 5) très
+    rapprochés (diamètre < 0.05) suivis d'un saut significatif (> 0.25 de map)
+    vers une trajectoire principale beaucoup plus longue.
+
+    Cas typique : un joueur respawne au spawn mais les premières détections de
+    la vie atterrissent sur une fausse position (autre cart en mouvement
+    misclassé) avant de "snap" sur la vraie position au spawn.
+
+    Miroir temporel de Fix C (run en traîne), mais sans `max_run_duration` :
+    on n'a pas de "retour à l'ancre" à attendre, la trajectoire principale
+    est par définition celle qui suit le saut.
+    """
+    n = len(seq)
+    if n < 6:
+        return set()
+    jump_threshold = _OUTLIER_NEIGHBOR_WINDOW_S * _OUTLIER_MAX_SPEED_PER_S
+    for split in range(1, min(7, n)):  # premier saut potentiel en position 1..6
+        t_prev, x_prev, y_prev = seq[split - 1]
+        t_cur, x_cur, y_cur = seq[split]
+        dt = max(t_cur - t_prev, 1e-9)
+        dt_capped = min(dt, _OUTLIER_NEIGHBOR_WINDOW_S)
+        d_jump = ((x_cur - x_prev) ** 2 + (y_cur - y_prev) ** 2) ** 0.5
+        if d_jump <= _OUTLIER_MAX_SPEED_PER_S * dt_capped:
+            continue  # pas de saut ici, on continue dans le cluster initial
+        # Saut trouvé. Le cluster initial = [0..split-1].
+        if split > 5:
+            return set()  # cluster initial trop long → probablement la vraie traj
+        xs = [seq[k][1] for k in range(split)]
+        ys = [seq[k][2] for k in range(split)]
+        diameter = ((max(xs) - min(xs)) ** 2 + (max(ys) - min(ys)) ** 2) ** 0.5
+        if diameter > 0.05:
+            return set()  # le leading bouge trop, c'est une vraie trajectoire
+        if d_jump <= jump_threshold:
+            return set()  # saut pas assez grand → simple drift
+        # Trajectoire principale doit être nettement plus longue que le leading
+        # — sinon les deux pourraient être aussi suspects l'un que l'autre.
+        if (n - split) < 3 * split:
+            return set()
+        # Si la trajectoire principale REPASSE par la position du leading
+        # (≥ 2 points dans un rayon de 0.1 du centre du cluster), c'est un
+        # vrai aller-retour (TP + activité + return). Sinon, le leading est
+        # une zone que le joueur ne visite jamais ailleurs = aberrant.
+        cx = sum(xs) / len(xs)
+        cy = sum(ys) / len(ys)
+        revisits = 0
+        for k in range(split, n):
+            dx = seq[k][1] - cx
+            dy = seq[k][2] - cy
+            if dx * dx + dy * dy < 0.01:  # < 0.1 de distance
+                revisits += 1
+                if revisits >= 2:
+                    return set()  # vrai aller-retour
+        return set(range(split))
+    return set()
+
+
+def _find_line_fit_outliers(seq: list,
+                             residual_threshold: float = 0.1,
+                             max_anchor_dist: float = 0.15) -> set:
+    """Fix H : détecte les points qui s'écartent significativement de la ligne
+    droite entre leur voisin avant et après — TANT QUE les deux voisins sont
+    proches l'un de l'autre (sinon c'est une zone de mouvement rapide où
+    "off-line" est normal).
+
+    Couvre le cas du lone hop mid-trajectoire où chaque transition individuelle
+    reste sous le seuil de cohérence (vitesse < 0.5/s pour un saut court) mais
+    le point lui-même est manifestement hors trajectoire. Ex : J9 vie 2 à 2m24s
+    où un saut isolé à (0.97, 0.48) entre deux points à (0.87, 0.36) et
+    (0.86, 0.27) — l'interpolation linéaire dit (0.86, 0.31), résiduel 0.20.
+    """
+    n = len(seq)
+    if n < 3:
+        return set()
+    to_remove: set = set()
+    for i in range(1, n - 1):
+        t_a, x_a, y_a = seq[i - 1]
+        t_i, x_i, y_i = seq[i]
+        t_c, x_c, y_c = seq[i + 1]
+        anchor_dist = ((x_c - x_a) ** 2 + (y_c - y_a) ** 2) ** 0.5
+        if anchor_dist > max_anchor_dist:
+            continue  # voisins trop éloignés → la "ligne" n'a pas de sens
+        dt = t_c - t_a
+        if dt <= 0:
+            continue
+        frac = (t_i - t_a) / dt
+        expected_x = x_a + frac * (x_c - x_a)
+        expected_y = y_a + frac * (y_c - y_a)
+        residual = ((x_i - expected_x) ** 2 + (y_i - expected_y) ** 2) ** 0.5
+        if residual > residual_threshold:
+            to_remove.add(i)
+    return to_remove
+
+
+def _find_isolated_outliers(seq: list) -> set:
+    """Marque les points qui n'ont **aucun** voisin cohérent dans une fenêtre
+    ±`_OUTLIER_NEIGHBOR_WINDOW_S`.
+
+    Filet de sécurité après la passe par runs pour rattraper les blinks
+    ponctuels dont la trajectoire reprend ailleurs (cas où aucun "retour"
+    n'est attendu : fausse détection en bord de vraie mort par exemple).
+
+    /!\\ Inclut le **premier et dernier** point de chaque vie. Le cas typique
+    qu'on couvre : un joueur meurt loin du spawn, et la dernière détection
+    de la vie atterrit accidentellement sur le spawn (autre joueur en
+    respawn classifié comme étant celui qui meurt). Le dernier point est
+    alors à 0.5+ de map du précédent — aucun voisin cohérent → supprimé.
+    """
+    n = len(seq)
+    if n < 3:
+        return set()
+    to_remove: set = set()
+    for i in range(n):
+        t_i, x_i, y_i = seq[i]
+        has_coherent_neighbor = False
+        j = i - 1
+        while j >= 0 and (t_i - seq[j][0]) <= _OUTLIER_NEIGHBOR_WINDOW_S:
+            t_j, x_j, y_j = seq[j]
+            dt = max(abs(t_j - t_i), 1e-9)
+            d = ((x_i - x_j) ** 2 + (y_i - y_j) ** 2) ** 0.5
+            if d <= _OUTLIER_MAX_SPEED_PER_S * dt:
+                has_coherent_neighbor = True
+                break
+            j -= 1
+        if not has_coherent_neighbor:
+            j = i + 1
+            while j < n and (seq[j][0] - t_i) <= _OUTLIER_NEIGHBOR_WINDOW_S:
                 t_j, x_j, y_j = seq[j]
                 dt = max(abs(t_j - t_i), 1e-9)
                 d = ((x_i - x_j) ** 2 + (y_i - y_j) ** 2) ** 0.5
                 if d <= _OUTLIER_MAX_SPEED_PER_S * dt:
                     has_coherent_neighbor = True
                     break
-                j -= 1
-            if not has_coherent_neighbor:
-                j = i + 1
-                while j < len(seq) and (seq[j][0] - t_i) <= _OUTLIER_NEIGHBOR_WINDOW_S:
-                    t_j, x_j, y_j = seq[j]
-                    dt = max(abs(t_j - t_i), 1e-9)
-                    d = ((x_i - x_j) ** 2 + (y_i - y_j) ** 2) ** 0.5
-                    if d <= _OUTLIER_MAX_SPEED_PER_S * dt:
-                        has_coherent_neighbor = True
-                        break
-                    j += 1
-            if not has_coherent_neighbor:
-                to_remove.add(i)
+                j += 1
+        if not has_coherent_neighbor:
+            to_remove.add(i)
+    return to_remove
+
+
+def _find_mid_static_cluster(seq: list, min_run: int = 5,
+                              max_diameter: float = 0.005,
+                              min_jump: float = 0.1) -> set:
+    """Fix G : détecte un cluster STATIQUE en milieu de vie, encadré de jumps.
+
+    Un joueur réel a toujours un peu de bruit sub-pixel dans la détection. Une
+    séquence de >=5 frames à coords STRICTEMENT identiques (diamètre < 0.005)
+    qui apparaît loin de la trajectoire pré-cluster (jump d'entrée > 0.1) ET
+    repart loin (jump de sortie > 0.1) est forcément une fausse détection sur
+    un élément d'UI fixe (icône, score, etc.) — pas un vrai joueur immobile.
+
+    Cas typique observé : 15 frames à exactly (0.9583, 0.6617) pendant 1.4s
+    en milieu de vie blue/6, encadrées de transitions à 0.13 de map.
+    """
+    n = len(seq)
+    if n < min_run + 2:
+        return set()
+    to_remove: set = set()
+    i = 1  # commence à 1 pour avoir un point "avant" à comparer
+    while i < n - min_run:
+        # Étend un run de coords ~identiques à partir de seq[i]
+        j = i + 1
+        ref_x, ref_y = seq[i][1], seq[i][2]
+        while j < n:
+            dx = seq[j][1] - ref_x
+            dy = seq[j][2] - ref_y
+            if (dx * dx + dy * dy) > max_diameter * max_diameter:
+                break
+            j += 1
+        run_len = j - i
+        if run_len >= min_run and j < n:
+            # Vérifie les jumps d'entrée et de sortie
+            dx_in = seq[i][1] - seq[i - 1][1]
+            dy_in = seq[i][2] - seq[i - 1][2]
+            entry_jump = (dx_in * dx_in + dy_in * dy_in) ** 0.5
+            dx_out = seq[j][1] - seq[j - 1][1]
+            dy_out = seq[j][2] - seq[j - 1][2]
+            exit_jump = (dx_out * dx_out + dy_out * dy_out) ** 0.5
+            if entry_jump > min_jump and exit_jump > min_jump:
+                for k in range(i, j):
+                    to_remove.add(k)
+            i = j  # avance après le run quoi qu'il arrive
+        else:
+            i += 1
+    return to_remove
+
+
+def _point_near_any_spawn(x: float, y: float, spawn_polys: list, tol: float = 0.0) -> bool:
+    """`spawn_polys`: liste de np.ndarray shape (N, 1, 2) en inner-fraction.
+    Retourne True si (x, y) est à l'intérieur d'un des polygones ou à moins
+    de `tol` de fraction-de-map de son bord.
+    """
+    for poly in spawn_polys:
+        d = cv2.pointPolygonTest(poly, (float(x), float(y)), True)
+        if d >= -tol:
+            return True
+    return False
+
+
+def _find_leading_off_spawn(seq: list, spawn_polys: list,
+                             max_check: int = 10,
+                             spawn_tol: float = 0.05) -> set:
+    """Fix F : si la vie démarre LOIN du spawn et qu'on trouve un point AU spawn
+    dans les `max_check` premiers points, on supprime tous les points avant.
+
+    Couvre le cas où les 1ers frames d'une vie sont mal classés (autre cart en
+    mouvement détecté comme étant celui du joueur) avant que le tracker "snap"
+    enfin sur la vraie position au spawn. Fix E ne s'applique pas si le leading
+    fait plus de 5 frames OU contient du mouvement (diamètre > 0.05) ; Fix F
+    couvre ces cas grâce au polygone spawn de la map.
+
+    `spawn_tol = 0.05` (~5 % de map) tolère les détections juste sur la
+    frontière du polygone (player qui materializes au bord du spawn).
+    """
+    if not spawn_polys or len(seq) < 2:
+        return set()
+    # Si le 1er point est déjà au spawn, rien à corriger.
+    if _point_near_any_spawn(seq[0][1], seq[0][2], spawn_polys, spawn_tol):
+        return set()
+    # Cherche le 1er point AU spawn dans les `max_check` premiers points.
+    for k in range(1, min(max_check, len(seq))):
+        if _point_near_any_spawn(seq[k][1], seq[k][2], spawn_polys, spawn_tol):
+            return set(range(k))
+    # Aucun spawn trouvé tôt → vie démarre vraiment hors spawn (rare ou cas
+    # exotique). On ne touche pas pour éviter de massacrer un cas légitime.
+    return set()
+
+
+def _interpolate_alive_gaps(history: list,
+                             short_max_gap: float = 2.0,
+                             long_max_gap: float = 10.0,
+                             long_max_avg_speed: float = 0.05) -> int:
+    """Injecte des points interpolés à 10 FPS pour combler les gaps de tracking
+    dans une vie. Remplace l'interpolation historiquement faite côté front pour
+    la centraliser ici (cohérence avec le split en vies déjà migré côté Python).
+
+    Deux régimes :
+      - gap ≤ `short_max_gap` (2s) : interpolation INCONDITIONNELLE. Au-dessus
+        de l'ancien plafond front (1s) parce qu'on observe régulièrement des
+        gaps 1-2s pendant un walking normal (0.06-0.10/s) que l'utilisateur
+        attend visuellement comblés. Sur 2s à vitesse normale (~0.2/s), le
+        bridge fait ~0.4 — la ligne droite reste une approximation visuelle
+        acceptable (le joueur a effectivement traversé cette zone).
+      - `short_max_gap` < gap ≤ `long_max_gap` (2-10s) : interpolation
+        CONDITIONNELLE sur la VITESSE MOYENNE. Le joueur a été perdu par le
+        blob detector / CNN pendant plusieurs secondes. Si bridge_distance / gap
+        < `long_max_avg_speed` (5 %/s — soit quasi-immobile), on comble.
+        Sinon il a bougé → on respecte le gap (pas de ligne artificielle à
+        travers la map).
+
+    On opère sur une seule vie (déjà splittée sur les morts de hp_timeline),
+    donc le joueur est par construction alive pendant tout le seq — pas besoin
+    de re-vérifier hp_timeline ici.
+
+    Modifie `history` en place. Retourne nb de points injectés.
+    """
+    if len(history) < 2:
+        return 0
+    min_gap = 1.0 / _PLAYER_TRACK_FPS  # 0.1s à 10 FPS — gap minimal à combler
+    out = [history[0]]
+    n_inserted = 0
+    for i in range(1, len(history)):
+        t_prev, x_prev, y_prev = history[i - 1]
+        t_curr, x_curr, y_curr = history[i]
+        gap = t_curr - t_prev
+        should_interp = False
+        if min_gap < gap <= short_max_gap:
+            should_interp = True
+        elif short_max_gap < gap <= long_max_gap:
+            bridge = ((x_curr - x_prev) ** 2 + (y_curr - y_prev) ** 2) ** 0.5
+            avg_speed = bridge / gap
+            if avg_speed < long_max_avg_speed:
+                should_interp = True
+        if should_interp:
+            n_frames = max(int(round(gap * _PLAYER_TRACK_FPS)) - 1, 0)
+            for k in range(1, n_frames + 1):
+                frac = k / (n_frames + 1)
+                t_interp = t_prev + gap * frac
+                x_interp = x_prev + (x_curr - x_prev) * frac
+                y_interp = y_prev + (y_curr - y_prev) * frac
+                out.append((round(t_interp, 2),
+                            round(x_interp, 4),
+                            round(y_interp, 4)))
+                n_inserted += 1
+        out.append((t_curr, x_curr, y_curr))
+    history[:] = out
+    return n_inserted
+
+
+def _filter_outliers(seq: list, spawn_polys: list = None) -> int:
+    """Applique les passes Fix A/B/C/D/E/F/G sur une seq d'une vie.
+
+      1. Passe par "runs" (`_find_aberrant_runs`) — clusters d'aberrations
+         qui partent et reviennent (Fix A : cap dt) + traînes en fin de vie
+         (Fix C : run en traîne tightly clustered) + sauts solo haute vitesse
+         (Fix D : pas isolé > 0.35/s qui ne mène nulle part).
+      2. Passe par "leading aberration" (`_find_leading_aberration`, Fix E) —
+         miroir de Fix C en tête : cluster court et serré en début de vie
+         disconnecté de la trajectoire principale qui suit.
+      3. Passe par "leading off-spawn" (`_find_leading_off_spawn`, Fix F) —
+         si le polygone spawn est fourni, vire les premières frames d'une vie
+         qui n'atterrissent pas dans/près du spawn, jusqu'à atteindre une
+         frame qui y est. Couvre le cas où le leading bouge (Fix E ne s'applique
+         pas) mais est clairement hors zone de respawn.
+      4. Passe par "mid-vie static cluster" (`_find_mid_static_cluster`, Fix G) —
+         cluster de 5+ frames à coords exactement identiques au milieu de la
+         vie, encadré de jumps. Forcément un misread sur un élément UI fixe.
+      5. Passe par "voisin cohérent" (`_find_isolated_outliers`) — blinks
+         isolés sans voisin cohérent, incluant premier et dernier point
+         de la vie (Fix B).
+
+    Modifie `seq` en place. Retourne nb retiré.
+    """
+    if len(seq) < 3:
+        return 0
+    n_removed = 0
+    # Boucle Fix A/C/D jusqu'à stabilité : Fix C utilise `break` après le 1er
+    # cluster trailing trouvé. Si une vie a PLUSIEURS clusters trailing (ex :
+    # J2 vie 0 = (0.37,0.30) + (0.25,0.72) après mort), une seule passe ne
+    # retire que le dernier. Re-passer attrape le suivant, et ainsi de suite.
+    while True:
+        to_remove = _find_aberrant_runs(seq)
+        if not to_remove:
+            break
+        seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
+        n_removed += len(to_remove)
+    to_remove = _find_leading_aberration(seq)
+    if to_remove:
+        seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
+        n_removed += len(to_remove)
+    if spawn_polys:
+        to_remove = _find_leading_off_spawn(seq, spawn_polys)
         if to_remove:
             seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
             n_removed += len(to_remove)
+    to_remove = _find_mid_static_cluster(seq)
+    if to_remove:
+        seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
+        n_removed += len(to_remove)
+    to_remove = _find_line_fit_outliers(seq)
+    if to_remove:
+        seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
+        n_removed += len(to_remove)
+    to_remove = _find_isolated_outliers(seq)
+    if to_remove:
+        seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
+        n_removed += len(to_remove)
     return n_removed
+
+
+def _remove_outlier_detections(histories: dict) -> int:
+    """[backward-compat] Applique `_filter_outliers` à chaque seq d'un dict
+    `{(team, num): [(t,x,y), ...]}`. Modifie en place. Retourne nb total retiré.
+
+    NB : ne connaît pas le découpage en vies. Pour le filtrage sémantiquement
+    correct (Fix C en fin de vie, pas en fin d'historique complet), passer par
+    `_filter_outliers` directement après le split en vies.
+    """
+    return sum(_filter_outliers(seq) for seq in histories.values())
 
 
 def _track_players_on_minimap(
@@ -3075,6 +3589,19 @@ def _track_players_on_minimap(
     # déborde dans la marge transparente.
     margins = md.get('margins')
 
+    # Polygones spawn (par équipe) en coords inner-fraction — alimentent Fix F
+    # dans `_filter_outliers` pour virer le leading hors-spawn.
+    spawn_polys_per_team: dict = {'orange': [], 'blue': []}
+    for team_name in ('orange', 'blue'):
+        for sp in md.get('spawns', {}).get(team_name, []):
+            inner_pts = [
+                _template_px_to_inner_frac(p[0], p[1], tpl_w, tpl_h, margins)
+                for p in sp.get('polygon', [])
+            ]
+            if len(inner_pts) >= 3:
+                arr = np.array(inner_pts, dtype=np.float32).reshape(-1, 1, 2)
+                spawn_polys_per_team[team_name].append(arr)
+
     # Précompute le lookup des joueurs morts par instant (forward-filled).
     # Si fourni, on rejette toute détection (team, num) pour un joueur HP=0
     # à ce ts — c'est forcément du bruit (le joueur n'est pas affiché).
@@ -3164,24 +3691,42 @@ def _track_players_on_minimap(
                           f'({processed}/{total} frames, {detections_total} dets)'})
             last_pct = pct
 
-    # 4. Post-process : retire les détections isolées trop éloignées de leurs
-    # voisins temporels (typiquement le fantôme entre la mort visuelle et
-    # la confirmation hp_timeline).
-    n_outliers = _remove_outlier_detections(histories)
-    if n_outliers:
-        _emit({'log': f'[player_tracking] retire {n_outliers} detections '
-                      f'aberrantes (saut isole > {_OUTLIER_MAX_SPEED_PER_S}/s)'})
+    # 4. Découpage en vies sur les transitions HP>0 → HP=0 de hp_timeline.
+    # Le front consomme `lives` directement (plus de calcul des death times en
+    # TS, plus de duplication de la convention EVA slot↔HP-column).
+    deaths_per_player = _compute_death_times(hp_timeline or {}, n_orange, n_blue)
 
-    # 5. Format payload. id séquentiel ; slot 10 si number = 0 (Blue 5v5).
+    # 5. Filtre des détections aberrantes PAR VIE. Découpée d'abord (étape 4)
+    # parce que la passe par "runs" a besoin de connaître les bornes de la vie
+    # (Fix C détecte les clusters en TRAÎNE — il faut que la fin du seq
+    # corresponde à la fin d'une vie, pas au milieu du playthrough complet du
+    # joueur). Après filtrage, on supprime les vies vidées.
+    n_outliers = 0
+    n_interpolated = 0
+    cleaned_lives_per_player: dict = {}
+    for key, hist in histories.items():
+        team_name = key[0]
+        spawn_polys = spawn_polys_per_team.get(team_name, [])
+        deaths = deaths_per_player.get(key, [])
+        lives = _split_history_into_lives(hist, deaths)
+        for life in lives:
+            n_outliers += _filter_outliers(life['history'], spawn_polys=spawn_polys)
+            n_interpolated += _interpolate_alive_gaps(life['history'])
+        cleaned_lives_per_player[key] = [l for l in lives if l['history']]
+    if n_outliers or n_interpolated:
+        _emit({'log': f'[player_tracking] retire {n_outliers} detections aberrantes, '
+                      f'injecte {n_interpolated} points interpolés'})
+
+    # 6. Format payload. id séquentiel ; slot 10 si number = 0 (Blue 5v5).
     out = []
     for next_id, (team, num) in enumerate(sorted(histories.keys())):
         slot = 10 if num == 0 else num
         out.append({
-            'team':    team,
-            'id':      next_id,
-            'slot':    slot,
-            'number':  num,
-            'history': histories[(team, num)],
+            'team':   team,
+            'id':     next_id,
+            'slot':   slot,
+            'number': num,
+            'lives':  cleaned_lives_per_player[(team, num)],
         })
     _emit({'log': f'[player_tracking] done: {len(out)} (team, number) tracks, '
                   f'{detections_total} total detections, '
@@ -3278,13 +3823,15 @@ def _refine_game_start_with_timer(cap, base_ts: float, timer_box,
     """
     Affine `game.start` en avançant seconde par seconde depuis `base_ts` et
     en lisant le timer in-game jusqu'à voir un décrément (M:S avec S > 0).
-    Le start est alors back-computé : start = T - (60 - S), soit l'instant
-    où le timer était à (M+1):00. La minute de départ est inconnue (10 par
-    défaut, mais l'admin peut la régler de 4 à 13+) — on ne s'en sert pas,
-    seul S compte. Tant qu'on voit M:00 (timer figé en attente du go) ou des
-    lectures invalides, on continue. `new_start` est clampé à `base_ts` :
-    une back-compute antérieure au start initial serait nécessairement un
-    OCR erroné (le loading screen borne le début par le bas).
+    Le start est alors back-computé : start = T - (60 - S) - 2, soit l'instant
+    2 secondes avant que le timer affiche (M+1):00 (buffer pour capter le
+    début du loading screen / handshake juste avant le tick). La minute de
+    départ est inconnue (10 par défaut, mais l'admin peut la régler de 4 à
+    13+) — on ne s'en sert pas, seul S compte. Tant qu'on voit M:00 (timer
+    figé en attente du go) ou des lectures invalides, on continue. `new_start`
+    est clampé à `base_ts` : une back-compute antérieure au start initial
+    serait nécessairement un OCR erroné (le loading screen borne le début
+    par le bas).
     """
     _emit({'log': f'[refine_start] START scan from base_ts={base_ts:.1f}s (max_search={max_search}s)'})
     for OFFSET in range(0, max_search + 1):
@@ -3310,10 +3857,10 @@ def _refine_game_start_with_timer(cap, base_ts: float, timer_box,
         if S == 0:
             _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → S=0, timer figé ou pile minute (skip)'})
             continue
-        BACK = TS - (60 - S)
+        BACK = TS - (60 - S) - 2
         REFINED = max(base_ts, BACK)
         CLAMPED = ' [CLAMPED to base_ts]' if BACK < base_ts else ''
-        _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → back-compute={BACK:.1f}s → start={REFINED:.1f}s (from base_ts={base_ts:.1f}s){CLAMPED}'})
+        _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → back-compute={BACK:.1f}s (M:00 - 2s) → start={REFINED:.1f}s (from base_ts={base_ts:.1f}s){CLAMPED}'})
         return REFINED
     _emit({'log': f'[refine_start] DONE no decrement found within {max_search}s of {base_ts:.1f}s, keeping {base_ts:.1f}s'})
     return base_ts
