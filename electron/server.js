@@ -411,6 +411,65 @@ if (!APP_GOT_THE_LOCK) {
 
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
+            case 'openFiles': {
+                const PICKED_FILES = await openFiles(
+                    data.filesExtensions ?? [],
+                    data.multiple ?? false
+                );
+                socketEmit(data.socket, 'openFiles', {
+                    paths: PICKED_FILES,
+                    port: getCurrentPort()
+                });
+                StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                break;
+            }
+            case 'manualCutVideoFile':
+                if (data.path && Array.isArray(data.chunks)) {
+                    const NOTIFICATION_DATA = {
+                        percent: 0,
+                        leftRounded: true,
+                        infinite: true,
+                        icon: 'fa-sharp fa-solid fa-scissors',
+                        text: '.view.replay_cutter.cuttingVideo',
+                        state: 'info'
+                    };
+                    await createFloatingWindow(
+                        450,
+                        150,
+                        JSON.stringify(NOTIFICATION_DATA)
+                    );
+
+                    const FILE_EXTENSION = data.path
+                        .split('.')
+                        .pop()
+                        .toLowerCase();
+                    const VIDEO_DIR = path.dirname(data.path);
+                    const VIDEO_NAME = path.basename(
+                        data.path,
+                        `.${FILE_EXTENSION}`
+                    );
+                    const OUTPUT_FILE_PATH = path.join(
+                        VIDEO_DIR,
+                        `${VIDEO_NAME} - manual cutted.${FILE_EXTENSION}`
+                    );
+
+                    if (fs.existsSync(OUTPUT_FILE_PATH)) {
+                        unlinkSync(OUTPUT_FILE_PATH);
+                    }
+
+                    await cutWithoutReencode(
+                        data.path,
+                        OUTPUT_FILE_PATH,
+                        data.chunks
+                    );
+
+                    deleteFloatingWindow(false);
+
+                    // Ouvre le fichier découpé avec l'application par défaut du système.
+                    shell.openPath(OUTPUT_FILE_PATH);
+                }
+                StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                break;
             case 'analyzeChunks':
                 if (
                     data.videoPath &&
