@@ -204,21 +204,26 @@ _A_PATTERNS = [
 
 # Pour chaque map : `aliases` = mots OCR reconnus (incluant erreurs fréquentes),
 # `points` = nombre attendu de capture points (garde-fou anti-FP dans
-# `_detect_capture_points_for_map`).
+# `_detect_capture_points_for_map`), `respawn` = délai de respawn en secondes
+# (sert au death lockout de `_smooth_hp_timeline`). Une map sans clé `respawn`
+# (ex. The Rock, ou une future map) retombe sur DEFAULT_RESPAWN (15 s).
 _MAPS = {
-    'Artefact':       {'aliases': ['artefact'], 'points': 1},
-    'Atlantis':       {'aliases': ['atlantis'], 'points': 3},
-    'Ceres':          {'aliases': ['ceres'], 'points': 1},
-    'Engine':         {'aliases': ['engine', 'enaine'], 'points': 3},
-    'Helios Station': {'aliases': ['helios', 'station', 'hheliosstation', 'rheliosstation', 'heliosstation'], 'points': 3},
-    'Lunar Outpost':  {'aliases': ['lunar', 'outpost', 'lunaroutpost'], 'points': 3},
-    'Outlaw':         {'aliases': ['outlaw', 'qutlaw'], 'points': 5},
-    'Polaris':        {'aliases': ['polaris', 'polarkg', 'polarg'], 'points': 1},
-    'Silva':          {'aliases': ['silva'], 'points': 1},
-    'The Cliff':      {'aliases': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt', 'theclife', 'the clife', 'theclifen'], 'points': 1},
+    'Artefact':       {'aliases': ['artefact'], 'points': 1, 'respawn': 18},
+    'Atlantis':       {'aliases': ['atlantis'], 'points': 3, 'respawn': 17},
+    'Ceres':          {'aliases': ['ceres'], 'points': 1, 'respawn': 17},
+    'Engine':         {'aliases': ['engine', 'enaine'], 'points': 3, 'respawn': 17},
+    'Helios Station': {'aliases': ['helios', 'station', 'hheliosstation', 'rheliosstation', 'heliosstation'], 'points': 3, 'respawn': 17},
+    'Lunar Outpost':  {'aliases': ['lunar', 'outpost', 'lunaroutpost'], 'points': 3, 'respawn': 17},
+    'Outlaw':         {'aliases': ['outlaw', 'qutlaw'], 'points': 5, 'respawn': 15},
+    'Polaris':        {'aliases': ['polaris', 'polarkg', 'polarg'], 'points': 1, 'respawn': 17},
+    'Silva':          {'aliases': ['silva'], 'points': 1, 'respawn': 17},
+    'The Cliff':      {'aliases': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt', 'theclife', 'the clife', 'theclifen'], 'points': 1, 'respawn': 17},
     'The Rock':       {'aliases': ['rock', 'therock'], 'points': 1},
-    'Horizon':        {'aliases': ['horizon'], 'points': 2},
+    'Horizon':        {'aliases': ['horizon'], 'points': 2, 'respawn': 15},
 }
+
+# Délai de respawn par défaut (s) pour les maps sans clé `respawn` dans _MAPS.
+DEFAULT_RESPAWN = 15
 
 WIDTH  = 1920
 HEIGHT = 1080
@@ -2530,12 +2535,16 @@ def _identify_carts(frame: np.ndarray,
     return out
 
 
-def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7) -> dict:
+def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7,
+                        respawn: int = DEFAULT_RESPAWN) -> dict:
     """Patche les faux "mort" en HP=1.
+
+    `respawn` = délai de respawn de la map (s), résolu depuis _MAPS par
+    l'appelant. Pilote la fenêtre de death lockout ci-dessous.
 
     Règle EVA :
       - regen passive après 5 s sans dégâts (1 HP → remonte)
-      - respawn 15–17 s après mort selon la partie
+      - respawn 15–18 s après mort selon la map
 
     Si un joueur est détecté HP=0 puis remonte > 0 dans les `regen_window` sec
     (par défaut 7 s = 5 s regen + 2 s marge), il n'était pas vraiment mort —
@@ -2588,25 +2597,45 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7) -> dict:
                         pairs[idx][team][i] = 1
                         break
     # Death lockout: a confirmed dead player (HP=0 not regen-patched above)
-    # cannot revive before 15 s (EVA respawn delay; some lobbies use 17 s, we
-    # use the shorter value as a safety floor — picking 17 would force HP=0 on
-    # already-respawned players in 15-s lobbies, creating false negatives).
-    # Any HP>0 reading inside that window is a misread → forced back to 0.
-    # We exit the lockout early only on a "real respawn" reading (HP ≥ 85).
+    # cannot revive before le délai de respawn de la map (`respawn`, 15–18 s
+    # selon la map — résolu depuis _MAPS par l'appelant). Auparavant on figeait
+    # ce plancher à 15 s pour toutes les maps : sur les maps à 17-18 s, la
+    # fenêtre 15→respawn n'était plus protégée et un misread y faisait
+    # réapparaître le joueur jusqu'à 3 s trop tôt. La valeur per-map supprime ce
+    # décalage. Any HP>0 reading inside that window is a misread → forced back to 0.
+    # We exit the lockout early on a "real respawn" reading (HP ≥ 85), but ONLY
+    # if enough time has elapsed since the death for a respawn to be possible
+    # (>= MIN_RESPAWN_ELAPSED). A full-HP reading that lands too soon after the
+    # death is physically impossible as a respawn (respawn needs `respawn` s) —
+    # it proves the HP=0 was itself a misread, so we ERASE the death (and any 0s
+    # forced since) back to alive instead of treating it as a respawn. Sans ça,
+    # un 100→0→100 sur une seule frame restait une fausse mort : le patch regen
+    # l'ignore (recovery > 50) et l'early-exit le prenait pour un respawn.
     # Threshold 85 (rather than 96 or 90) absorbs the fade-in animation. Certains
     # slots de carts (observé sur le 4e cart orange/Ceres) rendent à 87-89 % le
     # premier instant du respawn — quelques rangées du haut ne matchent pas
     # encore la couleur d'équipe à cause d'un overlay UI ou de l'opacité de
     # l'animation. À 90, on rate ces respawns et le lockout se ré-étend à
-    # chaque nouvelle lecture HP=0, bloquant la timeline 5-15 s. À 85, on capte.
+    # chaque nouvelle lecture HP=0, bloquant la timeline. À 85, on capte.
     # Les misreads pendant lockout sont typiquement entre 30 et 60 — bien sous
     # 85 — donc on garde la robustesse anti-misread.
-    DEATH_LOCKOUT = 15
+    DEATH_LOCKOUT = respawn
     RESPAWN_MIN = 85
+    # Délai minimal avant qu'un respawn soit plausible. Une lecture pleine vie
+    # qui arrive moins de MIN_RESPAWN_ELAPSED s après la mort ne peut pas être un
+    # respawn → c'est la mort qui était un misread, on l'efface. On le dérive de
+    # DEATH_LOCKOUT (marge de 2 s sous le plancher) pour qu'il suive toute
+    # modif du lockout : la bande [MIN_RESPAWN_ELAPSED, DEATH_LOCKOUT) absorbe un
+    # respawn lu un poil tôt (fade-in / timer légèrement décalé / mort détectée
+    # en retard) sans le confondre avec un misread à effacer.
+    MIN_RESPAWN_ELAPSED = DEATH_LOCKOUT - 2
     for team in ('orange', 'blue'):
         n_players = max((len(p.get(team) or []) for p in pairs), default=0)
         for i in range(n_players):
             lockout_until = -1
+            death_idx = -1
+            death_s = -1
+            forced = []   # idx des entrées réécrites à 0 pendant ce lockout
             for idx, s in enumerate(secs):
                 team_hps = pairs[idx].get(team) or []
                 if i >= len(team_hps):
@@ -2614,14 +2643,31 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7) -> dict:
                 val = team_hps[i]
                 if val == 0:
                     lockout_until = s + DEATH_LOCKOUT
+                    death_idx = idx
+                    death_s = s
+                    forced = []
                 elif s < lockout_until:
-                    if val >= RESPAWN_MIN:
+                    if val >= RESPAWN_MIN and s - death_s >= MIN_RESPAWN_ELAPSED:
                         lockout_until = -1   # real respawn
+                    elif val >= RESPAWN_MIN:
+                        # Pleine vie trop tôt après la mort → la mort était un
+                        # misread. On efface la mort et les 0 forcés depuis, en
+                        # restaurant la valeur pleine vie mesurée.
+                        for fidx in [death_idx] + forced:
+                            fhps = pairs[fidx].get(team) or []
+                            if i < len(fhps):
+                                pairs[fidx] = dict(pairs[fidx])
+                                pairs[fidx][team] = list(fhps)
+                                pairs[fidx][team][i] = val
+                        lockout_until = -1
+                        death_idx = -1
+                        forced = []
                     else:
                         # Misread inside the dead window — overwrite with 0.
                         pairs[idx] = dict(pairs[idx])
                         pairs[idx][team] = list(team_hps)
                         pairs[idx][team][i] = 0
+                        forced.append(idx)
     # Re-sparse: collapse consecutive identical pairs.
     out = {}
     prev = None
@@ -3823,15 +3869,18 @@ def _refine_game_start_with_timer(cap, base_ts: float, timer_box,
     """
     Affine `game.start` en avançant seconde par seconde depuis `base_ts` et
     en lisant le timer in-game jusqu'à voir un décrément (M:S avec S > 0).
-    Le start est alors back-computé : start = T - (60 - S) - 2, soit l'instant
-    2 secondes avant que le timer affiche (M+1):00 (buffer pour capter le
-    début du loading screen / handshake juste avant le tick). La minute de
-    départ est inconnue (10 par défaut, mais l'admin peut la régler de 4 à
-    13+) — on ne s'en sert pas, seul S compte. Tant qu'on voit M:00 (timer
-    figé en attente du go) ou des lectures invalides, on continue. `new_start`
-    est clampé à `base_ts` : une back-compute antérieure au start initial
-    serait nécessairement un OCR erroné (le loading screen borne le début
-    par le bas).
+    Le start est alors back-computé : start = T - (60 - S) - 1, soit 2 secondes
+    avant le premier tick du timer (M+1):00 → (M+1):59. Détail du -1 :
+      - T - (60 - S)  = instant du dernier tick visible (timer (M+1):S)
+      - + 1           = instant du tick (M+1):00 → (M+1):59 (= début gameplay)
+      - - 2           = buffer de 2s pour capter le handshake / fin de loading
+      → net : -1.
+    La minute de départ est inconnue (10 par défaut, mais l'admin peut la
+    régler de 4 à 13+) — on ne s'en sert pas, seul S compte. Tant qu'on voit
+    M:00 (timer figé en attente du go) ou des lectures invalides, on continue.
+    `new_start` est clampé à `base_ts` : une back-compute antérieure au start
+    initial serait nécessairement un OCR erroné (le loading screen borne le
+    début par le bas).
     """
     _emit({'log': f'[refine_start] START scan from base_ts={base_ts:.1f}s (max_search={max_search}s)'})
     for OFFSET in range(0, max_search + 1):
@@ -3857,10 +3906,10 @@ def _refine_game_start_with_timer(cap, base_ts: float, timer_box,
         if S == 0:
             _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → S=0, timer figé ou pile minute (skip)'})
             continue
-        BACK = TS - (60 - S) - 2
+        BACK = TS - (60 - S) - 1
         REFINED = max(base_ts, BACK)
         CLAMPED = ' [CLAMPED to base_ts]' if BACK < base_ts else ''
-        _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → back-compute={BACK:.1f}s (M:00 - 2s) → start={REFINED:.1f}s (from base_ts={base_ts:.1f}s){CLAMPED}'})
+        _emit({'log': f'[refine_start] ts={TS:.1f}s offset=+{OFFSET}s box={BOX_KIND} ocr={TIMER_TEXT!r} parsed={M}:{S:02d} → back-compute={BACK:.1f}s (1st tick - 2s) → start={REFINED:.1f}s (from base_ts={base_ts:.1f}s){CLAMPED}'})
         return REFINED
     _emit({'log': f'[refine_start] DONE no decrement found within {max_search}s of {base_ts:.1f}s, keeping {base_ts:.1f}s'})
     return base_ts
@@ -4202,9 +4251,14 @@ def _analyze(
 def _parse_timer_text(timer_text: str):
     """
     Parse une chaîne timer ('MM:SS' ou 'MMSS' si Tesseract loupe le ':')
-    et retourne le tuple (M, S), ou None si non parsable.
-    Aucune validation de bornes — l'appelant valide selon son contexte
-    (en phase 2, la borne max dépend du max_time_per_game auto-détecté).
+    et retourne le tuple (M, S), ou None si non parsable / hors bornes.
+
+    Bornes : M ∈ [0, 99], S ∈ [0, 59]. Sans cette validation, un OCR bruité
+    type "0969" (au lieu de "0959") produit S=69, ce qui mène à des back-compute
+    aberrants (ex. start dans le futur) dans `_refine_game_start_with_timer`.
+
+    Accepte aussi 5 chiffres sans colon ("10000" = "10:00" où le ":" a été
+    interprété comme un "0" supplémentaire) : 2 premiers = M, 2 derniers = S.
     """
     if not timer_text:
         return None
@@ -4213,12 +4267,17 @@ def _parse_timer_text(timer_text: str):
         PARTS = timer_text.split(':')
     elif len(timer_text) == 4 and timer_text.isdigit():
         PARTS = [timer_text[:2], timer_text[2:]]
+    elif len(timer_text) == 5 and timer_text.isdigit():
+        PARTS = [timer_text[:2], timer_text[3:]]
     if not PARTS or len(PARTS) != 2:
         return None
     try:
-        return (int(PARTS[0]), int(PARTS[1]))
+        M, S = int(PARTS[0]), int(PARTS[1])
     except Exception:
         return None
+    if not (0 <= M <= 99 and 0 <= S <= 59):
+        return None
+    return (M, S)
 
 
 def _reconstruct_field(raw_obs: dict, field: str, max_score, max_rate: int = MAX_SCORE_RATE_PER_SECOND) -> dict:
@@ -5012,7 +5071,9 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 HP_TIMELINE[str(K)] = pair
                 prev_hp = pair
         # Faux "mort" détectés (HP=0 mais joueur en regen) → forcés à 1.
-        HP_TIMELINE = _smooth_hp_timeline(HP_TIMELINE)
+        # Le death lockout est calé sur le délai de respawn de la map.
+        RESPAWN = _MAPS.get(MAP_NAME, {}).get('respawn', DEFAULT_RESPAWN)
+        HP_TIMELINE = _smooth_hp_timeline(HP_TIMELINE, respawn=RESPAWN)
 
         # Trailer non-gameplay : à la fin du chunk, l'écran de score final
         # s'affiche jusqu'à ~15 s (ou moins si la vidéo a été pré-coupée). On
