@@ -106,12 +106,17 @@ MODES = [
                     # score frame pro_league a :
                     # - left pill colorée (sat >= 100 dans >50% de la zone)
                     # - right pill colorée (sat >= 100 dans >40% de la zone)
-                    # - texte EVA PRO LEAGUE gris/blanc (sat >= 100 dans <30%)
+                    # - texte EVA PRO LEAGUE gris/blanc (sat >= 100 dans <45%)
                     # Coords (x1, y1, x2, y2, sat_min, min_ratio, max_ratio).
                     'validate_regions': [
                         (5, 0, 106, 34, 100, 0.4, 1.0),       # left pill saturated
                         (1166, 135, 1267, 168, 100, 0.4, 1.0),  # right pill saturated
-                        (556, 64, 717, 104, 100, 0.0, 0.3),    # EVA text gray
+                        # Plafond à 0.45 (et non 0.3) : le logo "EVA PRO LEAGUE" est
+                        # semi-transparent, le fond de map transparaît derrière. Sur
+                        # les maps à fond coloré (ex. The Cliff, paroi orange) la zone
+                        # monte à ~0.36, alors que les pills colorés restent à
+                        # 0.88-0.97 → la marge de discrimination reste nette.
+                        (556, 64, 717, 104, 100, 0.0, 0.45),   # EVA text gray
                     ],
                 },
                 # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
