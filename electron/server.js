@@ -378,6 +378,16 @@ if (!APP_GOT_THE_LOCK) {
                 if (FILES_PATHS.length > 0) {
                     const MAX_TIME_PER_GAME = data.maxTime ?? 10;
                     const MAX_GAMES_AT_SAME_TIME = data.maxGames ?? 3;
+                    // Scores forcés (panneau "association") : on ne les encode que
+                    // si LES DEUX sont des entiers 0-100. Sinon on ignore (analyse
+                    // normale, association via OCR).
+                    const isValidScore = (v) =>
+                        Number.isInteger(v) && v >= 0 && v <= 100;
+                    const FORCED_SCORES =
+                        isValidScore(data.forcedOrangeScore) &&
+                        isValidScore(data.forcedBlueScore)
+                            ? `__fos-${data.forcedOrangeScore}__fbs-${data.forcedBlueScore}`
+                            : '';
                     const DURATIONS = await Promise.all(
                         FILES_PATHS.map((p) =>
                             getVideoDuration(p).catch(() => 0)
@@ -398,7 +408,7 @@ if (!APP_GOT_THE_LOCK) {
                         const BASE = path.basename(SRC, EXT);
                         const DEST = path.join(
                             WATCH_FOLDER,
-                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${EXT}`
+                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${FORCED_SCORES}${EXT}`
                         );
                         fs.copyFileSync(SRC, DEST);
                     }

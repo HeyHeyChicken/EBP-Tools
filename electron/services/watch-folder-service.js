@@ -31,6 +31,11 @@ const SUPPORTED_EXT = new Set(['.mp4', '.mkv', '.mov', '.avi', '.webm']);
 const AUTH_RETRY_INTERVAL_MS = 30 * 1000;
 const MTPG_RE = /__mtpg-(\d+)/;
 const MGAST_RE = /__mgast-(\d+)/;
+// Scores forcés (panneau "association" côté front) : présents uniquement quand
+// l'utilisateur force l'association d'une game pré-découpée. Les deux toujours
+// ensemble (validés côté front + server.js avant encodage).
+const FOS_RE = /__fos-(\d+)/;
+const FBS_RE = /__fbs-(\d+)/;
 // Nombre de games analysées en profondeur en parallèle (un process Python par
 // game). Ajuster selon les retours terrain : plus on monte, plus on sature CPU
 // / mémoire (chaque process recharge tesseract, templates, ouvre sa propre
@@ -51,21 +56,29 @@ function parseMeta(filePath) {
     const BASE = path.basename(filePath, EXT);
     const MTPG = BASE.match(MTPG_RE);
     const MGAST = BASE.match(MGAST_RE);
-    if (!MTPG && !MGAST) {
+    const FOS = BASE.match(FOS_RE);
+    const FBS = BASE.match(FBS_RE);
+    if (!MTPG && !MGAST && !FOS && !FBS) {
         return {
             cleanBasename: BASE,
             maxTimePerGame: undefined,
-            maxGamesAtSameTime: undefined
+            maxGamesAtSameTime: undefined,
+            forcedOrangeScore: undefined,
+            forcedBlueScore: undefined
         };
     }
     const FIRST_IDX = Math.min(
         MTPG ? MTPG.index : Infinity,
-        MGAST ? MGAST.index : Infinity
+        MGAST ? MGAST.index : Infinity,
+        FOS ? FOS.index : Infinity,
+        FBS ? FBS.index : Infinity
     );
     return {
         cleanBasename: BASE.slice(0, FIRST_IDX),
         maxTimePerGame: MTPG ? parseInt(MTPG[1], 10) : undefined,
-        maxGamesAtSameTime: MGAST ? parseInt(MGAST[1], 10) : undefined
+        maxGamesAtSameTime: MGAST ? parseInt(MGAST[1], 10) : undefined,
+        forcedOrangeScore: FOS ? parseInt(FOS[1], 10) : undefined,
+        forcedBlueScore: FBS ? parseInt(FBS[1], 10) : undefined
     };
 }
 
@@ -227,7 +240,14 @@ function notifyStatusChange() {
  * identify (l'idée justement c'est de récupérer les rosters AVANT phase 2 pour
  * pouvoir les injecter dans l'OCR du killfeed).
  */
-function toIdentifySegments(games) {
+function toIdentifySegments(games, forcedScores) {
+    // Scores forcés (game pré-découpée + association forcée) : ils remplacent les
+    // scores OCR. Le caller ne les passe que lorsqu'une seule game est détectée
+    // (sinon `null`), donc l'override ne s'applique de fait qu'à cette game.
+    const FORCED =
+        forcedScores &&
+        forcedScores.orange !== undefined &&
+        forcedScores.blue !== undefined;
     return games.map((g, i) => ({
         tempId: `temp-${i}`,
         startSeconds: g.start,
@@ -235,8 +255,16 @@ function toIdentifySegments(games) {
         mode: g.mode,
         mapName: g.map,
         mapImage: g.mapImage,
-        blueScore: g.blueTeam ? g.blueTeam.score : null,
-        orangeScore: g.orangeTeam ? g.orangeTeam.score : null,
+        blueScore: FORCED
+            ? forcedScores.blue
+            : g.blueTeam
+              ? g.blueTeam.score
+              : null,
+        orangeScore: FORCED
+            ? forcedScores.orange
+            : g.orangeTeam
+              ? g.orangeTeam.score
+              : null,
         blueTeam: g.blueTeam,
         orangeTeam: g.orangeTeam
     }));
@@ -273,12 +301,29 @@ async function processVideo(videoPath, deps) {
         return;
     }
 
+    // Scores forcés : valables uniquement sur une game pré-découpée isolée. Si
+    // la détection en trouve plusieurs, on ne peut pas savoir à laquelle les
+    // attribuer → on ignore le forçage et on retombe sur l'association OCR.
+    const FORCED_SCORES =
+        META.forcedOrangeScore !== undefined &&
+        META.forcedBlueScore !== undefined;
+    if (FORCED_SCORES && GAMES.length !== 1) {
+        console.log(
+            `[watch-folder] forced scores ignorés : ${GAMES.length} games détectées (1 attendue)`
+        );
+    }
+
     // Identify : on demande au back les rosters trustés AVANT la phase 2 pour
     // pouvoir les passer en argument à l'analyse approfondie (utile au fuzzy
     // match du killfeed OCR).
     const IDENTIFY_PAYLOAD = {
         sourceFilename: META.cleanBasename + path.extname(videoPath),
-        segments: toIdentifySegments(GAMES)
+        segments: toIdentifySegments(
+            GAMES,
+            FORCED_SCORES && GAMES.length === 1
+                ? { orange: META.forcedOrangeScore, blue: META.forcedBlueScore }
+                : null
+        )
     };
     console.log(
         '[watch-folder] identify payload:',
