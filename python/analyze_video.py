@@ -575,56 +575,78 @@ def _find_text_border(frame: np.ndarray, colors: list, search_region, tol_color:
     return ((x1, y1), (x2, y2))
 
 
-def _pick_dominant_color(frame: np.ndarray, search_region, candidates: list, tol_color: int = 20, min_pixels: int = 30):
+def _color_match_counts(frame: np.ndarray, search_region, candidates: list, tol_color: int = 20):
     """
-    Parmi une liste de couleurs candidates, retourne (couleur, index) du
-    meilleur match dans search_region — ou (None, -1) si aucune ne dépasse
-    min_pixels. Utilisé pour verrouiller la couleur d'équipe réellement
-    présente (TEAM_ORANGE et TEAM_BLUE listent plusieurs valeurs possibles).
-    L'index permet à l'appelant d'imposer un appairage orange/bleu sur le
-    même slot (TEAM_ORANGE[i] joue contre TEAM_BLUE[i]).
+    Compte, pour chaque couleur candidate, le nombre de pixels de search_region
+    à <= tol_color (distance L-inf RGB). Retourne une liste d'entiers alignée
+    sur `candidates`.
+
+    Sert à résoudre la couleur d'équipe : TEAM_ORANGE[i] et TEAM_BLUE[i] forment
+    la paire du thème i, et l'appelant choisit le thème en scorant les deux côtés
+    ENSEMBLE (cf. `_resolve_team_colors`), plutôt que par un argmax indépendant
+    par côté — ce qui évite qu'un thème au color quasi-identique sur un seul côté
+    ne vole le slot.
     """
     h, w = frame.shape[:2]
     (sx1, sy1), (sx2, sy2) = search_region
     sx1 = max(0, int(sx1)); sy1 = max(0, int(sy1))
     sx2 = min(w, int(sx2)); sy2 = min(h, int(sy2))
     if sx1 >= sx2 or sy1 >= sy2:
-        return (None, -1)
+        return [0] * len(candidates)
     sub = frame[sy1:sy2, sx1:sx2].astype(np.int16)
-    best = None
-    best_idx = -1
-    best_count = 0
-    for i, c in enumerate(candidates):
+    counts = []
+    for c in candidates:
         target = np.array(c, dtype=np.int16)
-        count = int(((np.abs(sub - target) <= tol_color).all(axis=2)).sum())
-        if count > best_count:
-            best_count = count
-            best = c
-            best_idx = i
-    if best_count >= min_pixels:
-        return (best, best_idx)
-    return (None, -1)
+        counts.append(int(((np.abs(sub - target) <= tol_color).all(axis=2)).sum()))
+    return counts
 
 
 def _resolve_team_colors(frame: np.ndarray, anchor=None):
     """
     Détermine la couleur effective de chaque équipe sur la frame courante en
-    comptant les pixels matchant chaque candidat dans la zone de score
-    (dérivée de la barre HUD haute). Retourne (orange_rgb, blue_rgb) — chaque
-    élément peut être None si la zone n'est pas assez peuplée.
+    comptant les pixels matchant chaque candidat sur les CARTES DE VIE des
+    joueurs (`_find_team_card_box`) : leur fond est un aplat plein de la couleur
+    d'équipe quand le joueur est full life, donc proche des valeurs canoniques.
+    On évite ainsi les chiffres de score, alpha-blendés sur le HUD sombre, dont
+    la couleur dérive vers le gris (échec du match à tol serrée) — et les pills
+    de score centraux, absents/peu fiables selon les vidéos.
+
+    Retourne (orange_rgb, blue_rgb) — chaque élément peut être None si la zone
+    n'est pas assez peuplée.
     """
-    o_box = _find_orange_score_box(frame, anchor=anchor)
-    b_box = _find_blue_score_box(frame, anchor=anchor)
+    if anchor is None:
+        anchor = _find_playing_top_anchor(frame)
+    o_box = _find_team_card_box(anchor, 'left')
+    b_box = _find_team_card_box(anchor, 'right')
     if o_box is None or b_box is None:
         return (None, None)
-    o_color, o_idx = _pick_dominant_color(frame, o_box, TEAM_ORANGE)
-    b_color, b_idx = _pick_dominant_color(frame, b_box, TEAM_BLUE)
-    # TEAM_ORANGE[i] et TEAM_BLUE[i] vont par paire (un seul "thème" de partie
-    # peut être actif). Si les meilleurs candidats ne tombent pas sur le même
-    # slot, on rejette la frame et l'algo réessaiera plus loin.
-    if o_idx != b_idx or o_color is None or b_color is None:
+    o_counts = _color_match_counts(frame, o_box, TEAM_ORANGE)
+    b_counts = _color_match_counts(frame, b_box, TEAM_BLUE)
+    # TEAM_ORANGE[i] et TEAM_BLUE[i] forment la paire du thème i (un seul thème
+    # est actif). On retient le thème qui maximise orange_count[i] + blue_count[i],
+    # À CONDITION que les deux couleurs soient présentes (>= MIN_PIXELS).
+    #
+    # Scorer la PAIRE (et non un argmax indépendant par côté + garde-fou
+    # o_idx==b_idx) évite qu'un thème au color quasi-identique sur UN seul côté
+    # vole le slot : p.ex. le bleu Local League (180,0,245) ≈ Summit (179,0,243)
+    # à (1,0,2) près — le bleu seul ne tranche pas, mais l'orange (Local vert vs
+    # Summit cyan, distincts) fait clairement pencher le score combiné.
+    #
+    # Note : ce critère retourne le même slot que l'ancien appairage quand
+    # celui-ci réussissait (si l'argmax de chaque côté tombe sur k, alors k
+    # maximise aussi la somme) — donc pas de régression, seulement des cas en
+    # plus qui se résolvent.
+    MIN_PIXELS = 30
+    best_i, best_score = -1, -1
+    for i in range(len(TEAM_ORANGE)):
+        if o_counts[i] < MIN_PIXELS or b_counts[i] < MIN_PIXELS:
+            continue
+        score = o_counts[i] + b_counts[i]
+        if score > best_score:
+            best_score, best_i = score, i
+    if best_i < 0:
         return (None, None)
-    return (o_color, b_color)
+    return (TEAM_ORANGE[best_i], TEAM_BLUE[best_i])
 
 
 def _validate_kill_row(frame: np.ndarray, bbox, kf_spec: dict) -> bool:
@@ -1855,6 +1877,43 @@ def _find_score_box(anchor, side: str):
     score_x1 = int(score_cx - score_w / 2)
     score_x2 = int(score_cx + score_w / 2)
     return ((score_x1, score_y1), (score_x2, score_y2))
+
+
+# Bornes Y des cartes de vie, en fraction de la hauteur de `playing_top` (mesuré
+# sur le HUD haut). De -12 % (les cartes débordent un peu au-dessus de la barre)
+# à +110 % (elles descendent un peu en-dessous).
+_CARD_Y1_RATIO = -0.12
+_CARD_Y2_RATIO = 1.10
+
+
+def _find_team_card_box(anchor, side: str):
+    """Boîte de recherche de la couleur d'équipe sur les CARTES DE VIE des
+    joueurs (et non les chiffres de score). Quand un joueur est full life, le
+    fond de sa carte est un aplat plein de la couleur d'équipe — bien plus
+    fiable que les chiffres de score, qui sont alpha-blendés sur la barre HUD
+    sombre : leur couleur est tirée vers le gris (canal B remonté pour le jaune,
+    descendu pour le cyan) → hors tolérance, et deux thèmes aux teintes proches
+    (Challenger vs Pro League sur le bleu) deviennent indiscernables.
+
+    Layout : cartes orange à GAUCHE du HUD haut, cartes bleues à DROITE. Bornes
+    Y dérivées de `playing_top` (_CARD_Y*_RATIO). Bornes X = tout le côté hors du
+    HUD : le décor n'étant pas team-coloré, l'élargissement est sans risque et ça
+    exclut au passage les pills de score centraux (eux aussi colorés).
+
+    Retourne ((x1, y1), (x2, y2)) ou None si l'ancre est absente.
+    """
+    if anchor is None:
+        return None
+    x, y, th, tw = anchor
+    y1 = max(0, int(y + th * _CARD_Y1_RATIO))
+    y2 = int(y + th * _CARD_Y2_RATIO)
+    if side == 'left':   # cartes orange, à gauche du HUD
+        x1, x2 = 0, int(x)
+    else:                # cartes bleues, à droite du HUD
+        x1, x2 = int(x + tw), WIDTH
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return ((x1, y1), (x2, y2))
 
 
 def _find_orange_score_box(frame: np.ndarray, anchor=None):
