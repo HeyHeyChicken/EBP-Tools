@@ -32,11 +32,16 @@ function getFFmpegPath(osPlatform, isDevMode, rootPath) {
 
     const DIRECTORY = isDevMode ? '../binaries/ffmpeg' : 'ffmpeg';
 
-    return path.join(
-        rootPath,
-        DIRECTORY,
-        osPlatform === 'win32' ? 'win32.exe' : osPlatform
-    );
+    if (osPlatform === 'win32') {
+        return path.join(rootPath, DIRECTORY, 'win32.exe');
+    }
+
+    // macOS ships per-architecture binaries (darwin-arm64 / darwin-x64).
+    if (osPlatform === 'darwin') {
+        return path.join(rootPath, DIRECTORY, `darwin-${process.arch}`);
+    }
+
+    return path.join(rootPath, DIRECTORY, osPlatform);
 }
 
 /**

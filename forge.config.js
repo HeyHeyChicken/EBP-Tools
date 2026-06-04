@@ -166,7 +166,7 @@ module.exports = {
                 );
 
                 const BINARIES = [
-                    path.join(RESOURCES_BASE, 'ffmpeg', 'darwin'),
+                    path.join(RESOURCES_BASE, 'ffmpeg', 'darwin-' + ARCH),
                     // onedir: executable is inside the darwin/ directory
                     path.join(RESOURCES_BASE, 'analyzer', 'darwin', 'darwin')
                 ];
