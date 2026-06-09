@@ -226,36 +226,15 @@ function fixForBrowser(videoPath) {
 }
 
 /**
- * Probes the video codec of a file by spawning ffmpeg and parsing its stderr.
- * Cheap (no decoding); returns the codec short name (e.g. "h264", "hevc")
- * lowercased, or null if unknown.
- */
-function probeVideoCodec(inputPath) {
-    return new Promise((resolve) => {
-        const FFMPEG = spawn(FFMPEG_PATH, [
-            '-hide_banner',
-            '-i',
-            inputPath
-        ]);
-        let stderr = '';
-        FFMPEG.stderr.on('data', (d) => {
-            stderr += d.toString();
-        });
-        FFMPEG.on('close', () => {
-            const M = stderr.match(/Stream #\d+:\d+[^\n]*Video:\s+(\w+)/);
-            resolve(M ? M[1].toLowerCase() : null);
-        });
-        FFMPEG.on('error', () => resolve(null));
-    });
-}
-
-/**
- * Cuts a video segment, stream-copying the video track if it's already H.264
- * (the common case for game capture tools) and re-encoding to libx264
- * otherwise. Audio is always re-encoded to AAC (MP4 doesn't officially
- * support Opus). Faststart for browser streaming. With stream-copy the cut
- * lands at the nearest keyframe before `startSec`, so the actual start may
- * be a few seconds earlier than requested — acceptable for replay gameplay.
+ * Cuts a video segment and re-encodes the video track to libx264 with a
+ * keyframe every second, so the web player can seek to any timecode quickly
+ * (a seek only needs to download/decode ~1s back to the nearest keyframe).
+ * We re-encode even when the source is already H.264 because game capture
+ * tools emit a coarse GOP (~4s), which makes scrubbing slow — stream-copy
+ * would preserve that coarse spacing. Audio is re-encoded to AAC (MP4 doesn't
+ * officially support Opus). Faststart for browser streaming. `-ss` before
+ * `-i` keeps input seeking fast while the re-encode makes the cut start
+ * frame-accurate at `startSec`.
  * @param {string} inputPath  Source video.
  * @param {string} outputPath Destination .mp4.
  * @param {number} startSec   Inclusive start time (seconds).
@@ -267,16 +246,6 @@ async function cutAndEncodeGame(inputPath, outputPath, startSec, endSec) {
         unlinkSync(outputPath);
     }
 
-    const VIDEO_CODEC = await probeVideoCodec(inputPath);
-    const STREAM_COPY = VIDEO_CODEC === 'h264';
-    console.log(
-        `[FFMPEG] Cut+encode - source video codec=${VIDEO_CODEC ?? 'unknown'}, ${STREAM_COPY ? 'stream-copy' : 'libx264 re-encode'}`
-    );
-
-    const VIDEO_ARGS = STREAM_COPY
-        ? ['-c:v', 'copy']
-        : ['-c:v', 'libx264', '-preset', 'medium', '-crf', '23'];
-
     return new Promise((resolve, reject) => {
         const FFMPEG_ARGS = [
             '-ss',
@@ -285,7 +254,16 @@ async function cutAndEncodeGame(inputPath, outputPath, startSec, endSec) {
             String(endSec),
             '-i',
             inputPath,
-            ...VIDEO_ARGS,
+            '-c:v',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '23',
+            // Keyframe toutes les secondes, indépendamment du fps source, pour un seek
+            // fluide côté lecteur web (cf. game-player). `n_forced` = index de keyframe forcée.
+            '-force_key_frames',
+            'expr:gte(t,n_forced*1)',
             '-c:a',
             'aac',
             '-b:a',
