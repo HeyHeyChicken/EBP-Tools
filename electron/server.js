@@ -373,6 +373,54 @@ if (!APP_GOT_THE_LOCK) {
                     );
                 }
                 break;
+            case 'reencodeVideoFile': {
+                // Réencode une vidéo sélectionnée comme on le fait après un téléchargement
+                // Twitch (remux `fixForBrowser`), pour la rendre analysable par Tools.
+                const FILES_TO_FIX = await openFiles(data.filesExtensions);
+                if (FILES_TO_FIX.length == 1) {
+                    const NOTIFICATION_DATA = {
+                        percent: 0,
+                        leftRounded: true,
+                        infinite: true,
+                        icon: '',
+                        text: '.common.encoding',
+                        state: 'info'
+                    };
+                    await createFloatingWindow(
+                        450,
+                        150,
+                        JSON.stringify(NOTIFICATION_DATA)
+                    );
+
+                    try {
+                        await fixForBrowser(FILES_TO_FIX[0]);
+
+                        getMainWindow().webContents.send(
+                            'set-notification-data',
+                            {
+                                percent: 100,
+                                leftRounded: true,
+                                infinite: false,
+                                icon: 'fa-sharp fa-solid fa-check',
+                                text: '.common.encoded',
+                                state: 'success'
+                            }
+                        );
+
+                        setTimeout(() => {
+                            deleteFloatingWindow();
+                        }, 5000);
+                    } catch (error) {
+                        console.error(
+                            '[REENCODE] fixForBrowser failed:',
+                            error
+                        );
+                        deleteFloatingWindow();
+                    }
+                }
+                StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                break;
+            }
             case 'analyzeVideoFile':
                 const FILES_PATHS = await openFiles(data.filesExtensions, true);
                 if (FILES_PATHS.length > 0) {
