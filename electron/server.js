@@ -70,7 +70,8 @@ const { setupExpressServer } = require('./express/express-server');
 const {
     changeVideoResolution,
     removeBorders,
-    fixForBrowser
+    fixForBrowser,
+    remuxToForAnalysis
 } = require('./services/video-service');
 const { unlinkSync } = require('./services/global-service');
 const UpdateService = require('./services/update-service');
@@ -458,7 +459,10 @@ if (!APP_GOT_THE_LOCK) {
                             WATCH_FOLDER,
                             `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${FORCED_SCORES}${EXT}`
                         );
-                        fs.copyFileSync(SRC, DEST);
+                        // Remux (stream copy + faststart) au lieu d'une copie brute :
+                        // tout fichier — Twitch, YouTube ou capture — arrive dans le
+                        // watch folder avec un conteneur propre. Fallback copie si échec.
+                        await remuxToForAnalysis(SRC, DEST);
                     }
                 } else {
                     socketEmit(data.socket, 'analyzeVideoFileGames', {

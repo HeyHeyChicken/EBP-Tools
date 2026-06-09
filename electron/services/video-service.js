@@ -226,6 +226,60 @@ function fixForBrowser(videoPath) {
 }
 
 /**
+ * Copies a video to `dest` while remuxing it (stream copy + faststart), so any
+ * source — Twitch, YouTube or a raw capture — lands in the watch folder with a
+ * clean container. Replaces a plain copy: same disk I/O, just a clean rewrite.
+ * Never touches the source file. Falls back to a raw copy if FFmpeg fails, so a
+ * file we couldn't remux still gets analyzed.
+ * @param {string} src  Source video.
+ * @param {string} dest Destination in the watch folder.
+ * @returns {Promise<string>} Resolves with `dest`.
+ */
+function remuxToForAnalysis(src, dest) {
+    return new Promise((resolve) => {
+        const FFMPEG_ARGS = [
+            '-y',
+            '-i',
+            src,
+            '-c',
+            'copy',
+            '-movflags',
+            'faststart',
+            dest
+        ];
+
+        console.log(
+            `[FFMPEG] Remux for analysis - Executing: ${FFMPEG_PATH} ${FFMPEG_ARGS.join(' ')}`
+        );
+
+        const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+
+        FFMPEG.on('close', (code) => {
+            if (code === 0 && fs.existsSync(dest)) {
+                resolve(dest);
+            } else {
+                console.warn(
+                    `[FFMPEG] Remux for analysis failed (code ${code}), falling back to raw copy`
+                );
+                if (fs.existsSync(dest)) {
+                    unlinkSync(dest);
+                }
+                fs.copyFileSync(src, dest);
+                resolve(dest);
+            }
+        });
+
+        FFMPEG.on('error', (err) => {
+            console.warn(
+                `[FFMPEG] Remux for analysis errored (${err.message}), falling back to raw copy`
+            );
+            fs.copyFileSync(src, dest);
+            resolve(dest);
+        });
+    });
+}
+
+/**
  * Cuts a video segment and re-encodes the video track to libx264 with a
  * keyframe every second, so the web player can seek to any timecode quickly
  * (a seek only needs to download/decode ~1s back to the nearest keyframe).
@@ -302,5 +356,6 @@ module.exports = {
     changeVideoResolution,
     removeBorders,
     fixForBrowser,
+    remuxToForAnalysis,
     cutAndEncodeGame
 };
