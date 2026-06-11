@@ -2699,6 +2699,7 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7,
             lockout_until = -1
             death_idx = -1
             death_s = -1
+            n_death_reads = 0   # nb de lectures HP=0 dans la mort EN COURS
             forced = []   # idx des entrées réécrites à 0 pendant ce lockout
             for idx, s in enumerate(secs):
                 team_hps = pairs[idx].get(team) or []
@@ -2706,17 +2707,29 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7,
                     continue
                 val = team_hps[i]
                 if val == 0:
+                    # On ancre death_s/idx sur le PREMIER 0 de la mort seulement.
+                    # Les 0 suivants (mort soutenue) ne ré-ancrent PAS : sinon
+                    # l'écart mort→respawn se mesure depuis le DERNIER 0 lu, et une
+                    # vraie mort de plusieurs secondes suivie d'un faux respawn
+                    # passe pour un simple blip juste avant ce respawn → la branche
+                    # d'effacement ci-dessous se déclenchait à tort.
+                    # Cas réel : orange/1 à 3m07 — mort à 186, HP=0 soutenu jusqu'à
+                    # 191, faux 100 à 193. Avec ré-ancrage, 193 semblait à 2 s du 0
+                    # de 191 → mort effacée → joueur « vivant » 12 s trop tôt.
+                    if n_death_reads == 0:
+                        death_idx = idx
+                        death_s = s
+                        forced = []
+                    n_death_reads += 1
                     lockout_until = s + DEATH_LOCKOUT
-                    death_idx = idx
-                    death_s = s
-                    forced = []
                 elif s < lockout_until:
                     if val >= RESPAWN_MIN and s - death_s >= MIN_RESPAWN_ELAPSED:
                         lockout_until = -1   # real respawn
-                    elif val >= RESPAWN_MIN:
-                        # Pleine vie trop tôt après la mort → la mort était un
-                        # misread. On efface la mort et les 0 forcés depuis, en
-                        # restaurant la valeur pleine vie mesurée.
+                        n_death_reads = 0
+                    elif val >= RESPAWN_MIN and n_death_reads <= 1:
+                        # Mort NON confirmée (un seul 0 transitoire) + pleine vie
+                        # juste après = misread 100→0→100. On efface la mort et les
+                        # 0 forcés depuis, en restaurant la pleine vie mesurée.
                         for fidx in [death_idx] + forced:
                             fhps = pairs[fidx].get(team) or []
                             if i < len(fhps):
@@ -2725,13 +2738,21 @@ def _smooth_hp_timeline(timeline_sparse: dict, regen_window: int = 7,
                                 pairs[fidx][team][i] = val
                         lockout_until = -1
                         death_idx = -1
+                        n_death_reads = 0
                         forced = []
                     else:
-                        # Misread inside the dead window — overwrite with 0.
+                        # Soit mort CONFIRMÉE (>= 2 lectures 0) + pleine vie trop
+                        # tôt = c'est le 100 qui est le misread (respawn impossible
+                        # avant `respawn` s) ; soit misread < 85 dans la fenêtre.
+                        # Dans les deux cas on écrase à 0, le lockout continue.
                         pairs[idx] = dict(pairs[idx])
                         pairs[idx][team] = list(team_hps)
                         pairs[idx][team][i] = 0
                         forced.append(idx)
+                else:
+                    # Vivant hors de la fenêtre de lockout → la mort courante est
+                    # terminée ; un futur 0 ré-ancrera une nouvelle mort.
+                    n_death_reads = 0
     # Re-sparse: collapse consecutive identical pairs.
     out = {}
     prev = None
@@ -3309,6 +3330,68 @@ def _find_line_fit_outliers(seq: list,
     return to_remove
 
 
+def _find_short_excursion(seq: list, max_window_s: float = 3.0,
+                          max_anchor_dist: float = 0.15,
+                          min_offset: float = 0.1) -> set:
+    """Fix I : burst de fausses détections pendant un TROU de tracking, encadré
+    par deux ancres PROCHES l'une de l'autre.
+
+    Généralise Fix H (`_find_line_fit_outliers`, qui ne traite qu'UN point isolé)
+    aux bursts de taille quelconque. Pendant un trou (joueur momentanément perdu),
+    le détecteur peut pondre une rafale de positions FAUSSES dispersées partout
+    sur la carte avant de ré-acquérir le joueur quasi là où il l'avait perdu —
+    l'interpolation reliait ensuite ce garbage en un « tour » de carte.
+
+    Cas réel orange/4 à 4m36 : entre (0.10,0.22) à t=276.0 et (0.12,0.21) à
+    t=278.7 — deux ancres à 0.08 l'une de l'autre — ~12 faux points dispersés
+    (bas-gauche, haut-droite, coin (0.98,0.0), bord gauche...). Ni Fix G (les
+    points bougent), ni `_find_aberrant_runs` (le retour arrive > 1 s après, hors
+    de sa fenêtre), ni Fix H (plusieurs points qui se cautionnent) ne couvraient
+    ça. L'ancienne version de Fix I (bornée à 3 frames) non plus.
+
+    Algo : pour chaque ancre `a = seq[i-1]`, on cherche en avant, dans une FENÊTRE
+    TEMPORELLE `max_window_s`, la 1ʳᵉ ancre `b` telle que :
+      - `b` est PROCHE de `a` (< `max_anchor_dist`) — la trajectoire revient là
+        d'où elle est partie : le joueur n'a en fait pas bougé ;
+      - TOUS les points entre `a` et `b` sont LOIN (> `min_offset`) des DEUX ancres.
+    Si trouvé, on supprime tout l'intervalle. Borne TEMPORELLE (et non par nombre
+    de frames) car un trou de tracking peut générer un burst arbitrairement long.
+
+    Pourquoi c'est sûr (pas de faux positif sur un vrai déplacement) : un vrai
+    joueur ne bouge que ~1-5 %/frame ; juste après avoir quitté `a`, sa 1ʳᵉ frame
+    est donc à < `min_offset` de `a` → la condition « tous loin » échoue → on ne
+    touche pas. Seul un burst qui SAUTE instantanément loin (> 10 % en 1 frame,
+    physiquement impossible) puis revient satisfait la condition.
+    """
+    n = len(seq)
+    if n < 3:
+        return set()
+
+    def _d(p, q):
+        return ((p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2) ** 0.5
+
+    to_remove: set = set()
+    i = 1
+    while i < n - 1:
+        a = seq[i - 1]
+        found = False
+        j = i + 1
+        while j < n and (seq[j][0] - a[0]) <= max_window_s:
+            b = seq[j]
+            if _d(a, b) <= max_anchor_dist and all(
+                    _d(seq[k], a) > min_offset and _d(seq[k], b) > min_offset
+                    for k in range(i, j)):
+                for k in range(i, j):
+                    to_remove.add(k)
+                i = j
+                found = True
+                break
+            j += 1
+        if not found:
+            i += 1
+    return to_remove
+
+
 def _find_isolated_outliers(seq: list) -> set:
     """Marque les points qui n'ont **aucun** voisin cohérent dans une fenêtre
     ±`_OUTLIER_NEIGHBOR_WINDOW_S`.
@@ -3354,19 +3437,51 @@ def _find_isolated_outliers(seq: list) -> set:
     return to_remove
 
 
-def _find_mid_static_cluster(seq: list, min_run: int = 5,
+def _find_mid_static_cluster(seq: list, min_run: int = 2,
                               max_diameter: float = 0.005,
-                              min_jump: float = 0.1) -> set:
+                              min_jump: float = 0.1,
+                              short_run_max: int = 2,
+                              max_return_dist: float = 0.15) -> set:
     """Fix G : détecte un cluster STATIQUE en milieu de vie, encadré de jumps.
 
     Un joueur réel a toujours un peu de bruit sub-pixel dans la détection. Une
-    séquence de >=5 frames à coords STRICTEMENT identiques (diamètre < 0.005)
+    séquence de >=2 frames à coords STRICTEMENT identiques (diamètre < 0.005)
     qui apparaît loin de la trajectoire pré-cluster (jump d'entrée > 0.1) ET
     repart loin (jump de sortie > 0.1) est forcément une fausse détection sur
     un élément d'UI fixe (icône, score, etc.) — pas un vrai joueur immobile.
 
-    Cas typique observé : 15 frames à exactly (0.9583, 0.6617) pendant 1.4s
-    en milieu de vie blue/6, encadrées de transitions à 0.13 de map.
+    `min_run=2` : ce n'est PAS la longueur du run qui discrimine, c'est la
+    conjonction (a) coords strictement identiques au pixel près (diamètre ~0)
+    et (b) double saut > 0.1 de map (= > 1.0/s, soit 2× la vitesse plausible
+    max) à l'entrée ET à la sortie. Un vrai joueur n'apparaît jamais en
+    téléportant sur 2 frames figées puis en téléportant ailleurs ; quand il
+    s'immobilise, ses voisins sont proches (pas de double saut). Mesuré sur un
+    match complet, min_run=2 ne retire que des artefacts au BORD de la minimap
+    (x≈0.05 / 0.96), zéro point en milieu de carte.
+
+    GARDE-FOU runs courts (run_len <= `short_run_max`, soit 2 frames) :
+    `min_jump` est une DISTANCE, pas une vitesse — donc après un trou de
+    tracking un VRAI joueur peut légitimement avoir bougé > 0.1 entre deux
+    détections espacées. Risque théorique de faux positif : joueur perdu →
+    réapparaît figé 2 frames → reperdu → réapparaît AILLEURS (A→B→C). Pour ne
+    retirer que le vrai artefact (téléport aller-retour A→B→A), on exige en plus,
+    sur ces runs courts, que le point AVANT et le point APRÈS le cluster soient
+    proches (< `max_return_dist`) : la trajectoire revient là d'où elle est
+    partie. Un déplacement légitime à travers des trous progresse (A→B→C) et ne
+    satisfait pas cette condition → il est préservé. Les runs longs
+    (>= 3 frames) gardent l'ancien comportement (pas de check de retour) : leur
+    longueur + diamètre nul suffit déjà à les disqualifier comme vrai joueur.
+
+    Cas typiques observés :
+      - 15 frames à exactly (0.9583, 0.6617) pendant 1.4s en milieu de vie
+        blue/6, encadrées de transitions à 0.13 de map.
+      - 2-3 frames à exactly (0.959, 0.483) en milieu de vie blue/9 (~1m22s),
+        encadrées de sauts de 0.85 de map (le nb de frames brutes de la fausse
+        détection varie 2↔3 d'un run à l'autre). Trop court pour les filtres de
+        points isolés (les frames se cautionnent mutuellement) et son
+        aller-retour est trop lent (> _OUTLIER_MAX_RUN_DURATION_S) pour
+        `_find_aberrant_runs` → seul ce filtre statique le capte. before/after
+        à 0.09 de map (retour à l'origine) → passe le garde-fou.
     """
     n = len(seq)
     if n < min_run + 2:
@@ -3393,8 +3508,21 @@ def _find_mid_static_cluster(seq: list, min_run: int = 5,
             dy_out = seq[j][2] - seq[j - 1][2]
             exit_jump = (dx_out * dx_out + dy_out * dy_out) ** 0.5
             if entry_jump > min_jump and exit_jump > min_jump:
-                for k in range(i, j):
-                    to_remove.add(k)
+                # Garde-fou runs courts : sur un run de <= short_run_max frames,
+                # n'efface que si la trajectoire REVIENT près de son point de
+                # départ (avant ≈ après). Évite de virer un vrai joueur qui a
+                # bougé > 0.1 à travers un trou de tracking (A→B→C, before/after
+                # éloignés). Les runs longs sont déjà sûrs → pas de check.
+                ok_to_remove = True
+                if run_len <= short_run_max:
+                    dx_ret = seq[i - 1][1] - seq[j][1]
+                    dy_ret = seq[i - 1][2] - seq[j][2]
+                    return_dist = (dx_ret * dx_ret + dy_ret * dy_ret) ** 0.5
+                    if return_dist > max_return_dist:
+                        ok_to_remove = False
+                if ok_to_remove:
+                    for k in range(i, j):
+                        to_remove.add(k)
             i = j  # avance après le run quoi qu'il arrive
         else:
             i += 1
@@ -3414,31 +3542,50 @@ def _point_near_any_spawn(x: float, y: float, spawn_polys: list, tol: float = 0.
 
 
 def _find_leading_off_spawn(seq: list, spawn_polys: list,
-                             max_check: int = 10,
+                             max_lead_seconds: float = 5.0,
                              spawn_tol: float = 0.05) -> set:
     """Fix F : si la vie démarre LOIN du spawn et qu'on trouve un point AU spawn
-    dans les `max_check` premiers points, on supprime tous les points avant.
+    dans la première fenêtre de la vie, on supprime tous les points avant.
 
-    Couvre le cas où les 1ers frames d'une vie sont mal classés (autre cart en
-    mouvement détecté comme étant celui du joueur) avant que le tracker "snap"
-    enfin sur la vraie position au spawn. Fix E ne s'applique pas si le leading
-    fait plus de 5 frames OU contient du mouvement (diamètre > 0.05) ; Fix F
-    couvre ces cas grâce au polygone spawn de la map.
+    Invariant physique : un joueur qui respawn APPARAÎT TOUJOURS au spawn. Donc,
+    au début d'une vie, toute détection AVANT la première arrivée au spawn est
+    nécessairement fausse (le joueur n'est pas encore sur la map). On scanne donc
+    le début de la vie jusqu'à la 1ʳᵉ frame au spawn et on coupe tout l'amont.
 
-    `spawn_tol = 0.05` (~5 % de map) tolère les détections juste sur la
-    frontière du polygone (player qui materializes au bord du spawn).
+    Couvre deux cas :
+      - 1ers frames mal classés (autre cart en mouvement pris pour ce joueur)
+        avant que le tracker "snap" sur la vraie position au spawn. Fix E ne
+        s'applique pas si ce leading fait > 5 frames OU bouge (diamètre > 0.05).
+      - Death lockout HP raté : `hp_timeline` peut manquer la fenêtre de mort
+        d'un joueur autour d'un respawn (HP affiché vivant alors qu'il est mort),
+        si bien que le lockout `_dead_at` ne rejette pas les détections fausses
+        en tête de vie. Ex. orange/4 à ~2m41 : ~12 frames fausses à (0.29, 0.18)
+        en plein milieu, le vrai spawn (0.02, 0.41) n'arrivant qu'à t+2.1s. Fix F
+        étant indépendant de l'HP, il rattrape ce que le lockout a laissé passer.
+
+    Borne TEMPORELLE plutôt que par index (`max_lead_seconds`, 5 s) : la séquence
+    est sparse (détections seulement quand qqch est vu), donc un cap par index
+    (ancien `max_check=10`) couvrait < 1 s de jeu et ratait un leading faux un peu
+    long — c'est ce qui laissait passer le cas orange/4 (spawn à l'indice ~12).
+    On scanne jusqu'au 1er spawn tant qu'on reste dans les 5 premières secondes
+    de la vie. Au-delà sans spawn trouvé : vie qui démarre vraiment hors spawn
+    (rare/exotique) → on ne touche à rien pour ne pas massacrer un cas légitime.
+
+    `spawn_tol = 0.05` (~5 % de map) : petite tolérance autour du polygone pour
+    un joueur qui matérialise juste au bord du spawn.
     """
     if not spawn_polys or len(seq) < 2:
         return set()
     # Si le 1er point est déjà au spawn, rien à corriger.
     if _point_near_any_spawn(seq[0][1], seq[0][2], spawn_polys, spawn_tol):
         return set()
-    # Cherche le 1er point AU spawn dans les `max_check` premiers points.
-    for k in range(1, min(max_check, len(seq))):
+    t0 = seq[0][0]
+    # Cherche le 1er point AU spawn dans la fenêtre [t0, t0 + max_lead_seconds].
+    for k in range(1, len(seq)):
+        if seq[k][0] - t0 > max_lead_seconds:
+            break  # hors fenêtre → cas légitime hors spawn, on ne touche pas
         if _point_near_any_spawn(seq[k][1], seq[k][2], spawn_polys, spawn_tol):
             return set(range(k))
-    # Aucun spawn trouvé tôt → vie démarre vraiment hors spawn (rare ou cas
-    # exotique). On ne touche pas pour éviter de massacrer un cas légitime.
     return set()
 
 
@@ -3519,9 +3666,14 @@ def _filter_outliers(seq: list, spawn_polys: list = None) -> int:
          frame qui y est. Couvre le cas où le leading bouge (Fix E ne s'applique
          pas) mais est clairement hors zone de respawn.
       4. Passe par "mid-vie static cluster" (`_find_mid_static_cluster`, Fix G) —
-         cluster de 5+ frames à coords exactement identiques au milieu de la
+         cluster de 2+ frames à coords exactement identiques au milieu de la
          vie, encadré de jumps. Forcément un misread sur un élément UI fixe.
-      5. Passe par "voisin cohérent" (`_find_isolated_outliers`) — blinks
+      5. Passe par "line-fit" (`_find_line_fit_outliers`, Fix H) — point isolé
+         hors de la ligne entre deux voisins proches.
+      6. Passe par "short excursion" (`_find_short_excursion`, Fix I) — burst de
+         fausses détections pendant un trou de tracking (taille quelconque, borné
+         en temps), encadré par deux ancres proches (généralise Fix H).
+      7. Passe par "voisin cohérent" (`_find_isolated_outliers`) — blinks
          isolés sans voisin cohérent, incluant premier et dernier point
          de la vie (Fix B).
 
@@ -3554,6 +3706,10 @@ def _filter_outliers(seq: list, spawn_polys: list = None) -> int:
         seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
         n_removed += len(to_remove)
     to_remove = _find_line_fit_outliers(seq)
+    if to_remove:
+        seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
+        n_removed += len(to_remove)
+    to_remove = _find_short_excursion(seq)
     if to_remove:
         seq[:] = [e for k, e in enumerate(seq) if k not in to_remove]
         n_removed += len(to_remove)
