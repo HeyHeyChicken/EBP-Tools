@@ -4,9 +4,11 @@
 
 """Loader des métadonnées statiques par map.
 
-Chaque map a un fichier JSON dans `templates/minimaps/<slug>.json` qui
-décrit ses éléments statiques (spawns, téléporteurs, points de capture).
-Coordonnées en pixels du template minimap (cf. `size` du JSON).
+Chaque map a son dossier `templates/minimaps/<slug>/` contenant `<slug>.json`
+(éléments statiques : spawns, téléporteurs, points de capture), `<slug>.png`
+(template visuel) et, optionnel, `walkable.png` (masque de zones traversables :
+noir = traversable, blanc = mur/décor). Coordonnées en pixels du template
+minimap (cf. `size` du JSON).
 
 Schema attendu (validé par `_validate`) :
 
@@ -76,7 +78,10 @@ def load(map_name: str) -> Optional[dict]:
     fn = _METADATA_FILES.get(map_name)
     if fn is None:
         return None
-    path = os.path.join(_TEMPLATES_DIR, fn)
+    # Layout : un dossier par map (`templates/minimaps/<slug>/`) contenant
+    # `<slug>.json`, `<slug>.png` et (optionnel) `<slug>_walkable.png`.
+    slug = os.path.splitext(fn)[0]
+    path = os.path.join(_TEMPLATES_DIR, slug, fn)
     if not os.path.isfile(path):
         return None
     with open(path, 'r') as f:
@@ -169,7 +174,8 @@ def _render_overlay(map_name: str, out_path: str) -> None:
     if data is None:
         print(f'!! no metadata for {map_name!r}')
         return
-    tpl_path = os.path.join(_TEMPLATES_DIR, data['template'])
+    slug = os.path.splitext(data['template'])[0]
+    tpl_path = os.path.join(_TEMPLATES_DIR, slug, data['template'])
     img = cv2.imread(tpl_path, cv2.IMREAD_COLOR)
     if img is None:
         print(f'!! cannot read template {tpl_path}')

@@ -85,7 +85,9 @@ def _load_template(map_name: str) -> Optional[np.ndarray]:
     fn = _TEMPLATE_FILES.get(map_name)
     if fn is None:
         return None
-    path = os.path.join(_TEMPLATES_DIR, fn)
+    # Layout : un dossier par map (`templates/minimaps/<slug>/`).
+    slug = os.path.splitext(fn)[0]
+    path = os.path.join(_TEMPLATES_DIR, slug, fn)
     if not os.path.isfile(path):
         return None
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)

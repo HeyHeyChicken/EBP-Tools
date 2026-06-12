@@ -3089,6 +3089,129 @@ _OUTLIER_MAX_RUN_DURATION_S = 1.0
 # dans les replays EVA (la plupart sous 0.3/s).
 _OUTLIER_HIGH_SPEED_PER_S = 0.35
 
+# ── Tracker de sélection (Layer 2 MOT léger) ───────────────────────────────
+# À chaque frame, le CNN peut classifier PLUSIEURS blobs comme le même
+# (team, number) — typiquement le vrai marqueur + un faux (autre marqueur
+# misclassé), TOUS à conf 1.00. L'ancien dédup « la plus haute confidence
+# gagne » tranchait alors au hasard. Le tracker tranche par COHÉRENCE DE
+# TRAJECTOIRE : parmi les candidats, on prend le plus proche de la dernière
+# position connue du joueur (gate de vitesse, élargi aux téléporteurs).
+_TRK_DT_CAP = 0.6          # cap du dt pour le gate (évite qu'un long trou ouvre tout)
+_TRK_GATE_MARGIN = 0.05    # tolérance jitter (fraction de map)
+_TRK_CLUSTER_R = 0.10      # rayon pour considérer 2 candidats « au même endroit »
+# Un cluster lointain STABLE qui persiste ce délai SANS qu'un candidat
+# atteignable ne réapparaisse = vrai déplacement (le joueur a quitté l'ancienne
+# position) → on ré-acquiert. Distingue un vrai déplacement (la nouvelle
+# position persiste, l'ancienne ne réapparaît plus) d'un flicker d'identité
+# (le vrai marqueur réapparaît sans cesse entre les faux) : ce dernier
+# re-verrouille le track avant d'atteindre ce seuil.
+_TRK_REACQUIRE_S = 1.0
+_TRK_HARD_TIMEOUT = 2.5    # sans aucune détection acceptée depuis ce délai → ré-acquiert le meilleur conf
+_TRK_TP_RADIUS = 0.05      # rayon autour d'une extrémité de téléporteur (fraction de map)
+
+
+def _track_select(trk, cands: list, t_rel: float, tp_pairs: list):
+    """Choisit LA détection à retenir parmi `cands` (liste de (conf, x, y)) pour
+    un (team, number) à l'instant `t_rel`, par cohérence de trajectoire.
+
+    `trk` = état précédent {'x','y','t','pend'} ou None (track neuf).
+    Retourne (conf, x, y) à accepter, ou None pour COASTER (rien cette frame).
+    Mute `trk['pend']` pendant le coasting pour suivre un éventuel cluster
+    lointain stable (= vrai déplacement à ré-acquérir).
+
+    Règle :
+      - track neuf → meilleur conf (acquisition).
+      - candidat(s) ATTEIGNABLE(s) depuis la dernière position (gate de vitesse,
+        ou via une paire de téléporteurs) → le plus proche. C'est lui qui filtre
+        les faux : un marqueur misclassé à l'autre bout de la carte n'est pas
+        atteignable → ignoré au profit du vrai, proche.
+      - aucun atteignable : on COASTE, sauf si un même cluster lointain persiste
+        ≥ `_TRK_REACQUIRE_S` (vrai déplacement : l'ancienne position ne réapparaît
+        plus) ou trou > `_TRK_HARD_TIMEOUT` → ré-acquisition.
+    """
+    if not cands:
+        return None
+    if trk is None:
+        return max(cands, key=lambda c: c[0])
+    dt = t_rel - trk['t']
+    allowed = _OUTLIER_MAX_SPEED_PER_S * min(dt, _TRK_DT_CAP) + _TRK_GATE_MARGIN
+    tx, ty = trk['x'], trk['y']
+
+    def _tp_ok(cx, cy):
+        r2 = _TRK_TP_RADIUS * _TRK_TP_RADIUS
+        for (ax, ay), (bx, by) in tp_pairs:
+            if (((tx - ax) ** 2 + (ty - ay) ** 2 <= r2 and (cx - bx) ** 2 + (cy - by) ** 2 <= r2) or
+                    ((tx - bx) ** 2 + (ty - by) ** 2 <= r2 and (cx - ax) ** 2 + (cy - ay) ** 2 <= r2)):
+                return True
+        return False
+
+    reach = [c for c in cands
+             if ((c[1] - tx) ** 2 + (c[2] - ty) ** 2) ** 0.5 <= allowed or _tp_ok(c[1], c[2])]
+    if reach:
+        trk['pend'] = None
+        return min(reach, key=lambda c: (c[1] - tx) ** 2 + (c[2] - ty) ** 2)
+    if dt > _TRK_HARD_TIMEOUT:
+        trk['pend'] = None
+        return max(cands, key=lambda c: c[0])
+    best = max(cands, key=lambda c: c[0])
+    pend = trk.get('pend')
+    if pend is not None and ((best[1] - pend[0]) ** 2 + (best[2] - pend[1]) ** 2) ** 0.5 < _TRK_CLUSTER_R:
+        if t_rel - pend[2] >= _TRK_REACQUIRE_S:
+            trk['pend'] = None
+            return best
+    else:
+        trk['pend'] = (best[1], best[2], t_rel)
+    return None
+
+
+_walkable_cache: dict = {}
+
+
+def _load_walkable_mask(map_name: str, erode_px: int = 6):
+    """Charge (et met en cache) le masque de traversabilité `walkable.png` de la
+    map : noir (<128) = traversable, blanc = mur/décor.
+
+    On DILATE la zone traversable de `erode_px` px : une détection ne compte
+    « dans un mur » que si elle est à plus de `erode_px` d'une zone traversable.
+    Cette marge absorbe la taille du marqueur joueur et l'imprécision du masque
+    au ras des murs (calibré sur Polaris : ~0.1 % des vraies positions touchées
+    à 6 px, tout en attrapant les faux profonds — ex. #9 à 0m20, 8.6 px dans le
+    mur). Retourne un array uint8 (1 = ok, 0 = mur) aligné sur l'inner du
+    template, ou None si la map n'a pas de masque.
+    """
+    if map_name in _walkable_cache:
+        return _walkable_cache[map_name]
+    res = None
+    fn = _map_metadata._METADATA_FILES.get(map_name)
+    if fn:
+        slug = os.path.splitext(fn)[0]
+        path = os.path.join(_map_metadata._TEMPLATES_DIR, slug, 'walkable.png')
+        if os.path.isfile(path):
+            g = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            # On n'active le masque que s'il est réellement BINAIRE (≥97 % de
+            # pixels noir ou blanc purs). Par défaut `walkable.png` est une copie
+            # du minimap couleur (placeholder non peint) — l'appliquer rejetterait
+            # des détections au hasard. Ce garde-fou ignore ces copies et
+            # s'auto-active dès qu'une map est peinte en vrai masque.
+            if g is not None and float(((g < 30) | (g > 225)).mean()) >= 0.97:
+                walk = (g < 128).astype(np.uint8)
+                if erode_px > 0:
+                    walk = cv2.dilate(walk, cv2.getStructuringElement(
+                        cv2.MORPH_ELLIPSE, (2 * erode_px + 1, 2 * erode_px + 1)))
+                res = walk
+    _walkable_cache[map_name] = res
+    return res
+
+
+def _is_walkable(mask, x_frac: float, y_frac: float) -> bool:
+    """True si (x_frac, y_frac) est en zone traversable (ou si pas de masque)."""
+    if mask is None:
+        return True
+    h, w = mask.shape
+    px = min(w - 1, max(0, int(round(x_frac * (w - 1)))))
+    py = min(h - 1, max(0, int(round(y_frac * (h - 1)))))
+    return bool(mask[py, px])
+
 
 def _template_px_to_inner_frac(x_tpl: float, y_tpl: float,
                                 tpl_w: int, tpl_h: int,
@@ -3543,7 +3666,7 @@ def _point_near_any_spawn(x: float, y: float, spawn_polys: list, tol: float = 0.
 
 def _find_leading_off_spawn(seq: list, spawn_polys: list,
                              max_lead_seconds: float = 5.0,
-                             spawn_tol: float = 0.05) -> set:
+                             spawn_tol: float = 0.10) -> set:
     """Fix F : si la vie démarre LOIN du spawn et qu'on trouve un point AU spawn
     dans la première fenêtre de la vie, on supprime tous les points avant.
 
@@ -3571,8 +3694,13 @@ def _find_leading_off_spawn(seq: list, spawn_polys: list,
     de la vie. Au-delà sans spawn trouvé : vie qui démarre vraiment hors spawn
     (rare/exotique) → on ne touche à rien pour ne pas massacrer un cas légitime.
 
-    `spawn_tol = 0.05` (~5 % de map) : petite tolérance autour du polygone pour
-    un joueur qui matérialise juste au bord du spawn.
+    `spawn_tol = 0.10` (~10 % de map) : tolérance autour du polygone. Élargie de
+    0.05 → 0.10 car la 1ʳᵉ détection au spawn est parfois ratée et le joueur
+    n'est ré-acquis qu'un peu plus loin (ex. orange/1 ~5m00 : faux départ à
+    (0.76, 0.52), puis le joueur n'est détecté qu'à 0.073 du spawn — au-delà de
+    0.05, donc Fix F abandonnait et le faux départ survivait). La tolérance ne
+    sert qu'à reconnaître « assez près du spawn pour être le vrai départ » ; un
+    vrai respawn matérialise toujours dans/au bord du polygone.
     """
     if not spawn_polys or len(seq) < 2:
         return set()
@@ -3589,10 +3717,75 @@ def _find_leading_off_spawn(seq: list, spawn_polys: list,
     return set()
 
 
+def _is_teleporter_jump(ax: float, ay: float, bx: float, by: float,
+                        tp_pairs: list, radius: float = 0.12) -> bool:
+    """True si le segment (a → b) relie deux extrémités APPARIÉES d'un téléporteur
+    (a près de l'une, b près de l'autre, dans un sens ou l'autre). Sert à ne pas
+    interpoler un trou qui est en fait un vrai TP (sinon on trace un trait entre
+    l'entrée et la sortie du téléporteur)."""
+    if not tp_pairs:
+        return False
+    r2 = radius * radius
+    for (px, py), (qx, qy) in tp_pairs:
+        if (((ax - px) ** 2 + (ay - py) ** 2 <= r2 and (bx - qx) ** 2 + (by - qy) ** 2 <= r2) or
+                ((ax - qx) ** 2 + (ay - qy) ** 2 <= r2 and (bx - px) ** 2 + (by - py) ** 2 <= r2)):
+            return True
+    return False
+
+
+def _collapse_tp_spans(history: list, tp_pairs: list,
+                       radius: float = 0.12, max_window: float = 5.0) -> int:
+    """Supprime les détections parasites APPARUES PENDANT un téléporteur.
+
+    Pendant l'animation de TP le joueur est invisible : toute détection entre
+    l'entrée (près d'une extrémité) et la sortie (près de l'extrémité APPARIÉE)
+    est forcément fausse (autre marqueur, effet de TP…). Le tracker peut en
+    accepter une (son gate s'élargit après un trou), ce qui casse le trou de TP
+    en deux et empêche le step-fill. On scanne donc : pour chaque point i près
+    d'une extrémité, on cherche en avant (≤ `max_window`) le 1er point j près de
+    l'extrémité appariée, et on retire tout i+1..j-1. Modifie `history` en place,
+    retourne le nb de points retirés.
+    """
+    if not tp_pairs or len(history) < 3:
+        return 0
+    n = len(history)
+    keep = [True] * n
+    removed = 0
+    i = 0
+    while i < n - 1:
+        found = False
+        j = i + 1
+        while j < n and history[j][0] - history[i][0] <= max_window:
+            if _is_teleporter_jump(history[i][1], history[i][2],
+                                   history[j][1], history[j][2], tp_pairs, radius):
+                # Garde-fou : ne collapser que si le joueur a VRAIMENT disparu
+                # entre i et j (peu de points sur le span = TP, joueur invisible).
+                # S'il est détecté en continu d'une extrémité à l'autre, c'est
+                # une marche (rare, mais le TP existe justement pour l'éviter) →
+                # on ne touche pas.
+                span = history[j][0] - history[i][0]
+                expected = span * _PLAYER_TRACK_FPS
+                if (j - i) < 0.5 * expected:
+                    for k in range(i + 1, j):
+                        if keep[k]:
+                            keep[k] = False
+                            removed += 1
+                    i = j
+                    found = True
+                break
+            j += 1
+        if not found:
+            i += 1
+    if removed:
+        history[:] = [p for k, p in zip(keep, history) if k]
+    return removed
+
+
 def _interpolate_alive_gaps(history: list,
                              short_max_gap: float = 2.0,
                              long_max_gap: float = 10.0,
-                             long_max_avg_speed: float = 0.05) -> int:
+                             long_max_avg_speed: float = 0.05,
+                             tp_pairs: list = None) -> int:
     """Injecte des points interpolés à 10 FPS pour combler les gaps de tracking
     dans une vie. Remplace l'interpolation historiquement faite côté front pour
     la centraliser ici (cohérence avec le split en vies déjà migré côté Python).
@@ -3619,6 +3812,9 @@ def _interpolate_alive_gaps(history: list,
     """
     if len(history) < 2:
         return 0
+    # Nettoie d'abord les faux points apparus pendant un TP (sinon ils cassent
+    # le trou et empêchent le step-fill ci-dessous).
+    _collapse_tp_spans(history, tp_pairs)
     min_gap = 1.0 / _PLAYER_TRACK_FPS  # 0.1s à 10 FPS — gap minimal à combler
     out = [history[0]]
     n_inserted = 0
@@ -3626,6 +3822,22 @@ def _interpolate_alive_gaps(history: list,
         t_prev, x_prev, y_prev = history[i - 1]
         t_curr, x_curr, y_curr = history[i]
         gap = t_curr - t_prev
+        is_tp = (min_gap < gap <= long_max_gap and
+                 _is_teleporter_jump(x_prev, y_prev, x_curr, y_curr, tp_pairs))
+        if is_tp:
+            # Vrai téléporteur : le joueur disparaît pendant l'animation de TP.
+            # On comble le trou en MARCHES (pas en trait diagonal) : 1ère moitié
+            # du trou à l'entrée (TP1, dernière position connue), 2e moitié à la
+            # sortie (TP2). Ex. trou de 2s → 1s figé au TP1 puis 1s au TP2.
+            n_frames = max(int(round(gap * _PLAYER_TRACK_FPS)) - 1, 0)
+            for k in range(1, n_frames + 1):
+                frac = k / (n_frames + 1)
+                t_interp = t_prev + gap * frac
+                xi, yi = (x_prev, y_prev) if frac < 0.5 else (x_curr, y_curr)
+                out.append((round(t_interp, 2), round(xi, 4), round(yi, 4)))
+                n_inserted += 1
+            out.append((t_curr, x_curr, y_curr))
+            continue
         should_interp = False
         if min_gap < gap <= short_max_gap:
             should_interp = True
@@ -3868,6 +4080,27 @@ def _track_players_on_minimap(
                 arr = np.array(inner_pts, dtype=np.float32).reshape(-1, 1, 2)
                 spawn_polys_per_team[team_name].append(arr)
 
+    # Paires de téléporteurs en coords inner-fraction — un saut entre deux
+    # extrémités appariées est un déplacement LÉGITIME que le gate du tracker
+    # doit autoriser (sinon un vrai TP serait rejeté comme aberration).
+    tp_pairs: list = []
+    _tp_by_id = {tp['id']: tp for tp in md.get('teleporters', [])}
+    _tp_seen: set = set()
+    for tp in md.get('teleporters', []):
+        a = tp.get('id'); b = tp.get('paired_with')
+        if not b or b not in _tp_by_id or (b, a) in _tp_seen:
+            continue
+        _tp_seen.add((a, b))
+        pa = _template_px_to_inner_frac(tp['position'][0], tp['position'][1], tpl_w, tpl_h, margins)
+        pb = _template_px_to_inner_frac(_tp_by_id[b]['position'][0], _tp_by_id[b]['position'][1], tpl_w, tpl_h, margins)
+        tp_pairs.append((pa, pb))
+
+    # Masque de traversabilité (optionnel, par map) : une détection en plein mur
+    # est physiquement impossible → rejetée avant le tracker.
+    walkable_mask = _load_walkable_mask(map_name)
+    if walkable_mask is not None:
+        _emit({'log': '[player_tracking] walkable mask actif'})
+
     # Précompute le lookup des joueurs morts par instant (forward-filled).
     # Si fourni, on rejette toute détection (team, num) pour un joueur HP=0
     # à ce ts — c'est forcément du bruit (le joueur n'est pas affiché).
@@ -3883,6 +4116,7 @@ def _track_players_on_minimap(
     # cap.set(POS_MSEC) reseek-to-keyframe + decode-forward (~50-200 ms).
     # Fallback sur l'ancien comportement seek-per-frame si FPS indisponible.
     histories: dict = {}  # (team, number) → [(t_rel, x_frac, y_frac), ...]
+    tracks: dict = {}     # (team, number) → {'x','y','t','pend'} état du tracker
     total = int((end_ts - start_ts) * _PLAYER_TRACK_FPS) + 1
     native_fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
     use_sequential = native_fps > 0
@@ -3898,6 +4132,7 @@ def _track_players_on_minimap(
     last_pct = -1
     detections_total = 0
     detections_rejected_dead = 0
+    detections_rejected_wall = 0
     processed = 0
     frame_idx = 0
     step = 1.0 / _PLAYER_TRACK_FPS
@@ -3923,22 +4158,38 @@ def _track_players_on_minimap(
             break
 
         blobs_raw = _blob_detector.detect_blobs(frame, info, orange_rgb, blue_rgb)
+        # dedup=False : on récupère TOUS les candidats par (team, number) — le
+        # tracker ci-dessous départage les doublons par cohérence de trajectoire
+        # (et non par confidence, qui sature souvent à 1.00 sur le vrai ET le faux).
         filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.5, map_meta=md,
-                                            valid_numbers=valid_numbers)
+                                            valid_numbers=valid_numbers, dedup=False)
         t_rel = ts - start_ts
         dead_set = _dead_at(dead_lookup, t_rel)
+
+        # Regroupe les candidats de la frame par (team, number), en inner-frac.
+        cands_by_key: dict = {}
         for team in ('orange', 'blue'):
             for b in filtered[team]:
                 num = int(b['digit'])
                 if (team, num) in dead_set:
                     detections_rejected_dead += 1
                     continue
-                x_frac, y_frac = _template_px_to_inner_frac(
-                    float(b['x']), float(b['y']),
-                    tpl_w, tpl_h, margins)
-                histories.setdefault((team, num), []).append(
-                    (round(t_rel, 2), round(x_frac, 4), round(y_frac, 4)))
-                detections_total += 1
+                xf, yf = _template_px_to_inner_frac(float(b['x']), float(b['y']),
+                                                    tpl_w, tpl_h, margins)
+                if not _is_walkable(walkable_mask, xf, yf):
+                    detections_rejected_wall += 1
+                    continue  # détection en plein mur → impossible
+                cands_by_key.setdefault((team, num), []).append((float(b['conf']), xf, yf))
+
+        for key, cands in cands_by_key.items():
+            chosen = _track_select(tracks.get(key), cands, t_rel, tp_pairs)
+            if chosen is None:
+                continue  # coasting : aucune détection acceptée cette frame
+            _c, cx, cy = chosen
+            tracks[key] = {'x': cx, 'y': cy, 't': t_rel, 'pend': None}
+            histories.setdefault(key, []).append(
+                (round(t_rel, 2), round(cx, 4), round(cy, 4)))
+            detections_total += 1
 
         processed += 1
 
@@ -3977,7 +4228,7 @@ def _track_players_on_minimap(
         lives = _split_history_into_lives(hist, deaths)
         for life in lives:
             n_outliers += _filter_outliers(life['history'], spawn_polys=spawn_polys)
-            n_interpolated += _interpolate_alive_gaps(life['history'])
+            n_interpolated += _interpolate_alive_gaps(life['history'], tp_pairs=tp_pairs)
         cleaned_lives_per_player[key] = [l for l in lives if l['history']]
     if n_outliers or n_interpolated:
         _emit({'log': f'[player_tracking] retire {n_outliers} detections aberrantes, '

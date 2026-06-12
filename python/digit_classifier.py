@@ -88,7 +88,8 @@ class DigitClassifier:
     def filter_blobs(self, frame_bgr: np.ndarray, minimap_info: dict,
                       blobs: dict, min_conf: float = _DEFAULT_MIN_CONF,
                       map_meta: Optional[dict] = None,
-                      valid_numbers: Optional[dict] = None) -> dict:
+                      valid_numbers: Optional[dict] = None,
+                      dedup: bool = True) -> dict:
         """Filtre les blobs détectés en gardant ceux classifiés comme digit.
 
         Pour chaque candidate de `blobs[team]`, on extrait le crop 21×21
@@ -202,7 +203,17 @@ class DigitClassifier:
         # l'unicité d'un (team, number) à tout instant. Plusieurs candidates
         # classifiés "orange #4" à des positions différentes = forcément
         # 1 vrai + N-1 faux positifs.
-        best_by_key: dict = {}  # (team, digit) → (conf, blob)
+        # `dedup=True` (défaut) : EXACTEMENT 1 détection par (team, number) par
+        # frame, la plus haute confidence gagne. `dedup=False` : on renvoie
+        # TOUS les candidats valides (plusieurs par (team, number) possibles).
+        # Utile au tracker, qui départage les doublons par cohérence de
+        # trajectoire (et non par confidence) : quand le vrai marqueur et un
+        # faux sont tous deux classifiés à conf 1.00, seule la position récente
+        # du joueur permet de choisir le bon. Le dédup hard par confidence
+        # choisissait alors arbitrairement, parfois le faux (cf. blue/7 ~2m04 :
+        # vrai 7 en bas vs un orange "2" sur tyrolienne misclassé blue 7 au
+        # centre, les deux à conf 1.00).
+        candidates: list = []  # (team, digit, conf, blob)
         for (team, blob), (digit, conf) in zip(all_meta, results):
             if digit == _GARBAGE_LABEL:
                 continue
@@ -214,17 +225,20 @@ class DigitClassifier:
                 continue  # candidate sur un TP / capture point statique
             if _is_in_enemy_spawn(team, blob['x'], blob['y']):
                 continue  # un digit ne peut pas apparaître dans le spawn adverse
-            key = (team, digit)
-            if key not in best_by_key or conf > best_by_key[key][0]:
-                best_by_key[key] = (conf, blob)
+            candidates.append((team, digit, conf, blob))
 
         out: dict = {'orange': [], 'blue': []}
-        for (team, digit), (conf, blob) in best_by_key.items():
-            out[team].append({
-                **blob,
-                'digit': digit,
-                'conf': conf,
-            })
+        if dedup:
+            best_by_key: dict = {}  # (team, digit) → (conf, blob)
+            for team, digit, conf, blob in candidates:
+                key = (team, digit)
+                if key not in best_by_key or conf > best_by_key[key][0]:
+                    best_by_key[key] = (conf, blob)
+            for (team, digit), (conf, blob) in best_by_key.items():
+                out[team].append({**blob, 'digit': digit, 'conf': conf})
+        else:
+            for team, digit, conf, blob in candidates:
+                out[team].append({**blob, 'digit': digit, 'conf': conf})
         return out
 
 
