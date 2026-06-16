@@ -13,7 +13,8 @@ const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const SOCKET = io(
     IS_DEV_MODE ? 'http://localhost:3005' : 'https://evabattleplan.com/',
     {
-        reconnection: true
+        reconnection: true,
+        transports: ['websocket']
     }
 );
 
