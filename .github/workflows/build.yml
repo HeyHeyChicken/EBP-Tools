@@ -239,8 +239,12 @@ jobs:
                       out/make/latest-mac.yml
 
     # Create the Windows version of the application.
+    # Pinned to windows-2022 (Visual Studio 2022 / v17). windows-latest now maps
+    # to the win25-vs2026 image (Visual Studio 2026 / v18), which the node-gyp
+    # bundled with Electron does not recognize ("unsupported version: 18"),
+    # breaking the native build of registry-js.
     build-windows:
-        runs-on: windows-latest
+        runs-on: windows-2022
         needs: [test]
         steps:
             # Clone the repository.
