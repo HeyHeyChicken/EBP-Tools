@@ -336,6 +336,14 @@ async function processVideo(videoPath, deps) {
         JSON.stringify(IDENTIFY_RES, null, 2)
     );
     const MATCHES = IDENTIFY_RES.matches || [];
+    if (MATCHES.length === 0) {
+        const DEST = moveTo(videoPath, FAILED_DIR);
+        console.log(
+            '[watch-folder] no identify match → skip analyse/encodage,',
+            DEST
+        );
+        return;
+    }
     const MATCH_BY_TEMP = new Map(
         MATCHES.map((m) => [
             m.tempId,
