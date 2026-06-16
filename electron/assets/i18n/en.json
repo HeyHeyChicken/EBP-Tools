@@ -1,0 +1,5 @@
+{
+    "watchFolder": {
+        "notAuthenticated": "Authentication failed, please log out (using the white button at the top right) and log back in."
+    }
+}

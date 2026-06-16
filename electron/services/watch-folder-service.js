@@ -10,6 +10,7 @@ const path = require('node:path');
 const chokidar = require('chokidar');
 const { Notification, app } = require('electron');
 const StorageManager = require('../core/storage-manager');
+const { t } = require('./translate.service');
 const { unlinkSync } = require('./global-service');
 const { cutAndEncodeGame } = require('./video-service');
 const {
@@ -511,7 +512,7 @@ async function workerLoop(deps) {
                 continue;
             }
             if (!(await getAuthCookie())) {
-                console.log('[watch-folder] not authenticated, pausing');
+                console.log(`[watch-folder] ${t('watchFolder.notAuthenticated')}`);
                 await sleep(AUTH_RETRY_INTERVAL_MS);
                 continue;
             }
