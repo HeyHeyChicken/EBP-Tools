@@ -1390,15 +1390,24 @@ if (!APP_GOT_THE_LOCK) {
 
             // If a second instance is launched, the first is displayed.
             app.on('second-instance', (event, commandLine) => {
-                // Handle deep link on Windows when app is already running
+                console.log(
+                    '[INSTANCE] New instance detected, focusing existing window'
+                );
+
+                // Restore and bring the existing window to the foreground.
+                const WINDOW = getMainWindow();
+                if (WINDOW && !WINDOW.isDestroyed() && WINDOW.isMinimized()) {
+                    WINDOW.restore();
+                }
+                showMainWindow();
+
+                // Handle deep link on Windows when app is already running.
                 const DEEP_LINK_URL = commandLine.find((arg) =>
                     arg.startsWith(`${PROTOCOL_NAME}://`)
                 );
-                console.log(
-                    '[INSTANCE] New instance detected, quitting current instance to be replaced'
-                );
-                destroyMainWindow();
-                app.quit();
+                if (DEEP_LINK_URL) {
+                    handleDeepLink(DEEP_LINK_URL);
+                }
             });
 
             app.setLoginItemSettings({
