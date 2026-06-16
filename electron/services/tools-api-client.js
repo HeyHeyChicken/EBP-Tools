@@ -166,7 +166,7 @@ async function apiRequest(
  * ±1, sessions 4h) et retourne les rosters avec K/D pour pouvoir nourrir la
  * phase 2 d'analyse approfondie avec des pseudos full-confiance.
  *
- * @param {object} payload { sourceFilename?, segments: [{ tempId, startSeconds, endSeconds, mode, mapName, blueScore, orangeScore, ... }] }
+ * @param {object} payload { sourceFilename?, teamId, segments: [{ tempId, startSeconds, endSeconds, mode, mapName, blueScore, orangeScore, ... }] }
  * @returns {Promise<{ matches: Array<{tempId, gameID, hasVideo, orangePlayers: Array<{name, K, D}>, bluePlayers: Array<{name, K, D}>}>, unmatched: Array<string> }>}
  *   `hasVideo` indique qu'une vidéo est déjà attachée à la game côté serveur :
  *   le client doit alors skip découpage / réencodage / upload pour ce segment.

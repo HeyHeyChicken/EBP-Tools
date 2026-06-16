@@ -37,6 +37,9 @@ const MGAST_RE = /__mgast-(\d+)/;
 // ensemble (validés côté front + server.js avant encodage).
 const FOS_RE = /__fos-(\d+)/;
 const FBS_RE = /__fbs-(\d+)/;
+// Équipe ciblée pour le matching serveur (/identify) : ID du chef d'équipe choisi
+// côté front. Présent à chaque analyse lancée depuis le site.
+const TID_RE = /__tid-(\d+)/;
 // Nombre de games analysées en profondeur en parallèle (un process Python par
 // game). Ajuster selon les retours terrain : plus on monte, plus on sature CPU
 // / mémoire (chaque process recharge tesseract, templates, ouvre sa propre
@@ -45,12 +48,13 @@ const FBS_RE = /__fbs-(\d+)/;
 const DEEP_ANALYSIS_CONCURRENCY = 3;
 
 /**
- * Extrait les valeurs `maxTimePerGame` et `maxGamesAtSameTime` encodées dans le
- * nom du fichier par `analyzeVideoFile` (suffixes `__mtpg-N` et `__mgast-M`
- * avant l'extension), et renvoie un basename "propre" pour l'aval (cut
- * filenames, sourceFilename API). Si un suffixe est absent (fichier déposé
- * manuellement), la valeur correspondante est undefined → fallback sur la
- * valeur par défaut côté Python / DEEP_ANALYSIS_CONCURRENCY.
+ * Extrait les valeurs `maxTimePerGame`, `maxGamesAtSameTime`, scores forcés et
+ * `teamId` encodées dans le nom du fichier par `analyzeVideoFile` (suffixes
+ * `__mtpg-N`, `__mgast-M`, `__fos-/__fbs-` et `__tid-N` avant l'extension), et
+ * renvoie un basename "propre" pour l'aval (cut filenames, sourceFilename API).
+ * Si un suffixe est absent (fichier déposé manuellement), la valeur
+ * correspondante est undefined → fallback sur la valeur par défaut côté Python /
+ * DEEP_ANALYSIS_CONCURRENCY (et `teamId` undefined → /identify renverra 400).
  */
 function parseMeta(filePath) {
     const EXT = path.extname(filePath);
@@ -59,27 +63,32 @@ function parseMeta(filePath) {
     const MGAST = BASE.match(MGAST_RE);
     const FOS = BASE.match(FOS_RE);
     const FBS = BASE.match(FBS_RE);
-    if (!MTPG && !MGAST && !FOS && !FBS) {
+    const TID = BASE.match(TID_RE);
+    if (!MTPG && !MGAST && !FOS && !FBS && !TID) {
         return {
             cleanBasename: BASE,
             maxTimePerGame: undefined,
             maxGamesAtSameTime: undefined,
             forcedOrangeScore: undefined,
-            forcedBlueScore: undefined
+            forcedBlueScore: undefined,
+            teamId: undefined
         };
     }
     const FIRST_IDX = Math.min(
         MTPG ? MTPG.index : Infinity,
         MGAST ? MGAST.index : Infinity,
         FOS ? FOS.index : Infinity,
-        FBS ? FBS.index : Infinity
+        FBS ? FBS.index : Infinity,
+        TID ? TID.index : Infinity
     );
     return {
         cleanBasename: BASE.slice(0, FIRST_IDX),
         maxTimePerGame: MTPG ? parseInt(MTPG[1], 10) : undefined,
         maxGamesAtSameTime: MGAST ? parseInt(MGAST[1], 10) : undefined,
         forcedOrangeScore: FOS ? parseInt(FOS[1], 10) : undefined,
-        forcedBlueScore: FBS ? parseInt(FBS[1], 10) : undefined
+        forcedBlueScore: FBS ? parseInt(FBS[1], 10) : undefined,
+        // Gardé en string : c'est l'ID transmis tel quel au serveur (/identify).
+        teamId: TID ? TID[1] : undefined
     };
 }
 
@@ -319,6 +328,7 @@ async function processVideo(videoPath, deps) {
     // match du killfeed OCR).
     const IDENTIFY_PAYLOAD = {
         sourceFilename: META.cleanBasename + path.extname(videoPath),
+        teamId: META.teamId,
         segments: toIdentifySegments(
             GAMES,
             FORCED_SCORES && GAMES.length === 1

@@ -437,6 +437,14 @@ if (!APP_GOT_THE_LOCK) {
                         isValidScore(data.forcedBlueScore)
                             ? `__fos-${data.forcedOrangeScore}__fbs-${data.forcedBlueScore}`
                             : '';
+                    // Équipe ciblée pour le matching serveur (/identify). Encodée en
+                    // suffixe pour suivre le fichier dans le watch folder jusqu'à
+                    // parseMeta. ID numérique uniquement.
+                    const TEAM_ID =
+                        typeof data.teamId === 'string' &&
+                        /^\d+$/.test(data.teamId)
+                            ? `__tid-${data.teamId}`
+                            : '';
                     const DURATIONS = await Promise.all(
                         FILES_PATHS.map((p) =>
                             getVideoDuration(p).catch(() => 0)
@@ -457,7 +465,7 @@ if (!APP_GOT_THE_LOCK) {
                         const BASE = path.basename(SRC, EXT);
                         const DEST = path.join(
                             WATCH_FOLDER,
-                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${FORCED_SCORES}${EXT}`
+                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${FORCED_SCORES}${TEAM_ID}${EXT}`
                         );
                         // Remux (stream copy + faststart) au lieu d'une copie brute :
                         // tout fichier — Twitch, YouTube ou capture — arrive dans le
