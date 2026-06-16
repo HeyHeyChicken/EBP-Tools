@@ -1701,13 +1701,56 @@ if (!APP_GOT_THE_LOCK) {
         });
 
         // The front-end asks the server to return the JWT token content.
-        ipcMain.handle('get-jwt-access-token', () => {
-            const JWT = StorageManager.permanentSettings['jwt'];
-            if (JWT) {
-                getMainWindow().webContents.send(
-                    'set-jwt-access-token',
-                    JWT.access_token
-                );
+        ipcMain.handle('get-jwt-access-token', async () => {
+            // Authentication actually relies on the EBP domain's session
+            // cookies (the JWT is not persisted). We therefore query the
+            // backend with those cookies to retrieve the user's information.
+            try {
+                const COOKIES =
+                    await getMainWindow().webContents.session.cookies.get({
+                        url: `https://${EBP_DOMAIN}`
+                    });
+                const COOKIES_HEADER = COOKIES.map(
+                    (c) => `${c.name}=${c.value}`
+                ).join('; ');
+
+                const DATA = await new Promise((resolve, reject) => {
+                    const REQUEST = https.request(
+                        {
+                            hostname: EBP_DOMAIN,
+                            port: 443,
+                            path: '/back/api/?c=user&r=token',
+                            method: 'GET',
+                            headers: {
+                                Cookie: COOKIES_HEADER,
+                                Accept: 'application/json'
+                            }
+                        },
+                        (res) => {
+                            let body = '';
+                            res.on('data', (chunk) => (body += chunk));
+                            res.on('end', () => resolve(body));
+                        }
+                    );
+                    REQUEST.on('error', reject);
+                    REQUEST.end();
+                });
+
+                const PARSED = JSON.parse(DATA);
+
+                if (PARSED.access_token) {
+                    const PAYLOAD = JSON.parse(
+                        Buffer.from(
+                            PARSED.access_token.split('.')[1],
+                            'base64'
+                        ).toString()
+                    );
+                    if(PAYLOAD.email) {
+                        console.log('[USER] User\'s email:', PAYLOAD.email);
+                    }
+                }
+            } catch (e) {
+                console.error('[USER] Could not retrieve user:', e.message);
             }
 
             return undefined;
