@@ -446,19 +446,30 @@ def _ocr_color_masked(
     pad: int = 20,
     whitelist: str = '',
     psms: tuple = (7, 6, 8),
+    lang: str = 'eng',
+    checker=None,
     debug_save_prefix: str = '',
 ) -> str:
     """OCR avec masque couleur : pixels proches de target_color → noir,
     reste → blanc (polarité Tesseract standard), upscale BICUBIC + pad.
-    Vote sur les PSMs, retourne le résultat le plus fréquent."""
+    Vote sur les PSMs, retourne le résultat le plus fréquent.
+
+    target_color : une couleur (r, g, b) OU une liste de couleurs candidates
+                   (ex. TEAM_ORANGE pour couvrir les thèmes de ligue). Un pixel
+                   est gardé s'il matche l'une des couleurs.
+    lang : un modèle Tesseract OU un tuple de modèles — le vote porte alors sur
+           toutes les combinaisons (lang × psm).
+    checker : fonction optionnelle appliquée à chaque résultat avant le vote."""
     h, w = frame.shape[:2]
     x1 = max(0, int(x1)); y1 = max(0, int(y1))
     x2 = min(w, int(x2)); y2 = min(h, int(y2))
     if x2 <= x1 or y2 <= y1:
         return ''
     sub = frame[y1:y2, x1:x2].astype(np.int16)
-    target = np.array(target_color, dtype=np.int16)
-    mask = (np.abs(sub - target).max(axis=2) <= tol_color)
+    targets = target_color if isinstance(target_color[0], (tuple, list)) else [target_color]
+    mask = np.zeros(sub.shape[:2], dtype=bool)
+    for c in targets:
+        mask |= (np.abs(sub - np.array(c, dtype=np.int16)).max(axis=2) <= tol_color)
     bw = np.where(mask, 0, 255).astype(np.uint8)
     pil = Image.fromarray(bw).resize(
         (bw.shape[1] * upscale, bw.shape[0] * upscale), Image.BICUBIC
@@ -476,17 +487,21 @@ def _ocr_color_masked(
 
     cfg_wl = f' -c "tessedit_char_whitelist={whitelist}"' if whitelist else ''
     FILTER_PATTERN = re.compile(f'[^{re.escape(whitelist)}]') if whitelist else None
+    langs = (lang,) if isinstance(lang, str) else tuple(lang)
     results = []
-    for psm in psms:
-        try:
-            txt = pytesseract.image_to_string(
-                pil, config=f'--psm {psm}{cfg_wl}'
-            ).replace('\r', '').replace('\n', '').strip()
-            if FILTER_PATTERN:
-                txt = FILTER_PATTERN.sub('', txt)
-            results.append(txt)
-        except Exception:
-            results.append('')
+    for lg in langs:
+        for psm in psms:
+            try:
+                txt = pytesseract.image_to_string(
+                    pil, lang=lg, config=f'--psm {psm}{cfg_wl}'
+                ).replace('\r', '').replace('\n', '').strip()
+                if FILTER_PATTERN:
+                    txt = FILTER_PATTERN.sub('', txt)
+                results.append(txt)
+            except Exception:
+                results.append('')
+    if checker:
+        results = [checker(r) for r in results]
     NON_EMPTY = [r for r in results if r]
     RESULT = _most_frequent(NON_EMPTY) if NON_EMPTY else ''
     if DEBUG:
@@ -4476,19 +4491,33 @@ def _analyze(
                         if DEBUG:
                             _emit({'log': f'[border] {label} not found in search region'})
 
+                # Les chiffres du score sont eux-mêmes colorés (couleur d'équipe).
+                # On OCR sur un masque couleur — qui isole les chiffres du décor
+                # HUD (silhouette de mascotte, courbes grises) — plutôt qu'un seuil
+                # de luminance qui ne sépare pas l'orange du fond clair derrière.
+                _OS_SPEC = _SF_RAW['orangeScore']
+                _BS_SPEC = _SF_RAW['blueScore']
+                # On vote sur les deux modèles : evadigits et eng se trompent sur
+                # des chiffres différents (evadigits lit parfois 5→0, eng échoue
+                # sur d'autres), mais leurs erreurs ne coïncident pas → le vote
+                # combiné sur (lang × psm) tranche correctement.
                 if OS is not None:
-                    _set_score(GAME, 'orangeTeam', _ocr_region(
+                    _set_score(GAME, 'orangeTeam', _ocr_color_masked(
                         FRAME,
                         OS[0][0], OS[0][1], OS[1][0], OS[1][1],
-                        psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
+                        target_color=_OS_SPEC['colors'],
+                        tol_color=_OS_SPEC.get('tol_color', 20),
+                        whitelist='0123456789%', lang=('evadigits', 'eng'),
                         checker=_score_checker,
                     ))
 
                 if BS is not None:
-                    _set_score(GAME, 'blueTeam', _ocr_region(
+                    _set_score(GAME, 'blueTeam', _ocr_color_masked(
                         FRAME,
                         BS[0][0], BS[0][1], BS[1][0], BS[1][1],
-                        psm=7, extra_psms=[8], whitelist='0123456789%', luminance=100, apply_filter=True, lang='evadigits',
+                        target_color=_BS_SPEC['colors'],
+                        tol_color=_BS_SPEC.get('tol_color', 20),
+                        whitelist='0123456789%', lang=('evadigits', 'eng'),
                         checker=_score_checker,
                     ))
 
