@@ -1722,7 +1722,7 @@ def _detect_game_loading_frame(frame: np.ndarray) -> bool:
     # Recherche dans une zone centrale large.
     sub = gray[80:1000, 200:1720]
     best = 0.0
-    for scale in (0.7, 0.85, 1.0, 1.15, 1.3):
+    for scale in (0.4, 0.45, 0.5, 0.6, 0.7, 0.85, 1.0, 1.15, 1.3):
         th = int(tpl.shape[0] * scale); tw = int(tpl.shape[1] * scale)
         if th >= sub.shape[0] or tw >= sub.shape[1]:
             continue
