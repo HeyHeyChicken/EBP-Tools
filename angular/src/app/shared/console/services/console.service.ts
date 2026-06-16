@@ -162,7 +162,7 @@ export class ConsoleService {
    * @param obj The object to sanitize.
    * @returns A sanitized copy of the object.
    */
-  private sanitizeImageData(obj: any): any {
+  private sanitizeImageData(obj: any, seen: WeakSet<object> = new WeakSet()): any {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -171,18 +171,21 @@ export class ConsoleService {
       return obj.startsWith('data:image/') ? 'data:image/...' : obj;
     }
 
-    if (Array.isArray(obj)) {
-      if (obj.length > 0) {
-        return obj.map((item) => this.sanitizeImageData(item));
-      }
-      return [];
-    }
-
     if (typeof obj === 'object') {
+      // Guard against circular references which would otherwise overflow the stack.
+      if (seen.has(obj)) {
+        return '[Circular]';
+      }
+      seen.add(obj);
+
+      if (Array.isArray(obj)) {
+        return obj.map((item) => this.sanitizeImageData(item, seen));
+      }
+
       const sanitized: any = {};
       for (const key in obj) {
         if (obj.hasOwnProperty(key)) {
-          sanitized[key] = this.sanitizeImageData(obj[key]);
+          sanitized[key] = this.sanitizeImageData(obj[key], seen);
         }
       }
       return sanitized;
