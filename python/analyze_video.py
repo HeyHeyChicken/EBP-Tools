@@ -32,14 +32,14 @@ import map_metadata as _map_metadata
 # Couleurs des équipes — partagées entre l'identify (matching pixel) et la
 # détection de bordure (find_text_border). Une seule source de vérité par couleur.
 TEAM_ORANGE = [
-    (255, 128, 0),   # Classic
+    (238, 120, 12),  # Classic (couleur décodée réelle ; sert de clé de match exact au killfeed)
     (170, 220, 80),  # Pro League
     (255, 220, 0),   # Challenger League
     (40, 255, 120),  # Local League
     (51, 188, 255),  # Summit
 ]
 TEAM_BLUE = [
-    (51, 151, 254),  # Classic
+    (43, 137, 237),  # Classic (couleur décodée réelle ; sert de clé de match exact au killfeed)
     (55, 190, 220),  # Pro League
     (50, 185, 255),  # Challenger League
     (180, 0, 245),   # Local League
