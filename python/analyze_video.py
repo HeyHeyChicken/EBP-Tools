@@ -67,15 +67,23 @@ MODES = [
                 # Le SCORE est lui-même coloré (chiffres en couleur de l'équipe). On
                 # cherche tous les pixels colorés, le bbox englobant = bbox des chiffres.
                 # On élargit de 3 px (inset négatif) pour donner du padding à l'OCR.
+                # tol_color = 35 (au lieu du défaut 20) : selon le décodeur et la
+                # ligue, les chiffres alpha-blendés dérivent des valeurs canoniques
+                # (ex. Local League décodé AVFoundation : vert (32,224,112) au lieu
+                # de (40,255,120) → écart 31 sur G). À tol 20 le masque ne captait
+                # que quelques pixels, d'où un bbox tronqué et un OCR faux. La phase
+                # 2 in-game applique déjà 40 pour la même raison.
                 'orangeScore': {
                     'colors': TEAM_ORANGE,
                     'search': ((30, 410), (358, 528)),
                     'inset': -10,
+                    'tol_color': 35,
                 },
                 'blueScore': {
                     'colors': TEAM_BLUE,
                     'search': ((30, 599), (358, 731)),
                     'inset': -10,
+                    'tol_color': 35,
                 },
             },
             # Variante 1 : score frame compétitive
@@ -635,8 +643,16 @@ def _resolve_team_colors(frame: np.ndarray, anchor=None):
     b_box = _find_team_card_box(anchor, 'right')
     if o_box is None or b_box is None:
         return (None, None)
-    o_counts = _color_match_counts(frame, o_box, TEAM_ORANGE)
-    b_counts = _color_match_counts(frame, b_box, TEAM_BLUE)
+    # tol_color = 40 (au lieu de 20) : selon le décodeur, les aplats de carte de
+    # vie dérivent des valeurs canoniques (ex. Local League décodé AVFoundation :
+    # orange (≈36,216,108) au lieu de (40,255,120), écart ~39 sur G ; bleu
+    # (≈168,24,228) au lieu de (180,0,245)). À tol 20 quasi aucun pixel ne matche
+    # → counts < MIN_PIXELS → résolution échoue → repli sur les couleurs Classic
+    # par défaut (une game Local League s'affichait alors en Classic). Le scoring
+    # PAR PAIRE (orange+bleu) lève l'ambiguïté Local/Summit sur le bleu malgré la
+    # tol élargie : le vert Local ne matche pas le cyan Summit côté orange.
+    o_counts = _color_match_counts(frame, o_box, TEAM_ORANGE, tol_color=40)
+    b_counts = _color_match_counts(frame, b_box, TEAM_BLUE, tol_color=40)
     # TEAM_ORANGE[i] et TEAM_BLUE[i] forment la paire du thème i (un seul thème
     # est actif). On retient le thème qui maximise orange_count[i] + blue_count[i],
     # À CONDITION que les deux couleurs soient présentes (>= MIN_PIXELS).
@@ -2611,6 +2627,81 @@ def _identify_carts(frame: np.ndarray,
             assignment[empties[0]] = unused[0]
         out[team] = [_player_slot(team, j) if j >= 0 else None
                      for j in assignment]
+    return out
+
+
+# Identification des carts. Le bandeau pseudo est un texte NOIR sur un fond =
+# couleur d'équipe : la barre de vie remplit la cart par le BAS, et le nom est
+# tout en HAUT. À pleine vie le remplissage (saturé, lumineux) atteint le nom →
+# faible contraste avec le texte noir → OCR peu fiable (surtout magenta/bleu,
+# luminance basse). Dès que la vie descend sous ~60 %, le haut de la cart se vide
+# (gris neutre) → texte noir sur gris → OCR net. On identifie donc chaque cart en
+# votant sur les frames où SON joueur a HP < _CART_READ_MAX_HP (capture aussi les
+# joueurs qui ne meurent jamais). Un misread ne matche pas le roster (ratio≤0.5)
+# → pas de vote ; _CART_DEAD_MIN_VOTES votes concordants figent une cart (borne
+# le coût OCR et empêche un misread isolé de l'emporter).
+_CART_DEAD_MIN_VOTES = 2
+_CART_READ_MAX_HP = 60
+
+
+def _cart_vote_confident(ctr, min_votes: int) -> bool:
+    """True si le slot en tête de `ctr` (Counter de votes) atteint min_votes."""
+    return bool(ctr) and ctr.most_common(1)[0][1] >= min_votes
+
+
+def _identify_one_cart(frame: np.ndarray, team: str, idx: int, n_team: int,
+                       max_n: int, names: list, anchor) -> Optional[int]:
+    """OCR le bandeau de la cart `idx` et retourne le slot du roster le mieux
+    matché (ratio fuzzy > 0.5), ou None. Identifie une cart isolée sur une frame
+    choisie (typiquement quand son joueur est mort → fond gris, texte net),
+    indépendamment des autres carts. Encodage slot : cf. `_player_slot`."""
+    if not names:
+        return None
+    chars = set()
+    for nm in names:
+        chars.update(nm.upper())
+    whitelist = ''.join(sorted(chars))
+    x = _player_cart_x_left(team, idx, n_team, max_n)
+    w = _player_cart_w(max_n)
+    raws = _ocr_cart_pseudo(frame, x, w, anchor, whitelist=whitelist)
+    best_j, best_ratio = -1, 0.0
+    for j, nm in enumerate(names):
+        _, ratio = _match_player(raws, [nm], with_ratio=True)
+        if ratio > best_ratio:
+            best_ratio, best_j = ratio, j
+    if best_j >= 0 and best_ratio > 0.5:
+        return _player_slot(team, best_j)
+    return None
+
+
+def _resolve_cart_assignment(dead_votes: dict, alive: dict) -> dict:
+    """Construit l'assignation finale cart→slot. Priorité aux votes collectés sur
+    les frames où le joueur était mort (fond gris → OCR fiable) ; à défaut, on
+    retombe sur l'identification « vivante » (`alive`, issue de `_identify_carts`).
+    Chaque slot n'est attribué qu'une fois par équipe : on traite d'abord les
+    carts les plus sûres (le plus de votes « mort »)."""
+    out = {}
+    for team in ('orange', 'blue'):
+        ctrs = dead_votes.get(team) or []
+        n = len(ctrs)
+        alive_team = (alive or {}).get(team) or []
+        order = sorted(range(n),
+                       key=lambda i: -(ctrs[i].most_common(1)[0][1] if ctrs[i] else 0))
+        assigned = [None] * n
+        used = set()
+        for i in order:
+            if ctrs[i]:
+                for slot, _cnt in ctrs[i].most_common():
+                    if slot not in used:
+                        assigned[i] = slot
+                        used.add(slot)
+                        break
+            else:
+                slot = alive_team[i] if i < len(alive_team) else None
+                if slot is not None and slot not in used:
+                    assigned[i] = slot
+                    used.add(slot)
+        out[team] = assigned
     return out
 
 
@@ -5112,10 +5203,13 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # gameplay; agrégé par median (per-player) en fin de chunk pour
         # encaisser les frames de transition et les artefacts ponctuels.
         HP_OBSERVATIONS = {}    # {elapsed_s: [{'orange': [hp...], 'blue': [hp...]}, ...]}
-        # Mapping cart-position → pseudo, calculé une seule fois par chunk
-        # à la première frame exploitable (HUD anchor + couleurs résolus).
-        # Format : {'orange': [name_at_cart_0, ...], 'blue': [...]}.
+        # Mapping cart-position → slot. Format : {'orange': [slot_at_cart_0, ...],
+        # 'blue': [...]}. Identifié principalement en votant sur les frames où le
+        # joueur de la cart est mort (fond gris → OCR du pseudo fiable), avec
+        # repli sur l'identification « vivante » pour les carts jamais mortes.
         CART_ASSIGNMENT = None
+        CART_ALIVE = None       # identification de secours via _identify_carts (1×)
+        CART_DEAD_VOTES = None  # {'orange': [Counter(), ...], 'blue': [...]}
         MAX_TIME = None   # auto-détecté à la première lecture timer valide
 
         # Couleur effectivement utilisée par chaque équipe dans cette partie.
@@ -5309,7 +5403,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             return True
 
         def _process_ocr_item(item):
-            nonlocal MAX_TIME, TIMELINE_OFFSET, CART_ASSIGNMENT
+            nonlocal MAX_TIME, TIMELINE_OFFSET, CART_ASSIGNMENT, CART_ALIVE, CART_DEAD_VOTES
             _, ts, frame, fut_timer, fut_orange, fut_blue = item
             TIMER_TEXT = fut_timer.result()
             ORANGE_RAW = fut_orange.result()
@@ -5325,33 +5419,42 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     luminance=100, apply_filter=True, lang='evadigits',
                 )
                 MS = _parse_timer_text(TIMER_TEXT)
-            if MS is None:
-                return
-            M, S = MS
-            if not (0 <= S < 60):
-                return
-            if MAX_TIME is None:
-                # Cap dur sur M : un OCR foireux qui lit "13:00" au lieu de
-                # "10:00" verrouillerait MAX_TIME à 13 et shifterait toute la
-                # timeline de 180 s. On attend une lecture ≤ MAX_TIME_CAP.
-                if not (0 <= M <= MAX_TIME_CAP):
-                    return
-                REMAINING = M * 60 + S
-                if REMAINING <= 0:
-                    return
-                MAX_TIME = -(-REMAINING // 60)
-            elif M > MAX_TIME:
-                return
-            RAW_ELAPSED = MAX_TIME * 60 - (M * 60 + S)
-            if RAW_ELAPSED < 0:
-                return
 
-            # Borne dynamique : in-game elapsed ne peut pas dépasser
-            # (temps vidéo écoulé) + offset déjà adopté + tolérance.
             VIDEO_ELAPSED = ts - START
-            EXPECTED_MAX = VIDEO_ELAPSED + TIMELINE_OFFSET + SUSPECT_TOLERANCE
 
-            if RAW_ELAPSED > EXPECTED_MAX:
+            # RAW_ELAPSED = elapsed dérivé du TIMER (None si timer illisible ou
+            # incohérent). Sert UNIQUEMENT à (1) verrouiller MAX_TIME et (2)
+            # détecter les coupes vidéo — PAS comme axe d'enregistrement : le
+            # timer peut être bruité (ex. overlay couleur d'équipe sur les
+            # secondes en fin de partie → secondes illisibles). L'axe
+            # d'enregistrement est recalé sur le temps vidéo plus bas.
+            RAW_ELAPSED = None
+            if MS is not None:
+                M, S = MS
+                if 0 <= S < 60:
+                    if MAX_TIME is None:
+                        # Cap dur sur M : un OCR foireux qui lit "13:00" au lieu
+                        # de "10:00" verrouillerait MAX_TIME à 13 et shifterait
+                        # toute la timeline de 180 s. On exige M ≤ MAX_TIME_CAP.
+                        REMAINING = M * 60 + S
+                        if 0 <= M <= MAX_TIME_CAP and REMAINING > 0:
+                            MAX_TIME = -(-REMAINING // 60)
+                    if MAX_TIME is not None and M <= MAX_TIME:
+                        CAND = MAX_TIME * 60 - (M * 60 + S)
+                        if CAND >= 0:
+                            RAW_ELAPSED = CAND
+
+            # Tant que la synchro n'est pas établie (MAX_TIME None), on exige un
+            # timer lisible pour démarrer la timeline.
+            if MAX_TIME is None:
+                return
+
+            # Détection de coupe vidéo (inchangée) : ne s'applique que si le timer
+            # est lisible. Un RAW_ELAPSED qui dépasse la borne vidéo est une coupe
+            # potentielle (confirmée par SUSPECT_CONFIRM_LEN samples linéaires) ou
+            # une hallucination isolée.
+            if RAW_ELAPSED is not None and \
+                    RAW_ELAPSED > VIDEO_ELAPSED + TIMELINE_OFFSET + SUSPECT_TOLERANCE:
                 SUSPECT_BUFFER.append((ts, RAW_ELAPSED, ORANGE_RAW, BLUE_RAW))
                 if DEBUG:
                     _emit({'log': f'[_analyze_chunks] SUSPECT {TIMER_TEXT}: ELAPSED={RAW_ELAPSED}s @ vid={VIDEO_ELAPSED:.0f}s (buffer {len(SUSPECT_BUFFER)}/{SUSPECT_CONFIRM_LEN})'})
@@ -5372,12 +5475,26 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 return
 
             # Sample dans la borne : tout suspect en attente était une hallucination isolée.
-            if SUSPECT_BUFFER:
+            if RAW_ELAPSED is not None and SUSPECT_BUFFER:
                 if DEBUG:
                     _emit({'log': f'[_analyze_chunks] SUSPECT clear ({len(SUSPECT_BUFFER)} samples invalidés par sample normal)'})
                 SUSPECT_BUFFER.clear()
 
-            _record_raw(RAW_ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
+            # Axe d'enregistrement. On garde TOUJOURS le temps in-game du TIMER
+            # quand il est lisible : c'est le temps de référence (kills, etc.),
+            # alors que le temps vidéo + offset peut dériver (pauses, frames
+            # sautées) et décalerait les events hors de leur instant réel. On ne
+            # retombe sur l'estimation vidéo (monotone par construction) QUE
+            # lorsque le timer est franchement illisible (RAW_ELAPSED None — ex.
+            # overlay couleur d'équipe sur les secondes en fin de partie : '4',
+            # '0377', …). Évite de perdre la fenêtre finale (sprint de score)
+            # sans dater les autres frames sur un axe vidéo dérivé.
+            ELAPSED = RAW_ELAPSED if RAW_ELAPSED is not None \
+                else round(VIDEO_ELAPSED + TIMELINE_OFFSET)
+            if ELAPSED < 0:
+                return
+
+            _record_raw(ELAPSED, ORANGE_RAW, BLUE_RAW, TIMER_TEXT)
 
             # Taux de remplissage par équipe pour chaque point de capture
             # verrouillé. Couleurs résolues passées explicitement → robuste
@@ -5390,7 +5507,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 for PT in LOCKED_POINTS:
                     O_PCT, B_PCT = _compute_point_fill(frame, PT, ORG_C, BLU_C)
                     POINT_OBSERVATIONS.setdefault(PT['letter'], {}) \
-                        .setdefault(RAW_ELAPSED, []).append((O_PCT, B_PCT))
+                        .setdefault(ELAPSED, []).append((O_PCT, B_PCT))
 
             # Killfeed : detect → split → OCR killer/victim → fuzzy match contre
             # le roster de l'équipe correspondante. Multi-frame consensus (kill
@@ -5426,7 +5543,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                             frame, SPLIT['weapon']['box'],
                             WEAPON_TEMPLATES, HEADSHOT_TEMPLATE,
                         )
-                        KILL_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append({
+                        KILL_OBSERVATIONS.setdefault(ELAPSED, []).append({
                             'killer': K_SLOT, 'victim': V_SLOT,
                             'killer_raw': KRAW, 'victim_raw': VRAW,
                             'killer_ratio': KRATIO, 'victim_ratio': VRATIO,
@@ -5441,17 +5558,41 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     frame, len(ORANGE_ROSTER), len(BLUE_ROSTER),
                     RESOLVED_ORANGE, RESOLVED_BLUE, anchor=HUD_ANCHOR,
                 )
-                HP_OBSERVATIONS.setdefault(RAW_ELAPSED, []).append(HP)
-                # Identifier la cart→pseudo mapping une seule fois par chunk,
-                # à la première frame exploitable (couleurs résolues = HUD
-                # stabilisé). Utile au front pour interpréter hp_timeline
-                # (qui est indexé par position de cart à l'écran, pas par
-                # ordre du roster envoyé).
-                if CART_ASSIGNMENT is None:
-                    CART_ASSIGNMENT = _identify_carts(
+                HP_OBSERVATIONS.setdefault(ELAPSED, []).append(HP)
+
+                # Identification cart→slot. Utile au front pour interpréter
+                # hp_timeline (indexé par position de cart à l'écran, pas par
+                # ordre du roster). Stratégie : le pseudo (texte noir sur fond
+                # team-color) n'est fiable à l'OCR que quand le haut de la cart
+                # est gris, c.-à-d. quand la vie est sous ~50 %. On vote donc
+                # l'identité de chaque cart sur les frames où son HP <
+                # _CART_READ_MAX_HP, jusqu'à _CART_DEAD_MIN_VOTES votes
+                # concordants. `_identify_carts` (frame pleine vie) ne sert que de
+                # repli pour les carts dont la vie ne descend jamais assez.
+                if CART_ALIVE is None:
+                    CART_ALIVE = _identify_carts(
                         frame, len(ORANGE_ROSTER), len(BLUE_ROSTER),
                         ORANGE_ROSTER, BLUE_ROSTER, anchor=HUD_ANCHOR,
                     )
+                if CART_DEAD_VOTES is None:
+                    CART_DEAD_VOTES = {'orange': [Counter() for _ in ORANGE_ROSTER],
+                                       'blue':   [Counter() for _ in BLUE_ROSTER]}
+                MAX_N = max(len(ORANGE_ROSTER), len(BLUE_ROSTER))
+                CART_VOTED = False
+                for TEAM, ROSTER in (('orange', ORANGE_ROSTER), ('blue', BLUE_ROSTER)):
+                    NAMES = [p.get('name') or '' for p in ROSTER]
+                    for I in range(len(ROSTER)):
+                        if I >= len(HP[TEAM]) or HP[TEAM][I] >= _CART_READ_MAX_HP:
+                            continue
+                        if _cart_vote_confident(CART_DEAD_VOTES[TEAM][I], _CART_DEAD_MIN_VOTES):
+                            continue
+                        SLOT = _identify_one_cart(frame, TEAM, I, len(ROSTER), MAX_N,
+                                                  NAMES, HUD_ANCHOR)
+                        if SLOT is not None:
+                            CART_DEAD_VOTES[TEAM][I][SLOT] += 1
+                            CART_VOTED = True
+                if CART_VOTED or CART_ASSIGNMENT is None:
+                    CART_ASSIGNMENT = _resolve_cart_assignment(CART_DEAD_VOTES, CART_ALIVE)
                     if DEBUG:
                         _emit({'log': f'[_analyze_chunks] {GAME_ID} cart_assignment={CART_ASSIGNMENT}'})
 
