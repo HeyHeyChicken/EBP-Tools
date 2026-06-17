@@ -22,21 +22,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
             >
               <i class="fa-sharp fa-solid fa-crop"></i>
             </button>
-          </div>
-        </ebp-column>
-        <ebp-column [xs]="6">
-          <div class="p-relative h-100">
-            <div
-              class="dropper"
-              [class.disabled]="inputFileDisabled"
-              (click)="onInputFileClick(true)"
-            >
-              <div class="icon">
-                <i class="fa-sharp fa-solid fa-dumbbell"></i>
-              </div>
-              <p>{{ 'view.replay_cutter.inputTrainingFile' | translate }}</p>
-            </div>
-            <div class="buttons">
               <button
                 class="btn squared"
                 (click)="openSettings()"
@@ -44,20 +29,19 @@ See LICENSE for terms. Unauthorized use is prohibited.
               >
                 <i class="fa-sharp fa-solid fa-gear"></i>
               </button>
-            </div>
           </div>
         </ebp-column>
-        <ebp-column [xs]="6">
+        <ebp-column [xs]="12">
           <div class="p-relative h-100">
             <div
-              class="dropper right"
+              class="dropper"
               [class.disabled]="inputFileDisabled"
-              (click)="onInputFileClick(false)"
+              (click)="onInputFileClick()"
             >
               <div class="icon">
-                <i class="fa-sharp fa-solid fa-trophy"></i>
+                <i class="fa-sharp fa-solid fa-dumbbell"></i>
               </div>
-              <p>{{ 'view.replay_cutter.inputOfficialFile' | translate }}</p>
+              <p>{{ 'view.replay_cutter.inputTrainingFile' | translate }}</p>
             </div>
           </div>
         </ebp-column>

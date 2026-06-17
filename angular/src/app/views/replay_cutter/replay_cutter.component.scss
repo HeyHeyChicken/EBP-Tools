@@ -11,72 +11,16 @@ video:not(.visible) {
 
 .p-relative {
   position: relative;
-
-  > .buttons {
-    position: absolute;
-    bottom: 0;
-    left: calc(100% + #{variables.$margin});
-    display: flex;
-    padding: variables.$margin variables.$margin 0 variables.$margin;
-    transform: translateX(-50%);
-    z-index: 1;
-    background-image: url('/assets/img/border.png');
-    background-size: 100% 100%;
-  }
 }
 
 .dropper {
-  border-style: dashed;
-  border-color: variables.$border_color;
   padding: calc(#{variables.$margin} * 2);
   text-align: center;
   position: relative;
   height: 100%;
   box-sizing: border-box;
-
-  &:before,
-  &:after {
-    content: '';
-    position: absolute;
-    background-color: variables.$dark_color;
-    left: 0;
-    top: 0;
-    z-index: 0;
-    transition: all 0.2s ease-in-out;
-    box-sizing: border-box;
-  }
-
-  &:before {
-    height: 100%;
-    width: calc(100% - #{variables.$margin} * 1.5);
-    border-bottom: 1px dashed variables.$border_color;
-  }
-
-  &:after {
-    width: 100%;
-    height: calc(100% - #{variables.$form_height} - #{variables.$margin});
-  }
-
-  &:not(.right) {
-    border-width: 1px 0 0 1px;
-
-    &:after {
-      border-right: 1px dashed variables.$border_color;
-    }
-  }
-
-  &.right {
-    border-width: 1px 1px 0 0;
-
-    &:before {
-      right: 0;
-      left: initial;
-    }
-
-    &:after {
-      border-left: 1px dashed variables.$border_color;
-    }
-  }
+  background-color: variables.$dark_color;
+  border: 1px dashed variables.$border_color;
 
   &:not(.disabled) {
     cursor: pointer;

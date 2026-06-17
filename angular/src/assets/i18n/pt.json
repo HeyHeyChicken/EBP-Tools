@@ -116,8 +116,7 @@
           "description": "O seu replay contém bordas a remover antes da análise?<br/>Pode removê-las manualmente aqui.<br/>O processamento pode demorar algum tempo.",
           "title": "Remover as bordas"
         }
-      },
-      "inputOfficialFile": "Clique aqui para cortar manualmente o seu ficheiro de vídeo oficial"
+      }
     },
     "notification": {
       "manual-cutting": {

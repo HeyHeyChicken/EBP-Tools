@@ -116,8 +116,7 @@
           "description": "Your replay contains borders that should be removed before analysis?<br/>You can remove them manually here.<br/>Processing may take a little while.",
           "title": "Remove borders"
         }
-      },
-      "inputOfficialFile": "Click here to manually cut your official video file"
+      }
     },
     "notification": {
       "manual-cutting": {

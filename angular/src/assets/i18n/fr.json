@@ -116,8 +116,7 @@
           "description": "Votre replay contient des bordures à supprimer avant analyse ?<br/>Vous pouvez les retirer manuellement ici.<br/>Le traitement risque d'être un peu long.",
           "title": "Supprimer les bordures"
         }
-      },
-      "inputOfficialFile": "Cliquez ici pour découper manuellement votre fichier vidéo officiel"
+      }
     },
     "notification": {
       "manual-cutting": {

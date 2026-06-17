@@ -4965,20 +4965,51 @@ def _reconstruct_field(raw_obs: dict, field: str, max_score, max_rate: int = MAX
     return {T_MIN + OFF: PATH[OFF] for OFF in range(T_LEN) if (T_MIN + OFF) in OBS_COUNTS}
 
 
-def _color_isolated_bw(frame: np.ndarray, box, colors: list, tol: int = 50) -> Image.Image:
+def _color_isolated_bw(frame: np.ndarray, box, colors: list, tol: int = 50,
+                       other_colors: list = None) -> Image.Image:
     """
     Crée une image PIL N&B isolant les pixels matchant `colors` dans la région `box`
     du frame. Pixels matchants → noir (texte), tout le reste → blanc (fond).
     Élimine les ombres, fonds et artefacts qui parasitent un seuil de luminance
     générique. La signature visuelle d'un score EVA, c'est sa couleur d'équipe.
+
+    Si `other_colors` est fourni, on masque par DIRECTION de teinte (chroma
+    cosinus), invariant à la luminance, plutôt que par distance L-inf RGB : on
+    garde les pixels brillants+saturés dont la teinte penche vers `colors`
+    plutôt que vers `other_colors` (l'équipe adverse). Robuste aux dérives de
+    décodeur — ex. le vert Local League est rendu en lime brillant
+    (~129,224,68), loin du canonique (40,255,120) : le match L-inf le rate
+    (cœur du chiffre R>90 exclu) alors que sa teinte reste « vert d'équipe » —
+    tout en rejetant un fond de la couleur adverse (ex. barre de capture
+    magenta qui bave dans la box du score orange).
     """
     X1, Y1 = int(box[0][0]), int(box[0][1])
     X2, Y2 = int(box[1][0]), int(box[1][1])
     REGION = frame[Y1:Y2, X1:X2].astype(np.int16)
-    MASK = np.zeros(REGION.shape[:2], dtype=bool)
-    for C in colors:
-        TARGET = np.array(C, dtype=np.int16)
-        MASK |= (np.abs(REGION - TARGET) <= tol).all(axis=2)
+    if other_colors:
+        F = REGION.astype(np.float32)
+        FC = F - F.mean(axis=2, keepdims=True)
+        FN = np.linalg.norm(FC, axis=2) + 1e-6
+
+        def _max_chroma_cos(cols):
+            best = np.full(REGION.shape[:2], -1.0, dtype=np.float32)
+            for c in cols:
+                t = np.array(c, dtype=np.float32)
+                tc = t - t.mean()
+                tn = float(np.linalg.norm(tc)) + 1e-6
+                best = np.maximum(best, (FC * tc).sum(axis=2) / (FN * tn))
+            return best
+
+        MX = REGION.max(axis=2)
+        CHROMA = MX - REGION.min(axis=2)
+        CO = _max_chroma_cos(colors)
+        CB = _max_chroma_cos(other_colors)
+        MASK = (MX >= 110) & (CHROMA >= 50) & (CO > CB) & (CO >= 0.3)
+    else:
+        MASK = np.zeros(REGION.shape[:2], dtype=bool)
+        for C in colors:
+            TARGET = np.array(C, dtype=np.int16)
+            MASK |= (np.abs(REGION - TARGET) <= tol).all(axis=2)
     BW = np.full(REGION.shape[:2], 255, dtype=np.uint8)
     BW[MASK] = 0
     return Image.fromarray(BW, mode='L').convert('RGB')
@@ -5022,7 +5053,7 @@ def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = 
     BOX = _resolve_region(spec, frame)
     if BOX is None:
         return None
-    BW = _color_isolated_bw(frame, BOX, colors)
+    BW = _color_isolated_bw(frame, BOX, colors, other_colors=spec.get('other_colors'))
     WHITELIST = '0123456789%'
     FILTER_PATTERN = re.compile(f'[^{re.escape(WHITELIST)}]')
     # PSM 7 seul (single line) : suffit dans la quasi-totalité des cas avec
@@ -5369,8 +5400,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             # de couverture en élargissant la tolérance par couleur.
             O_COLORS = [RESOLVED_ORANGE] if RESOLVED_ORANGE else TEAM_ORANGE
             B_COLORS = [RESOLVED_BLUE]   if RESOLVED_BLUE   else TEAM_BLUE
-            O_SPEC = {'colors': O_COLORS, 'search': O_BOX, 'inset': -10, 'tol_color': 40}
-            B_SPEC = {'colors': B_COLORS, 'search': B_BOX, 'inset': -10, 'tol_color': 40}
+            O_SPEC = {'colors': O_COLORS, 'search': O_BOX, 'inset': -10, 'tol_color': 40, 'other_colors': B_COLORS}
+            B_SPEC = {'colors': B_COLORS, 'search': B_BOX, 'inset': -10, 'tol_color': 40, 'other_colors': O_COLORS}
 
             return ('ocr', ts, FRAME,
                     EXECUTOR.submit(_ocr_timer_fast, FRAME, T_BOX),

@@ -116,8 +116,7 @@
           "description": "¿Tu repetición contiene bordes que deben eliminarse antes del análisis?<br/>Puedes quitarlos manualmente aquí.<br/>El procesamiento puede tardar un poco.",
           "title": "Eliminar los bordes"
         }
-      },
-      "inputOfficialFile": "Haga clic aquí para cortar manualmente su archivo de video oficial"
+      }
     },
     "notification": {
       "manual-cutting": {

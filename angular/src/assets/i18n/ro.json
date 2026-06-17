@@ -116,8 +116,7 @@
           "description": "Redarea ta conține margini care trebuie eliminate înainte de analiză?<br/>Le poți elimina manual aici.<br/>Procesarea poate dura puțin mai mult.",
           "title": "Elimina marginile"
         }
-      },
-      "inputOfficialFile": "Faceți clic aici pentru a tăia manual fișierul video oficial"
+      }
     },
     "notification": {
       "manual-cutting": {
