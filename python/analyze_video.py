@@ -2701,6 +2701,21 @@ def _resolve_cart_assignment(dead_votes: dict, alive: dict) -> dict:
                 if slot is not None and slot not in used:
                     assigned[i] = slot
                     used.add(slot)
+        # Élimination ORDRE-AGNOSTIQUE : si un seul cart reste sans slot, il ne
+        # reste qu'un seul slot possible (l'ensemble du roster moins ceux déjà
+        # attribués) → on l'assigne, sans aucune hypothèse sur l'ordre d'affichage
+        # vs l'ordre du roster (l'API peut donner les joueurs dans un ordre
+        # différent de l'écran — cf. cart_assignment non-identité en prod). Cas
+        # typique : deux pseudos quasi identiques tronqués au même préfixe par
+        # l'OCR (MTSxHollist|an vs MTSxHollist|erok) → l'un reste null, déduit ici.
+        # À PARTIR DE 2 null on ne devine pas (impossible de savoir qui est qui
+        # sans info de position fiable) : on laisse null plutôt que risquer une
+        # inversion.
+        expected = {_player_slot(team, i) for i in range(n)}
+        remaining = expected - used
+        nulls = [i for i in range(n) if assigned[i] is None]
+        if len(nulls) == 1 and len(remaining) == 1:
+            assigned[nulls[0]] = remaining.pop()
         out[team] = assigned
     return out
 
