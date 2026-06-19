@@ -46,7 +46,7 @@ TEAM_BLUE = [
     (179, 0, 243),   # Summit
 ]
 
-DEBUG = False
+DEBUG = True
 
 MODES = [
     #region Mode 0
@@ -1964,6 +1964,7 @@ def _find_blue_score_box(frame: np.ndarray, anchor=None):
 
 
 _POINT_TEMPLATE_CACHE = None  # tuple (gray, alpha_mask) ou (None, None)
+_PLAYER_CAM_TEMPLATE_CACHE = None  # tuple (gray, alpha_mask) ou (None, None)
 
 # Largeur native de `playing_top.png` à 1920×1080. Sert à dériver l'échelle
 # du template `point.png` proportionnellement à la taille du HUD détecté.
@@ -1988,6 +1989,296 @@ def _get_point_template():
     alpha = rgba[:, :, 3]
     _POINT_TEMPLATE_CACHE = (gray, alpha)
     return _POINT_TEMPLATE_CACHE
+
+
+def _get_player_cam_template():
+    """Charge (et cache) le template du panneau "camera focus joueur" en
+    (gray, alpha). Ce panneau (cadre du portrait + bandeau pseudo) apparaît en
+    bas-droite de l'écran quand la caméra suit un joueur en particulier pendant
+    le gameplay. Le canal alpha sert de mask pour `cv2.matchTemplate` : on ne
+    matche que le contour blanc semi-transparent (~20 % des pixels), pas le
+    centre transparent où défile l'action de jeu."""
+    global _PLAYER_CAM_TEMPLATE_CACHE
+    if _PLAYER_CAM_TEMPLATE_CACHE is not None:
+        return _PLAYER_CAM_TEMPLATE_CACHE
+    base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, 'templates', 'playing-player-cam.png')
+    if not os.path.isfile(path):
+        _PLAYER_CAM_TEMPLATE_CACHE = (None, None)
+        return _PLAYER_CAM_TEMPLATE_CACHE
+    rgba = np.array(Image.open(path).convert('RGBA'))
+    gray = cv2.cvtColor(rgba[:, :, :3], cv2.COLOR_RGB2GRAY)
+    alpha = rgba[:, :, 3]
+    _PLAYER_CAM_TEMPLATE_CACHE = (gray, alpha)
+    return _PLAYER_CAM_TEMPLATE_CACHE
+
+
+# Largeur native de `playing-player-cam.png` à 1920×1080. Sert à dériver
+# l'échelle du template proportionnellement à la taille du HUD détecté.
+_PLAYER_CAM_NATIVE_W = 242
+
+
+def _detect_player_cam(frame: np.ndarray, anchor=None,
+                       threshold: float = 0.55):
+    """Détecte si l'on est en mode "camera focus joueur" : un panneau (cadre
+    portrait + bandeau pseudo) en bas-droite de l'écran pendant le gameplay.
+
+    Retourne la box `(x, y, w, h)` du panneau en coordonnées plein-cadre si
+    détecté, sinon None.
+
+    On matche le template `playing-player-cam.png` (mask alpha → seul le
+    contour blanc compte) dans le quart bas-droite de la frame, à l'échelle
+    dérivée de la largeur du HUD haut (`anchor`). TM_CCORR_NORMED est invariant
+    à la luminosité → un contour sombre du décor peut scorer haut ; on vérifie
+    donc que les pixels du contour matché sont bien clairs (overlay blanc).
+
+    `anchor` = barre HUD (`_find_playing_top_anchor`) pour l'échelle ; si None,
+    on suppose l'échelle native 1920×1080 dérivée de la largeur de frame.
+    """
+    tpl_gray, tpl_mask = _get_player_cam_template()
+    if tpl_gray is None:
+        return None
+
+    h, w = frame.shape[:2]
+    # Échelle : depuis la largeur HUD si dispo, sinon depuis la largeur frame.
+    if anchor is not None:
+        scale = anchor[3] / float(_HUD_NATIVE_W)
+    else:
+        scale = w / 1920.0
+
+    # Recherche restreinte au coin bas-droite : le panneau y est TOUJOURS quasi
+    # collé (mesuré sur les dumps : top-left ~x=0.86, y=0.74). Une zone trop
+    # large laissait matcher des faux positifs (contours blancs de la neige/HUD
+    # au centre, ex. x=0.71/y=0.56). On garde une marge sous la position réelle.
+    sx1 = int(w * 0.78)
+    sy1 = int(h * 0.66)
+    sub = cv2.cvtColor(frame[sy1:h, sx1:w], cv2.COLOR_RGB2GRAY)
+
+    best = 0.0
+    best_box = None
+    for s in (scale * 0.9, scale * 1.0, scale * 1.1):
+        h_t = int(round(tpl_gray.shape[0] * s))
+        w_t = int(round(tpl_gray.shape[1] * s))
+        if h_t < 16 or w_t < 16 or h_t >= sub.shape[0] or w_t >= sub.shape[1]:
+            continue
+        rs_t = cv2.resize(tpl_gray, (w_t, h_t), interpolation=cv2.INTER_AREA)
+        rs_m = cv2.resize(tpl_mask, (w_t, h_t), interpolation=cv2.INTER_AREA)
+        try:
+            res = cv2.matchTemplate(sub, rs_t, cv2.TM_CCORR_NORMED, mask=rs_m)
+        except cv2.error:
+            continue
+        res = np.where(np.isfinite(res), res, 0)
+        _, mx, _, loc = cv2.minMaxLoc(res)
+        if mx > best:
+            best = mx
+            best_box = (loc[0], loc[1], w_t, h_t, rs_m)
+
+    if best < threshold or best_box is None:
+        return None
+
+    # Rejet des faux positifs sombres : le contour matché doit être clair
+    # (overlay blanc), pas un bord sombre du décor 3D.
+    bx, by, bw, bh, bm = best_box
+    crop = sub[by:by + bh, bx:bx + bw]
+    if crop.shape[:2] != bm.shape[:2]:
+        return None
+    outline = crop[bm > 200]
+    if len(outline) == 0 or outline.mean() < 110:
+        return None
+
+    return (bx + sx1, by + sy1, bw, bh)
+
+
+# Position du pseudo, en fraction de la box du panneau cam (mesuré manuellement
+# sur le HUD EVA : le pseudo blanc occupe le bandeau bas du panneau).
+_PLAYER_CAM_PSEUDO_RATIO = (0.14, 0.79, 0.87, 0.96)  # x1, y1, x2, y2
+
+# Tolérance du masque couleur blanc pour l'OCR du pseudo cam (écart L-inf max
+# par canal à 255). `_PLAYER_CAM_WHITE_TOL` = valeur primaire (1er essai +
+# incrustation debug). `_CASCADE` = essais successifs dans `_identify_focus_slot`
+# si aucun joueur ne matche : on retente avec une tolérance plus serrée (le
+# masque change → l'OCR aussi). Partagée pour ne jamais diverger du debug.
+_PLAYER_CAM_WHITE_TOL = 80
+_PLAYER_CAM_WHITE_TOL_CASCADE = (80, 70, 60)
+
+
+def _player_cam_pseudo_box(cam_box):
+    """Dérive la box du pseudo (x1, y1, x2, y2) depuis la box du panneau cam
+    `(x, y, w, h)` via les ratios `_PLAYER_CAM_PSEUDO_RATIO`."""
+    x, y, w, h = cam_box
+    rx1, ry1, rx2, ry2 = _PLAYER_CAM_PSEUDO_RATIO
+    return (int(x + rx1 * w), int(y + ry1 * h),
+            int(x + rx2 * w), int(y + ry2 * h))
+
+
+def _player_cam_whitelist(roster_names=None) -> str:
+    """Whitelist Tesseract pour le pseudo cam. Les pseudos EVA sont rendus en
+    MAJUSCULES. Si `roster_names` (pseudos de l'API) est fourni, on restreint à
+    l'union des caractères présents dans ces pseudos (uppercased) — toute lettre
+    absente de l'ensemble des pseudos est rejetée, ce qui coupe les confusions
+    type 0↔O, 8↔B, 1↔I. Sinon fallback A-Z + 0-9."""
+    if roster_names:
+        chars = set()
+        for n in roster_names:
+            if n:
+                chars.update(n.upper())
+        if chars:
+            return ''.join(sorted(chars))
+    return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
+
+def _ocr_player_cam_pseudo(frame: np.ndarray, cam_box, roster_names=None,
+                           lang: str = 'eng', tol_color: int = None) -> str:
+    """OCR le pseudo du joueur suivi par la caméra. Le texte est blanc sur fond
+    transparent (gameplay derrière) → masquage couleur blanc. Souvent 1 ligne,
+    parfois 2 si le pseudo est long ; `_ocr_color_masked` retire les `\\n` donc
+    un pseudo wrappé est reconstitué. Moteur `eng` par défaut : la fonte du
+    panneau cam n'est PAS celle des cartes/score, donc le modèle `evapseudos`
+    (entraîné sur cette dernière) lit 0 % ici alors que `eng` atteint ~94 %
+    (mesuré sur cliff3). Whitelist dérivée du roster si dispo. `lang`
+    paramétrable pour comparer les moteurs."""
+    px1, py1, px2, py2 = _player_cam_pseudo_box(cam_box)
+    return _ocr_color_masked(
+        frame, px1, py1, px2, py2,
+        target_color=(255, 255, 255),
+        tol_color=_PLAYER_CAM_WHITE_TOL if tol_color is None else tol_color,
+        whitelist=_player_cam_whitelist(roster_names),
+        lang=lang,
+    )
+
+
+# Zone team-color du panneau cam (bande de stats à droite), en fraction de la
+# box. La plus solidement teintée à la couleur d'équipe (validé ~99% sur le dump
+# debug) → sert à déterminer l'équipe du joueur suivi avant l'OCR.
+_FOCUS_TEAM_STRIP_RATIO = (0.69, 0.02, 0.97, 0.67)  # x1, y1, x2, y2
+
+
+def _focus_panel_team(frame: np.ndarray, cam_box,
+                      resolved_orange, resolved_blue):
+    """Détermine l'équipe ('orange'/'blue') du joueur suivi : couleur dominante
+    (médiane par canal, robuste au texte sombre des stats) de la zone team-color
+    du panneau, puis plus proche voisin (distance L2) entre RESOLVED_ORANGE et
+    RESOLVED_BLUE. Retourne None si les couleurs ne sont pas résolues."""
+    if resolved_orange is None or resolved_blue is None:
+        return None
+    x, y, w, h = cam_box
+    rx1, ry1, rx2, ry2 = _FOCUS_TEAM_STRIP_RATIO
+    H, W = frame.shape[:2]
+    sx1 = max(0, int(x + rx1 * w)); sy1 = max(0, int(y + ry1 * h))
+    sx2 = min(W, int(x + rx2 * w)); sy2 = min(H, int(y + ry2 * h))
+    if sx2 <= sx1 or sy2 <= sy1:
+        return None
+    dom = np.median(frame[sy1:sy2, sx1:sx2].reshape(-1, 3).astype(float), axis=0)
+    d_o = np.linalg.norm(dom - np.array(resolved_orange, dtype=float))
+    d_b = np.linalg.norm(dom - np.array(resolved_blue, dtype=float))
+    return 'orange' if d_o < d_b else 'blue'
+
+
+def _identify_focus_slot(frame: np.ndarray, cam_box,
+                         orange_roster, blue_roster, anchor=None,
+                         resolved_orange=None, resolved_blue=None,
+                         lang: str = 'eng'):
+    """Identifie le joueur suivi par la caméra (panneau bas-droite).
+
+    1. Détermine l'équipe via la couleur de la bande de stats (`_focus_panel_team`)
+       → restreint les candidats à CE roster (5 pseudos au lieu de 10), ce qui
+       resserre la whitelist OCR et élimine les faux matchs cross-équipe.
+       Fallback sur le roster combiné si l'équipe n'est pas identifiable.
+    2. OCR le pseudo (whitelist = caractères des candidats), fuzzy-match.
+
+    Retourne `(slot, pseudo)` : slot = `_player_slot` du meilleur match (None si
+    aucun pseudo ne dépasse le cutoff), pseudo = texte OCR brut (debug/log).
+    Slot encodé par équipe (orange[i]→1..5, blue[i]→6..9/0), cohérent killfeed/carts."""
+    names_o = [p.get('name') if isinstance(p, dict) else p for p in (orange_roster or [])]
+    names_o = [n for n in names_o if n]
+    names_b = [p.get('name') if isinstance(p, dict) else p for p in (blue_roster or [])]
+    names_b = [n for n in names_b if n]
+    if not names_o and not names_b:
+        return None, ''
+
+    team = _focus_panel_team(frame, cam_box, resolved_orange, resolved_blue)
+    if team == 'orange' and names_o:
+        names, teams = names_o, ['orange'] * len(names_o)
+    elif team == 'blue' and names_b:
+        names, teams = names_b, ['blue'] * len(names_b)
+    else:
+        names = names_o + names_b
+        teams = ['orange'] * len(names_o) + ['blue'] * len(names_b)
+
+    # Cascade de tolérance : on tente d'abord la tol primaire (80) ; si aucun
+    # joueur ne matche, on retente avec une tol plus serrée (70 puis 60) — le
+    # masque blanc change, donc l'OCR aussi, ce qui récupère des frames ratées.
+    # Retour dès le 1er match. On garde le pseudo du 1er essai pour le debug si
+    # tout échoue (cohérent avec l'incrustation, qui utilise la tol primaire).
+    first_pseudo = None
+    for tol in _PLAYER_CAM_WHITE_TOL_CASCADE:
+        pseudo = _ocr_player_cam_pseudo(frame, cam_box, roster_names=names,
+                                        lang=lang, tol_color=tol)
+        if first_pseudo is None:
+            first_pseudo = pseudo
+        name = _match_player(pseudo, names)
+        if name:
+            idx = names.index(name)
+            t = teams[idx]
+            local_idx = names_o.index(name) if t == 'orange' else names_b.index(name)
+            return _player_slot(t, local_idx), pseudo
+    return None, first_pseudo or ''
+
+
+_PLAYER_CAM_DEBUG_DIR = None  # cache du dossier de dump (créé à la 1ère frame)
+
+
+def _dump_focus_debug(frame: np.ndarray, timestamp: float, cam_box,
+                      pseudo: str = '', slot=None, team=None):
+    """DEBUG : sauvegarde la frame dans ~/Downloads/tmp/ avec le panneau cam
+    (vert), la zone pseudo (jaune), la bande de détection d'équipe (cyan) et le
+    pseudo OCR + équipe + slot matché en overlay. Sert à valider visuellement la
+    détection + équipe + OCR + match roster ; aucun effet sur l'analyse."""
+    global _PLAYER_CAM_DEBUG_DIR
+    if _PLAYER_CAM_DEBUG_DIR is None:
+        _PLAYER_CAM_DEBUG_DIR = os.path.join(
+            os.path.expanduser('~'), 'Downloads', 'tmp')
+        os.makedirs(_PLAYER_CAM_DEBUG_DIR, exist_ok=True)
+
+    annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    x, y, w, h = cam_box
+    cv2.rectangle(annotated, (x, y), (x + w, y + h), (0, 255, 0), 3)
+    px1, py1, px2, py2 = _player_cam_pseudo_box(cam_box)
+    cv2.rectangle(annotated, (px1, py1), (px2, py2), (0, 255, 255), 2)
+    rx1, ry1, rx2, ry2 = _FOCUS_TEAM_STRIP_RATIO
+    cv2.rectangle(annotated, (int(x + rx1 * w), int(y + ry1 * h)),
+                  (int(x + rx2 * w), int(y + ry2 * h)), (255, 255, 0), 2)
+    label = f'{team or "?"} {pseudo or "?"}' + (f' [slot {slot}]' if slot is not None else '')
+    # Aligné à droite (fin du texte sur le bord droit de la zone pseudo) : le
+    # panneau est en bas-droite, un texte long aligné à gauche déborderait hors
+    # écran et serait coupé.
+    (tw, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+    cv2.putText(annotated, label, (max(0, px2 - tw), max(0, py1 - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+    # Incrustation du masque EXACT donné à Tesseract : mêmes params que
+    # `_ocr_player_cam_pseudo` (blanc, tol 60) → pixels blancs en NOIR (texte),
+    # reste en BLANC (polarité Tesseract). Collé en haut-gauche, upscale ×4,
+    # pour voir précisément ce que lit l'OCR.
+    sub = frame[py1:py2, px1:px2].astype(np.int16)
+    if sub.size:
+        m = np.abs(sub - np.array((255, 255, 255), dtype=np.int16)).max(axis=2) <= _PLAYER_CAM_WHITE_TOL
+        bw = np.where(m, 0, 255).astype(np.uint8)
+        bw = cv2.resize(bw, (bw.shape[1] * 4, bw.shape[0] * 4),
+                        interpolation=cv2.INTER_NEAREST)
+        bw = cv2.copyMakeBorder(bw, 2, 2, 2, 2, cv2.BORDER_CONSTANT, value=128)
+        ins = cv2.cvtColor(bw, cv2.COLOR_GRAY2BGR)
+        ih, iw = ins.shape[:2]
+        H, W = annotated.shape[:2]
+        y0 = 10 + int(0.15 * H)   # descendu de 15% de la hauteur
+        if y0 + ih < H and iw + 10 < W:
+            annotated[y0:y0 + ih, 10:10 + iw] = ins
+            cv2.putText(annotated, 'OCR input', (10, y0 + ih + 22),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+    safe = re.sub(r'[^A-Za-z0-9]', '', pseudo) or 'noocr'
+    fname = f't{int(timestamp * 1000):09d}_focus_{safe}_s{slot}.png'
+    cv2.imwrite(os.path.join(_PLAYER_CAM_DEBUG_DIR, fname), annotated)
 
 
 def _ocr_point_letter(frame: np.ndarray, x: int, y: int, w: int, h: int) -> str:
@@ -5272,6 +5563,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         LOCKED_POINTS = None
         # {letter: {elapsed: [(orange_pct, blue_pct), ...]}}
         POINT_OBSERVATIONS = {}
+        # Joueur suivi par la caméra (focus). Une obs (= slot) par frame où le
+        # panneau cam est détecté ET le pseudo matche un roster. Agrégé par vote
+        # par elapsed en fin de chunk → focus_timeline.
+        FOCUS_OBSERVATIONS = {}   # {elapsed_s: [slot, ...]}
 
         # Garde-fou anti-pollution timer : un timer OCR foireux (ex: "09:43" lu
         # "03:43") génère un ELAPSED aberrant qui décale toute la timeline.
@@ -5642,6 +5937,23 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     if DEBUG:
                         _emit({'log': f'[_analyze_chunks] {GAME_ID} cart_assignment={CART_ASSIGNMENT}'})
 
+            # Joueur suivi par la caméra (panneau bas-droite). Indépendant des
+            # couleurs résolues : on détecte le panneau, OCR le pseudo (whitelist
+            # roster) et fuzzy-match → slot. Skip si rosters vides (chunk non
+            # matché côté back) : sans roster, pas de whitelist ni de validation.
+            if ORANGE_ROSTER or BLUE_ROSTER:
+                CAM_BOX = _detect_player_cam(frame, anchor=HUD_ANCHOR)
+                if CAM_BOX is not None:
+                    FSLOT, FPSEUDO = _identify_focus_slot(
+                        frame, CAM_BOX, ORANGE_ROSTER, BLUE_ROSTER, anchor=HUD_ANCHOR,
+                        resolved_orange=RESOLVED_ORANGE, resolved_blue=RESOLVED_BLUE)
+                    if FSLOT is not None:
+                        FOCUS_OBSERVATIONS.setdefault(ELAPSED, []).append(FSLOT)
+                    if DEBUG:
+                        FTEAM = _focus_panel_team(frame, CAM_BOX, RESOLVED_ORANGE, RESOLVED_BLUE)
+                        _emit({'log': f'[_analyze_chunks] {GAME_ID} focus @ {ELAPSED}s team={FTEAM} pseudo={FPSEUDO!r} slot={FSLOT}'})
+                        _dump_focus_debug(frame, ts, CAM_BOX, FPSEUDO, FSLOT, team=FTEAM)
+
         TIMESTAMP = float(START)
         INFLIGHT = deque()
 
@@ -5762,6 +6074,30 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         RESPAWN = _MAPS.get(MAP_NAME, {}).get('respawn', DEFAULT_RESPAWN)
         HP_TIMELINE = _smooth_hp_timeline(HP_TIMELINE, respawn=RESPAWN)
 
+        # Focus caméra : slot du joueur suivi, voté par seconde (le panneau
+        # reste affiché plusieurs frames → le consensus encaisse les misreads).
+        FOCUS_VOTED = {K: Counter(v).most_common(1)[0][0]
+                       for K, v in FOCUS_OBSERVATIONS.items()}
+        # Lissage temporel : comble un trou/blip d'UNE seconde — si une seconde
+        # diffère de ses deux voisins immédiats identiques (slot manquant à
+        # cause d'un OCR raté, ou misread isolé), elle adopte leur valeur. Ne
+        # franchit PAS les trous ≥ 2 s (caméra hors focus) ni les vrais switchs.
+        if FOCUS_VOTED:
+            lo, hi = min(FOCUS_VOTED), max(FOCUS_VOTED)
+            for K in range(lo + 1, hi):
+                nb = FOCUS_VOTED.get(K - 1)
+                if nb is not None and nb == FOCUS_VOTED.get(K + 1) \
+                        and FOCUS_VOTED.get(K) != nb:
+                    FOCUS_VOTED[K] = nb
+        # Sparse comme hp_timeline : on émet uniquement les sec où le slot change.
+        FOCUS_TIMELINE = {}
+        prev_focus = None
+        for K in sorted(FOCUS_VOTED):
+            slot = FOCUS_VOTED[K]
+            if slot != prev_focus:
+                FOCUS_TIMELINE[str(K)] = slot
+                prev_focus = slot
+
         # Trailer non-gameplay : à la fin du chunk, l'écran de score final
         # s'affiche jusqu'à ~15 s (ou moins si la vidéo a été pré-coupée). On
         # remonte le chunk seconde par seconde depuis END, jusqu'à 20 s max,
@@ -5806,6 +6142,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     'score_timeline': SCORE_TIMELINE,
                     'points_timeline': POINTS_TIMELINE,
                     'hp_timeline': HP_TIMELINE,
+                    'focus_timeline': FOCUS_TIMELINE,
                     'cart_assignment': CART_ASSIGNMENT,
                     'kills': KILLS_OUT,
                     'end_non_gameplay_seconds': END_NON_GAMEPLAY,
