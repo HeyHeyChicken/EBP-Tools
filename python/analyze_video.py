@@ -46,7 +46,7 @@ TEAM_BLUE = [
     (179, 0, 243),   # Summit
 ]
 
-DEBUG = True
+DEBUG = False
 
 MODES = [
     #region Mode 0
@@ -6089,14 +6089,22 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 if nb is not None and nb == FOCUS_VOTED.get(K + 1) \
                         and FOCUS_VOTED.get(K) != nb:
                     FOCUS_VOTED[K] = nb
-        # Sparse comme hp_timeline : on émet uniquement les sec où le slot change.
-        FOCUS_TIMELINE = {}
-        prev_focus = None
+        # Segments explicites [slot, start, end] : le focus n'est PAS continu —
+        # il y a des phases de caméra libre (aucune obs). On NE peut donc pas
+        # forward-fill un slot jusqu'au prochain changement ; on marque le début
+        # et la fin de chaque focus. Un segment = run de secondes CONSÉCUTIVES
+        # sur le même slot ; une coupure (slot différent OU trou ≥ 2 s, les trous
+        # d'1 s ayant été lissés) le ferme. Les intervalles non couverts entre
+        # deux segments = caméra libre. Format compact [slot, start, end] ;
+        # start/end en secondes in-game (incluses).
+        FOCUS_TIMELINE = []
         for K in sorted(FOCUS_VOTED):
             slot = FOCUS_VOTED[K]
-            if slot != prev_focus:
-                FOCUS_TIMELINE[str(K)] = slot
-                prev_focus = slot
+            if FOCUS_TIMELINE and slot == FOCUS_TIMELINE[-1][0] \
+                    and K == FOCUS_TIMELINE[-1][2] + 1:
+                FOCUS_TIMELINE[-1][2] = K
+            else:
+                FOCUS_TIMELINE.append([slot, K, K])
 
         # Trailer non-gameplay : à la fin du chunk, l'écran de score final
         # s'affiche jusqu'à ~15 s (ou moins si la vidéo a été pré-coupée). On
