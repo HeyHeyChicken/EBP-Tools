@@ -4,10 +4,23 @@
 
 //#region Imports
 
+const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const { URL } = require('url');
 const { EBP_DOMAIN } = require('../config/constants');
+
+// Cible REST : en dev on tape le serveur EBP local (http://localhost:3005),
+// comme le socket — sinon prod en HTTPS. Indispensable pour tester le live :
+// c'est l'appel REST `analysis-status` qui déclenche le broadcast socket, donc
+// il doit viser le même serveur que celui auquel le front est connecté.
+// Le cookie d'auth (JWT) reste lu sur evabattleplan.com (cf. getAuthCookie) et
+// est transmis tel quel — le serveur dev doit partager le secret JWT pour le
+// valider, et sa base contenir les games (pour /identify).
+const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
+const API_HTTP = IS_DEV_MODE ? http : https;
+const API_HOST = IS_DEV_MODE ? 'localhost' : EBP_DOMAIN;
+const API_PORT = IS_DEV_MODE ? 3005 : 443;
 // `getMainWindow` est lazy-loaded dans `getAuthCookie` pour casser le cycle
 // d'imports window-manager → watch-folder-service → tools-api-client → window-manager.
 
@@ -62,7 +75,7 @@ function sleep(ms) {
  */
 function httpsRequest(options, bodyBuffer = null) {
     return new Promise((resolve, reject) => {
-        const REQ = https.request(options, (res) => {
+        const REQ = API_HTTP.request(options, (res) => {
             const CHUNKS = [];
             res.on('data', (c) => CHUNKS.push(c));
             res.on('end', () => {
@@ -95,8 +108,8 @@ async function apiRequest(
 
     const PAYLOAD = body ? Buffer.from(JSON.stringify(body), 'utf8') : null;
     const OPTIONS = {
-        hostname: EBP_DOMAIN,
-        port: 443,
+        hostname: API_HOST,
+        port: API_PORT,
         path: API_BASE_PATH + apiPath,
         method,
         headers: {
@@ -228,6 +241,50 @@ async function pushWatcherStatus(status) {
 }
 
 /**
+ * POST /api/tools/games/:gameID/analysis-status
+ * Push de l'état de progression d'UNE game (phase + percent sur l'échelle
+ * unifiée 0-100). Le serveur persiste l'état et le broadcast aux sockets du
+ * user (affichage live sur la ligne de la game côté site).
+ *
+ * Tolérant aux échecs comme `pushWatcherStatus` : appelé en continu pendant
+ * la pipeline, il ne doit jamais la faire planter (back down / non authentifié).
+ *
+ * @param {string|number} gameID  vrai ID DB de la game (games matchées).
+ * @param {{phase:'queued'|'analyzing'|'processing'|'done'|'failed', percent:number, teamId?:string}} status
+ *   `teamId` = équipe de destination choisie dans Tools (informatif côté back).
+ */
+async function pushGameAnalysisStatus(gameID, status) {
+    try {
+        await apiRequest(
+            'POST',
+            `/games/${encodeURIComponent(gameID)}/analysis-status`,
+            status,
+            { retries: 1 }
+        );
+    } catch (e) {
+        if (e instanceof NotAuthenticatedError) return;
+        console.warn('[tools-api] pushGameAnalysisStatus failed:', e.message);
+    }
+}
+
+/**
+ * POST /api/tools/games/analysis-issue
+ * Remonte un problème d'analyse AU NIVEAU FICHIER (sans game), ex. "aucune game
+ * détectée" — cas où /identify n'est jamais appelé. Tolérant aux échecs (comme
+ * pushGameAnalysisStatus) pour ne pas perturber le worker.
+ *
+ * @param {{sourceFilename:string, teamId:string, reason:'no_games'}} payload
+ */
+async function reportAnalysisIssue(payload) {
+    try {
+        await apiRequest('POST', '/games/analysis-issue', payload, { retries: 1 });
+    } catch (e) {
+        if (e instanceof NotAuthenticatedError) return;
+        console.warn('[tools-api] reportAnalysisIssue failed:', e.message);
+    }
+}
+
+/**
  * Uploads a local file via HTTP PUT to a presigned URL with retry on
  * network/5xx errors. Resolves on 2xx, throws otherwise.
  */
@@ -304,6 +361,8 @@ module.exports = {
     confirmUpload,
     uploadFileToPresignedUrl,
     pushWatcherStatus,
+    pushGameAnalysisStatus,
+    reportAnalysisIssue,
     getAuthCookie,
     NotAuthenticatedError,
     ApiError

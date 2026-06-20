@@ -857,8 +857,12 @@ if (!APP_GOT_THE_LOCK) {
      * @param {string} videoPath Chemin absolu vers la vidéo (déjà choisi en phase 1, propagé par le front).
      * @param {string} socket    Socket ID du front qui doit recevoir les events.
      * @param {Array}  chunks    [{startSeconds, endSeconds, gameID, mode}] — segments à analyser.
+     * @param {object} settings  Réglages d'analyse propagés à Python.
+     * @param {(p:{gameID:string, percent:number})=>void} [onProgress] Callback appelé
+     *   à chaque tick de progression PAR GAME (les MSG taggés `gameID`). Utilisé en
+     *   mode headless (watch-folder) pour remonter l'état par game au backend.
      */
-    function runChunkAnalyzer(videoPath, socket, chunks, settings) {
+    function runChunkAnalyzer(videoPath, socket, chunks, settings, onProgress) {
         const HEADLESS = !socket;
         const NOTIFICATION_DATA = {
             percent: 0,
@@ -919,6 +923,17 @@ if (!APP_GOT_THE_LOCK) {
 
                         if (typeof MSG.percent === 'number') {
                             percent = MSG.percent;
+                            // Progression PAR GAME (MSG taggé gameID) → callback
+                            // headless. Le tick global de fin (sans gameID) est
+                            // ignoré ici, c'est un signal fichier.
+                            if (MSG.gameID != null && onProgress) {
+                                try {
+                                    onProgress({
+                                        gameID: MSG.gameID,
+                                        percent: MSG.percent
+                                    });
+                                } catch (_) {}
+                            }
                         }
                         if (WINDOW && !WINDOW.isDestroyed()) {
                             WINDOW.webContents.send('analyzer-update', MSG);

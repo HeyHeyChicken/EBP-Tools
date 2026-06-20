@@ -20,6 +20,8 @@ const {
     confirmUpload,
     uploadFileToPresignedUrl,
     pushWatcherStatus,
+    pushGameAnalysisStatus,
+    reportAnalysisIssue,
     getAuthCookie,
     NotAuthenticatedError,
     ApiError
@@ -46,6 +48,15 @@ const TID_RE = /__tid-(\d+)/;
 // VideoCapture). 1 = comportement séquentiel d'avant. Surchargeable par fichier
 // via le suffixe `__mgast-N` (voir parseMeta).
 const DEEP_ANALYSIS_CONCURRENCY = 3;
+
+// Bandes de la barre de progression UNIFIÉE par game (0-100), assemblée à
+// partir des phases du pipeline. La détection (phase 1) est par fichier et
+// antérieure à l'identification des games : elle n'est pas représentée dans la
+// barre (la game démarre à 0 en `queued`). La phase 2 remplit [0, ANALYZE_END],
+// le réencodage [ANALYZE_END, ENCODE_END], l'upload [ENCODE_END, 100].
+const PROGRESS_DETECT_END = 0; // game identifiée → départ à 0 (queued)
+const PROGRESS_ANALYZE_END = 75; // phase 2 (analyse) terminée
+const PROGRESS_ENCODE_END = 90; // réencodage terminé (upload en cours)
 
 /**
  * Extrait les valeurs `maxTimePerGame`, `maxGamesAtSameTime`, scores forcés et
@@ -245,6 +256,25 @@ function notifyStatusChange() {
 }
 
 /**
+ * Push fire-and-forget de l'état de progression d'UNE game au backend (qui
+ * persiste + broadcast aux clients du user). `pushGameAnalysisStatus` swallow
+ * toute erreur réseau/auth, donc on n'await pas : la pipeline n'est jamais
+ * ralentie ni interrompue par le reporting.
+ * @param {string|number} gameID  vrai ID DB (games matchées uniquement).
+ * @param {'queued'|'analyzing'|'processing'|'done'|'failed'} phase
+ * @param {number} percent  0-100 sur l'échelle unifiée.
+ * @param {string|undefined} teamId  équipe de DESTINATION choisie dans Tools
+ *   (suffixe `__tid-N`) — permet à un chef qui coache une autre équipe de cibler
+ *   la bonne. Transmise au backend ; `undefined` (dépôt manuel) → null en base.
+ */
+function reportGameStatus(gameID, phase, percent, teamId) {
+    console.log(
+        `[watch-folder] game ${gameID} → ${phase} ${percent}%`
+    );
+    pushGameAnalysisStatus(gameID, { phase, percent, teamId });
+}
+
+/**
  * Builds the segments payload for /games/identify from analyzer-detected games.
  * Pas de champ `analysis` ici : la phase 2 n'a pas encore tourné quand on appelle
  * identify (l'idée justement c'est de récupérer les rosters AVANT phase 2 pour
@@ -308,6 +338,15 @@ async function processVideo(videoPath, deps) {
     if (GAMES.length === 0) {
         const DEST = moveTo(videoPath, FAILED_DIR);
         console.log('[watch-folder] no games detected →', DEST);
+        // Remonte le problème au site (ligne sans gameID) — sauf dépôt manuel
+        // sans équipe ciblée (pas de teamId → on ne sait pas où l'afficher).
+        if (META.teamId) {
+            reportAnalysisIssue({
+                sourceFilename: META.cleanBasename + path.extname(videoPath),
+                teamId: META.teamId,
+                reason: 'no_games'
+            });
+        }
         return;
     }
 
@@ -366,6 +405,15 @@ async function processVideo(videoPath, deps) {
         ])
     );
 
+    // Toutes les games matchées passent en "identifiée / en attente" : le site
+    // affiche un loader sur leur ligne jusqu'au démarrage de leur phase 2.
+    // Set des vrais IDs DB pour filtrer les ticks de progression (les games
+    // non matchées n'ont pas de ligne côté site → on les ignore).
+    const MATCHED_GAME_IDS = new Set(MATCHES.map((m) => String(m.gameID)));
+    for (const ID of MATCHED_GAME_IDS) {
+        reportGameStatus(ID, 'queued', PROGRESS_DETECT_END, META.teamId);
+    }
+
     // Phase 2: deep analysis on all detected games. On injecte les rosters de
     // l'identify dans chaque chunk — Python s'en sert comme liste de pseudos
     // trustés pour le fuzzy match du killfeed OCR. Pas de match côté back ?
@@ -376,7 +424,11 @@ async function processVideo(videoPath, deps) {
         return {
             startSeconds: g.start,
             endSeconds: g.end,
-            gameID: TEMP_ID,
+            // gameID transmis à l'analyseur = vrai ID DB renvoyé par /identify
+            // quand la game est matchée (Python le réémet tel quel dans les
+            // logs de progression par game et dans les résultats). Fallback sur
+            // le tempId pour les games non matchées (pas de ligne côté site).
+            gameID: M && M.gameID != null ? String(M.gameID) : TEMP_ID,
             mode: g.mode,
             // Nom de map (ex. "Outlaw", "Helios Station") — Python s'en sert
             // pour appliquer la règle Domination/Hardpoint sur points_timeline
@@ -394,7 +446,19 @@ async function processVideo(videoPath, deps) {
     const CONCURRENCY = META.maxGamesAtSameTime ?? DEEP_ANALYSIS_CONCURRENCY;
     const DEEP_T0 = Date.now();
     const CHUNK_RESULTS = await mapWithLimit(CHUNKS, CONCURRENCY, (chunk) =>
-        deps.runChunkAnalyzer(videoPath, null, [chunk], SETTINGS)
+        deps.runChunkAnalyzer(videoPath, null, [chunk], SETTINGS, (p) => {
+            // p.gameID = vrai ID DB (matché) ou tempId (unmatched, pas de ligne
+            // côté site → ignoré). p.percent = 0-100 de la phase 2 de la game,
+            // remappé sur la bande [DETECT_END, ANALYZE_END] de la barre unifiée.
+            if (!MATCHED_GAME_IDS.has(String(p.gameID))) return;
+            const UNIFIED =
+                PROGRESS_DETECT_END +
+                Math.round(
+                    ((PROGRESS_ANALYZE_END - PROGRESS_DETECT_END) * p.percent) /
+                        100
+                );
+            reportGameStatus(p.gameID, 'analyzing', UNIFIED, META.teamId);
+        })
     );
     const DEEP_ELAPSED_S = ((Date.now() - DEEP_T0) / 1000).toFixed(1);
     console.log(
@@ -404,19 +468,21 @@ async function processVideo(videoPath, deps) {
     if (FIRST_ERROR) {
         throw new Error(`Chunk analyzer failed: ${FIRST_ERROR.error}`);
     }
-    const ANALYSIS_BY_TEMP = {};
+    // Indexé par la clé renvoyée par l'analyseur = le champ `gameID` injecté
+    // dans le chunk (vrai ID DB si matché, sinon tempId).
+    const ANALYSIS_BY_KEY = {};
     for (const RES of CHUNK_RESULTS) {
         for (const r of RES.results || []) {
-            ANALYSIS_BY_TEMP[r.gameID] = { payload: r.payload };
+            ANALYSIS_BY_KEY[r.gameID] = { payload: r.payload };
         }
     }
-    console.log(ANALYSIS_BY_TEMP);
+    console.log(ANALYSIS_BY_KEY);
 
     // Persist : on remonte au back les analyses approfondies pour les games
     // matchées par identify (les unmatched n'ont pas de gameID, on skip).
     const ANALYSES_TO_PERSIST = [];
     for (const M of MATCHES) {
-        const A = ANALYSIS_BY_TEMP[M.tempId];
+        const A = ANALYSIS_BY_KEY[String(M.gameID)];
         if (!A || A.payload === undefined) continue;
         ANALYSES_TO_PERSIST.push({ gameID: M.gameID, payload: A.payload });
     }
@@ -441,6 +507,9 @@ async function processVideo(videoPath, deps) {
         const TEMP_ID = `temp-${i}`;
         const M = MATCH_BY_TEMP.get(TEMP_ID);
         if (M && M.hasVideo) {
+            // Vidéo déjà présente côté serveur : pas d'encodage/upload → la game
+            // est terminée dès la persistance de son analyse.
+            reportGameStatus(M.gameID, 'done', 100, META.teamId);
             console.log(
                 `[watch-folder] skipped cut/upload for game ${M.gameID} (tempId=${TEMP_ID}) — video already uploaded`
             );
@@ -455,6 +524,10 @@ async function processVideo(videoPath, deps) {
             TMP_DIR,
             `${VIDEO_BASENAME}___${SAFE_MAP}-${ORANGE_SCORE}-${BLUE_SCORE}__${i}-${Date.now()}.mp4`
         );
+        // Réencodage : le site affiche un loader (étape "processing").
+        if (M && M.gameID != null) {
+            reportGameStatus(M.gameID, 'processing', PROGRESS_ANALYZE_END, META.teamId);
+        }
         try {
             await cutAndEncodeGame(videoPath, OUT, G.start, G.end);
             CUT_FILES.push({ tempId: TEMP_ID, file: OUT, game: G, index: i });
@@ -463,6 +536,9 @@ async function processVideo(videoPath, deps) {
                 `[watch-folder] cut failed for game ${i} of ${videoPath}:`,
                 e.message
             );
+            if (M && M.gameID != null) {
+                reportGameStatus(M.gameID, 'failed', PROGRESS_ANALYZE_END, META.teamId);
+            }
         }
     }
 
@@ -476,10 +552,14 @@ async function processVideo(videoPath, deps) {
             continue;
         }
         try {
+            // Upload en cours : le site garde un loader (étape "processing").
+            reportGameStatus(GAME_ID, 'processing', PROGRESS_ENCODE_END, META.teamId);
             const UPLOAD = await requestUploadUrl(GAME_ID);
             await uploadFileToPresignedUrl(UPLOAD.url, CUT.file);
             await confirmUpload(GAME_ID, { guid: UPLOAD.guid });
             safeUnlink(CUT.file);
+            // Tout est bon : le loader disparaît, le site charge l'analyse.
+            reportGameStatus(GAME_ID, 'done', 100, META.teamId);
             console.log(
                 `[watch-folder] uploaded game ${GAME_ID} (tempId=${CUT.tempId})`
             );
@@ -488,6 +568,7 @@ async function processVideo(videoPath, deps) {
             // Filet de sécurité serveur : la game a déjà une vidéo (race ou flag
             // hasVideo manqué). On ne re-upload pas, on jette le cut local.
             if (e instanceof ApiError && e.status === 409) {
+                reportGameStatus(GAME_ID, 'done', 100, META.teamId);
                 console.log(
                     `[watch-folder] skipped upload for game ${GAME_ID} — already uploaded (409)`
                 );
@@ -498,6 +579,7 @@ async function processVideo(videoPath, deps) {
                 `[watch-folder] upload failed for game ${GAME_ID}:`,
                 e.message
             );
+            reportGameStatus(GAME_ID, 'failed', PROGRESS_ENCODE_END, META.teamId);
             const DEST = moveTo(CUT.file, FAILED_DIR);
             console.log('[watch-folder] failed →', DEST);
         }

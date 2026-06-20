@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
 from scipy.optimize import linear_sum_assignment as scipy_linear_sum_assignment
-from typing import Optional
+from typing import Optional, Callable
 
 import minimap as _minimap
 import blob_detector as _blob_detector
@@ -3338,6 +3338,12 @@ def _sample_team_colors_from_spawns(roi_bgr: np.ndarray, map_meta: dict,
 # Échantillonnage temporel de la passe joueurs.
 _PLAYER_TRACK_FPS = 10
 
+# Répartition de la progression par game en phase 2 : la passe OCR (1 Hz, balaie
+# toute la durée du chunk) occupe la bande [0, _PROGRESS_OCR_PCT] ; la passe
+# player-tracking (10 Hz, fenêtre bornée) la bande [_PROGRESS_OCR_PCT, 100].
+# Ratio calé sur le coût relatif observé (~70/30).
+_PROGRESS_OCR_PCT = 70
+
 
 def _valid_numbers_from_roster(n_orange: int, n_blue: int) -> dict:
     """Convertit les tailles de roster en sets de numéros valides EVA.
@@ -4363,6 +4369,7 @@ def _track_players_on_minimap(
     n_orange: int = 0,
     n_blue: int = 0,
     hp_timeline: Optional[dict] = None,
+    progress_cb: Optional[Callable[[float], None]] = None,
 ) -> list:
     """Détection per-frame des joueurs sur la minimap.
 
@@ -4615,9 +4622,12 @@ def _track_players_on_minimap(
                     break
 
         pct = int(100 * processed / total) if total > 0 else 0
-        if pct != last_pct and pct % 10 == 0:
-            _emit({'log': f'[player_tracking] {pct}% '
-                          f'({processed}/{total} frames, {detections_total} dets)'})
+        if pct != last_pct:
+            if pct % 10 == 0:
+                _emit({'log': f'[player_tracking] {pct}% '
+                              f'({processed}/{total} frames, {detections_total} dets)'})
+            if progress_cb is not None:
+                progress_cb(processed / total if total > 0 else 1.0)
             last_pct = pct
 
     # 4. Découpage en vies sur les transitions HP>0 → HP=0 de hp_timeline.
@@ -5957,6 +5967,12 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         TIMESTAMP = float(START)
         INFLIGHT = deque()
 
+        # Progression PAR GAME : la passe OCR balaie [START, END] à 1 Hz. On
+        # mappe l'avancement de CE chunk sur la bande [0, _PROGRESS_OCR_PCT].
+        CHUNK_OCR_TOTAL = max(1, END - START)
+        CHUNK_OCR_DONE = 0
+        GAME_LAST_PCT = -1
+
         # Remplissage initial de la fenêtre : on submit jusqu'à WINDOW frames
         # avant de commencer à drainer.
         while len(INFLIGHT) < WINDOW and TIMESTAMP <= END:
@@ -5967,6 +5983,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         while INFLIGHT:
             ITEM = INFLIGHT.popleft()
             PROCESSED_SECONDS += 1
+            CHUNK_OCR_DONE += 1
             if ITEM[0] == 'ocr':
                 _process_ocr_item(ITEM)
 
@@ -5974,10 +5991,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 INFLIGHT.append(_submit_frame(TIMESTAMP))
                 TIMESTAMP += 1.0
 
-            PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 0
-            if PERCENT != LAST_PERCENT and PERCENT < 100:
-                _emit({'percent': PERCENT, 'results': []})
-                LAST_PERCENT = PERCENT
+            GAME_PCT = int(_PROGRESS_OCR_PCT * min(CHUNK_OCR_DONE, CHUNK_OCR_TOTAL) / CHUNK_OCR_TOTAL)
+            if GAME_PCT != GAME_LAST_PCT:
+                _emit({'percent': GAME_PCT, 'gameID': GAME_ID})
+                GAME_LAST_PCT = GAME_PCT
 
         # Reconstruction globale par DP : à partir de toutes les lectures OCR
         # brutes, on trouve la trajectoire monotone (par champ, indépendamment)
@@ -6128,6 +6145,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # [START, END - END_NON_GAMEPLAY] pour éviter de scanner l'écran de
         # score final. Encapsulée dans try/except : si ça plante, on continue
         # l'analyse OCR (player_tracks reste vide dans le payload).
+        # Bande tracking [_PROGRESS_OCR_PCT, 100] de la progression de cette game.
+        def _emit_track_progress(frac):
+            nonlocal GAME_LAST_PCT
+            pct = _PROGRESS_OCR_PCT + int(
+                (100 - _PROGRESS_OCR_PCT) * max(0.0, min(1.0, frac)))
+            if pct != GAME_LAST_PCT and pct < 100:
+                _emit({'percent': pct, 'gameID': GAME_ID})
+                GAME_LAST_PCT = pct
+
         try:
             PLAYER_TRACKS, MINIMAP_POSITION = _track_players_on_minimap(
                 CAP, float(START), float(END - END_NON_GAMEPLAY),
@@ -6135,6 +6161,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 n_orange=len(ORANGE_ROSTER),
                 n_blue=len(BLUE_ROSTER),
                 hp_timeline=HP_TIMELINE,
+                progress_cb=_emit_track_progress,
             )
         except Exception as exc:
             _emit({'log': f'[player_tracking] FAILED: {exc}'})
@@ -6162,6 +6189,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             }],
         })
         LAST_PERCENT = CHUNK_PERCENT
+        # Bande complète : phase 2 de cette game terminée.
+        _emit({'percent': 100, 'gameID': GAME_ID})
 
     EXECUTOR.shutdown()
     CAP.release()
