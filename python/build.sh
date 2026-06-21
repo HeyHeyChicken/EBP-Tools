@@ -10,6 +10,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 echo "Installing dependencies..."
+# tesserocr/cysignals compile from source on macOS. Pin the build to the host
+# arch so a universal2 Python doesn't try to link the missing second-arch
+# Homebrew libs (Intel brew ships x86_64-only leptonica). pkg-config (installed
+# in CI) lets tesserocr discover the real lib name (-lleptonica, not legacy -llept).
+export ARCHFLAGS="-arch $(uname -m)"
 pip3 install -r requirements.txt
 
 echo "Building macOS binary with PyInstaller (embedding Tesseract)..."

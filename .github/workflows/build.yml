@@ -81,7 +81,10 @@ jobs:
 
             # Install Tesseract and build the Python analyzer binary.
             - name: Install Tesseract
-              run: brew install tesseract
+              # pkg-config lets tesserocr's source build find leptonica by its
+              # real name (-lleptonica). Without it the link fails with
+              # "library 'lept' not found" (legacy hardcoded fallback).
+              run: brew install tesseract pkg-config
 
             - name: Build Python analyzer binary
               run: cd python && bash build.sh
@@ -195,7 +198,10 @@ jobs:
 
             # Install Tesseract and build the Python analyzer binary.
             - name: Install Tesseract
-              run: brew install tesseract
+              # pkg-config lets tesserocr's source build find leptonica by its
+              # real name (-lleptonica). Without it the link fails with
+              # "library 'lept' not found" (legacy hardcoded fallback).
+              run: brew install tesseract pkg-config
 
             - name: Build Python analyzer binary
               run: cd python && bash build.sh
