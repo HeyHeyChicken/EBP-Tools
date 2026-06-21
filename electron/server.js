@@ -422,6 +422,168 @@ if (!APP_GOT_THE_LOCK) {
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
             }
+            case 'exportHudVideo': {
+                // Export "vue HUD-only" (HUD en haut + minimap en dessous) demandé depuis le
+                // lecteur web. On reçoit l'URL S3 présignée de la vidéo source (lue directement
+                // par ffmpeg, pas de ré-auth), les deux bbox en fractions [x1,y1,x2,y2] de la
+                // frame source et la largeur pixel native `vw`. On recadre les deux régions, on
+                // les scale à une largeur commune puis on les empile (vstack) — même filtre que
+                // l'aperçu écran. L'encodage tourne ici, sur la machine de l'utilisateur.
+                const isBbox = (b) =>
+                    Array.isArray(b) &&
+                    b.length === 4 &&
+                    b.every((n) => typeof n === 'number' && n >= 0 && n <= 1) &&
+                    b[2] > b[0] &&
+                    b[3] > b[1];
+                if (
+                    typeof data.url !== 'string' ||
+                    !isBbox(data.hud) ||
+                    !isBbox(data.mm) ||
+                    typeof data.vw !== 'number' ||
+                    data.vw <= 0
+                ) {
+                    console.error('[HUD-EXPORT] Invalid payload', data);
+                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                    break;
+                }
+
+                const { canceled, filePath: OUTPUT_FILE_PATH } =
+                    await dialog.showSaveDialog({
+                        defaultPath: path.join(
+                            StorageManager.getPermanentSettingsValue(
+                                'videoCutterOutputPath',
+                                path.join(os.homedir(), 'Downloads')
+                            ),
+                            data.filename || 'EBP-hud.mp4'
+                        ),
+                        filters: [{ name: 'MP4', extensions: ['mp4'] }]
+                    });
+                if (canceled || !OUTPUT_FILE_PATH) {
+                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                    break;
+                }
+
+                // Largeur de sortie commune = plus large des deux crops, plafonnée à 720p (1280 px)
+                // et arrondie au pair (requis par yuv420p). Crops exprimés en `iw`/`ih` ; seul `W`
+                // a besoin d'être concret car `scale` ne peut pas référencer une autre branche.
+                const MAX_OUTPUT_WIDTH = 1280;
+                const RAW_W =
+                    Math.max(data.hud[2] - data.hud[0], data.mm[2] - data.mm[0]) *
+                    data.vw;
+                const W = Math.max(
+                    2,
+                    Math.round(Math.min(RAW_W, MAX_OUTPUT_WIDTH) / 2) * 2
+                );
+                const crop = (b) =>
+                    `crop=iw*${(b[2] - b[0]).toFixed(6)}:ih*${(b[3] - b[1]).toFixed(6)}:iw*${b[0].toFixed(6)}:ih*${b[1].toFixed(6)}`;
+                const FILTER =
+                    `[0:v]${crop(data.hud)},scale=${W}:-2,setsar=1[hud];` +
+                    `[0:v]${crop(data.mm)},scale=${W}:-2,setsar=1[mm];` +
+                    `[hud][mm]vstack=inputs=2[v]`;
+
+                const NOTIFICATION_DATA = {
+                    percent: 0,
+                    leftRounded: true,
+                    infinite: false,
+                    icon: '',
+                    text: '.common.encoding',
+                    state: 'info'
+                };
+                await createFloatingWindow(
+                    450,
+                    150,
+                    JSON.stringify(NOTIFICATION_DATA)
+                );
+
+                // Durée pour la progression (ffmpeg lit l'URL présignée directement). En cas
+                // d'échec de sondage, on retombe sur une barre indéterminée.
+                let DURATION = 0;
+                try {
+                    DURATION = await getVideoDuration(data.url);
+                } catch (error) {
+                    console.warn('[HUD-EXPORT] duration probe failed:', error);
+                }
+
+                if (fs.existsSync(OUTPUT_FILE_PATH)) {
+                    unlinkSync(OUTPUT_FILE_PATH);
+                }
+
+                const ARGS = [
+                    '-y',
+                    '-i',
+                    data.url,
+                    '-filter_complex',
+                    FILTER,
+                    '-map',
+                    '[v]',
+                    '-map',
+                    '0:a?',
+                    '-c:v',
+                    'libx264',
+                    '-crf',
+                    '20',
+                    '-pix_fmt',
+                    'yuv420p',
+                    '-c:a',
+                    'aac',
+                    OUTPUT_FILE_PATH
+                ];
+
+                console.log('[FFMPEG] Exporting HUD view...');
+                const COMMAND = spawn(FFMPEG_PATH, ARGS);
+
+                let ffmpegStderr = '';
+                COMMAND.stderr.on('data', (chunk) => {
+                    const STR = chunk.toString();
+                    ffmpegStderr += STR;
+
+                    const TIME_MATCH = STR.match(/time=(\d+:\d+:\d+\.\d+)/);
+                    if (TIME_MATCH && DURATION > 0) {
+                        const [h, m, s] = TIME_MATCH[1].split(':');
+                        const CURRENT = +h * 3600 + +m * 60 + parseFloat(s);
+                        const PERCENT = Math.min(
+                            100,
+                            Math.round((CURRENT / DURATION) * 100)
+                        );
+                        getMainWindow().webContents.send('set-notification-data', {
+                            ...NOTIFICATION_DATA,
+                            ...{ percent: PERCENT, infinite: DURATION <= 0 }
+                        });
+                    }
+                });
+
+                COMMAND.on('error', (error) => {
+                    console.error('[HUD-EXPORT] ffmpeg spawn error:', error);
+                    deleteFloatingWindow();
+                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                });
+
+                COMMAND.on('close', (code) => {
+                    if (code === 0) {
+                        console.log('[FFMPEG] HUD view exported.');
+                        getMainWindow().webContents.send('set-notification-data', {
+                            percent: 100,
+                            leftRounded: true,
+                            infinite: false,
+                            icon: 'fa-sharp fa-solid fa-check',
+                            text: '.common.encoded',
+                            state: 'success'
+                        });
+                        // Ouvre le dossier de destination avec le fichier sélectionné.
+                        shell.showItemInFolder(OUTPUT_FILE_PATH);
+                        setTimeout(() => {
+                            deleteFloatingWindow();
+                        }, 5000);
+                    } else {
+                        console.error(
+                            `[HUD-EXPORT] ffmpeg exited with code ${code}: ${ffmpegStderr.trim()}`
+                        );
+                        deleteFloatingWindow();
+                    }
+                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                });
+                break;
+            }
             case 'analyzeVideoFile':
                 const FILES_PATHS = await openFiles(data.filesExtensions, true);
                 if (FILES_PATHS.length > 0) {
