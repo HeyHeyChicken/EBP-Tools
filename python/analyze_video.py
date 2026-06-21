@@ -16,6 +16,7 @@ from collections import deque, Counter
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
+import eva_ocr
 from scipy.optimize import linear_sum_assignment as scipy_linear_sum_assignment
 from typing import Optional, Callable
 
@@ -364,29 +365,22 @@ def _ocr_region(
     """
     img = _region_to_pil(frame, x1, y1, x2, y2)
 
-    def _build_config(p: int) -> str:
-        c = f'--psm {p}'
-        if whitelist:
-            c += f' -c "tessedit_char_whitelist={whitelist}"'
-        return c
-
     PSMS = [psm] + [p for p in (extra_psms or []) if p != psm]
-    CONFIGS = [_build_config(p) for p in PSMS]
 
     # Pattern de filtrage : si un whitelist est défini, on ne garde que ses caractères
     FILTER_PATTERN = re.compile(f'[^{re.escape(whitelist)}]') if whitelist else None
 
     def _recognize(i: Image.Image) -> list:
         out = []
-        for cfg in CONFIGS:
+        for p in PSMS:
             try:
-                TEXT = pytesseract.image_to_string(i, lang=lang, config=cfg).replace('\r', '').replace('\n', '').strip()
+                TEXT = eva_ocr.recognize(i, lang=lang, psm=p, whitelist=whitelist).replace('\r', '').replace('\n', '').strip()
                 if FILTER_PATTERN:
                     TEXT = FILTER_PATTERN.sub('', TEXT)
                 out.append(TEXT)
             except Exception as EXC:
                 if DEBUG:
-                    _emit({'log': f'[OCR][ERROR] lang={lang!r} cfg={cfg!r} cmd={pytesseract.pytesseract.tesseract_cmd!r} tessdata={os.environ.get("TESSDATA_PREFIX", "<unset>")} exc={type(EXC).__name__}: {EXC}'})
+                    _emit({'log': f'[OCR][ERROR] lang={lang!r} psm={p} cmd={pytesseract.pytesseract.tesseract_cmd!r} tessdata={os.environ.get("TESSDATA_PREFIX", "<unset>")} exc={type(EXC).__name__}: {EXC}'})
                 out.append('')
         return out
 
@@ -493,15 +487,14 @@ def _ocr_color_masked(
         except Exception:
             pass
 
-    cfg_wl = f' -c "tessedit_char_whitelist={whitelist}"' if whitelist else ''
     FILTER_PATTERN = re.compile(f'[^{re.escape(whitelist)}]') if whitelist else None
     langs = (lang,) if isinstance(lang, str) else tuple(lang)
     results = []
     for lg in langs:
         for psm in psms:
             try:
-                txt = pytesseract.image_to_string(
-                    pil, lang=lg, config=f'--psm {psm}{cfg_wl}'
+                txt = eva_ocr.recognize(
+                    pil, lang=lg, psm=psm, whitelist=whitelist
                 ).replace('\r', '').replace('\n', '').strip()
                 if FILTER_PATTERN:
                     txt = FILTER_PATTERN.sub('', txt)
@@ -857,9 +850,6 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
 
     if whitelist is None:
         whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    cfg = f'-c tessedit_char_whitelist={whitelist}'
-    if user_words_path:
-        cfg += f' -c user_words_file={user_words_path}'
 
     candidates = []
     # 4x BICUBIC × {PSM 6, 7, 8} est notre cheval de bataille (cas stable).
@@ -873,8 +863,9 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     pil4 = ImageOps.expand(pil4, border=pad, fill=255).convert('RGB')
     for psm in (6, 7, 8):
         try:
-            txt = pytesseract.image_to_string(
-                pil4, config=f'--psm {psm} {cfg}'
+            txt = eva_ocr.recognize(
+                pil4, lang='eng', psm=psm, whitelist=whitelist,
+                user_words_file=user_words_path,
             ).replace('\r', '').replace('\n', '').strip()
             if txt:
                 candidates.append(txt)
@@ -885,8 +876,9 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     )
     pil8 = ImageOps.expand(pil8, border=pad, fill=255).convert('RGB')
     try:
-        txt = pytesseract.image_to_string(
-            pil8, config=f'--psm 8 {cfg}'
+        txt = eva_ocr.recognize(
+            pil8, lang='eng', psm=8, whitelist=whitelist,
+            user_words_file=user_words_path,
         ).replace('\r', '').replace('\n', '').strip()
         if txt:
             candidates.append(txt)
@@ -2310,8 +2302,8 @@ def _ocr_point_letter(frame: np.ndarray, x: int, y: int, w: int, h: int) -> str:
             pil = ImageOps.expand(pil, border=20, fill=255).convert('RGB')
             for psm in (10, 8, 7, 6):
                 try:
-                    txt = pytesseract.image_to_string(
-                        pil, config=f'--psm {psm} -c "tessedit_char_whitelist={WHITELIST}"'
+                    txt = eva_ocr.recognize(
+                        pil, lang='eng', psm=psm, whitelist=WHITELIST
                     ).strip()
                 except Exception:
                     txt = ''
@@ -2833,12 +2825,11 @@ def _ocr_cart_pseudo(frame: np.ndarray, cart_x: int, cart_w: int,
     pil = ImageOps.expand(pil, border=20, fill=255).convert('RGB')
     if whitelist is None:
         whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    cfg = f'-c tessedit_char_whitelist={whitelist}'
     candidates = []
     for psm in (7, 8):
         try:
-            txt = pytesseract.image_to_string(
-                pil, config=f'--psm {psm} {cfg}', lang='evapseudos',
+            txt = eva_ocr.recognize(
+                pil, lang='evapseudos', psm=psm, whitelist=whitelist,
             )
             txt = txt.replace('\r', '').replace('\n', '').strip()
             if txt:
@@ -5348,10 +5339,9 @@ def _ocr_timer_fast(frame: np.ndarray, box, text_color=(10, 10, 10), tol_color: 
     MASK = DIFF <= tol_color
     BW = np.where(MASK, 255, 0).astype(np.uint8)
     try:
-        TEXT = pytesseract.image_to_string(
+        TEXT = eva_ocr.recognize(
             Image.fromarray(BW).convert('RGB'),
-            lang='evadigits',
-            config='--psm 7 -c tessedit_char_whitelist=0123456789:',
+            lang='evadigits', psm=7, whitelist='0123456789:',
         ).replace('\r', '').replace('\n', '').strip()
         return re.sub(r'[^0-9:]', '', TEXT)
     except Exception:
@@ -5378,9 +5368,8 @@ def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = 
     RESULTS = []
     for PSM in (7, 8):
         try:
-            TEXT = pytesseract.image_to_string(
-                BW, lang='evadigits',
-                config=f'--psm {PSM} -c tessedit_char_whitelist={WHITELIST}',
+            TEXT = eva_ocr.recognize(
+                BW, lang='evadigits', psm=PSM, whitelist=WHITELIST,
             ).replace('\r', '').replace('\n', '').strip()
             TEXT = FILTER_PATTERN.sub('', TEXT)
             CHECKED = _score_checker(TEXT)
@@ -6270,6 +6259,18 @@ def main() -> None:
     if len(sys.argv) < 2:
         _emit({'type': 'error', 'message': 'Usage: analyze_video <detect|chunks> <video_path> <ffmpeg_path> [tesseract_cmd] [settings_json]'})
         sys.exit(1)
+
+    # `selftest` : confirme quel backend OCR le BINAIRE (potentiellement gelé
+    # PyInstaller) utilise réellement. Sert à valider qu'un build packagé
+    # (Windows surtout) embarque bien tesserocr et pas seulement le fallback.
+    # Aucune vidéo ni ffmpeg requis. Exit 0 = tesserocr actif, 3 = fallback.
+    if sys.argv[1] == 'selftest':
+        BUNDLED_TESSDATA = _get_bundled_tessdata()
+        if BUNDLED_TESSDATA:
+            os.environ['TESSDATA_PREFIX'] = BUNDLED_TESSDATA
+        BACKEND, DETAIL = eva_ocr.probe()
+        _emit({'selftest': True, 'ocr_backend': BACKEND, 'detail': DETAIL})
+        sys.exit(0 if BACKEND == 'tesserocr' else 3)
 
     if sys.argv[1] in ('detect', 'chunks'):
         SUBCOMMAND = sys.argv[1]

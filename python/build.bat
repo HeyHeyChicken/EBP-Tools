@@ -10,10 +10,21 @@ call .venv\Scripts\activate.bat
 echo Installing dependencies...
 pip install -r requirements.txt
 
+REM In-process OCR (~3.65x). tesserocr can't compile from source on Windows, so
+REM we install simonflueckiger's prebuilt wheel (cp312, bundles tesseract DLLs).
+REM Requires the Python interpreter to be 3.12 (pinned in CI via setup-python).
+echo Installing prebuilt tesserocr wheel...
+pip install "https://github.com/simonflueckiger/tesserocr-windows_build/releases/download/tesserocr-v2.10.0-tesseract-5.5.2/tesserocr-2.10.0-cp312-cp312-win_amd64.whl"
+
+REM Only bundle tesserocr if it imported successfully; otherwise the build still
+REM works via eva_ocr's pytesseract fallback (no --collect-all on a missing module).
+set "TESSEROCR_FLAG="
+python -c "import tesserocr" 2>nul && set "TESSEROCR_FLAG=--collect-all tesserocr"
+
 set TESS_DIR=C:\Program Files\Tesseract-OCR
 
 echo Building Windows binary with PyInstaller (embedding Tesseract)...
-pyinstaller --onefile --name win32 ^
+pyinstaller --onefile --name win32 %TESSEROCR_FLAG% ^
   --collect-all onnxruntime ^
   --exclude-module torch ^
   --exclude-module torchvision ^

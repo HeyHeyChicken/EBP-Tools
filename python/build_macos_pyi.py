@@ -115,6 +115,10 @@ def main() -> None:
         # pas les chargements dynamiques, on doit collect-all pour bundler
         # toutes les libs natives (.dylib) qu'il chargera au runtime.
         "--collect-all", "onnxruntime",
+        # tesserocr (OCR in-process, ~3.65x) cimporte cysignals au chargement ;
+        # ses sous-modules compilés sont des imports dynamiques que PyInstaller
+        # ne suit pas seul → on les collecte explicitement. Conditionnel plus bas
+        # car cysignals n'est tiré que par tesserocr (absent du build Windows).
         # Exclusions : torch/torchvision sont uniquement utilisés par
         # train_cnn.py (training sur machine dev). Le binaire n'a besoin
         # que d'onnxruntime pour l'inference. Sans cette exclusion,
@@ -134,6 +138,14 @@ def main() -> None:
         # joueurs sur la minimap (player tracking). Chargé par digit_classifier.
         "--add-data", f"{repo_models}:models",
     ]
+    # cysignals : seulement si présent (= tesserocr installé sur cette plateforme).
+    try:
+        import cysignals  # noqa: F401
+        args += ["--collect-all", "cysignals"]
+        print("cysignals detected → bundling (tesserocr in-process OCR enabled)")
+    except ImportError:
+        print("cysignals absent → tesserocr disabled, eva_ocr will use pytesseract fallback")
+
     for dylib in dylibs:
         args += ["--add-binary", f"{dylib}:tesseract"]
     args.append("analyze_video.py")

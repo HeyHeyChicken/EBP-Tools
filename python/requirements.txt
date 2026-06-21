@@ -1,6 +1,15 @@
 numpy
 Pillow
 pytesseract
+# In-process OCR accelerator (~3.65x on the analysis phase). Native build that
+# links libtesseract/leptonica + pulls cysignals — only installable from source
+# where the dev libs exist, hence the macOS-only marker here.
+#   - macOS: built from source here (build validated end-to-end).
+#   - Windows: NOT from source (won't compile); build.bat installs a prebuilt
+#     wheel (simonflueckiger) that bundles the tesseract DLLs.
+#   - Linux: add later (needs libtesseract-dev/libleptonica-dev in CI).
+# Anywhere tesserocr ends up absent, eva_ocr.py falls back to pytesseract.
+tesserocr; sys_platform == "darwin"
 opencv-python
 pyinstaller
 scipy
