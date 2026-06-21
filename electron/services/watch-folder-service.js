@@ -218,12 +218,24 @@ async function mapWithLimit(items, limit, fn) {
     return RESULTS;
 }
 
-function moveTo(srcPath, destDir) {
+async function moveTo(srcPath, destDir, retries = 5, delayMs = 2000) {
     if (!fs.existsSync(srcPath)) return;
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
     const DEST = path.join(destDir, path.basename(srcPath));
-    fs.renameSync(srcPath, DEST);
-    return DEST;
+    for (let i = 0; i <= retries; i++) {
+        try {
+            fs.renameSync(srcPath, DEST);
+            return DEST;
+        } catch (e) {
+            // Windows: file still held by Python subprocess or AV/Search Indexer
+            if (e.code === 'EBUSY' && i < retries) {
+                console.log(`[watch-folder] EBUSY on rename, retry ${i + 1}/${retries} in ${delayMs}ms`);
+                await sleep(delayMs);
+            } else {
+                throw e;
+            }
+        }
+    }
 }
 
 function safeUnlink(filePath) {
@@ -336,7 +348,7 @@ async function processVideo(videoPath, deps) {
     }
     const GAMES = DETECT.games || [];
     if (GAMES.length === 0) {
-        const DEST = moveTo(videoPath, FAILED_DIR);
+        const DEST = await moveTo(videoPath, FAILED_DIR);
         console.log('[watch-folder] no games detected →', DEST);
         // Remonte le problème au site (ligne sans gameID) — sauf dépôt manuel
         // sans équipe ciblée (pas de teamId → on ne sait pas où l'afficher).
@@ -386,7 +398,7 @@ async function processVideo(videoPath, deps) {
     );
     const MATCHES = IDENTIFY_RES.matches || [];
     if (MATCHES.length === 0) {
-        const DEST = moveTo(videoPath, FAILED_DIR);
+        const DEST = await moveTo(videoPath, FAILED_DIR);
         console.log(
             '[watch-folder] no identify match → skip analyse/encodage,',
             DEST
@@ -547,7 +559,7 @@ async function processVideo(videoPath, deps) {
         const M = MATCH_BY_TEMP.get(CUT.tempId);
         const GAME_ID = M ? M.gameID : null;
         if (!GAME_ID) {
-            const DEST = moveTo(CUT.file, FAILED_DIR);
+            const DEST = await moveTo(CUT.file, FAILED_DIR);
             console.log('[watch-folder] unmatched →', DEST);
             continue;
         }
@@ -580,7 +592,7 @@ async function processVideo(videoPath, deps) {
                 e.message
             );
             reportGameStatus(GAME_ID, 'failed', PROGRESS_ENCODE_END, META.teamId);
-            const DEST = moveTo(CUT.file, FAILED_DIR);
+            const DEST = await moveTo(CUT.file, FAILED_DIR);
             console.log('[watch-folder] failed →', DEST);
         }
     }
@@ -639,7 +651,7 @@ async function workerLoop(deps) {
                     const FAILED_DIR = path.join(ROOT, 'failed');
                     if (fs.existsSync(NEXT)) {
                         try {
-                            moveTo(NEXT, FAILED_DIR);
+                            await moveTo(NEXT, FAILED_DIR);
                         } catch (mvErr) {
                             console.error(
                                 '[watch-folder] move-to-failed error:',
