@@ -12,6 +12,7 @@ import statistics
 import time
 import numpy as np
 import cv2
+import threading
 from collections import deque, Counter
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageEnhance
@@ -277,9 +278,17 @@ def check_pixels(frame, points, tol_color=20, tol_pos=10):
 
     return True
 
+_EMIT_LOCK = threading.Lock()
+
+
 def _emit(msg: dict) -> None:
-    """Sérialise msg en JSON et l'écrit sur stdout (flush immédiat)."""
-    print(json.dumps(msg), flush=True)
+    """Sérialise msg en JSON et l'écrit sur stdout (flush immédiat).
+    Verrou : le player tracking (collect) tourne dans un thread concurrent de
+    la boucle OCR ; sans lock deux print() simultanés peuvent entrelacer une
+    ligne JSON sur stdout."""
+    s = json.dumps(msg)
+    with _EMIT_LOCK:
+        print(s, flush=True)
 
 
 def _get_pixel(frame: np.ndarray, x: float, y: float):
@@ -4352,52 +4361,34 @@ def _remove_outlier_detections(histories: dict) -> int:
     return sum(_filter_outliers(seq) for seq in histories.values())
 
 
-def _track_players_on_minimap(
+def _track_collect(
     cap: cv2.VideoCapture,
     start_ts: float,
     end_ts: float,
     map_name: str,
     n_orange: int = 0,
     n_blue: int = 0,
-    hp_timeline: Optional[dict] = None,
     progress_cb: Optional[Callable[[float], None]] = None,
-) -> list:
-    """Détection per-frame des joueurs sur la minimap.
+):
+    """Phase 1 du player tracking, INDÉPENDANTE de hp_timeline : localise la
+    minimap puis balaie à 10 FPS (blob_detector → CNN classifier) en collectant
+    les candidats BRUTS par frame. Le filtre des morts (hp_timeline) et le
+    tracker sont déférés à `_track_finalize` — ce qui permet d'exécuter cette
+    phase coûteuse (décodage + ONNX) en parallèle de la boucle OCR.
 
-    Pipeline simple, sans smoothing temporel :
-      1. Charge map_metadata (spawns + TPs + capture points)
-      2. Localise la minimap sur une frame mid-chunk
-      3. Sample les couleurs d'équipe depuis les polygones de spawn
-      4. Loop 10 FPS : blob_detector → CNN classifier (min_conf=0.5)
-      5. Agrège les détections par (team, number) → une history par joueur
-
-    Pas de tracker, pas d'identification Layer 3 : on fait confiance au CNN
-    pour identifier le digit à chaque frame, et chaque (team, number) reconnu
-    devient un joueur indépendant. Sortie cohérente avec benchmark_tracking.py.
-
-    Args:
-        cap, start_ts, end_ts : VideoCapture et bornes du chunk en secondes vidéo.
-        map_name              : nom canonique de la map.
-
-    Returns:
-        Tuple (tracks, minimap_position) :
-          - tracks : liste de dicts sérialisables, un par (team, number) détecté :
-              {team, id, slot, number, history: [[t, x_pct, y_pct], ...]}
-            Vide si la map metadata est absente ou si la pipeline échoue.
-          - minimap_position : [x1, y1, x2, y2] en fractions [0,1] du frame
-            (WIDTH×HEIGHT), ou None si la localisation a échoué. Permet au
-            front de positionner l'overlay minimap pile sur la zone détectée
-            (le placement HUD varie d'une partie à l'autre même sur la même map).
+    Retourne un dict de contexte (frames + géométrie minimap) à passer à
+    `_track_finalize`, ou None si map_metadata / classifier / localisation
+    échouent.
     """
     md = _map_metadata.load(map_name)
     if md is None:
         _emit({'log': f'[player_tracking] no map_metadata for {map_name!r}, skipping'})
-        return [], None
+        return None
 
     classifier = _get_digit_classifier()
     if classifier is None:
         _emit({'log': '[player_tracking] no classifier available, skipping'})
-        return [], None
+        return None
 
     valid_numbers = _valid_numbers_from_roster(n_orange, n_blue) if (n_orange or n_blue) else None
     if valid_numbers:
@@ -4511,22 +4502,13 @@ def _track_players_on_minimap(
     if walkable_mask is not None:
         _emit({'log': '[player_tracking] walkable mask actif'})
 
-    # Précompute le lookup des joueurs morts par instant (forward-filled).
-    # Si fourni, on rejette toute détection (team, num) pour un joueur HP=0
-    # à ce ts — c'est forcément du bruit (le joueur n'est pas affiché).
-    dead_lookup = _build_dead_lookup(hp_timeline, n_orange, n_blue)
-    if dead_lookup is not None:
-        _emit({'log': f'[player_tracking] hp_timeline avec '
-                      f'{len(dead_lookup[0])} entries → filtre morts actif'})
-
-    # 3. Loop 10 FPS : detect + classify, agrège par (team, number).
+    # 3. Loop 10 FPS : decode + blob + classify. On COLLECTE les candidats
+    # bruts par frame ; le filtre des morts et le tracker (qui dépendent de
+    # hp_timeline) sont appliqués plus tard par `_track_finalize`.
     # Lecture séquentielle quand FPS connu : 1 seul seek au début, puis read()
     # pour la frame samplée + grab() pour skip les intermédiaires (cheap : pas
-    # de BGR convert). Évite N×6000 seeks coûteux sur Windows où chaque
-    # cap.set(POS_MSEC) reseek-to-keyframe + decode-forward (~50-200 ms).
-    # Fallback sur l'ancien comportement seek-per-frame si FPS indisponible.
-    histories: dict = {}  # (team, number) → [(t_rel, x_frac, y_frac), ...]
-    tracks: dict = {}     # (team, number) → {'x','y','t','pend'} état du tracker
+    # de BGR convert). Fallback sur seek-per-frame si FPS indisponible.
+    frames: list = []  # [(t_rel, [(team, num, conf, bx, by), ...]), ...]
     total = int((end_ts - start_ts) * _PLAYER_TRACK_FPS) + 1
     native_fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
     use_sequential = native_fps > 0
@@ -4540,9 +4522,6 @@ def _track_players_on_minimap(
         _emit({'log': f'[player_tracking] seek-per-frame fallback (FPS unknown)'})
 
     last_pct = -1
-    detections_total = 0
-    detections_rejected_dead = 0
-    detections_rejected_wall = 0
     processed = 0
     frame_idx = 0
     step = 1.0 / _PLAYER_TRACK_FPS
@@ -4569,37 +4548,17 @@ def _track_players_on_minimap(
 
         blobs_raw = _blob_detector.detect_blobs(frame, info, orange_rgb, blue_rgb)
         # dedup=False : on récupère TOUS les candidats par (team, number) — le
-        # tracker ci-dessous départage les doublons par cohérence de trajectoire
-        # (et non par confidence, qui sature souvent à 1.00 sur le vrai ET le faux).
+        # tracker (dans _track_finalize) départage les doublons par cohérence de
+        # trajectoire (et non par confidence, qui sature souvent à 1.00).
         filtered = classifier.filter_blobs(frame, info, blobs_raw, min_conf=0.5, map_meta=md,
                                             valid_numbers=valid_numbers, dedup=False)
         t_rel = ts - start_ts
-        dead_set = _dead_at(dead_lookup, t_rel)
-
-        # Regroupe les candidats de la frame par (team, number), en inner-frac.
-        cands_by_key: dict = {}
+        frame_cands = []
         for team in ('orange', 'blue'):
             for b in filtered[team]:
-                num = int(b['digit'])
-                if (team, num) in dead_set:
-                    detections_rejected_dead += 1
-                    continue
-                xf, yf = _template_px_to_inner_frac(float(b['x']), float(b['y']),
-                                                    tpl_w, tpl_h, margins)
-                if not _is_walkable(walkable_mask, xf, yf):
-                    detections_rejected_wall += 1
-                    continue  # détection en plein mur → impossible
-                cands_by_key.setdefault((team, num), []).append((float(b['conf']), xf, yf))
-
-        for key, cands in cands_by_key.items():
-            chosen = _track_select(tracks.get(key), cands, t_rel, tp_pairs)
-            if chosen is None:
-                continue  # coasting : aucune détection acceptée cette frame
-            _c, cx, cy = chosen
-            tracks[key] = {'x': cx, 'y': cy, 't': t_rel, 'pend': None}
-            histories.setdefault(key, []).append(
-                (round(t_rel, 2), round(cx, 4), round(cy, 4)))
-            detections_total += 1
+                frame_cands.append((team, int(b['digit']), float(b['conf']),
+                                    float(b['x']), float(b['y'])))
+        frames.append((t_rel, frame_cands))
 
         processed += 1
 
@@ -4615,11 +4574,72 @@ def _track_players_on_minimap(
         pct = int(100 * processed / total) if total > 0 else 0
         if pct != last_pct:
             if pct % 10 == 0:
-                _emit({'log': f'[player_tracking] {pct}% '
-                              f'({processed}/{total} frames, {detections_total} dets)'})
+                _emit({'log': f'[player_tracking] collect {pct}% '
+                              f'({processed}/{total} frames)'})
             if progress_cb is not None:
                 progress_cb(processed / total if total > 0 else 1.0)
             last_pct = pct
+
+    return {
+        'frames': frames,
+        'minimap_position': minimap_position,
+        'tp_pairs': tp_pairs,
+        'spawn_polys_per_team': spawn_polys_per_team,
+        'margins': margins,
+        'tpl_w': tpl_w,
+        'tpl_h': tpl_h,
+        'walkable_mask': walkable_mask,
+    }
+
+def _track_finalize(ctx: dict, hp_timeline, n_orange: int = 0, n_blue: int = 0):
+    """Phase 2 du player tracking, DÉPENDANTE de hp_timeline : applique le filtre
+    des morts puis le tracker (MOT) sur les candidats collectés par
+    `_track_collect`, découpe en vies et formate. Bit-pour-bit identique à
+    l'ancienne boucle monolithique (mêmes candidats, même ordre, même état
+    tracker). Retourne (tracks, minimap_position)."""
+    frames = ctx['frames']
+    minimap_position = ctx['minimap_position']
+    tp_pairs = ctx['tp_pairs']
+    spawn_polys_per_team = ctx['spawn_polys_per_team']
+    margins = ctx['margins']
+    tpl_w, tpl_h = ctx['tpl_w'], ctx['tpl_h']
+    walkable_mask = ctx['walkable_mask']
+
+    # Lookup des joueurs morts par instant (forward-filled) : on rejette toute
+    # détection (team, num) d'un joueur HP=0 à ce ts (bruit, joueur non affiché).
+    dead_lookup = _build_dead_lookup(hp_timeline, n_orange, n_blue)
+    if dead_lookup is not None:
+        _emit({'log': f'[player_tracking] hp_timeline avec '
+                      f'{len(dead_lookup[0])} entries → filtre morts actif'})
+
+    histories: dict = {}  # (team, number) → [(t_rel, x_frac, y_frac), ...]
+    tracks: dict = {}     # (team, number) → {'x','y','t','pend'} état du tracker
+    detections_total = 0
+    detections_rejected_dead = 0
+    detections_rejected_wall = 0
+    for t_rel, frame_cands in frames:
+        dead_set = _dead_at(dead_lookup, t_rel)
+        # Regroupe les candidats de la frame par (team, number), en inner-frac.
+        cands_by_key: dict = {}
+        for team, num, conf, bx, by in frame_cands:
+            if (team, num) in dead_set:
+                detections_rejected_dead += 1
+                continue
+            xf, yf = _template_px_to_inner_frac(bx, by, tpl_w, tpl_h, margins)
+            if not _is_walkable(walkable_mask, xf, yf):
+                detections_rejected_wall += 1
+                continue  # détection en plein mur → impossible
+            cands_by_key.setdefault((team, num), []).append((conf, xf, yf))
+
+        for key, cands in cands_by_key.items():
+            chosen = _track_select(tracks.get(key), cands, t_rel, tp_pairs)
+            if chosen is None:
+                continue  # coasting : aucune détection acceptée cette frame
+            _c, cx, cy = chosen
+            tracks[key] = {'x': cx, 'y': cy, 't': t_rel, 'pend': None}
+            histories.setdefault(key, []).append(
+                (round(t_rel, 2), round(cx, 4), round(cy, 4)))
+            detections_total += 1
 
     # 4. Découpage en vies sur les transitions HP>0 → HP=0 de hp_timeline.
     # Le front consomme `lives` directement (plus de calcul des death times en
@@ -4662,6 +4682,26 @@ def _track_players_on_minimap(
                   f'{detections_total} total detections, '
                   f'{detections_rejected_dead} rejetees (joueur mort)'})
     return out, minimap_position
+
+
+def _track_players_on_minimap(
+    cap: cv2.VideoCapture,
+    start_ts: float,
+    end_ts: float,
+    map_name: str,
+    n_orange: int = 0,
+    n_blue: int = 0,
+    hp_timeline: Optional[dict] = None,
+    progress_cb: Optional[Callable[[float], None]] = None,
+):
+    """Compat mono-appel : `_track_collect` (décode/classify) puis
+    `_track_finalize` (filtre morts + tracker). `_analyze_chunks` appelle les
+    deux séparément pour faire tourner la collecte en parallèle de la boucle OCR.
+    Retourne (tracks, minimap_position)."""
+    ctx = _track_collect(cap, start_ts, end_ts, map_name, n_orange, n_blue, progress_cb)
+    if ctx is None:
+        return [], None
+    return _track_finalize(ctx, hp_timeline, n_orange, n_blue)
 
 
 # Score à partir duquel on considère la localisation suffisamment fiable
@@ -5456,6 +5496,13 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     WINDOW = max(1, min(CPU // 4, 4))
     MAX_WORKERS = max(3, WINDOW * 3)
     EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+    # Pool dédié (1 worker) pour la PHASE 1 du player tracking (collect), lancée
+    # en parallèle de la boucle OCR de chaque chunk. Séparé d'EXECUTOR (saturé
+    # par les OCR timer/score) pour qu'elle tourne réellement en concurrence.
+    TRACK_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+    # Pré-charge le classifier ONNX (singleton) dans le thread principal pour
+    # éviter une init concurrente depuis le thread de collecte.
+    _get_digit_classifier()
     if DEBUG:
         _emit({'log': f'[_analyze_chunks] cpu={CPU} window={WINDOW} workers={MAX_WORKERS}'})
 
@@ -5577,6 +5624,41 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         SUSPECT_TOLERANCE = 5      # secondes de marge sur la borne dynamique
         SUSPECT_CONFIRM_LEN = 5    # samples consécutifs requis pour confirmer une coupe
         SUSPECT_DRIFT_TOL = 2      # |Δelapsed - Δts| toléré pour "linéaire"
+
+        # Trailer non-gameplay (écran de score final en fin de chunk) : calculé
+        # AVANT la boucle OCR car il borne la fenêtre du player tracking lancé en
+        # parallèle juste après. Seeks absolus → valeur identique quel que soit le
+        # moment ; la boucle OCR re-seek à START juste en dessous.
+        END_NON_GAMEPLAY = 0
+        for OFFSET in range(1, 21):
+            TS = END - OFFSET
+            if TS < START:
+                break
+            FRAME_END = _get_frame(CAP, TS)
+            if FRAME_END is None:
+                break
+            if _detect_game_playing(FRAME_END):
+                break
+            END_NON_GAMEPLAY = OFFSET
+
+        # Player tracking minimap — PHASE 1 (collect : décode 10 FPS + blob +
+        # ONNX) lancée en parallèle de la boucle OCR. C'est le plus gros coût
+        # restant de l'analyse ; on le recouvre par l'OCR. La PHASE 2 (finalize,
+        # qui dépend de hp_timeline) tourne après la boucle. CAP DÉDIÉ : ne pas
+        # déplacer le CAP principal qui lit en séquentiel.
+        TRACK_CAP = None
+        TRACK_FUTURE = None
+        try:
+            TRACK_CAP = _open_video(video_path)
+            if TRACK_CAP is not None:
+                TRACK_FUTURE = TRACK_EXECUTOR.submit(
+                    _track_collect, TRACK_CAP, float(START),
+                    float(END - END_NON_GAMEPLAY), MAP_NAME,
+                    len(ORANGE_ROSTER), len(BLUE_ROSTER),
+                )
+        except Exception as exc:
+            _emit({'log': f'[player_tracking] collect submit FAILED: {exc}'})
+            TRACK_FUTURE = None
 
         # Lecture séquentielle quand FPS connu : 1 seul seek au début du chunk
         # puis read() pour la frame samplée + grab() pour skip les intermédiaires
@@ -6112,50 +6194,27 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
             else:
                 FOCUS_TIMELINE.append([slot, K, K])
 
-        # Trailer non-gameplay : à la fin du chunk, l'écran de score final
-        # s'affiche jusqu'à ~15 s (ou moins si la vidéo a été pré-coupée). On
-        # remonte le chunk seconde par seconde depuis END, jusqu'à 20 s max,
-        # et on compte les secondes consécutives où `_detect_game_playing`
-        # est False. Le client peut s'en servir pour découper proprement.
-        END_NON_GAMEPLAY = 0
-        for OFFSET in range(1, 21):
-            TS = END - OFFSET
-            if TS < START:
-                break
-            FRAME_END = _get_frame(CAP, TS)
-            if FRAME_END is None:
-                break
-            if _detect_game_playing(FRAME_END):
-                break
-            END_NON_GAMEPLAY = OFFSET
-
-        # Player tracking sur la minimap (Layer 1 blob detection + Layer 2 MOT
-        # + Layer 3 identification via hp_timeline). Bornée à
-        # [START, END - END_NON_GAMEPLAY] pour éviter de scanner l'écran de
-        # score final. Encapsulée dans try/except : si ça plante, on continue
-        # l'analyse OCR (player_tracks reste vide dans le payload).
-        # Bande tracking [_PROGRESS_OCR_PCT, 100] de la progression de cette game.
-        def _emit_track_progress(frac):
-            nonlocal GAME_LAST_PCT
-            pct = _PROGRESS_OCR_PCT + int(
-                (100 - _PROGRESS_OCR_PCT) * max(0.0, min(1.0, frac)))
-            if pct != GAME_LAST_PCT and pct < 100:
-                _emit({'percent': pct, 'gameID': GAME_ID})
-                GAME_LAST_PCT = pct
-
+        # Player tracking minimap — PHASE 2 (finalize) : applique le filtre des
+        # morts (hp_timeline) + le tracker MOT sur les candidats déjà collectés en
+        # parallèle de la boucle OCR (PHASE 1). La passe coûteuse (décode/ONNX)
+        # est donc déjà faite ; il ne reste que du calcul léger. END_NON_GAMEPLAY
+        # a été calculé en amont (avant la boucle) pour borner la collecte.
+        PLAYER_TRACKS = []
+        MINIMAP_POSITION = None
         try:
-            PLAYER_TRACKS, MINIMAP_POSITION = _track_players_on_minimap(
-                CAP, float(START), float(END - END_NON_GAMEPLAY),
-                MAP_NAME,
-                n_orange=len(ORANGE_ROSTER),
-                n_blue=len(BLUE_ROSTER),
-                hp_timeline=HP_TIMELINE,
-                progress_cb=_emit_track_progress,
-            )
+            CTX = TRACK_FUTURE.result() if TRACK_FUTURE is not None else None
+            if CTX is not None:
+                PLAYER_TRACKS, MINIMAP_POSITION = _track_finalize(
+                    CTX, HP_TIMELINE,
+                    n_orange=len(ORANGE_ROSTER), n_blue=len(BLUE_ROSTER),
+                )
         except Exception as exc:
             _emit({'log': f'[player_tracking] FAILED: {exc}'})
             PLAYER_TRACKS = []
             MINIMAP_POSITION = None
+        finally:
+            if TRACK_CAP is not None:
+                TRACK_CAP.release()
 
         CHUNK_PERCENT = int(100 * PROCESSED_SECONDS / TOTAL_SECONDS) if TOTAL_SECONDS > 0 else 100
         _emit({
@@ -6182,6 +6241,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         _emit({'percent': 100, 'gameID': GAME_ID})
 
     EXECUTOR.shutdown()
+    TRACK_EXECUTOR.shutdown()
     CAP.release()
 
     if LAST_PERCENT < 100:
