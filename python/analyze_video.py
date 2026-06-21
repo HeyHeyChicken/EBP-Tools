@@ -23,6 +23,22 @@ import minimap as _minimap
 import blob_detector as _blob_detector
 import digit_classifier as _digit_classifier
 import map_metadata as _map_metadata
+import tess_wrapper as _tess_wrapper
+
+
+def _tess_ocr(image, lang: str = 'eng', config: str = '') -> str:
+    """Dispatch OCR to in-process libtesseract wrapper if available, else pytesseract.
+    Returns stripped text (no CR/LF). Same behaviour as pytesseract.image_to_string()
+    followed by .replace('\\r','').replace('\\n','').strip()."""
+    w = _tess_wrapper.get_wrapper()
+    if w is not None:
+        try:
+            return w.image_to_string(image, lang=lang, config=config)
+        except Exception:
+            pass  # tessdata missing or other init failure → fall back
+    return pytesseract.image_to_string(
+        image, lang=lang, config=config
+    ).replace('\r', '').replace('\n', '').strip()
 
 # ---------------------------------------------------------------------------
 # MODES
@@ -380,7 +396,7 @@ def _ocr_region(
         out = []
         for cfg in CONFIGS:
             try:
-                TEXT = pytesseract.image_to_string(i, lang=lang, config=cfg).replace('\r', '').replace('\n', '').strip()
+                TEXT = _tess_ocr(i, lang=lang, config=cfg)
                 if FILTER_PATTERN:
                     TEXT = FILTER_PATTERN.sub('', TEXT)
                 out.append(TEXT)
@@ -500,9 +516,7 @@ def _ocr_color_masked(
     for lg in langs:
         for psm in psms:
             try:
-                txt = pytesseract.image_to_string(
-                    pil, lang=lg, config=f'--psm {psm}{cfg_wl}'
-                ).replace('\r', '').replace('\n', '').strip()
+                txt = _tess_ocr(pil, lang=lg, config=f'--psm {psm}{cfg_wl}')
                 if FILTER_PATTERN:
                     txt = FILTER_PATTERN.sub('', txt)
                 results.append(txt)
@@ -873,9 +887,7 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     pil4 = ImageOps.expand(pil4, border=pad, fill=255).convert('RGB')
     for psm in (6, 7, 8):
         try:
-            txt = pytesseract.image_to_string(
-                pil4, config=f'--psm {psm} {cfg}'
-            ).replace('\r', '').replace('\n', '').strip()
+            txt = _tess_ocr(pil4, config=f'--psm {psm} {cfg}')
             if txt:
                 candidates.append(txt)
         except Exception:
@@ -885,9 +897,7 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     )
     pil8 = ImageOps.expand(pil8, border=pad, fill=255).convert('RGB')
     try:
-        txt = pytesseract.image_to_string(
-            pil8, config=f'--psm 8 {cfg}'
-        ).replace('\r', '').replace('\n', '').strip()
+        txt = _tess_ocr(pil8, config=f'--psm 8 {cfg}')
         if txt:
             candidates.append(txt)
     except Exception:
@@ -2310,9 +2320,9 @@ def _ocr_point_letter(frame: np.ndarray, x: int, y: int, w: int, h: int) -> str:
             pil = ImageOps.expand(pil, border=20, fill=255).convert('RGB')
             for psm in (10, 8, 7, 6):
                 try:
-                    txt = pytesseract.image_to_string(
+                    txt = _tess_ocr(
                         pil, config=f'--psm {psm} -c "tessedit_char_whitelist={WHITELIST}"'
-                    ).strip()
+                    )
                 except Exception:
                     txt = ''
                 first = next((c for c in txt if c.isalpha()), '')
@@ -2837,10 +2847,7 @@ def _ocr_cart_pseudo(frame: np.ndarray, cart_x: int, cart_w: int,
     candidates = []
     for psm in (7, 8):
         try:
-            txt = pytesseract.image_to_string(
-                pil, config=f'--psm {psm} {cfg}', lang='evapseudos',
-            )
-            txt = txt.replace('\r', '').replace('\n', '').strip()
+            txt = _tess_ocr(pil, config=f'--psm {psm} {cfg}', lang='evapseudos')
             if txt:
                 candidates.append(txt)
         except Exception:
@@ -5348,11 +5355,11 @@ def _ocr_timer_fast(frame: np.ndarray, box, text_color=(10, 10, 10), tol_color: 
     MASK = DIFF <= tol_color
     BW = np.where(MASK, 255, 0).astype(np.uint8)
     try:
-        TEXT = pytesseract.image_to_string(
+        TEXT = _tess_ocr(
             Image.fromarray(BW).convert('RGB'),
             lang='evadigits',
             config='--psm 7 -c tessedit_char_whitelist=0123456789:',
-        ).replace('\r', '').replace('\n', '').strip()
+        )
         return re.sub(r'[^0-9:]', '', TEXT)
     except Exception:
         return ''
@@ -5378,10 +5385,10 @@ def _ocr_score_at(frame: np.ndarray, spec: dict, colors: list, max_score: int = 
     RESULTS = []
     for PSM in (7, 8):
         try:
-            TEXT = pytesseract.image_to_string(
+            TEXT = _tess_ocr(
                 BW, lang='evadigits',
                 config=f'--psm {PSM} -c tessedit_char_whitelist={WHITELIST}',
-            ).replace('\r', '').replace('\n', '').strip()
+            )
             TEXT = FILTER_PATTERN.sub('', TEXT)
             CHECKED = _score_checker(TEXT)
             if CHECKED:
