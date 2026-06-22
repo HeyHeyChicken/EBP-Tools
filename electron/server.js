@@ -71,7 +71,9 @@ const {
     changeVideoResolution,
     removeBorders,
     fixForBrowser,
-    remuxToForAnalysis
+    remuxToForAnalysis,
+    appendImageTail,
+    renderTeamScoreImage
 } = require('./services/video-service');
 const { unlinkSync } = require('./services/global-service');
 const UpdateService = require('./services/update-service');
@@ -712,6 +714,103 @@ if (!APP_GOT_THE_LOCK) {
                 }
                 StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
+            case 'addTeamScore': {
+                // Crée artificiellement l'écran de score de fin de game en
+                // ajoutant 5 secondes d'image (background.jpg) en fin de vidéo,
+                // pour que l'analyse puisse borner la game. Les scores fournis
+                // (orangeScore/blueScore) seront écrits sur l'image plus tard.
+                const FILES_TO_SCORE = await openFiles(data.filesExtensions);
+                if (FILES_TO_SCORE.length == 1) {
+                    const SRC = FILES_TO_SCORE[0];
+                    const EXT = path.extname(SRC);
+                    const OUTPUT_FILE_PATH = path.join(
+                        path.dirname(SRC),
+                        `${path.basename(SRC, EXT)} - with score${EXT}`
+                    );
+                    const TEAM_SCORE_DIR = path.join(
+                        ROOT_PATH,
+                        'assets',
+                        'team-score'
+                    );
+                    const BACKGROUND_PATH = path.join(
+                        TEAM_SCORE_DIR,
+                        'background.jpg'
+                    );
+                    // Image composée (fond + scores) rendue dans un fichier temporaire,
+                    // utilisée comme image de fin de vidéo puis supprimée.
+                    const SCORE_IMAGE_PATH = path.join(
+                        os.tmpdir(),
+                        `ebp-team-score-${getCurrentPort()}.png`
+                    );
+
+                    const NOTIFICATION_DATA = {
+                        percent: 0,
+                        leftRounded: true,
+                        infinite: false,
+                        icon: '',
+                        text: '.common.encoding',
+                        state: 'info'
+                    };
+                    await createFloatingWindow(
+                        450,
+                        150,
+                        JSON.stringify(NOTIFICATION_DATA)
+                    );
+
+                    try {
+                        await renderTeamScoreImage(
+                            BACKGROUND_PATH,
+                            TEAM_SCORE_DIR,
+                            data.orangeScore ?? 0,
+                            data.blueScore ?? 0,
+                            SCORE_IMAGE_PATH
+                        );
+
+                        await appendImageTail(
+                            SRC,
+                            OUTPUT_FILE_PATH,
+                            SCORE_IMAGE_PATH,
+                            5,
+                            (percent) => {
+                                getMainWindow().webContents.send(
+                                    'set-notification-data',
+                                    { ...NOTIFICATION_DATA, percent }
+                                );
+                            }
+                        );
+
+                        getMainWindow().webContents.send(
+                            'set-notification-data',
+                            {
+                                percent: 100,
+                                leftRounded: true,
+                                infinite: false,
+                                icon: 'fa-sharp fa-solid fa-check',
+                                text: '.common.encoded',
+                                state: 'success'
+                            }
+                        );
+
+                        shell.showItemInFolder(OUTPUT_FILE_PATH);
+
+                        setTimeout(() => {
+                            deleteFloatingWindow();
+                        }, 5000);
+                    } catch (error) {
+                        console.error(
+                            '[ADD-TEAM-SCORE] failed:',
+                            error
+                        );
+                        deleteFloatingWindow();
+                    } finally {
+                        if (fs.existsSync(SCORE_IMAGE_PATH)) {
+                            unlinkSync(SCORE_IMAGE_PATH);
+                        }
+                    }
+                }
+                StorageManager.setTemporarySettingsValue('deeplink', undefined);
+                break;
+            }
         }
     }
 

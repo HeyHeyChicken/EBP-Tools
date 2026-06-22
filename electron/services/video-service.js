@@ -352,10 +352,267 @@ async function cutAndEncodeGame(inputPath, outputPath, startSec, endSec) {
     });
 }
 
+/**
+ * Appends a few seconds of a still image to the END of a video, re-encoding the
+ * whole file. Used to artificially create the end-of-game team score frame that
+ * Tools needs to bound a game when the source video doesn't contain it.
+ * The image is scaled to the source resolution and the source frame rate; audio
+ * is padded with silence (`apad`) when present. The scores will be drawn on top
+ * of the image in a later step. `-c:v libx264` + faststart keep the result
+ * browser/analysis-ready.
+ * @param {string} inputPath     Source video.
+ * @param {string} outputPath    Destination video.
+ * @param {string} imagePath     Still image used for the tail (e.g. background).
+ * @param {number} seconds       Tail duration (seconds).
+ * @param {Function} [percentCallback] Called with an integer percent (0-100).
+ * @returns {Promise<string>} Resolves with `outputPath` on success.
+ */
+function appendImageTail(
+    inputPath,
+    outputPath,
+    imagePath,
+    seconds = 5,
+    percentCallback
+) {
+    return new Promise((resolve, reject) => {
+        if (fs.existsSync(outputPath)) {
+            unlinkSync(outputPath);
+        }
+
+        // Sonde la source : piste audio (sinon `apad` planterait), résolution et
+        // fps pour aligner le segment image sur la vidéo (requis par `concat`).
+        const PROBE = spawn(FFMPEG_PATH, ['-i', inputPath]);
+        let probeStderr = '';
+        PROBE.stderr.on('data', (d) => (probeStderr += d.toString()));
+        PROBE.on('error', reject);
+        PROBE.on('close', () => {
+            const HAS_AUDIO = /Stream #.*Audio:/.test(probeStderr);
+            const SIZE_MATCH = probeStderr.match(
+                /Video:[^\n]*?\s(\d{2,5})x(\d{2,5})/
+            );
+            const FPS_MATCH = probeStderr.match(/([\d.]+)\s+fps/);
+            const DURATION_MATCH = probeStderr.match(
+                /Duration:\s(\d+):(\d+):(\d+\.\d+)/
+            );
+            const WIDTH = SIZE_MATCH ? SIZE_MATCH[1] : DEFAULT_VIDEO_WIDTH;
+            const HEIGHT = SIZE_MATCH ? SIZE_MATCH[2] : DEFAULT_VIDEO_HEIGHT;
+            const FPS = FPS_MATCH ? FPS_MATCH[1] : 30;
+            const TOTAL = DURATION_MATCH
+                ? +DURATION_MATCH[1] * 3600 +
+                  +DURATION_MATCH[2] * 60 +
+                  parseFloat(DURATION_MATCH[3]) +
+                  seconds
+                : 0;
+
+            const FILTER =
+                `[1:v]scale=${WIDTH}:${HEIGHT},setsar=1,fps=${FPS},format=yuv420p[tail];` +
+                `[0:v]scale=${WIDTH}:${HEIGHT},setsar=1,fps=${FPS},format=yuv420p[main];` +
+                `[main][tail]concat=n=2:v=1:a=0[v]` +
+                (HAS_AUDIO ? `;[0:a]apad=pad_dur=${seconds}[a]` : '');
+
+            const FFMPEG_ARGS = [
+                '-i',
+                inputPath,
+                '-loop',
+                '1',
+                '-t',
+                String(seconds),
+                '-i',
+                imagePath,
+                '-filter_complex',
+                FILTER,
+                '-map',
+                '[v]',
+                ...(HAS_AUDIO ? ['-map', '[a]'] : []),
+                '-c:v',
+                'libx264',
+                '-preset',
+                'veryfast',
+                '-crf',
+                '23',
+                ...(HAS_AUDIO ? ['-c:a', 'aac', '-b:a', '128k'] : []),
+                '-movflags',
+                '+faststart',
+                outputPath
+            ];
+
+            console.log(
+                `[FFMPEG] Append image tail - Executing: ${FFMPEG_PATH} ${FFMPEG_ARGS.join(' ')}`
+            );
+
+            const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+
+            FFMPEG.stderr.on('data', (data) => {
+                const STR = data.toString();
+                const TIME_MATCH = STR.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+                if (TIME_MATCH && TOTAL > 0 && percentCallback) {
+                    const CURRENT =
+                        +TIME_MATCH[1] * 3600 +
+                        +TIME_MATCH[2] * 60 +
+                        parseFloat(TIME_MATCH[3]);
+                    percentCallback(
+                        Math.min(100, Math.round((CURRENT / TOTAL) * 100))
+                    );
+                }
+            });
+
+            FFMPEG.on('close', (code) => {
+                if (code === 0 && fs.existsSync(outputPath)) {
+                    resolve(outputPath);
+                } else {
+                    if (fs.existsSync(outputPath)) {
+                        unlinkSync(outputPath);
+                    }
+                    reject(
+                        new Error(`FFmpeg process exited with code ${code}`)
+                    );
+                }
+            });
+
+            FFMPEG.on('error', (err) => reject(err));
+        });
+    });
+}
+
+// Largeur native de chaque chiffre PNG (assets/team-score/<n>.png). Tous font 89px
+// de haut ; les largeurs varient (police proportionnelle). Les chiffres sont
+// rendus à leur taille native (pas de redimensionnement).
+const DIGIT_WIDTH = {
+    0: 74,
+    1: 59,
+    2: 66,
+    3: 59,
+    4: 71,
+    5: 64,
+    6: 71,
+    7: 61,
+    8: 73,
+    9: 65
+};
+// Coin haut-gauche du score, mesuré sur la maquette de référence (1920x1080) :
+// le score orange est SOUS sa pastille, le score bleu AU-DESSUS de la sienne.
+// Les scores sont alignés à gauche depuis ce point.
+const ORANGE_SCORE_ANCHOR = { x: 36, y: 439 };
+const BLUE_SCORE_ANCHOR = { x: 40, y: 629 };
+const SCORE_DIGIT_SPACING = 6;
+// Couleur des chiffres par équipe. Les PNG sont blancs : on les teinte par
+// multiplication (`colorchannelmixer` diagonal) pour obtenir la teinte voulue
+// tout en préservant l'alpha et l'anti-aliasing des glyphes.
+const ORANGE_SCORE_COLOR = 'ff8000';
+const BLUE_SCORE_COLOR = '3298fe';
+
+/**
+ * Construit le filtre `colorchannelmixer` qui teinte un glyphe blanc vers `hex`
+ * (multiplication par canal : blanc -> couleur, gris d'anti-aliasing -> nuance).
+ * @param {string} hex Couleur cible "rrggbb".
+ * @returns {string}
+ */
+function colorMixer(hex) {
+    const RR = (parseInt(hex.slice(0, 2), 16) / 255).toFixed(4);
+    const GG = (parseInt(hex.slice(2, 4), 16) / 255).toFixed(4);
+    const BB = (parseInt(hex.slice(4, 6), 16) / 255).toFixed(4);
+    return `colorchannelmixer=rr=${RR}:gg=${GG}:bb=${BB}`;
+}
+
+/**
+ * Calcule la position (taille native) de chaque chiffre d'un score, aligné à
+ * gauche depuis `anchor`, avec la couleur d'équipe.
+ * @param {number} score Score 0-100.
+ * @param {{x:number,y:number}} anchor Coin haut-gauche du premier chiffre.
+ * @param {string} color Couleur cible "rrggbb".
+ * @returns {{digit:string,x:number,y:number,color:string}[]}
+ */
+function layoutScore(score, anchor, color) {
+    const STR = String(score);
+    let x = anchor.x;
+    const ITEMS = [];
+    for (const D of STR) {
+        ITEMS.push({ digit: D, x, y: anchor.y, color });
+        x += DIGIT_WIDTH[D] + SCORE_DIGIT_SPACING;
+    }
+    return ITEMS;
+}
+
+/**
+ * Compose l'écran de score d'équipe : écrit les scores orange et bleu (avec la
+ * police des PNG chiffres, à leur taille native, teintés aux couleurs d'équipe)
+ * par-dessus `background.jpg`, et écrit le résultat dans `outputPath` (PNG).
+ * @param {string} backgroundPath Image de fond (1920x1080).
+ * @param {string} digitsDir      Dossier contenant 0.png … 9.png.
+ * @param {number} orangeScore    Score équipe orange (0-100).
+ * @param {number} blueScore      Score équipe bleue (0-100).
+ * @param {string} outputPath     PNG de sortie.
+ * @returns {Promise<string>} Resolves with `outputPath` on success.
+ */
+function renderTeamScoreImage(
+    backgroundPath,
+    digitsDir,
+    orangeScore,
+    blueScore,
+    outputPath
+) {
+    return new Promise((resolve, reject) => {
+        if (fs.existsSync(outputPath)) {
+            unlinkSync(outputPath);
+        }
+
+        const ITEMS = [
+            ...layoutScore(orangeScore, ORANGE_SCORE_ANCHOR, ORANGE_SCORE_COLOR),
+            ...layoutScore(blueScore, BLUE_SCORE_ANCHOR, BLUE_SCORE_COLOR)
+        ];
+
+        const INPUTS = ['-i', backgroundPath];
+        const FILTER = [];
+        let last = '0:v';
+        let idx = 1;
+        for (const ITEM of ITEMS) {
+            INPUTS.push('-i', path.join(digitsDir, `${ITEM.digit}.png`));
+            FILTER.push(`[${idx}:v]${colorMixer(ITEM.color)}[c${idx}]`);
+            FILTER.push(
+                `[${last}][c${idx}]overlay=${ITEM.x}:${ITEM.y}[o${idx}]`
+            );
+            last = `o${idx}`;
+            idx++;
+        }
+
+        const FFMPEG_ARGS = [
+            ...INPUTS,
+            '-filter_complex',
+            FILTER.join(';'),
+            '-map',
+            `[${last}]`,
+            '-frames:v',
+            '1',
+            outputPath
+        ];
+
+        console.log(
+            `[FFMPEG] Render team score - Executing: ${FFMPEG_PATH} ${FFMPEG_ARGS.join(' ')}`
+        );
+
+        const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+
+        FFMPEG.on('close', (code) => {
+            if (code === 0 && fs.existsSync(outputPath)) {
+                resolve(outputPath);
+            } else {
+                if (fs.existsSync(outputPath)) {
+                    unlinkSync(outputPath);
+                }
+                reject(new Error(`FFmpeg process exited with code ${code}`));
+            }
+        });
+
+        FFMPEG.on('error', (err) => reject(err));
+    });
+}
+
 module.exports = {
     changeVideoResolution,
     removeBorders,
     fixForBrowser,
     remuxToForAnalysis,
-    cutAndEncodeGame
+    cutAndEncodeGame,
+    appendImageTail,
+    renderTeamScoreImage
 };
