@@ -426,30 +426,29 @@ async function processVideo(videoPath, deps) {
         reportGameStatus(ID, 'queued', PROGRESS_DETECT_END, META.teamId);
     }
 
-    // Phase 2: deep analysis on all detected games. On injecte les rosters de
+    // Phase 2: deep analysis sur les seules games identifiées par /identify.
+    // Lancer l'OCR + player_tracking sur les unmatched serait du calcul perdu
+    // (pas de ligne côté site, pas de persist) — elles restent gérées en
+    // phase 4 (découpe stream-copy → failed/). On injecte les rosters de
     // l'identify dans chaque chunk — Python s'en sert comme liste de pseudos
-    // trustés pour le fuzzy match du killfeed OCR. Pas de match côté back ?
-    // tableaux vides → fallback OCR-only côté Python.
-    const CHUNKS = GAMES.map((g, i) => {
-        const TEMP_ID = `temp-${i}`;
-        const M = MATCH_BY_TEMP.get(TEMP_ID);
-        return {
+    // trustés pour le fuzzy match du killfeed OCR.
+    const CHUNKS = GAMES.map((g, i) => ({ g, M: MATCH_BY_TEMP.get(`temp-${i}`) }))
+        .filter(({ M }) => M && M.gameID != null)
+        .map(({ g, M }) => ({
             startSeconds: g.start,
             endSeconds: g.end,
             // gameID transmis à l'analyseur = vrai ID DB renvoyé par /identify
-            // quand la game est matchée (Python le réémet tel quel dans les
-            // logs de progression par game et dans les résultats). Fallback sur
-            // le tempId pour les games non matchées (pas de ligne côté site).
-            gameID: M && M.gameID != null ? String(M.gameID) : TEMP_ID,
+            // (Python le réémet tel quel dans les logs de progression par game
+            // et dans les résultats).
+            gameID: String(M.gameID),
             mode: g.mode,
             // Nom de map (ex. "Outlaw", "Helios Station") — Python s'en sert
             // pour appliquer la règle Domination/Hardpoint sur points_timeline
             // (Outlaw = Hardpoint, le reste = Domination).
             map: g.map || '',
-            orangePlayers: M ? M.orangePlayers : [],
-            bluePlayers: M ? M.bluePlayers : []
-        };
-    });
+            orangePlayers: M.orangePlayers,
+            bluePlayers: M.bluePlayers
+        }));
     // Un process Python par game, plafonné à CONCURRENCY en vol. Chaque process
     // est totalement indépendant (sa propre VideoCapture, son propre OCR) —
     // vraie parallélisation, pas de GIL. Si l'un crashe (`error`), on remonte
