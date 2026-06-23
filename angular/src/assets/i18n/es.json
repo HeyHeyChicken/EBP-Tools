@@ -116,6 +116,7 @@
       }
     },
     "notification": {
+      "identifying_games": "Identificando las partidas del vídeo...",
       "manual-cutting": {
         "description": "Su repetición se está recortando. Por favor, espere..."
       },

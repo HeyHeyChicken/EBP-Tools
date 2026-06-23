@@ -568,7 +568,6 @@ if (!APP_GOT_THE_LOCK) {
                         value: 0
                     });
                 }
-
                 break;
             case 'analyzeVideoUrl': {
                 const VIDEO_URL =
@@ -1046,6 +1045,16 @@ if (!APP_GOT_THE_LOCK) {
      * @param {*} data Deep link payload (socket, maxTime, maxGames, forced scores, teamId).
      */
     async function ingestFilesForAnalysis(filesPaths, data) {
+        const NOTIFICATION_DATA = {
+            percent: 0,
+            leftRounded: true,
+            infinite: true,
+            icon: 'fa-sharp fa-solid fa-clapperboard-play',
+            text: '.view.notification.identifying_games',
+            state: 'info'
+        };
+        createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+
         const MAX_TIME_PER_GAME = data.maxTime ?? 10;
         const MAX_GAMES_AT_SAME_TIME = data.maxGames ?? 3;
         // Scores forcés (panneau "association") : on ne les encode que si LES DEUX
@@ -1135,8 +1144,24 @@ if (!APP_GOT_THE_LOCK) {
         fs.createReadStream(VIDEO_PATH).pipe(UPLOAD_REQUEST);
     }
 
-    function runAnalyzer(videoPath, socket, settings) {
+    function runAnalyzer(videoPath, socket, settings, showFloatingProgress) {
         const HEADLESS = !socket;
+
+        // Floating window de progression pour la phase de détection. Utile au
+        // flux headless (watch-folder) où aucune UI front ne suit l'avancement ;
+        // le front interactif (socket) gère déjà sa propre barre via
+        // `analyzer-update`, donc on ne l'active que sur demande explicite.
+        const NOTIFICATION_DATA = {
+            percent: 0,
+            leftRounded: true,
+            infinite: true,
+            icon: 'fa-sharp fa-solid fa-clapperboard-play',
+            text: '.view.notification.identifying_games',
+            state: 'info'
+        };
+        if (showFloatingProgress) {
+            createFloatingWindow(500, 150, JSON.stringify(NOTIFICATION_DATA));
+        }
 
         return new Promise((resolve, reject) => {
             const SETTINGS_JSON = JSON.stringify(settings || {});
@@ -1179,12 +1204,26 @@ if (!APP_GOT_THE_LOCK) {
 
                         if (WINDOW && !WINDOW.isDestroyed()) {
                             WINDOW.webContents.send('analyzer-update', MSG);
+                            // Met à jour la floating window de détection (relayée
+                            // au composant notification via BroadcastChannel).
+                            if (
+                                showFloatingProgress &&
+                                typeof MSG.percent === 'number'
+                            ) {
+                                WINDOW.webContents.send('set-notification-data', {
+                                    ...NOTIFICATION_DATA,
+                                    infinite: false,
+                                    percent: MSG.percent,
+                                    icon: undefined
+                                });
+                            }
                         }
                         if (
                             (MSG.type === 'done' || MSG.type === 'error') &&
                             !RESOLVED
                         ) {
-                            if (!HEADLESS) deleteFloatingWindow(false);
+                            if (!HEADLESS || showFloatingProgress)
+                                deleteFloatingWindow(false);
                             RESOLVED = true;
                             resolve({ ...MSG, games: GAMES });
                         }
@@ -1220,6 +1259,9 @@ if (!APP_GOT_THE_LOCK) {
                 setImmediate(() => {
                     if (!RESOLVED) {
                         RESOLVED = true;
+                        // Filet : le process s'est fermé sans event done/error,
+                        // on ne laisse pas la floating window de détection orpheline.
+                        if (showFloatingProgress) deleteFloatingWindow(false);
                         resolve({ type: 'close', code, games: GAMES });
                     }
                 });
@@ -1233,6 +1275,7 @@ if (!APP_GOT_THE_LOCK) {
                         WINDOW.webContents.send('analyzer-update', MSG);
                     }
                 }
+                if (showFloatingProgress) deleteFloatingWindow(false);
                 reject(err);
             });
         });

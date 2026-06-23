@@ -116,6 +116,7 @@
       }
     },
     "notification": {
+      "identifying_games": "Se identifică meciurile din videoclip...",
       "manual-cutting": {
         "description": "Redarea dvs. este în curs de tăiere. Vă rugăm să așteptați..."
       },

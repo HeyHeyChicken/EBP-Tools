@@ -32,7 +32,30 @@ export class LoaderComponent implements OnDestroy {
 
   //#endregion
 
-  @Input() public value: number = 0;
+  //#region value
+
+  // Valeur réelle reçue du parent (source de vérité). Séparée de `displayValue`
+  // pour que l'animation infinite ne l'écrase pas : sinon, quand le mode infinite
+  // se coupe alors que `value` n'a pas changé (ex. premier tick à 0 %), Angular ne
+  // réécrit pas l'input et la barre reste figée sur la dernière valeur balayée.
+  private _value = 0;
+  @Input()
+  set value(v: number) {
+    this._value = v;
+    if (!this._infinite) {
+      this.displayValue = v;
+    }
+  }
+  get value(): number {
+    return this._value;
+  }
+
+  // Valeur réellement rendue (classe `t{n}`) : suit `value` hors infinite, et
+  // balaye 0→100 pendant l'animation infinite.
+  protected displayValue: number = 0;
+
+  //#endregion
+
   @Input() public icon: string | undefined;
   @Input() public state: 'info' | 'success' | 'error' = 'info';
 
@@ -65,13 +88,15 @@ export class LoaderComponent implements OnDestroy {
   private infiniteChange(): void {
     if (this.infinite) {
       this._interval = setInterval(() => {
-        this.value++;
-        if (this.value > 100) {
-          this.value = 0;
+        this.displayValue++;
+        if (this.displayValue > 100) {
+          this.displayValue = 0;
         }
       }, 10);
     } else {
       this.removeInterval();
+      // Sortie de l'animation : on retombe sur la vraie progression du parent.
+      this.displayValue = this._value;
     }
   }
 

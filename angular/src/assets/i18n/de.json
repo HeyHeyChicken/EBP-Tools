@@ -116,6 +116,7 @@
       }
     },
     "notification": {
+      "identifying_games": "Spiele im Video werden erkannt...",
       "manual-cutting": {
         "description": "Ihre Wiederholung wird gerade geschnitten. Bitte haben Sie Geduld..."
       },

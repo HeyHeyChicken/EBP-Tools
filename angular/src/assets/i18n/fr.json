@@ -116,6 +116,7 @@
       }
     },
     "notification": {
+      "identifying_games": "Identification des games dans la vidéo...",
       "manual-cutting": {
         "description": "Votre replay est en cours de découpage. Veuillez patienter..."
       },

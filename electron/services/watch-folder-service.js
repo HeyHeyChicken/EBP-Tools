@@ -341,8 +341,10 @@ async function processVideo(videoPath, deps) {
 
     console.log('[watch-folder] processing', videoPath);
 
-    // Phase 1: detect games
-    const DETECT = await deps.runAnalyzer(videoPath, null, SETTINGS);
+    // Phase 1: detect games. `showFloatingProgress=true` → floating window de
+    // progression (identification des games), puisque le flux watch-folder est
+    // headless et n'a pas d'UI front pour suivre l'avancement.
+    const DETECT = await deps.runAnalyzer(videoPath, null, SETTINGS, true);
     if (DETECT.type === 'error') {
         throw new Error(`Analyzer failed: ${DETECT.message}`);
     }
