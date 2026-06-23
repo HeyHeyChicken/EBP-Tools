@@ -165,20 +165,10 @@ if (!APP_GOT_THE_LOCK) {
     async function handleDeepLinkData(action, data) {
         console.log('[DEEP-LINK] Action:', action, 'Params:', data);
 
-        StorageManager.setTemporarySettingsValue('deeplink', {
-            action: action,
-            data: data
-        });
-
         switch (action) {
             case 'openFolder':
                 openDirectory((directoryPath) => {
                     socketEmit(data.socket, 'openFolder', directoryPath);
-
-                    StorageManager.setTemporarySettingsValue(
-                        'deeplink',
-                        undefined
-                    );
                 });
                 break;
             case 'importGamesFromExcel':
@@ -350,29 +340,16 @@ if (!APP_GOT_THE_LOCK) {
                                 }
                             );
 
-                            StorageManager.setTemporarySettingsValue(
-                                'deeplink',
-                                undefined
-                            );
-
                             setTimeout(() => {
                                 deleteFloatingWindow();
                             }, 5000);
                         } else {
                             deleteFloatingWindow();
-                            StorageManager.setTemporarySettingsValue(
-                                'deeplink',
-                                undefined
-                            );
                         }
                     });
                 } else {
                     console.log(
                         `Error: ${FILES_TO_ENCODE_PATHS.length} file${FILES_TO_ENCODE_PATHS.length > 1 ? 's' : ''} selected.`
-                    );
-                    StorageManager.setTemporarySettingsValue(
-                        'deeplink',
-                        undefined
                     );
                 }
                 break;
@@ -421,7 +398,6 @@ if (!APP_GOT_THE_LOCK) {
                         deleteFloatingWindow();
                     }
                 }
-                StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
             }
             case 'exportHudVideo': {
@@ -445,7 +421,6 @@ if (!APP_GOT_THE_LOCK) {
                     data.vw <= 0
                 ) {
                     console.error('[HUD-EXPORT] Invalid payload', data);
-                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
                     break;
                 }
 
@@ -461,7 +436,6 @@ if (!APP_GOT_THE_LOCK) {
                         filters: [{ name: 'MP4', extensions: ['mp4'] }]
                     });
                 if (canceled || !OUTPUT_FILE_PATH) {
-                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
                     break;
                 }
 
@@ -557,7 +531,6 @@ if (!APP_GOT_THE_LOCK) {
                 COMMAND.on('error', (error) => {
                     console.error('[HUD-EXPORT] ffmpeg spawn error:', error);
                     deleteFloatingWindow();
-                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 });
 
                 COMMAND.on('close', (code) => {
@@ -582,60 +555,13 @@ if (!APP_GOT_THE_LOCK) {
                         );
                         deleteFloatingWindow();
                     }
-                    StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 });
                 break;
             }
             case 'analyzeVideoFile':
                 const FILES_PATHS = await openFiles(data.filesExtensions, true);
                 if (FILES_PATHS.length > 0) {
-                    const MAX_TIME_PER_GAME = data.maxTime ?? 10;
-                    const MAX_GAMES_AT_SAME_TIME = data.maxGames ?? 3;
-                    // Scores forcés (panneau "association") : on ne les encode que
-                    // si LES DEUX sont des entiers 0-100. Sinon on ignore (analyse
-                    // normale, association via OCR).
-                    const isValidScore = (v) =>
-                        Number.isInteger(v) && v >= 0 && v <= 100;
-                    const FORCED_SCORES =
-                        isValidScore(data.forcedOrangeScore) &&
-                        isValidScore(data.forcedBlueScore)
-                            ? `__fos-${data.forcedOrangeScore}__fbs-${data.forcedBlueScore}`
-                            : '';
-                    // Équipe ciblée pour le matching serveur (/identify). Encodée en
-                    // suffixe pour suivre le fichier dans le watch folder jusqu'à
-                    // parseMeta. ID numérique uniquement.
-                    const TEAM_ID =
-                        typeof data.teamId === 'string' &&
-                        /^\d+$/.test(data.teamId)
-                            ? `__tid-${data.teamId}`
-                            : '';
-                    const DURATIONS = await Promise.all(
-                        FILES_PATHS.map((p) =>
-                            getVideoDuration(p).catch(() => 0)
-                        )
-                    );
-                    const TOTAL_SECONDS = DURATIONS.reduce((a, b) => a + b, 0);
-                    socketEmit(data.socket, 'analyzeVideoFileGames', {
-                        type: 'length',
-                        value: TOTAL_SECONDS
-                    });
-
-                    const WATCH_FOLDER = watchFolderService.getWatchFolder();
-                    if (!fs.existsSync(WATCH_FOLDER)) {
-                        fs.mkdirSync(WATCH_FOLDER, { recursive: true });
-                    }
-                    for (const SRC of FILES_PATHS) {
-                        const EXT = path.extname(SRC);
-                        const BASE = path.basename(SRC, EXT);
-                        const DEST = path.join(
-                            WATCH_FOLDER,
-                            `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${FORCED_SCORES}${TEAM_ID}${EXT}`
-                        );
-                        // Remux (stream copy + faststart) au lieu d'une copie brute :
-                        // tout fichier — Twitch, YouTube ou capture — arrive dans le
-                        // watch folder avec un conteneur propre. Fallback copie si échec.
-                        await remuxToForAnalysis(SRC, DEST);
-                    }
+                    await ingestFilesForAnalysis(FILES_PATHS, data);
                 } else {
                     socketEmit(data.socket, 'analyzeVideoFileGames', {
                         type: 'length',
@@ -643,8 +569,150 @@ if (!APP_GOT_THE_LOCK) {
                     });
                 }
 
-                StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
+            case 'analyzeVideoUrl': {
+                const VIDEO_URL =
+                    typeof data.url === 'string' ? data.url.trim() : '';
+                const PLATFORM = isYouTubeUrl(VIDEO_URL)
+                    ? 'youtube'
+                    : isTwitchUrl(VIDEO_URL)
+                      ? 'twitch'
+                      : undefined;
+                if (!PLATFORM) {
+                    socketEmit(data.socket, 'analyzeVideoFileGames', {
+                        type: 'unavailable'
+                    });
+                    break;
+                }
+
+                const NOTIFICATION_DATA = {
+                    leftRounded: true,
+                    percent: 0,
+                    infinite: true,
+                    icon: 'fa-sharp fa-solid fa-clapperboard-play',
+                    text: '.view.notification.replay_downloader.fetching',
+                    state: 'info'
+                };
+                await createFloatingWindow(
+                    500,
+                    150,
+                    JSON.stringify(NOTIFICATION_DATA)
+                );
+
+                const TEMP_DOWNLOAD_PATH = path.join(
+                    os.tmpdir(),
+                    `ebp_analyze_${new Date().getTime()}.mp4`
+                );
+
+                try {
+                    const YT_DLP_PATH = await ytDlpService.ensureYtDlp();
+
+                    // Ne télécharger que si la source propose du 1080p (ou mieux) :
+                    // sinon l'analyse n'est pas fiable. Sonde les formats via yt-dlp.
+                    const { stdout } = await execAsync(
+                        `"${YT_DLP_PATH}" -J "${VIDEO_URL}"`,
+                        { timeout: 30000, maxBuffer: 100 * 1024 * 1024 }
+                    );
+                    const INFO = JSON.parse(stdout);
+                    const HAS_1080P = (INFO.formats ?? []).some(
+                        (f) => f.vcodec !== 'none' && f.height >= 1080
+                    );
+                    if (!HAS_1080P) {
+                        socketEmit(data.socket, 'analyzeVideoFileGames', {
+                            type: 'unavailable'
+                        });
+                        // Flux lancé depuis le navigateur : ne pas ramener Tools au
+                        // premier plan (pas de showMainWindow), juste fermer la fenêtre.
+                        deleteFloatingWindow();
+                        break;
+                    }
+
+                    // Cap à 1080p (la source a au moins du 1080p, on évite de
+                    // télécharger inutilement du 1440p/4K).
+                    const FORMAT =
+                        PLATFORM === 'youtube'
+                            ? 'bestvideo[height<=1080]+bestaudio/best'
+                            : 'best[height<=1080]';
+                    const SETTINGS = [
+                        '--ffmpeg-location',
+                        FFMPEG_PATH,
+                        '-f',
+                        FORMAT,
+                        '--merge-output-format',
+                        'mp4',
+                        '--retries',
+                        'infinite',
+                        '--fragment-retries',
+                        'infinite',
+                        '--retry-sleep',
+                        '5',
+                        '--socket-timeout',
+                        '30',
+                        '-o',
+                        TEMP_DOWNLOAD_PATH,
+                        VIDEO_URL
+                    ];
+
+                    let percent = 0;
+                    await new Promise((resolve, reject) => {
+                        const DL = spawn(YT_DLP_PATH, SETTINGS);
+                        DL.stdout.on('data', (chunk) => {
+                            const MATCH = chunk
+                                .toString()
+                                .match(/(\d{1,3}\.\d)%/);
+                            if (MATCH) {
+                                const PERCENT = Number.parseInt(MATCH[1]);
+                                if (PERCENT > percent) {
+                                    percent = PERCENT;
+                                    getMainWindow().webContents.send(
+                                        'set-notification-data',
+                                        {
+                                            ...NOTIFICATION_DATA,
+                                            text: '.view.notification.replay_downloader.downloading',
+                                            infinite: PERCENT === 100,
+                                            percent: PERCENT
+                                        }
+                                    );
+                                }
+                            }
+                        });
+                        DL.on('error', reject);
+                        DL.on('close', (code) =>
+                            code === 0
+                                ? resolve()
+                                : reject(
+                                      new Error(`yt-dlp exited with code ${code}`)
+                                  )
+                        );
+                    });
+
+                    // Twitch : remux navigateur, comme pour un téléchargement Twitch.
+                    if (PLATFORM === 'twitch') {
+                        await fixForBrowser(TEMP_DOWNLOAD_PATH);
+                    }
+
+                    // Ingestion (durée + remux vers le watch folder) : à partir d'ici,
+                    // le flux est identique à `analyzeVideoFile`.
+                    await ingestFilesForAnalysis([TEMP_DOWNLOAD_PATH], data);
+
+                    if (fs.existsSync(TEMP_DOWNLOAD_PATH)) {
+                        fs.unlinkSync(TEMP_DOWNLOAD_PATH);
+                    }
+                    deleteFloatingWindow();
+                } catch (error) {
+                    console.error('[analyzeVideoUrl] Error:', error.message);
+                    if (fs.existsSync(TEMP_DOWNLOAD_PATH)) {
+                        fs.unlinkSync(TEMP_DOWNLOAD_PATH);
+                    }
+                    socketEmit(data.socket, 'analyzeVideoFileGames', {
+                        type: 'unavailable'
+                    });
+                    // Idem : ne pas forcer Tools au premier plan en cas d'échec.
+                    deleteFloatingWindow();
+                }
+
+                break;
+            }
             case 'openFiles': {
                 const PICKED_FILES = await openFiles(
                     data.filesExtensions ?? [],
@@ -654,7 +722,6 @@ if (!APP_GOT_THE_LOCK) {
                     paths: PICKED_FILES,
                     port: getCurrentPort()
                 });
-                StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
             }
             case 'manualCutVideoFile':
@@ -702,7 +769,6 @@ if (!APP_GOT_THE_LOCK) {
                     // Ouvre le fichier découpé avec l'application par défaut du système.
                     shell.openPath(OUTPUT_FILE_PATH);
                 }
-                StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
             case 'analyzeChunks':
                 if (
@@ -712,7 +778,6 @@ if (!APP_GOT_THE_LOCK) {
                 ) {
                     runChunkAnalyzer(data.videoPath, data.socket, data.chunks);
                 }
-                StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
             case 'addTeamScore': {
                 // Crée artificiellement l'écran de score de fin de game en
@@ -808,7 +873,6 @@ if (!APP_GOT_THE_LOCK) {
                         }
                     }
                 }
-                StorageManager.setTemporarySettingsValue('deeplink', undefined);
                 break;
             }
         }
@@ -971,6 +1035,70 @@ if (!APP_GOT_THE_LOCK) {
                 resolve(duration);
             });
         });
+    }
+
+    /**
+     * Ingest local video files into the watch folder for analysis: emits the total
+     * duration (length) on the socket, then remuxes each file into the watch folder
+     * with the analysis parameters encoded in its name (max time/games, forced
+     * scores, team id). Shared by `analyzeVideoFile` and `analyzeVideoUrl`.
+     * @param {string[]} filesPaths Local paths of the source videos.
+     * @param {*} data Deep link payload (socket, maxTime, maxGames, forced scores, teamId).
+     */
+    async function ingestFilesForAnalysis(filesPaths, data) {
+        const MAX_TIME_PER_GAME = data.maxTime ?? 10;
+        const MAX_GAMES_AT_SAME_TIME = data.maxGames ?? 3;
+        // Scores forcés (panneau "association") : on ne les encode que si LES DEUX
+        // sont des entiers 0-100. Sinon on ignore (analyse normale, OCR).
+        const isValidScore = (v) => Number.isInteger(v) && v >= 0 && v <= 100;
+        const FORCED_SCORES =
+            isValidScore(data.forcedOrangeScore) &&
+            isValidScore(data.forcedBlueScore)
+                ? `__fos-${data.forcedOrangeScore}__fbs-${data.forcedBlueScore}`
+                : '';
+        // Équipe ciblée pour le matching serveur (/identify). ID numérique uniquement.
+        const TEAM_ID =
+            typeof data.teamId === 'string' && /^\d+$/.test(data.teamId)
+                ? `__tid-${data.teamId}`
+                : '';
+        const DURATIONS = await Promise.all(
+            filesPaths.map((p) => getVideoDuration(p).catch(() => 0))
+        );
+        const TOTAL_SECONDS = DURATIONS.reduce((a, b) => a + b, 0);
+        socketEmit(data.socket, 'analyzeVideoFileGames', {
+            type: 'length',
+            value: TOTAL_SECONDS
+        });
+
+        const WATCH_FOLDER = watchFolderService.getWatchFolder();
+        if (!fs.existsSync(WATCH_FOLDER)) {
+            fs.mkdirSync(WATCH_FOLDER, { recursive: true });
+        }
+        for (const SRC of filesPaths) {
+            const EXT = path.extname(SRC);
+            const BASE = path.basename(SRC, EXT);
+            const DEST = path.join(
+                WATCH_FOLDER,
+                `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${FORCED_SCORES}${TEAM_ID}${EXT}`
+            );
+            // Remux (stream copy + faststart) : tout fichier — Twitch, YouTube ou
+            // capture — arrive dans le watch folder avec un conteneur propre.
+            await remuxToForAnalysis(SRC, DEST);
+        }
+    }
+
+    /** URL YouTube : watch, live ou youtu.be. Aligné sur le site (analyze_video.dialog). */
+    function isYouTubeUrl(url) {
+        return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)[\w-]{11}([?&]\S*)?$/.test(
+            url
+        );
+    }
+
+    /** URL Twitch : VOD ou clip. Aligné sur le site (analyze_video.dialog). */
+    function isTwitchUrl(url) {
+        return /^(https?:\/\/)?(www\.)?twitch\.tv\/(videos\/\d+|[a-zA-Z0-9_]+\/video\/\d+|[a-zA-Z0-9_]+\/clip\/[a-zA-Z0-9_-]+)$/.test(
+            url
+        );
     }
 
     /**
@@ -1683,7 +1811,6 @@ if (!APP_GOT_THE_LOCK) {
                 if (WINDOW && !WINDOW.isDestroyed() && WINDOW.isMinimized()) {
                     WINDOW.restore();
                 }
-                showMainWindow();
 
                 // Handle deep link on Windows when app is already running.
                 const DEEP_LINK_URL = commandLine.find((arg) =>
@@ -1691,6 +1818,9 @@ if (!APP_GOT_THE_LOCK) {
                 );
                 if (DEEP_LINK_URL) {
                     handleDeepLink(DEEP_LINK_URL);
+                }
+                else{
+                    showMainWindow();
                 }
             });
 
