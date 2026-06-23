@@ -12,7 +12,7 @@ const { Notification, app } = require('electron');
 const StorageManager = require('../core/storage-manager');
 const { t } = require('./translate.service');
 const { unlinkSync } = require('./global-service');
-const { cutAndEncodeGame } = require('./video-service');
+const { cutAndEncodeGame, cutCopyGame } = require('./video-service');
 const {
     identifyGames,
     persistAnalysis,
@@ -541,7 +541,14 @@ async function processVideo(videoPath, deps) {
             reportGameStatus(M.gameID, 'processing', PROGRESS_ANALYZE_END, META.teamId);
         }
         try {
-            await cutAndEncodeGame(videoPath, OUT, G.start, G.end);
+            // Games identifiées → réencodage libx264 (keyframe/s pour le lecteur
+            // web). Games non identifiées → stream-copy rapide (elles partent dans
+            // failed/, pas besoin de payer un réencodage software).
+            if (M && M.gameID != null) {
+                await cutAndEncodeGame(videoPath, OUT, G.start, G.end);
+            } else {
+                await cutCopyGame(videoPath, OUT, G.start, G.end);
+            }
             CUT_FILES.push({ tempId: TEMP_ID, file: OUT, game: G, index: i });
         } catch (e) {
             console.error(

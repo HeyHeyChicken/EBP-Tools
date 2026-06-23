@@ -353,6 +353,78 @@ async function cutAndEncodeGame(inputPath, outputPath, startSec, endSec) {
 }
 
 /**
+ * Marge (secondes) ajoutée de chaque côté d'un cut stream-copy. Stream-copy ne
+ * peut couper que sur une keyframe, et les captures ont un GOP grossier (~4 s) :
+ * on recule donc le début / avance la fin d'une marge > GOP pour garantir qu'on
+ * déborde plutôt qu'on ne crope la game.
+ */
+const COPY_MARGIN_SEC = 6;
+
+/**
+ * Découpe une game en stream-copy (sans réencodage), pour les games NON
+ * identifiées côté site : elles partent dans failed/ pour revue manuelle, jamais
+ * dans le lecteur web, donc le surcoût de scrubbing du GOP grossier n'a aucune
+ * importance — et on évite un réencodage libx264 software inutile. La coupe est
+ * élargie de COPY_MARGIN_SEC de chaque côté (cf. constante). `-ss` avant `-i`
+ * garde le seek rapide ; `-avoid_negative_ts make_zero` rebase les timestamps
+ * pour que le clip démarre proprement à 0.
+ * @param {string} inputPath  Source video.
+ * @param {string} outputPath Destination .mp4.
+ * @param {number} startSec   Début de game (s) ; reculé de la marge.
+ * @param {number} endSec     Fin de game (s) ; avancée de la marge.
+ * @returns {Promise<string>} Resolves with outputPath on success.
+ */
+async function cutCopyGame(inputPath, outputPath, startSec, endSec) {
+    if (fs.existsSync(outputPath)) {
+        unlinkSync(outputPath);
+    }
+
+    const FROM = Math.max(0, startSec - COPY_MARGIN_SEC);
+    const TO = endSec + COPY_MARGIN_SEC;
+
+    return new Promise((resolve, reject) => {
+        const FFMPEG_ARGS = [
+            '-ss',
+            String(FROM),
+            '-to',
+            String(TO),
+            '-i',
+            inputPath,
+            '-c',
+            'copy',
+            '-avoid_negative_ts',
+            'make_zero',
+            '-movflags',
+            '+faststart',
+            outputPath
+        ];
+
+        console.log(
+            `[FFMPEG] Cut copy - Executing: ${FFMPEG_PATH} ${FFMPEG_ARGS.join(' ')}`
+        );
+
+        const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+
+        FFMPEG.stderr.on('data', (data) => {
+            console.log(`[FFMPEG] Cut copy - ${data.toString().trim()}`);
+        });
+
+        FFMPEG.on('close', (code) => {
+            if (code === 0 && fs.existsSync(outputPath)) {
+                resolve(outputPath);
+            } else {
+                if (fs.existsSync(outputPath)) {
+                    unlinkSync(outputPath);
+                }
+                reject(new Error(`FFmpeg process exited with code ${code}`));
+            }
+        });
+
+        FFMPEG.on('error', (err) => reject(err));
+    });
+}
+
+/**
  * Appends a few seconds of a still image to the END of a video, re-encoding the
  * whole file. Used to artificially create the end-of-game team score frame that
  * Tools needs to bound a game when the source video doesn't contain it.
@@ -613,6 +685,7 @@ module.exports = {
     fixForBrowser,
     remuxToForAnalysis,
     cutAndEncodeGame,
+    cutCopyGame,
     appendImageTail,
     renderTeamScoreImage
 };
