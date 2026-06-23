@@ -60,9 +60,6 @@
       "uploadingBlueInfos": "Caricamento informazioni squadra blu...",
       "dialog": {
         "settings": {
-          "orangeTeamName": "Nome della squadra arancione",
-          "blueTeamName": "Nome della squadra blu",
-          "teamNameDescription": "È possibile forzare i nomi delle squadre durante il rilevamento.",
           "maxTimePerGame": "Tempo massimo per partita (minuti)",
           "freeText": "Testo libero alla fine del nome del file"
         },

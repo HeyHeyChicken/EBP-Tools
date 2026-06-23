@@ -1165,8 +1165,7 @@ export class ReplayCutterComponent {
     window.electronAPI.runAnalyzer(
       videoFilePath,
       JSON.stringify({
-        orangeTeamName: this.settings.orangeTeamName,
-        blueTeamName: this.settings.blueTeamName
+        maxTimePerGame: this.settings.maxTimePerGame
       })
     );
   }
@@ -1181,13 +1180,11 @@ export class ReplayCutterComponent {
     map: string;
     mapImage?: string;
     orangeTeam: {
-      name: string;
       score: number;
       nameImage?: string;
       scoreImage?: string;
     };
     blueTeam: {
-      name: string;
       score: number;
       nameImage?: string;
       scoreImage?: string;

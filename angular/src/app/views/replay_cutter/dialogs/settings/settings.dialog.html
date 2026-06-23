@@ -41,27 +41,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
         <input matInput [(ngModel)]="data.freeText" type="text" />
       </mat-form-field>
     </ebp-column>
-    <ebp-column [xs]="12" class="pb-0">
-      {{ 'view.replay_cutter.dialog.settings.teamNameDescription' | translate }}
-    </ebp-column>
-    <ebp-column [xs]="6">
-      <mat-form-field class="orange uppercase">
-        <mat-label
-          >{{ 'view.replay_cutter.dialog.settings.orangeTeamName' | translate
-          }}</mat-label
-        >
-        <input matInput type="text" [(ngModel)]="data.orangeTeamName" />
-      </mat-form-field>
-    </ebp-column>
-    <ebp-column [xs]="6">
-      <mat-form-field class="blue uppercase">
-        <mat-label
-          >{{ 'view.replay_cutter.dialog.settings.blueTeamName' | translate
-          }}</mat-label
-        >
-        <input matInput type="text" [(ngModel)]="data.blueTeamName" />
-      </mat-form-field>
-    </ebp-column>
   </ebp-row>
 </mat-dialog-content>
 <mat-dialog-actions align="end">

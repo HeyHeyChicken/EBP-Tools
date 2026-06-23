@@ -60,9 +60,6 @@
       "uploadingBlueInfos": "A enviar as informações da equipa azul...",
       "dialog": {
         "settings": {
-          "orangeTeamName": "Nome da equipa laranja",
-          "blueTeamName": "Nome da equipa azul",
-          "teamNameDescription": "Pode forçar o nome das equipas durante a deteção.",
           "maxTimePerGame": "Tempo máximo por partida (minutos)",
           "freeText": "Texto livre no final do nome do ficheiro"
         },

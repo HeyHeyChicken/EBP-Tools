@@ -1843,7 +1843,11 @@ if (!APP_GOT_THE_LOCK) {
 
         // The front-end asks the server to run the Python video analyzer.
         ipcMain.handle('run-analyzer', (event, videoPath, settingsJSON) => {
-            runAnalyzer(videoPath);
+            let settings = {};
+            try {
+                settings = settingsJSON ? JSON.parse(settingsJSON) : {};
+            } catch (_) {}
+            runAnalyzer(videoPath, undefined, settings);
         });
 
         // The front-end asks the server to enables/disables debug mode.

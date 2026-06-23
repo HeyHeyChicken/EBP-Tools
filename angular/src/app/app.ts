@@ -166,23 +166,6 @@ export class App implements OnInit {
         });
       });
 
-      window.electronAPI.analyzeVideoFile(
-        (
-          socket: string,
-          filePath: string,
-          forcedTraining: boolean | undefined
-        ) => {
-          this.ngZone.run(() => {
-            ReplayCutterService.videoDetectMaps(
-              socket,
-              `http://localhost:${this.globalService.serverPort}/file?path=${filePath}`,
-              this.translateService,
-              this.notificationService
-            );
-          });
-        }
-      );
-
       window.electronAPI.toast(
         (
           type: 'success' | 'error' | 'warning' | 'info',
