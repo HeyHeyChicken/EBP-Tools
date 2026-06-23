@@ -294,7 +294,8 @@ async function uploadFileToPresignedUrl(
     {
         retries = DEFAULT_RETRIES,
         baseDelayMs = DEFAULT_BASE_DELAY_MS,
-        contentType = 'video/mp4'
+        contentType = 'video/mp4',
+        onProgress /* (percent: 0-100) => void, optionnel */
     } = {}
 ) {
     const URL_OBJ = new URL(presignedUrl);
@@ -335,6 +336,17 @@ async function uploadFileToPresignedUrl(
                 REQ.on('error', reject);
                 const STREAM = fs.createReadStream(filePath);
                 STREAM.on('error', reject);
+                // Compte les octets envoyés (le stream est paced par la
+                // backpressure de la requête PUT, donc ~= débit réseau réel).
+                if (onProgress && SIZE > 0) {
+                    let uploaded = 0;
+                    STREAM.on('data', (c) => {
+                        uploaded += c.length;
+                        onProgress(
+                            Math.min(100, Math.ceil((uploaded / SIZE) * 100))
+                        );
+                    });
+                }
                 STREAM.pipe(REQ);
             });
             return STATUS;

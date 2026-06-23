@@ -588,7 +588,19 @@ async function processVideo(videoPath, deps) {
             // Upload en cours : le site garde un loader (étape "processing").
             reportGameStatus(GAME_ID, 'processing', PROGRESS_ENCODE_END, META.teamId);
             const UPLOAD = await requestUploadUrl(GAME_ID);
-            await uploadFileToPresignedUrl(UPLOAD.url, CUT.file);
+            // Progression de l'upload (0-100% du fichier) remappée sur la bande
+            // [ENCODE_END, 100] de la barre unifiée, dédup par palier.
+            let lastUnified = -1;
+            await uploadFileToPresignedUrl(UPLOAD.url, CUT.file, {
+                onProgress: (pct) => {
+                    const UNIFIED =
+                        PROGRESS_ENCODE_END +
+                        Math.round(((100 - PROGRESS_ENCODE_END) * pct) / 100);
+                    if (UNIFIED === lastUnified) return;
+                    lastUnified = UNIFIED;
+                    reportGameStatus(GAME_ID, 'processing', UNIFIED, META.teamId);
+                }
+            });
             await confirmUpload(GAME_ID, { guid: UPLOAD.guid });
             safeUnlink(CUT.file);
             // Tout est bon : le loader disparaît, le site charge l'analyse.
