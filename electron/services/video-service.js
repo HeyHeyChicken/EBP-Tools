@@ -295,7 +295,13 @@ function remuxToForAnalysis(src, dest) {
  * @param {number} endSec     Exclusive end time (seconds).
  * @returns {Promise<string>} Resolves with outputPath on success.
  */
-async function cutAndEncodeGame(inputPath, outputPath, startSec, endSec) {
+async function cutAndEncodeGame(
+    inputPath,
+    outputPath,
+    startSec,
+    endSec,
+    onProgress /* (percent: 0-100) => void, optionnel */
+) {
     if (fs.existsSync(outputPath)) {
         unlinkSync(outputPath);
     }
@@ -333,8 +339,30 @@ async function cutAndEncodeGame(inputPath, outputPath, startSec, endSec) {
 
         const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
 
+        // Durée de sortie connue : -ss/-to rebasent les timestamps à 0, donc le
+        // `time=` de ffmpeg va de 0 à (endSec - startSec). On l'utilise pour la
+        // progression plutôt que la ligne `Duration:` (= durée de la source
+        // entière, pas du segment coupé).
+        const OUT_DURATION = Math.max(0, endSec - startSec);
+
         FFMPEG.stderr.on('data', (data) => {
-            console.log(`[FFMPEG] Cut+encode - ${data.toString().trim()}`);
+            const DATA = data.toString();
+            console.log(`[FFMPEG] Cut+encode - ${DATA.trim()}`);
+
+            if (onProgress && OUT_DURATION > 0) {
+                const TIME_MATCH = DATA.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+                if (TIME_MATCH) {
+                    const CURRENT =
+                        Number.parseInt(TIME_MATCH[1]) * 3600 +
+                        Number.parseInt(TIME_MATCH[2]) * 60 +
+                        Number.parseFloat(TIME_MATCH[3]);
+                    const PERCENT = Math.min(
+                        100,
+                        Math.ceil((CURRENT / OUT_DURATION) * 100)
+                    );
+                    onProgress(PERCENT);
+                }
+            }
         });
 
         FFMPEG.on('close', (code) => {

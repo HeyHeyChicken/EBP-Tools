@@ -544,7 +544,22 @@ async function processVideo(videoPath, deps) {
             // web). Games non identifiées → stream-copy rapide (elles partent dans
             // failed/, pas besoin de payer un réencodage software).
             if (M && M.gameID != null) {
-                await cutAndEncodeGame(videoPath, OUT, G.start, G.end);
+                // Progression du réencodage (0-100% du segment) remappée sur la
+                // bande [ANALYZE_END, ENCODE_END] de la barre unifiée. On ne
+                // ré-émet que sur changement de palier pour éviter de spammer le
+                // site (ffmpeg crache une ligne time= très fréquemment).
+                let lastUnified = -1;
+                await cutAndEncodeGame(videoPath, OUT, G.start, G.end, (pct) => {
+                    const UNIFIED =
+                        PROGRESS_ANALYZE_END +
+                        Math.round(
+                            ((PROGRESS_ENCODE_END - PROGRESS_ANALYZE_END) * pct) /
+                                100
+                        );
+                    if (UNIFIED === lastUnified) return;
+                    lastUnified = UNIFIED;
+                    reportGameStatus(M.gameID, 'processing', UNIFIED, META.teamId);
+                });
             } else {
                 await cutCopyGame(videoPath, OUT, G.start, G.end);
             }
