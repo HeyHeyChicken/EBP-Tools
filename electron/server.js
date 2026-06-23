@@ -1875,6 +1875,17 @@ if (!APP_GOT_THE_LOCK) {
                                     YOUTUBE_FORMAT,
                                     '--merge-output-format',
                                     'mp4',
+                                    // Survive temporary connection losses: keep
+                                    // retrying instead of aborting, so the
+                                    // download resumes when the network returns.
+                                    '--retries',
+                                    'infinite',
+                                    '--fragment-retries',
+                                    'infinite',
+                                    '--retry-sleep',
+                                    '5',
+                                    '--socket-timeout',
+                                    '30',
                                     '-o',
                                     TEMP_DOWNLOAD_PATH,
                                     url
@@ -1887,6 +1898,17 @@ if (!APP_GOT_THE_LOCK) {
                                 settings = [
                                     `-f`,
                                     TWITCH_FORMAT,
+                                    // Survive temporary connection losses: keep
+                                    // retrying instead of aborting, so the
+                                    // download resumes when the network returns.
+                                    '--retries',
+                                    'infinite',
+                                    '--fragment-retries',
+                                    'infinite',
+                                    '--retry-sleep',
+                                    '5',
+                                    '--socket-timeout',
+                                    '30',
                                     `-o`,
                                     TEMP_DOWNLOAD_PATH,
                                     url
