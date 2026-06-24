@@ -511,11 +511,93 @@ async function processVideo(videoPath, deps) {
         }
     }
 
-    // Phase 4: cut every detected game into its own file (skip those qui ont déjà
-    // une vidéo côté serveur — pas de découpage, pas de réencodage).
+    // Phases 4 & 5 pipelinées : on réencode les games séquentiellement (libx264
+    // software est CPU-bound — paralléliser les encodages thrasherait le CPU),
+    // mais on lance l'upload de chaque game dès que son réencodage est terminé,
+    // en arrière-plan. Les uploads (réseau) chevauchent ainsi les réencodages
+    // suivants tout en restant sérialisés entre eux (1 à la fois) pour ne pas
+    // saturer la bande passante.
     const VIDEO_BASENAME = META.cleanBasename;
-    const CUT_FILES = [];
+
+    // Upload d'un cut : URL présignée → PUT → confirm. Gère lui-même ses erreurs
+    // (déplacement vers failed/, 409 déjà uploadé). Seul NotAuthenticatedError
+    // est propagé pour interrompre le pipeline.
+    const uploadCut = async (CUT) => {
+        const M = MATCH_BY_TEMP.get(CUT.tempId);
+        const GAME_ID = M ? M.gameID : null;
+        if (!GAME_ID) {
+            const DEST = await moveTo(CUT.file, FAILED_DIR);
+            console.log('[watch-folder] unmatched →', DEST);
+            return;
+        }
+        try {
+            // Upload en cours : le site garde un loader (étape "processing").
+            reportGameStatus(GAME_ID, 'processing', PROGRESS_ENCODE_END, META.teamId);
+            const UPLOAD = await requestUploadUrl(GAME_ID);
+            // Progression de l'upload (0-100% du fichier) remappée sur la bande
+            // [ENCODE_END, 100] de la barre unifiée, dédup par palier.
+            let lastUnified = -1;
+            await uploadFileToPresignedUrl(UPLOAD.url, CUT.file, {
+                onProgress: (pct) => {
+                    const UNIFIED =
+                        PROGRESS_ENCODE_END +
+                        Math.round(((100 - PROGRESS_ENCODE_END) * pct) / 100);
+                    if (UNIFIED === lastUnified) return;
+                    lastUnified = UNIFIED;
+                    reportGameStatus(GAME_ID, 'processing', UNIFIED, META.teamId);
+                }
+            });
+            await confirmUpload(GAME_ID, { guid: UPLOAD.guid });
+            safeUnlink(CUT.file);
+            // Tout est bon : le loader disparaît, le site charge l'analyse.
+            reportGameStatus(GAME_ID, 'done', 100, META.teamId);
+            console.log(
+                `[watch-folder] uploaded game ${GAME_ID} (tempId=${CUT.tempId})`
+            );
+        } catch (e) {
+            if (e instanceof NotAuthenticatedError) throw e;
+            // Filet de sécurité serveur : la game a déjà une vidéo (race ou flag
+            // hasVideo manqué). On ne re-upload pas, on jette le cut local.
+            if (e instanceof ApiError && e.status === 409) {
+                reportGameStatus(GAME_ID, 'done', 100, META.teamId);
+                console.log(
+                    `[watch-folder] skipped upload for game ${GAME_ID} — already uploaded (409)`
+                );
+                safeUnlink(CUT.file);
+                return;
+            }
+            console.error(
+                `[watch-folder] upload failed for game ${GAME_ID}:`,
+                e.message
+            );
+            reportGameStatus(GAME_ID, 'failed', PROGRESS_ENCODE_END, META.teamId);
+            const DEST = await moveTo(CUT.file, FAILED_DIR);
+            console.log('[watch-folder] failed →', DEST);
+        }
+    };
+
+    // Chaîne d'uploads sérialisée : chaque cut s'upload après le précédent, mais
+    // en arrière-plan des réencodages suivants. On capture la première erreur
+    // d'auth pour la repropager après avoir attendu la fin de la chaîne.
+    let uploadChain = Promise.resolve();
+    let pendingAuthError = null;
+    const enqueueUpload = (CUT) => {
+        uploadChain = uploadChain.then(() => {
+            if (pendingAuthError) return;
+            return uploadCut(CUT).catch((e) => {
+                if (e instanceof NotAuthenticatedError) {
+                    if (!pendingAuthError) pendingAuthError = e;
+                } else {
+                    throw e;
+                }
+            });
+        });
+    };
+
     for (let i = 0; i < GAMES.length; i++) {
+        // Auth perdue pendant un upload en arrière-plan : on arrête de réencoder,
+        // les games restantes seront retraitées au prochain passage.
+        if (pendingAuthError) break;
         const G = GAMES[i];
         const TEMP_ID = `temp-${i}`;
         const M = MATCH_BY_TEMP.get(TEMP_ID);
@@ -565,7 +647,9 @@ async function processVideo(videoPath, deps) {
             } else {
                 await cutCopyGame(videoPath, OUT, G.start, G.end);
             }
-            CUT_FILES.push({ tempId: TEMP_ID, file: OUT, game: G, index: i });
+            // Réencodage terminé → on enchaîne l'upload sans l'attendre : le
+            // réencodage de la game suivante démarre immédiatement.
+            enqueueUpload({ tempId: TEMP_ID, file: OUT, game: G, index: i });
         } catch (e) {
             console.error(
                 `[watch-folder] cut failed for game ${i} of ${videoPath}:`,
@@ -577,60 +661,10 @@ async function processVideo(videoPath, deps) {
         }
     }
 
-    // Phase 5: upload matched games, move unmatched and failed uploads to failed/
-    for (const CUT of CUT_FILES) {
-        const M = MATCH_BY_TEMP.get(CUT.tempId);
-        const GAME_ID = M ? M.gameID : null;
-        if (!GAME_ID) {
-            const DEST = await moveTo(CUT.file, FAILED_DIR);
-            console.log('[watch-folder] unmatched →', DEST);
-            continue;
-        }
-        try {
-            // Upload en cours : le site garde un loader (étape "processing").
-            reportGameStatus(GAME_ID, 'processing', PROGRESS_ENCODE_END, META.teamId);
-            const UPLOAD = await requestUploadUrl(GAME_ID);
-            // Progression de l'upload (0-100% du fichier) remappée sur la bande
-            // [ENCODE_END, 100] de la barre unifiée, dédup par palier.
-            let lastUnified = -1;
-            await uploadFileToPresignedUrl(UPLOAD.url, CUT.file, {
-                onProgress: (pct) => {
-                    const UNIFIED =
-                        PROGRESS_ENCODE_END +
-                        Math.round(((100 - PROGRESS_ENCODE_END) * pct) / 100);
-                    if (UNIFIED === lastUnified) return;
-                    lastUnified = UNIFIED;
-                    reportGameStatus(GAME_ID, 'processing', UNIFIED, META.teamId);
-                }
-            });
-            await confirmUpload(GAME_ID, { guid: UPLOAD.guid });
-            safeUnlink(CUT.file);
-            // Tout est bon : le loader disparaît, le site charge l'analyse.
-            reportGameStatus(GAME_ID, 'done', 100, META.teamId);
-            console.log(
-                `[watch-folder] uploaded game ${GAME_ID} (tempId=${CUT.tempId})`
-            );
-        } catch (e) {
-            if (e instanceof NotAuthenticatedError) throw e;
-            // Filet de sécurité serveur : la game a déjà une vidéo (race ou flag
-            // hasVideo manqué). On ne re-upload pas, on jette le cut local.
-            if (e instanceof ApiError && e.status === 409) {
-                reportGameStatus(GAME_ID, 'done', 100, META.teamId);
-                console.log(
-                    `[watch-folder] skipped upload for game ${GAME_ID} — already uploaded (409)`
-                );
-                safeUnlink(CUT.file);
-                continue;
-            }
-            console.error(
-                `[watch-folder] upload failed for game ${GAME_ID}:`,
-                e.message
-            );
-            reportGameStatus(GAME_ID, 'failed', PROGRESS_ENCODE_END, META.teamId);
-            const DEST = await moveTo(CUT.file, FAILED_DIR);
-            console.log('[watch-folder] failed →', DEST);
-        }
-    }
+    // On attend la fin de tous les uploads en arrière-plan avant de supprimer la
+    // source. Si l'auth a été perdue, on repropage pour déclencher le retry.
+    await uploadChain;
+    if (pendingAuthError) throw pendingAuthError;
 
     // Phase 6: source video deleted only once every cut has been uploaded or
     // moved to failed/. If we crash mid-pipeline, the source is still there
