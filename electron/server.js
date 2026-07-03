@@ -1076,6 +1076,19 @@ if (!APP_GOT_THE_LOCK) {
             typeof data.teamId === 'string' && /^\d+$/.test(data.teamId)
                 ? `__tid-${data.teamId}`
                 : '';
+        // Games ciblées (action groupée « Analyser » côté site) : /identify ne
+        // matchera que ces guids. Trop longs pour être encodés dans le nom de
+        // fichier (UUIDs, limite 255 chars) → sidecar JSON `<video>.json` écrit
+        // à côté du fichier remuxé (voir parseMeta côté watch-folder-service).
+        const GAME_GUIDS = Array.isArray(data.gameGuids)
+            ? data.gameGuids
+                  .filter(
+                      (g) =>
+                          typeof g === 'string' &&
+                          /^[0-9a-fA-F-]{36}$/.test(g)
+                  )
+                  .slice(0, 500)
+            : [];
         const DURATIONS = await Promise.all(
             filesPaths.map((p) => getVideoDuration(p).catch(() => 0))
         );
@@ -1096,6 +1109,14 @@ if (!APP_GOT_THE_LOCK) {
                 WATCH_FOLDER,
                 `${BASE}__mtpg-${MAX_TIME_PER_GAME}__mgast-${MAX_GAMES_AT_SAME_TIME}${FORCED_SCORES}${TEAM_ID}${EXT}`
             );
+            // Sidecar écrit AVANT le remux : la vidéo n'apparaît jamais dans le
+            // watch folder sans son scope (le watcher n'enfile que les vidéos).
+            if (GAME_GUIDS.length > 0) {
+                fs.writeFileSync(
+                    DEST + '.json',
+                    JSON.stringify({ gameGuids: GAME_GUIDS })
+                );
+            }
             // Remux (stream copy + faststart) : tout fichier — Twitch, YouTube ou
             // capture — arrive dans le watch folder avec un conteneur propre.
             await remuxToForAnalysis(SRC, DEST);

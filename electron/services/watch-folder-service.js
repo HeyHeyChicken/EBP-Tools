@@ -59,10 +59,37 @@ const PROGRESS_ANALYZE_END = 75; // phase 2 (analyse) terminée
 const PROGRESS_ENCODE_END = 90; // réencodage terminé (upload en cours)
 
 /**
+ * Lit le sidecar `<video>.json` écrit par `ingestFilesForAnalysis` (games
+ * ciblées par l'action groupée « Analyser » côté site — UUIDs trop longs pour
+ * le nom de fichier). Absent ou illisible (dépôt manuel) → [].
+ */
+function readSidecarGameGuids(filePath) {
+    try {
+        const RAW = fs.readFileSync(filePath + '.json', 'utf8');
+        const GUIDS = JSON.parse(RAW).gameGuids;
+        return Array.isArray(GUIDS)
+            ? GUIDS.filter((g) => typeof g === 'string')
+            : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+/**
+ * Supprime le sidecar d'une vidéo. À appeler dès que la vidéo quitte le watch
+ * folder (upload terminé ou déplacement vers failed/) — mais pas sur un retry
+ * auth, où la vidéo reste en place et sera retraitée avec son scope.
+ */
+function removeSidecar(videoPath) {
+    safeUnlink(videoPath + '.json');
+}
+
+/**
  * Extrait les valeurs `maxTimePerGame`, `maxGamesAtSameTime`, scores forcés et
  * `teamId` encodées dans le nom du fichier par `analyzeVideoFile` (suffixes
- * `__mtpg-N`, `__mgast-M`, `__fos-/__fbs-` et `__tid-N` avant l'extension), et
- * renvoie un basename "propre" pour l'aval (cut filenames, sourceFilename API).
+ * `__mtpg-N`, `__mgast-M`, `__fos-/__fbs-` et `__tid-N` avant l'extension),
+ * plus les `gameGuids` du sidecar JSON éventuel, et renvoie un basename
+ * "propre" pour l'aval (cut filenames, sourceFilename API).
  * Si un suffixe est absent (fichier déposé manuellement), la valeur
  * correspondante est undefined → fallback sur la valeur par défaut côté Python /
  * DEEP_ANALYSIS_CONCURRENCY (et `teamId` undefined → /identify renverra 400).
@@ -75,6 +102,7 @@ function parseMeta(filePath) {
     const FOS = BASE.match(FOS_RE);
     const FBS = BASE.match(FBS_RE);
     const TID = BASE.match(TID_RE);
+    const GAME_GUIDS = readSidecarGameGuids(filePath);
     if (!MTPG && !MGAST && !FOS && !FBS && !TID) {
         return {
             cleanBasename: BASE,
@@ -82,7 +110,8 @@ function parseMeta(filePath) {
             maxGamesAtSameTime: undefined,
             forcedOrangeScore: undefined,
             forcedBlueScore: undefined,
-            teamId: undefined
+            teamId: undefined,
+            gameGuids: GAME_GUIDS
         };
     }
     const FIRST_IDX = Math.min(
@@ -99,7 +128,8 @@ function parseMeta(filePath) {
         forcedOrangeScore: FOS ? parseInt(FOS[1], 10) : undefined,
         forcedBlueScore: FBS ? parseInt(FBS[1], 10) : undefined,
         // Gardé en string : c'est l'ID transmis tel quel au serveur (/identify).
-        teamId: TID ? TID[1] : undefined
+        teamId: TID ? TID[1] : undefined,
+        gameGuids: GAME_GUIDS
     };
 }
 
@@ -351,6 +381,7 @@ async function processVideo(videoPath, deps) {
     const GAMES = DETECT.games || [];
     if (GAMES.length === 0) {
         const DEST = await moveTo(videoPath, FAILED_DIR);
+        removeSidecar(videoPath);
         console.log('[watch-folder] no games detected →', DEST);
         // Remonte le problème au site (ligne sans gameID) — sauf dépôt manuel
         // sans équipe ciblée (pas de teamId → on ne sait pas où l'afficher).
@@ -382,6 +413,9 @@ async function processVideo(videoPath, deps) {
     const IDENTIFY_PAYLOAD = {
         sourceFilename: META.cleanBasename + path.extname(videoPath),
         teamId: META.teamId,
+        // Scope éventuel (action groupée « Analyser ») : le serveur ne matche
+        // que ces games.
+        ...(META.gameGuids.length > 0 && { gameGuids: META.gameGuids }),
         segments: toIdentifySegments(
             GAMES,
             FORCED_SCORES && GAMES.length === 1
@@ -401,6 +435,7 @@ async function processVideo(videoPath, deps) {
     const MATCHES = IDENTIFY_RES.matches || [];
     if (MATCHES.length === 0) {
         const DEST = await moveTo(videoPath, FAILED_DIR);
+        removeSidecar(videoPath);
         console.log(
             '[watch-folder] no identify match → skip analyse/encodage,',
             DEST
@@ -670,6 +705,7 @@ async function processVideo(videoPath, deps) {
     // moved to failed/. If we crash mid-pipeline, the source is still there
     // and chokidar re-enqueues it at next boot for a full retry.
     safeUnlink(videoPath);
+    removeSidecar(videoPath);
 }
 
 async function workerLoop(deps) {
@@ -728,6 +764,7 @@ async function workerLoop(deps) {
                             );
                         }
                     }
+                    removeSidecar(NEXT);
                     dequeue(NEXT);
                     processedInSession++;
                 }
