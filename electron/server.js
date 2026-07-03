@@ -78,6 +78,7 @@ const {
 const { unlinkSync } = require('./services/global-service');
 const UpdateService = require('./services/update-service');
 const ytDlpService = require('./services/ytdlp-service');
+const denoService = require('./services/deno-service');
 const watchFolderService = require('./services/watch-folder-service');
 
 //#endregion
@@ -605,11 +606,14 @@ if (!APP_GOT_THE_LOCK) {
 
                 try {
                     const YT_DLP_PATH = await ytDlpService.ensureYtDlp();
+                    // yt-dlp exige un runtime JavaScript (EJS) pour extraire
+                    // les formats YouTube : sans lui, l'extraction échoue.
+                    const DENO_PATH = await denoService.ensureDeno();
 
                     // Ne télécharger que si la source propose du 1080p (ou mieux) :
                     // sinon l'analyse n'est pas fiable. Sonde les formats via yt-dlp.
                     const { stdout } = await execAsync(
-                        `"${YT_DLP_PATH}" -J "${VIDEO_URL}"`,
+                        `"${YT_DLP_PATH}" --js-runtimes "deno:${DENO_PATH}" -J "${VIDEO_URL}"`,
                         { timeout: 30000, maxBuffer: 100 * 1024 * 1024 }
                     );
                     const INFO = JSON.parse(stdout);
@@ -633,6 +637,8 @@ if (!APP_GOT_THE_LOCK) {
                             ? 'bestvideo[height<=1080]+bestaudio/best'
                             : 'best[height<=1080]';
                     const SETTINGS = [
+                        '--js-runtimes',
+                        `deno:${DENO_PATH}`,
                         '--ffmpeg-location',
                         FFMPEG_PATH,
                         '-f',
@@ -1936,8 +1942,9 @@ if (!APP_GOT_THE_LOCK) {
         ipcMain.handle('get-video-formats', async (event, url) => {
             try {
                 const YT_DLP_PATH = await ytDlpService.ensureYtDlp();
+                const DENO_PATH = await denoService.ensureDeno();
                 const { stdout } = await execAsync(
-                    `"${YT_DLP_PATH}" -J "${url}"`,
+                    `"${YT_DLP_PATH}" --js-runtimes "deno:${DENO_PATH}" -J "${url}"`,
                     { timeout: 30000, maxBuffer: 100 * 1024 * 1024 }
                 );
                 const DATA = JSON.parse(stdout);
@@ -1973,6 +1980,7 @@ if (!APP_GOT_THE_LOCK) {
 
                 // Ensure yt-dlp is available and up-to-date
                 const YT_DLP_PATH = ytDlpService.getYtDlpPath();
+                const DENO_PATH = await denoService.ensureDeno();
 
                 const NOTIFICATION_DATA = {
                     leftRounded: true,
@@ -1990,7 +1998,7 @@ if (!APP_GOT_THE_LOCK) {
 
                 let percent = 0;
                 exec(
-                    `"${YT_DLP_PATH}" --ffmpeg-location "${FFMPEG_PATH}" --get-title ${url}`,
+                    `"${YT_DLP_PATH}" --js-runtimes "deno:${DENO_PATH}" --ffmpeg-location "${FFMPEG_PATH}" --get-title ${url}`,
                     (error, stdout, stderr) => {
                         if (error) {
                             console.error(error.message);
@@ -2046,6 +2054,8 @@ if (!APP_GOT_THE_LOCK) {
                                     ? `${formatId}+bestaudio/best`
                                     : `bestvideo[height<=${DEFAULT_VIDEO_HEIGHT}][fps>30]+bestaudio/best`;
                                 settings = [
+                                    '--js-runtimes',
+                                    `deno:${DENO_PATH}`,
                                     '--ffmpeg-location',
                                     FFMPEG_PATH,
                                     '-f',
