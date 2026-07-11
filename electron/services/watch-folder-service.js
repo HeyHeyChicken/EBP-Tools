@@ -534,15 +534,32 @@ async function processVideo(videoPath, deps) {
         if (!A || A.payload === undefined) continue;
         ANALYSES_TO_PERSIST.push({ gameID: M.gameID, payload: A.payload });
     }
+    // Games dont l'analyse a réellement été persistée : seules celles-là passent
+    // en phase encodage/upload. Une game refusée par le serveur (ex. garde
+    // "No kills" = matching /identify suspect) ou sans payload ne doit PAS voir
+    // sa vidéo uploadée — le serveur refuse d'ailleurs l'upload-url (412) sans
+    // analyse persistée.
+    let PERSISTED_IDS = new Set();
     if (ANALYSES_TO_PERSIST.length > 0) {
         const PERSIST_RES = await persistAnalysis({
             analyses: ANALYSES_TO_PERSIST
         });
+        PERSISTED_IDS = new Set(
+            (PERSIST_RES.persisted || []).map((id) => String(id))
+        );
         if (PERSIST_RES.failed && PERSIST_RES.failed.length > 0) {
             console.log(
                 '[watch-folder] persist-analysis partial failures:',
                 PERSIST_RES.failed
             );
+        }
+    }
+    // Matchées mais non persistées (refus serveur ou payload manquant) : statut
+    // "failed" tout de suite, sinon le loader du site resterait bloqué — ces
+    // games ne passeront pas par la phase upload qui émet normalement le statut.
+    for (const ID of MATCHED_GAME_IDS) {
+        if (!PERSISTED_IDS.has(ID)) {
+            reportGameStatus(ID, 'failed', PROGRESS_ANALYZE_END, META.teamId);
         }
     }
 
@@ -563,6 +580,17 @@ async function processVideo(videoPath, deps) {
         if (!GAME_ID) {
             const DEST = await moveTo(CUT.file, FAILED_DIR);
             console.log('[watch-folder] unmatched →', DEST);
+            return;
+        }
+        // Analyse non persistée (refus serveur ou payload manquant) : pas
+        // d'upload — la vidéo pourrait s'attacher à la mauvaise game (fuite).
+        // Statut "failed" déjà émis après le persist.
+        if (!PERSISTED_IDS.has(String(GAME_ID))) {
+            const DEST = await moveTo(CUT.file, FAILED_DIR);
+            console.log(
+                `[watch-folder] analysis not persisted for game ${GAME_ID} → skip upload,`,
+                DEST
+            );
             return;
         }
         try {
@@ -638,8 +666,12 @@ async function processVideo(videoPath, deps) {
         const M = MATCH_BY_TEMP.get(TEMP_ID);
         if (M && M.hasVideo) {
             // Vidéo déjà présente côté serveur : pas d'encodage/upload → la game
-            // est terminée dès la persistance de son analyse.
-            reportGameStatus(M.gameID, 'done', 100, META.teamId);
+            // est terminée dès la persistance de son analyse. "done" seulement si
+            // l'analyse a bien été persistée — sinon on laisse le statut "failed"
+            // émis après le persist.
+            if (PERSISTED_IDS.has(String(M.gameID))) {
+                reportGameStatus(M.gameID, 'done', 100, META.teamId);
+            }
             console.log(
                 `[watch-folder] skipped cut/upload for game ${M.gameID} (tempId=${TEMP_ID}) — video already uploaded`
             );
@@ -654,15 +686,20 @@ async function processVideo(videoPath, deps) {
             TMP_DIR,
             `${VIDEO_BASENAME}___${SAFE_MAP}-${ORANGE_SCORE}-${BLUE_SCORE}__${i}-${Date.now()}.mp4`
         );
+        // Seules les games persistées vont jusqu'à l'upload : les autres
+        // (unmatched OU analyse refusée) partent en stream-copy vers failed/.
+        const WILL_UPLOAD =
+            M && M.gameID != null && PERSISTED_IDS.has(String(M.gameID));
         // Réencodage : le site affiche un loader (étape "processing").
-        if (M && M.gameID != null) {
+        if (WILL_UPLOAD) {
             reportGameStatus(M.gameID, 'processing', PROGRESS_ANALYZE_END, META.teamId);
         }
         try {
             // Games identifiées → réencodage libx264 (keyframe/s pour le lecteur
-            // web). Games non identifiées → stream-copy rapide (elles partent dans
-            // failed/, pas besoin de payer un réencodage software).
-            if (M && M.gameID != null) {
+            // web). Games non identifiées ou non persistées → stream-copy rapide
+            // (elles partent dans failed/, pas besoin de payer un réencodage
+            // software).
+            if (WILL_UPLOAD) {
                 // Progression du réencodage (0-100% du segment) remappée sur la
                 // bande [ANALYZE_END, ENCODE_END] de la barre unifiée. On ne
                 // ré-émet que sur changement de palier pour éviter de spammer le
