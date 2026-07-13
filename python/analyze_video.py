@@ -48,6 +48,28 @@ TEAM_BLUE = [
     (179, 0, 243),   # Summit
 ]
 
+# Couleurs du TEXTE killfeed par thème (clé = index dans TEAM_ORANGE/TEAM_BLUE).
+# Le killfeed rend les pseudos plus sombres que les cartes de vie (cartouches
+# semi-transparents) : sur le thème Challenger (index 2, utilisé aussi par les
+# games Summit), le jaune carte (255,220,0) s'affiche ~(207,190,57) dans le
+# killfeed et le cyan (50,185,255) ~(75,155,190) — hors tolérance du row-scan
+# (tol 40) et du masque OCR, d'où un killfeed quasi aveugle sur ces games
+# (mesuré sur EVA Summit/Engine.mp4 : 1 kill/45 avant, 44/45 après recalage).
+# Thème absent du dict = texte killfeed ≈ couleurs cartes (cas Classic, dont
+# les valeurs TEAM_* ont historiquement été calibrées sur le killfeed même).
+KILLFEED_TEXT_COLORS = {
+    2: ((207, 190, 57), (75, 155, 190)),
+}
+
+
+def _killfeed_text_colors(resolved_orange, resolved_blue):
+    """Couleurs de texte killfeed du thème résolu ; fallback = couleurs résolues."""
+    try:
+        idx = TEAM_ORANGE.index(tuple(resolved_orange))
+    except (ValueError, TypeError):
+        return resolved_orange, resolved_blue
+    return KILLFEED_TEXT_COLORS.get(idx, (resolved_orange, resolved_blue))
+
 DEBUG = False
 
 MODES = [
@@ -852,47 +874,37 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     x2 = min(w, int(x2)); y2 = min(h, int(y2) + y_extend)
     if x2 <= x1 or y2 <= y1:
         return []
-    sub = frame[y1:y2, x1:x2].astype(np.int16)
+    sub = frame[y1:y2, x1:x2]
     target = np.array(target_color, dtype=np.int16)
-    mask = (np.abs(sub - target).max(axis=2) <= tol_color)
-    bw = np.where(mask, 0, 255).astype(np.uint8)
 
     if whitelist is None:
         whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
     candidates = []
-    # 4x BICUBIC × {PSM 6, 7, 8} est notre cheval de bataille (cas stable).
-    # 8x BICUBIC + PSM 8 (single word) rattrape spécifiquement les fade-ins :
-    # l'LSTM tesseract est sensible à la résolution sur les pixels semi-
-    # saturés du fade-in, et le PSM 8 (mot unique) tolère mieux la
-    # ségmentation de lettres qu'un PSM 6 (block) sur ces conditions.
-    pil4 = Image.fromarray(bw).resize(
-        (bw.shape[1] * 4, bw.shape[0] * 4), Image.BICUBIC
-    )
-    pil4 = ImageOps.expand(pil4, border=pad, fill=255).convert('RGB')
-    for psm in (6, 7, 8):
-        try:
-            txt = eva_ocr.recognize(
-                pil4, lang='eng', psm=psm, whitelist=whitelist,
-                user_words_file=user_words_path,
-            ).replace('\r', '').replace('\n', '').strip()
-            if txt:
-                candidates.append(txt)
-        except Exception:
-            pass
-    pil8 = Image.fromarray(bw).resize(
-        (bw.shape[1] * 8, bw.shape[0] * 8), Image.BICUBIC
-    )
-    pil8 = ImageOps.expand(pil8, border=pad, fill=255).convert('RGB')
-    try:
-        txt = eva_ocr.recognize(
-            pil8, lang='eng', psm=8, whitelist=whitelist,
-            user_words_file=user_words_path,
-        ).replace('\r', '').replace('\n', '').strip()
-        if txt:
-            candidates.append(txt)
-    except Exception:
-        pass
+    # UPSCALE PUIS masque (et non l'inverse) : binariser à résolution native
+    # (~11 px de glyph) puis upscaler donne des pavés crénelés que l'LSTM lit
+    # mal ; upscaler le crop COULEUR d'abord préserve l'anti-aliasing → les
+    # bords du masque sont lisses. Mesuré sur Summit/Engine (275 rows) : match
+    # killer 161→191, victim 216→255. 4x × {PSM 6, 7, 8} est le cheval de
+    # bataille ; 8x + PSM 8 (mot unique) rattrape les fade-ins et lectures
+    # dégradées (résolution supérieure + segmentation mot unique).
+    for upscale, psms in ((4, (6, 7, 8)), (8, (8,))):
+        big = np.array(Image.fromarray(sub).resize(
+            (sub.shape[1] * upscale, sub.shape[0] * upscale), Image.BICUBIC
+        )).astype(np.int16)
+        mask = (np.abs(big - target).max(axis=2) <= tol_color)
+        bw = np.where(mask, 0, 255).astype(np.uint8)
+        pil = ImageOps.expand(Image.fromarray(bw), border=pad, fill=255).convert('RGB')
+        for psm in psms:
+            try:
+                txt = eva_ocr.recognize(
+                    pil, lang='eng', psm=psm, whitelist=whitelist,
+                    user_words_file=user_words_path,
+                ).replace('\r', '').replace('\n', '').strip()
+                if txt:
+                    candidates.append(txt)
+            except Exception:
+                pass
     return candidates
 
 
@@ -1192,6 +1204,119 @@ def _match_player(raws, roster_names: list, cutoff: float = 0.5,
     return best_name if best_ratio >= cutoff else None
 
 
+def _lev_substring(needle: str, hay: str) -> int:
+    """Levenshtein de `needle` vers la meilleure SOUS-CHAÎNE de `hay` (préfixe
+    et suffixe de `hay` gratuits — DP dont la 1ère ligne est à 0 et dont on
+    prend le min de la dernière ligne). Sert au match des pseudos killfeed,
+    qui préfixent le tag de clan au pseudo roster : raw 'GLCxSayrox' vs
+    roster 'Sayrox' → distance 0 là où le Levenshtein plein plafonne à 4."""
+    n, m = len(needle), len(hay)
+    if n == 0:
+        return 0
+    prev = [0] * (m + 1)
+    for i in range(1, n + 1):
+        curr = [i] + [0] * m
+        for j in range(1, m + 1):
+            curr[j] = min(prev[j] + 1, curr[j - 1] + 1,
+                          prev[j - 1] + (0 if needle[i - 1] == hay[j - 1] else 1))
+        prev = curr
+    return min(prev)
+
+
+def _match_player_kf(raws, cand_map: dict, cutoff_plain: float = 0.5,
+                     cutoff_substring: float = 0.6):
+    """Fuzzy-match killfeed. Diffère de `_match_player` sur deux points :
+      1. les candidats sont un dict {candidat: nom canonique} — permet de
+         matcher des ALIAS (formes killfeed apprises, cf.
+         `_match_kill_observations`) tout en retournant le nom roster ;
+      2. combine Levenshtein plein (cutoff 0.5) et substring (cutoff 0.6) :
+         le killfeed affiche 'GLCxSayrox' pour un roster 'Sayrox' — le plein
+         seul plafonne à 0.6 et rate toute lecture un peu dégradée.
+    Le substring n'est admis que si le raw ne dépasse le candidat que de
+    ≤ 6 caractères (l'ordre de grandeur d'un tag de clan) : sans ce garde-fou,
+    un nom court se retrouve dans n'importe quel raw long (vu sur lunar :
+    'Midnight' trouvé dans une lecture de 'ZENxADMIIIIIIIIIIIIN').
+    Retourne (nom, ratio) ou (None, 0.0)."""
+    candidates = [raws] if isinstance(raws, str) else (raws or [])
+    candidates = [c for c in candidates if c]
+    best_name, best_ratio = None, 0.0
+    for raw in candidates:
+        raw_up = raw.upper()
+        for cand, canonical in cand_map.items():
+            cand_up = cand.upper()
+            if not cand_up:
+                continue
+            max_len = max(len(raw_up), len(cand_up))
+            r_plain = 1 - _levenshtein(raw_up, cand_up) / max_len
+            if len(raw_up) - len(cand_up) <= 6:
+                r_sub = 1 - _lev_substring(cand_up, raw_up) / len(cand_up)
+            else:
+                r_sub = 0.0
+            if r_plain < cutoff_plain and r_sub < cutoff_substring:
+                continue
+            ratio = max(r_plain, r_sub)
+            if ratio > best_ratio:
+                best_ratio, best_name = ratio, canonical
+    return best_name, best_ratio
+
+
+def _match_kill_observations(raw_observations: dict, roster_o: list,
+                             roster_b: list) -> dict:
+    """Résout les pseudos des observations killfeed brutes en slots, en 2 passes.
+
+    Le killfeed affiche les pseudos sous une FORME qui peut différer du roster :
+    tag de clan préfixé ('GLCxMillim' pour un roster 'Millim', 'HTYxNydraz'
+    pour 'HTYNydraz'). La victime (cartouche noir opaque) s'OCR bien ; le
+    tueur (cartouche semi-transparent sur le gameplay) s'OCR mal — matcher
+    ses lectures dégradées contre le pseudo roster SANS le tag échoue.
+
+    Passe 1 — apprend la forme killfeed de chaque joueur : raw le plus
+    fréquent parmi ses lectures VICTIME bien matchées (ratio ≥ 0.75), retenue
+    si vue ≥ 3 fois (un kill = ~5 obs, donc tout joueur tué au moins une fois
+    a sa forme). Passe 2 — re-matche tueur ET victime contre
+    {pseudo roster + forme apprise} et convertit en slots.
+
+    Entrée : {elapsed: [{'kt','vt','killer_raw','victim_raw','weapon',
+    'headshot'}]}. Sortie : format attendu par `_dedup_kills`. Les obs dont le
+    tueur ou la victime ne matchent pas sont écartées (rows parasites, decor)."""
+    base_o = {n: n for n in roster_o}
+    base_b = {n: n for n in roster_b}
+
+    forms = {}
+    for obs_list in raw_observations.values():
+        for obs in obs_list:
+            v_map = base_o if obs['vt'] == 'orange' else base_b
+            vm, vr = _match_player_kf(obs['victim_raw'], v_map)
+            if vm is not None and vr >= 0.75:
+                for r in obs['victim_raw']:
+                    forms.setdefault(vm, Counter())[r] += 1
+
+    cand_o, cand_b = dict(base_o), dict(base_b)
+    for name, counter in forms.items():
+        form, count = counter.most_common(1)[0]
+        if count >= 3 and len(form) >= len(name):
+            (cand_o if name in base_o else cand_b)[form] = name
+
+    out = {}
+    for elapsed, obs_list in raw_observations.items():
+        for obs in obs_list:
+            k_map = cand_o if obs['kt'] == 'orange' else cand_b
+            v_map = cand_o if obs['vt'] == 'orange' else cand_b
+            km, kr = _match_player_kf(obs['killer_raw'], k_map)
+            vm, vr = _match_player_kf(obs['victim_raw'], v_map)
+            if km is None or vm is None:
+                continue
+            k_roster = roster_o if obs['kt'] == 'orange' else roster_b
+            v_roster = roster_o if obs['vt'] == 'orange' else roster_b
+            out.setdefault(elapsed, []).append({
+                'killer': _player_slot(obs['kt'], k_roster.index(km)),
+                'victim': _player_slot(obs['vt'], v_roster.index(vm)),
+                'killer_ratio': kr, 'victim_ratio': vr,
+                'weapon': obs.get('weapon'), 'headshot': obs.get('headshot', False),
+            })
+    return out
+
+
 def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
                  respawn_window: int = 15) -> list:
     """
@@ -1236,6 +1361,20 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
                 'headshot': bool(obs.get('headshot', False)),
             })
 
+    def _cluster_start(cluster):
+        """Elapsed de départ robuste : le premier elapsed CONFIRMÉ par un
+        voisin à ≤ 2 s. Un kill s'affiche ~5 s → les vraies observations sont
+        denses (1 Hz) ; un misread isolé du timer (ex. 4:33 lu 4:28) crée un
+        outlier précoce que la règle « earliest » naïve adoptait, datant le
+        kill 4-9 s trop tôt (FP hors fenêtre de matching + events dédoublés
+        au-delà de la respawn window). Cluster singleton : son seul elapsed."""
+        if len(cluster) == 1:
+            return cluster[0]['elapsed']
+        for i in range(len(cluster) - 1):
+            if cluster[i + 1]['elapsed'] - cluster[i]['elapsed'] <= 2:
+                return cluster[i]['elapsed']
+        return cluster[0]['elapsed']
+
     def _finalize_cluster(cluster):
         weapons = [c['weapon'] for c in cluster if c['weapon']]
         weapon = None
@@ -1266,7 +1405,7 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
                 if len(cluster) >= min_observations:
                     fin = _finalize_cluster(cluster)
                     candidates.append({
-                        'elapsed': cluster[0]['elapsed'], 'killer': killer, 'victim': victim,
+                        'elapsed': _cluster_start(cluster), 'killer': killer, 'victim': victim,
                         **fin,
                     })
                 cluster = [e]
@@ -1275,7 +1414,7 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
         if len(cluster) >= min_observations:
             fin = _finalize_cluster(cluster)
             candidates.append({
-                'elapsed': cluster[0]['elapsed'], 'killer': killer, 'victim': victim,
+                'elapsed': _cluster_start(cluster), 'killer': killer, 'victim': victim,
                 **fin,
             })
 
@@ -5931,46 +6070,39 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     POINT_OBSERVATIONS.setdefault(PT['letter'], {}) \
                         .setdefault(ELAPSED, []).append((O_PCT, B_PCT))
 
-            # Killfeed : detect → split → OCR killer/victim → fuzzy match contre
-            # le roster de l'équipe correspondante. Multi-frame consensus (kill
-            # affiché 5 s) compense les misreads isolés. Skipped si rosters vides
-            # (chunk non matché côté back) — on pourrait fallback sur OCR brut
-            # mais sans validation roster c'est trop risqué de faux positifs.
+            # Killfeed : detect → split → OCR killer/victim. On stocke les
+            # lectures BRUTES par frame ; la résolution pseudo → slot se fait en
+            # fin de chunk (`_match_kill_observations`, 2 passes avec formes
+            # killfeed apprises) puis dédup multi-frame. Skipped si rosters
+            # vides (chunk non matché côté back) — on pourrait fallback sur OCR
+            # brut mais sans validation roster c'est trop risqué de faux positifs.
             if RESOLVED_ORANGE is not None and RESOLVED_BLUE is not None and (ORANGE_ROSTER or BLUE_ROSTER):
-                ROSTER_O_NAMES = [p['name'] for p in ORANGE_ROSTER if p.get('name')]
-                ROSTER_B_NAMES = [p['name'] for p in BLUE_ROSTER if p.get('name')]
-                # Slot mapping : orange[0..3] → 1..4, blue[0..3] → 6..9 (5 réservé).
-                # L'API /games/identify retourne les rosters dans le bon ordre slot.
-                for KILL_BBOX in _detect_kill_rows(frame, GF['killFeed'], RESOLVED_ORANGE, RESOLVED_BLUE):
-                    SPLIT = _split_kill_row(frame, KILL_BBOX, RESOLVED_ORANGE, RESOLVED_BLUE)
+                # Couleurs du texte killfeed : peuvent différer des couleurs
+                # cartes selon le thème (cartouches semi-transparents plus
+                # sombres, cf. KILLFEED_TEXT_COLORS).
+                KF_ORANGE, KF_BLUE = _killfeed_text_colors(RESOLVED_ORANGE, RESOLVED_BLUE)
+                for KILL_BBOX in _detect_kill_rows(frame, GF['killFeed'], KF_ORANGE, KF_BLUE):
+                    SPLIT = _split_kill_row(frame, KILL_BBOX, KF_ORANGE, KF_BLUE)
                     if SPLIT is None:
                         continue
                     KT, VT = SPLIT['killer']['team'], SPLIT['victim']['team']
-                    KT_COLOR = RESOLVED_ORANGE if KT == 'orange' else RESOLVED_BLUE
-                    VT_COLOR = RESOLVED_ORANGE if VT == 'orange' else RESOLVED_BLUE
+                    KT_COLOR = KF_ORANGE if KT == 'orange' else KF_BLUE
+                    VT_COLOR = KF_ORANGE if VT == 'orange' else KF_BLUE
                     KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR, user_words_path=USER_WORDS_PATH)
                     VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR, user_words_path=USER_WORDS_PATH)
-                    K_ROSTER = ROSTER_O_NAMES if KT == 'orange' else ROSTER_B_NAMES
-                    V_ROSTER = ROSTER_O_NAMES if VT == 'orange' else ROSTER_B_NAMES
-                    KMATCH, KRATIO = _match_player(KRAW, K_ROSTER, with_ratio=True)
-                    VMATCH, VRATIO = _match_player(VRAW, V_ROSTER, with_ratio=True)
-                    if KMATCH and VMATCH:
-                        K_SLOT = _player_slot(KT, K_ROSTER.index(KMATCH))
-                        V_SLOT = _player_slot(VT, V_ROSTER.index(VMATCH))
-                        # Identifie l'arme et le headshot via template matching.
-                        # Stocké par observation (= par frame) pour que le dédup
-                        # puisse voter sur l'arme la plus fréquemment matchée
-                        # sur les ~5 frames d'affichage du kill.
-                        WEAPON, HEADSHOT, _ = _identify_weapon(
-                            frame, SPLIT['weapon']['box'],
-                            WEAPON_TEMPLATES, HEADSHOT_TEMPLATE,
-                        )
-                        KILL_OBSERVATIONS.setdefault(ELAPSED, []).append({
-                            'killer': K_SLOT, 'victim': V_SLOT,
-                            'killer_raw': KRAW, 'victim_raw': VRAW,
-                            'killer_ratio': KRATIO, 'victim_ratio': VRATIO,
-                            'weapon': WEAPON, 'headshot': HEADSHOT,
-                        })
+                    # Identifie l'arme et le headshot via template matching.
+                    # Stocké par observation (= par frame) pour que le dédup
+                    # puisse voter sur l'arme la plus fréquemment matchée
+                    # sur les ~5 frames d'affichage du kill.
+                    WEAPON, HEADSHOT, _ = _identify_weapon(
+                        frame, SPLIT['weapon']['box'],
+                        WEAPON_TEMPLATES, HEADSHOT_TEMPLATE,
+                    )
+                    KILL_OBSERVATIONS.setdefault(ELAPSED, []).append({
+                        'kt': KT, 'vt': VT,
+                        'killer_raw': KRAW, 'victim_raw': VRAW,
+                        'weapon': WEAPON, 'headshot': HEADSHOT,
+                    })
 
             # %HP des joueurs : pixel-only (pas d'OCR), une obs par frame.
             # Skip tant qu'une couleur d'équipe n'est pas résolue (sinon les
@@ -6131,9 +6263,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         if not IS_HARDPOINT and POINTS_TIMELINE:
             POINTS_TIMELINE = _smooth_points_timeline_domination(POINTS_TIMELINE)
 
-        # Killfeed : dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
+        # Killfeed : résolution pseudo → slot en 2 passes (formes killfeed
+        # apprises sur les lectures victime, cf. _match_kill_observations),
+        # puis dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
         # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.
-        KILLS_OUT = _dedup_kills(KILL_OBSERVATIONS)
+        KILLS_OUT = _dedup_kills(_match_kill_observations(
+            KILL_OBSERVATIONS,
+            [p['name'] for p in ORANGE_ROSTER if p.get('name')],
+            [p['name'] for p in BLUE_ROSTER if p.get('name')],
+        ))
 
         # %HP par joueur : médiane des observations par seconde, par joueur.
         # Sparse comme score_timeline : on émet uniquement les sec où la
