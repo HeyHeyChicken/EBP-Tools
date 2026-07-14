@@ -194,7 +194,9 @@ function identifyGames(payload) {
  * matchées via `/identify`. Le client envoie directement les `gameID` (pas de
  * re-matching côté back). Ownership re-vérifiée par game.
  *
- * @param {object} payload { analyses: [{ gameID, payload }] }
+ * @param {object} payload { analyses: [{ gameID, payload }], teamId }
+ *   `teamId` = équipe-auteur des analyses (celle choisie dans Tools) ; sans lui,
+ *   le serveur retombe sur la première équipe éditable de l'appelant.
  * @returns {Promise<{ persisted: Array<string>, failed: Array<{gameID, reason}> }>}
  */
 function persistAnalysis(payload) {
@@ -203,14 +205,21 @@ function persistAnalysis(payload) {
 
 /**
  * POST /api/tools/games/:gameID/upload-url
+ * @param {string|number} gameID
+ * @param {string|undefined} teamId  équipe-auteur de la vidéo (celle choisie dans
+ *   Tools) ; sans lui, le serveur retombe sur la première équipe éditable.
  * @returns {Promise<{ url, key, expiresAt }>}
  */
-function requestUploadUrl(gameID) {
-    return apiRequest('POST', `/games/${encodeURIComponent(gameID)}/upload-url`, {});
+function requestUploadUrl(gameID, teamId) {
+    return apiRequest('POST', `/games/${encodeURIComponent(gameID)}/upload-url`, {
+        teamId
+    });
 }
 
 /**
  * POST /api/tools/games/:gameID/confirm-upload
+ * @param {object} payload { guid, teamId } — même `teamId` que l'upload-url, pour
+ *   que la vidéo atterrisse sur la même ligne d'analyse (game_id, author_team_id).
  */
 function confirmUpload(gameID, payload) {
     return apiRequest(

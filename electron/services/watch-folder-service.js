@@ -542,7 +542,8 @@ async function processVideo(videoPath, deps) {
     let PERSISTED_IDS = new Set();
     if (ANALYSES_TO_PERSIST.length > 0) {
         const PERSIST_RES = await persistAnalysis({
-            analyses: ANALYSES_TO_PERSIST
+            analyses: ANALYSES_TO_PERSIST,
+            teamId: META.teamId
         });
         PERSISTED_IDS = new Set(
             (PERSIST_RES.persisted || []).map((id) => String(id))
@@ -596,7 +597,7 @@ async function processVideo(videoPath, deps) {
         try {
             // Upload en cours : le site garde un loader (étape "processing").
             reportGameStatus(GAME_ID, 'processing', PROGRESS_ENCODE_END, META.teamId);
-            const UPLOAD = await requestUploadUrl(GAME_ID);
+            const UPLOAD = await requestUploadUrl(GAME_ID, META.teamId);
             // Progression de l'upload (0-100% du fichier) remappée sur la bande
             // [ENCODE_END, 100] de la barre unifiée, dédup par palier.
             let lastUnified = -1;
@@ -610,7 +611,10 @@ async function processVideo(videoPath, deps) {
                     reportGameStatus(GAME_ID, 'processing', UNIFIED, META.teamId);
                 }
             });
-            await confirmUpload(GAME_ID, { guid: UPLOAD.guid });
+            await confirmUpload(GAME_ID, {
+                guid: UPLOAD.guid,
+                teamId: META.teamId
+            });
             safeUnlink(CUT.file);
             // Tout est bon : le loader disparaît, le site charge l'analyse.
             reportGameStatus(GAME_ID, 'done', 100, META.teamId);
