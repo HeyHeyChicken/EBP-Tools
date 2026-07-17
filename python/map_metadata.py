@@ -25,7 +25,7 @@ Schema attendu (validé par `_validate`) :
         ...
       ],
       "capture_points": [
-        {"letter": str, "position": [[x1,y1], [x2,y2]]},
+        {"letter": str, "polygon": [[x,y], ...]},
         ...
       ]
     }
@@ -153,16 +153,14 @@ def _validate(data: dict, map_name: str) -> None:
         assert letter not in seen_letters, \
             f'{map_name}: duplicate capture point letter {letter!r}'
         seen_letters.add(letter)
-        pos = cp.get('position')
-        assert isinstance(pos, list) and len(pos) == 2, \
-            f'{map_name}: cp {letter}.position must be [[x1,y1], [x2,y2]] (bbox)'
-        for j, corner in enumerate(pos):
-            assert isinstance(corner, list) and len(corner) == 2, \
-                f'{map_name}: cp {letter}.position[{j}] must be [x, y]'
-            assert 0 <= corner[0] <= w and 0 <= corner[1] <= h, \
-                f'{map_name}: cp {letter}.position[{j}]={corner} out of bounds'
-        assert pos[0][0] < pos[1][0] and pos[0][1] < pos[1][1], \
-            f'{map_name}: cp {letter}.position bbox corners must be top-left then bottom-right'
+        poly = cp.get('polygon')
+        assert isinstance(poly, list) and len(poly) >= 3, \
+            f'{map_name}: cp {letter}.polygon needs ≥3 points'
+        for j, p in enumerate(poly):
+            assert isinstance(p, list) and len(p) == 2, \
+                f'{map_name}: cp {letter}.polygon[{j}] must be [x, y]'
+            assert 0 <= p[0] <= w and 0 <= p[1] <= h, \
+                f'{map_name}: cp {letter}.polygon[{j}]={p} out of bounds'
 
 
 def _render_overlay(map_name: str, out_path: str) -> None:
@@ -219,13 +217,12 @@ def _render_overlay(map_name: str, out_path: str) -> None:
                 q = (q[0] * scale, q[1] * scale)
                 _dashed_line(img, p, q, (200, 200, 255), thickness=1, dash=8)
 
-    # Capture points : rectangle vert + lettre.
+    # Capture points : polygone vert + lettre au centroïde.
     for cp in data['capture_points']:
-        (x1, y1), (x2, y2) = cp['position']
-        cv2.rectangle(img, (x1 * scale, y1 * scale), (x2 * scale, y2 * scale),
-                      (0, 220, 0), 2)
+        pts = np.array(cp['polygon'], dtype=np.int32) * scale
+        cv2.polylines(img, [pts], isClosed=True, color=(0, 220, 0), thickness=2)
         cv2.putText(img, cp['letter'],
-                    ((x1 + x2) * scale // 2 - 6, (y1 + y2) * scale // 2 + 8),
+                    (int(pts[:, 0].mean()) - 6, int(pts[:, 1].mean()) + 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 220, 0), 2)
 
     cv2.imwrite(out_path, img)

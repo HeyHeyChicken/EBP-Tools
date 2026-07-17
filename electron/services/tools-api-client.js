@@ -195,8 +195,8 @@ function identifyGames(payload) {
  * re-matching côté back). Ownership re-vérifiée par game.
  *
  * @param {object} payload { analyses: [{ gameID, payload }], teamId }
- *   `teamId` = équipe-auteur des analyses (celle choisie dans Tools) ; sans lui,
- *   le serveur retombe sur la première équipe éditable de l'appelant.
+ *   `teamId` = équipe-auteur des analyses (issue du deeplink du site) — OBLIGATOIRE,
+ *   le serveur refuse (403) sans lui.
  * @returns {Promise<{ persisted: Array<string>, failed: Array<{gameID, reason}> }>}
  */
 function persistAnalysis(payload) {
@@ -206,8 +206,8 @@ function persistAnalysis(payload) {
 /**
  * POST /api/tools/games/:gameID/upload-url
  * @param {string|number} gameID
- * @param {string|undefined} teamId  équipe-auteur de la vidéo (celle choisie dans
- *   Tools) ; sans lui, le serveur retombe sur la première équipe éditable.
+ * @param {string|undefined} teamId  équipe-auteur de la vidéo (issue du deeplink du
+ *   site) — OBLIGATOIRE, le serveur refuse (403) sans lui.
  * @returns {Promise<{ url, key, expiresAt }>}
  */
 function requestUploadUrl(gameID, teamId) {

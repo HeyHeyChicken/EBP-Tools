@@ -80,5 +80,15 @@
             "paired_with": "tp_4_1"
         }
     ],
-    "capture_points": []
+    "capture_points": [
+        {
+            "letter": "A",
+            "polygon": [
+                [207, 115],
+                [245, 115],
+                [245, 154],
+                [207, 154]
+            ]
+        }
+    ]
 }
