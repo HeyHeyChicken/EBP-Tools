@@ -129,6 +129,7 @@ def main() -> None:
         "--add-data", f"{TESS_DATA}/eng.traineddata:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evadigits.traineddata:tesseract/tessdata",
         "--add-data", f"{repo_tessdata}/evapseudos.traineddata:tesseract/tessdata",
+        "--add-data", f"{repo_tessdata}/evascores.traineddata:tesseract/tessdata",
         # Templates : détection d'arme + headshot (killfeed),
         # loading_logo (écran de loading), playing_top (ancre HUD haute),
         # minimaps (templates + JSON metadata par map).

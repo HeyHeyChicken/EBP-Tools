@@ -6,8 +6,10 @@ joueurs), puis OCR chaque zone via eva_ocr (tesserocr in-process, fallback
 pytesseract). Recette héritée d'analyze_video : upscale ×4 BICUBIC du crop
 COULEUR d'abord (binariser à résolution native crénelle les glyphes), puis
 plusieurs passes de binarisation (luminance, chroma pour le texte coloré du
-joueur sélectionné, niveaux de gris bruts) × plusieurs PSM × modèles
-(evadigits/evapseudos + eng), et vote majoritaire sur les candidats filtrés.
+joueur sélectionné, niveaux de gris bruts) × plusieurs PSM, et vote
+majoritaire sur les candidats filtrés. Chiffres : evadigits + atlas de
+glyphes. Pseudos : evascores (modèle fine-tuné sur les pseudos du scoreboard,
+cf. prepare_scoreboard_gt.py).
 
 Sortie : même structure que les .txt d'annotation —
     ligne 1 : nom de la map ('' si illisible / layout cast)
@@ -22,6 +24,7 @@ Usage :
                                                  # ground-truth <n>.txt de DIR
 """
 import argparse
+import base64
 import collections
 import json
 import os
@@ -73,6 +76,21 @@ def canonical_map(text):
 def _crop(img, zone):
     x1, y1, x2, y2 = (int(v) for v in zone)
     return img[max(y1, 0):y2, max(x1, 0):x2]
+
+
+def _crop_b64(img, zone):
+    """Crop d'une zone encodé en data-URI PNG, ou None si zone absente/vide.
+    Sert au client (Angular) pour afficher côte à côte la lecture OCR et le
+    pixel réel lu, afin de vérifier/corriger."""
+    if not zone:
+        return None
+    crop = _crop(img, zone)
+    if crop.size == 0:
+        return None
+    ok, buf = cv2.imencode('.png', crop)
+    if not ok:
+        return None
+    return 'data:image/png;base64,' + base64.b64encode(buf.tobytes()).decode('ascii')
 
 
 def _variants(crop_bgr, upscale):
@@ -233,7 +251,12 @@ def _name_candidates(img, zone):
     for line in lines:
         reads = []
         for pil in _line_images(line):
-            for lang in ('evapseudos', 'eng'):
+            # evascores : modèle Tesseract fine-tuné sur les pseudos du
+            # scoreboard (glyphes plus grands que le killfeed → distingue les
+            # X/H, V/U, 0/O que evapseudos confondait). Mesuré sur 6 frames
+            # non vues à l'entraînement : 52→79 % de pseudos exacts. Seul,
+            # sans eng/evapseudos qui réinjectaient leurs confusions au vote.
+            for lang in ('evascores',):
                 for psm in (7, 8):
                     try:
                         txt = eva_ocr.recognize(pil, lang=lang, psm=psm,
@@ -363,7 +386,7 @@ def match_roster(players, roster):
         used_n.add(name)
 
 
-def read_frame(img, roster=None, keep_candidates=False):
+def read_frame(img, roster=None, keep_candidates=False, with_zone_images=False):
     """Lit une frame BGR. Retourne un dict :
     {'layout', 'map', 'team1', 'team2',
      'players': [{'name', 'score', 'k', 'd', 'a'}, ...]} (valeurs str, ''
@@ -371,7 +394,11 @@ def read_frame(img, roster=None, keep_candidates=False):
 
     `roster` : liste optionnelle des pseudos attendus (les settings de chunk
     d'analyze_video les fournissent) — les noms lus sont alors fuzzy-matchés
-    dessus, ce qui absorbe les confusions de glyphes de la police EVA."""
+    dessus, ce qui absorbe les confusions de glyphes de la police EVA.
+
+    `with_zone_images` : joint une clé 'zones' avec le crop PNG base64 de chaque
+    zone où l'OCR a lu (map, %, et par joueur name/score/k/d/a), pour que le
+    client puisse vérifier/corriger la lecture face au pixel réel."""
     zones = scoreboard_zones.zones_for_frame(img)
     out = {'layout': zones['layout'], 'map': '', 'team1': '', 'team2': '',
            'players': []}
@@ -398,6 +425,7 @@ def read_frame(img, roster=None, keep_candidates=False):
     # ('750' lu '70') ou polluées ('9475').
     score_check = _int_checker(0, 3000, multiple=25)
     kda_check = _int_checker(0, 99)
+    zone_imgs = {'players': []} if with_zone_images else None
     for p in zones['players']:
         cands = _name_candidates(img_1080, p['name'])
         entry = {'name': cands[0] if cands else '',
@@ -408,11 +436,20 @@ def read_frame(img, roster=None, keep_candidates=False):
             entry[key] = _ocr_digits(img_1080, p[key], kda_check,
                                      psms=(7, 8, 10))
         out['players'].append(entry)
+        if with_zone_images:
+            zone_imgs['players'].append(
+                {key: _crop_b64(img_1080, p[key])
+                 for key in ('name', 'score', 'k', 'd', 'a')})
     if roster:
         match_roster(out['players'], roster)
     if not keep_candidates:
         for p in out['players']:
             p.pop('name_candidates', None)
+    if with_zone_images:
+        zone_imgs['map'] = _crop_b64(img_1080, zones.get('map'))
+        zone_imgs['team1_pct'] = _crop_b64(img_1080, zones['team1_pct'])
+        zone_imgs['team2_pct'] = _crop_b64(img_1080, zones['team2_pct'])
+        out['zones'] = zone_imgs
     return out
 
 
@@ -512,6 +549,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('frame', nargs='?', help='image de la frame (png/jpg)')
     ap.add_argument('--json', action='store_true', help='sortie JSON détaillée')
+    ap.add_argument('--zones', action='store_true',
+                    help='sortie JSON avec le crop base64 de chaque zone OCR')
     ap.add_argument('--qa', metavar='DIR',
                     help='compare chaque <n>.png de DIR à son <n>.txt')
     args = ap.parse_args()
@@ -526,8 +565,9 @@ def main():
     if img is None:
         print(f'lecture impossible : {args.frame}', file=sys.stderr)
         return 1
-    result = read_frame(img)
-    print(json.dumps(result) if args.json else format_txt(result))
+    result = read_frame(img, with_zone_images=args.zones)
+    print(json.dumps(result) if (args.json or args.zones)
+          else format_txt(result))
     return 0
 
 

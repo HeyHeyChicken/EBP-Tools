@@ -784,6 +784,35 @@ if (!APP_GOT_THE_LOCK) {
                     runChunkAnalyzer(data.videoPath, data.socket, data.chunks);
                 }
                 break;
+            case 'readScoreboard': {
+                // L'utilisateur choisit une image de scoreboard de fin de game ;
+                // le binaire Python la lit (OCR) et renvoie au client les infos
+                // ET le crop base64 de chaque zone lue, pour vérification /
+                // correction ultérieure côté Angular.
+                const SCOREBOARD_IMAGES = await openFiles([
+                    'png',
+                    'jpg',
+                    'jpeg'
+                ]);
+                if (SCOREBOARD_IMAGES.length !== 1) {
+                    socketEmit(data.socket, 'readScoreboard', {
+                        error: 'no-file'
+                    });
+                    break;
+                }
+                try {
+                    const RESULT = await runScoreboardReader(
+                        SCOREBOARD_IMAGES[0]
+                    );
+                    socketEmit(data.socket, 'readScoreboard', RESULT);
+                } catch (error) {
+                    console.error('[readScoreboard] failed:', error);
+                    socketEmit(data.socket, 'readScoreboard', {
+                        error: error.message
+                    });
+                }
+                break;
+            }
             case 'addTeamScore': {
                 // Crée artificiellement l'écran de score de fin de game en
                 // ajoutant 5 secondes d'image (background.jpg) en fin de vidéo,
@@ -1466,6 +1495,72 @@ if (!APP_GOT_THE_LOCK) {
                     }
                 }
                 reject(err);
+            });
+        });
+    }
+
+    /**
+     * Runs the packaged Python analyzer in `scoreboard` mode on a single image
+     * and resolves the OCR result: the read info plus a base64 PNG crop of every
+     * zone the OCR looked at (map, team %, and per player name/score/k/d/a), for
+     * client-side verification. Rejects on spawn error or if the process ends
+     * without emitting a `scoreboard` result.
+     * @param {string} imagePath Absolute path to the scoreboard frame (png/jpg).
+     * @returns {Promise<object>} `read_frame(..., with_zone_images=True)` output.
+     */
+    function runScoreboardReader(imagePath) {
+        return new Promise((resolve, reject) => {
+            const ARGS = ['scoreboard', imagePath];
+            const SPAWN_OPTIONS = {
+                stdio: ['ignore', 'pipe', 'pipe'],
+                cwd: path.dirname(ANALYZER_PATH),
+                windowsHide: true
+            };
+            const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            let BUFFER = '';
+            let RESULT = null;
+            let ERROR = null;
+
+            const handleLine = (line) => {
+                if (!line.trim()) return;
+                try {
+                    const MSG = JSON.parse(line);
+                    if (MSG.type === 'scoreboard') {
+                        RESULT = MSG.result;
+                    } else if (MSG.type === 'error') {
+                        ERROR = MSG.message;
+                    }
+                } catch (_) {}
+            };
+
+            ANALYZER.stdout.on('data', (chunk) => {
+                BUFFER += chunk.toString();
+                const LINES = BUFFER.split('\n');
+                BUFFER = LINES.pop();
+                for (const LINE of LINES) {
+                    handleLine(LINE);
+                }
+            });
+
+            ANALYZER.stderr.on('data', (data) => {
+                console.error('[scoreboard stderr]', data.toString());
+            });
+
+            ANALYZER.on('error', reject);
+
+            ANALYZER.on('close', () => {
+                if (BUFFER.trim()) {
+                    handleLine(BUFFER.trim());
+                }
+                if (RESULT) {
+                    resolve(RESULT);
+                } else {
+                    reject(
+                        new Error(
+                            ERROR || 'scoreboard reader produced no result'
+                        )
+                    );
+                }
             });
         });
     }

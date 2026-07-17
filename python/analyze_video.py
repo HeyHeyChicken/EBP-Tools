@@ -6672,6 +6672,39 @@ def main() -> None:
         _emit({'selftest': True, 'ocr_backend': BACKEND, 'detail': DETAIL})
         sys.exit(0 if BACKEND == 'tesserocr' else 3)
 
+    # `scoreboard <image>` : OCR d'une frame de scoreboard de fin de game
+    # (deep link Tools). Émet une ligne JSON { type: 'scoreboard', result }
+    # où result inclut la lecture ET le crop base64 de chaque zone OCR, pour
+    # que le client puisse vérifier/corriger. Réutilise le tessdata/tesseract
+    # bundlé exactement comme detect/chunks.
+    if sys.argv[1] == 'scoreboard':
+        if len(sys.argv) < 3:
+            _emit({'type': 'error', 'message': 'Usage: scoreboard <image_path>'})
+            sys.exit(1)
+        BUNDLED_TESSDATA = _get_bundled_tessdata()
+        if BUNDLED_TESSDATA:
+            os.environ['TESSDATA_PREFIX'] = BUNDLED_TESSDATA
+        TESSERACT_CMD = _get_bundled_tesseract()
+        if TESSERACT_CMD and not _tesseract_works(TESSERACT_CMD):
+            FALLBACK = _find_system_tesseract()
+            if FALLBACK and _tesseract_works(FALLBACK):
+                TESSERACT_CMD = FALLBACK
+        if TESSERACT_CMD:
+            pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+        import scoreboard_read
+        IMAGE = cv2.imread(sys.argv[2])
+        if IMAGE is None:
+            _emit({'type': 'error',
+                   'message': f'cannot read image: {sys.argv[2]}'})
+            sys.exit(1)
+        try:
+            RESULT = scoreboard_read.read_frame(IMAGE, with_zone_images=True)
+        except Exception as EXC:
+            _emit({'type': 'error', 'message': str(EXC)})
+            sys.exit(1)
+        _emit({'type': 'scoreboard', 'result': RESULT})
+        sys.exit(0)
+
     if sys.argv[1] in ('detect', 'chunks'):
         SUBCOMMAND = sys.argv[1]
         OFFSET = 2
