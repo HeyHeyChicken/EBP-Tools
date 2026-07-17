@@ -428,8 +428,10 @@ def read_frame(img, roster=None, keep_candidates=False, with_zone_images=False):
     zone_imgs = {'players': []} if with_zone_images else None
     for p in zones['players']:
         cands = _name_candidates(img_1080, p['name'])
+        # row 1 = rangée haut = équipe orange, row 2 = rangée bas = équipe bleue.
         entry = {'name': cands[0] if cands else '',
                  'name_candidates': cands,
+                 'team': 'orange' if p['row'] == 1 else 'blue',
                  'score': _ocr_digits(img_1080, p['score'], score_check,
                                       heights=(32, 40, 48))}
         for key in ('k', 'd', 'a'):
