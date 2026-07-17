@@ -23,6 +23,7 @@ from typing import Optional, Callable
 
 import minimap as _minimap
 import blob_detector as _blob_detector
+import capture_state as _capture_state
 import digit_classifier as _digit_classifier
 import map_metadata as _map_metadata
 
@@ -2732,6 +2733,96 @@ def _compute_point_fill(frame: np.ndarray, point: dict,
 
 
 _HARDPOINT_MAPS = {'Outlaw'}
+
+
+# Lissage de la série « capturable » (0/1 par seconde) d'un point :
+#   - trou de 0 ≤ _CAPTURABLE_GAP_FILL_S encadré par du capturable (1) des
+#     deux côtés → rempli : une occlusion transitoire (pastilles joueurs,
+#     reflets) ne fait pas disparaître un point pour le faire réapparaître ;
+#   - trou de 0 ≤ _CAPTURABLE_TRANSITION_GAP_S entre capturable d'un côté et
+#     « capturé » (jauge HUD, cf. points_timeline) de l'autre → rempli : un
+#     point qui se fait capturer était forcément capturable juste avant (idem
+#     à la neutralisation, dans l'autre sens). JAMAIS entre deux phases
+#     capturées (le point y est possédé, pas capturable), et les secondes
+#     capturées elles-mêmes ne sont jamais réécrites ;
+#   - flash de 1 ≤ _CAPTURABLE_FLASH_DROP_S encadré par du 0 → supprimé (un
+#     point ne s'active jamais pour 1-2 s ; anti-faux-positif).
+# Les runs en bord de série (début/fin de chunk) ne sont jamais réécrits :
+# pas de valeur confirmée de l'autre côté.
+_CAPTURABLE_GAP_FILL_S = 3
+_CAPTURABLE_TRANSITION_GAP_S = 6
+_CAPTURABLE_FLASH_DROP_S = 2
+
+
+def _rewrite_short_runs(keys: list, dense: dict, value: int,
+                        max_span: int, replacement: int) -> None:
+    """Remplace in-place les runs de `value` de durée ≤ max_span (secondes),
+    encadrés des deux côtés par une valeur opposée observée."""
+    n = len(keys)
+    i = 0
+    while i < n:
+        if dense[keys[i]] == value:
+            j = i
+            while j < n and dense[keys[j]] == value:
+                j += 1
+            if 0 < i and j < n and keys[j - 1] - keys[i] + 1 <= max_span:
+                for k in keys[i:j]:
+                    dense[k] = replacement
+            i = j
+        else:
+            i += 1
+
+
+def _fill_capturable_gaps(keys: list, dense: dict, captured: frozenset) -> None:
+    """Comble in-place les trous de 0 de la série capturable.
+
+    Durée max selon les bornes : capturable des deux côtés →
+    _CAPTURABLE_GAP_FILL_S ; capturable d'un côté et capturé de l'autre →
+    _CAPTURABLE_TRANSITION_GAP_S. Un creux entre deux phases capturées reste
+    à 0, et les secondes capturées bornent les trous sans jamais être
+    réécrites.
+    """
+    n = len(keys)
+    i = 0
+    while i < n:
+        if dense[keys[i]] == 0 and keys[i] not in captured:
+            j = i
+            while j < n and dense[keys[j]] == 0 and keys[j] not in captured:
+                j += 1
+            left = keys[i - 1] if i > 0 else None
+            right = keys[j] if j < n else None
+            left_white = left is not None and dense[left] == 1
+            right_white = right is not None and dense[right] == 1
+            left_ok = left_white or (left is not None and left in captured)
+            right_ok = right_white or (right is not None and right in captured)
+            if left_white and right_white:
+                max_span = _CAPTURABLE_GAP_FILL_S
+            else:
+                max_span = _CAPTURABLE_TRANSITION_GAP_S
+            if left_ok and right_ok and (left_white or right_white) \
+                    and keys[j - 1] - keys[i] + 1 <= max_span:
+                for k in keys[i:j]:
+                    dense[k] = 1
+            i = max(j, i + 1)
+        else:
+            i += 1
+
+
+def _smooth_capturable_dense(keys: list, dense: dict,
+                             captured: frozenset = frozenset()) -> dict:
+    """Applique les deux lissages (trous puis flashs) sur la série d'un point.
+
+    `captured` : secondes où le point est possédé / en cours de capture
+    d'après la jauge HUD (points_timeline consolidée).
+
+    Ordre voulu : combler d'abord les trous d'occlusion (le mode d'échec
+    documenté), puis supprimer les flashs restés isolés — un vrai passage
+    capturable réparé par l'étape 1 forme un run long que l'étape 2 ne
+    touche pas.
+    """
+    _fill_capturable_gaps(keys, dense, captured)
+    _rewrite_short_runs(keys, dense, 1, _CAPTURABLE_FLASH_DROP_S, 0)
+    return dense
 
 
 def _smooth_points_timeline_atlantis(timeline: dict) -> dict:
@@ -5748,6 +5839,18 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         LOCKED_POINTS = None
         # {letter: {elapsed: [(orange_pct, blue_pct), ...]}}
         POINT_OBSERVATIONS = {}
+        # Détection « point capturable » sur la minimap (cf. capture_state.py),
+        # maps whitelistées uniquement. La géométrie (box minimap + polygones
+        # projetés) est verrouillée une fois par chunk — le HUD ne bouge pas.
+        CAPTURABLE_POINTS_TPL = None
+        if MAP_NAME in _capture_state.CAPTURABLE_MAPS:
+            _md = _map_metadata.load(MAP_NAME)
+            if _md and _md.get('capture_points'):
+                CAPTURABLE_POINTS_TPL = _md['capture_points']
+        # {'polys': {letter: np.ndarray px frame}, 'scale_x': float}
+        CAPTURABLE_GEOM = None
+        # {letter: {elapsed_s: [0/1, ...]}}
+        CAPTURABLE_OBSERVATIONS = {}
         # Joueur suivi par la caméra (focus). Une obs (= slot) par frame où le
         # panneau cam est détecté ET le pseudo matche un roster. Agrégé par vote
         # par elapsed en fin de chunk → focus_timeline.
@@ -5854,7 +5957,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Sur CPU pur c'est OK ; sur PC à la traîne WINDOW=1 garde l'ancien
         # comportement bit-pour-bit (cf. sizing plus haut).
         def _submit_frame(ts):
-            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR, LOCKED_POINTS, NEXT_FRAME_IDX
+            nonlocal RESOLVED_ORANGE, RESOLVED_BLUE, HUD_ANCHOR, LOCKED_POINTS, NEXT_FRAME_IDX, CAPTURABLE_GEOM
             FRAME = _decode_for_ts(ts)
             if FRAME is None:
                 return ('skip', ts)
@@ -5897,6 +6000,34 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     LOCKED_POINTS = PTS
                     if DEBUG:
                         _emit({'log': f'[_analyze_chunks] {GAME_ID} locked {len(PTS)} points: ' + ' '.join(p['letter'] for p in PTS)})
+
+            # Verrouille la géométrie minimap pour la détection « point
+            # capturable » (maps whitelistées). Même précaution que
+            # LOCKED_POINTS : _locate_minimap peut sonder des frames voisines,
+            # on lui passe un CAP dédié pour ne pas déplacer le CAP principal.
+            if CAPTURABLE_POINTS_TPL is not None and CAPTURABLE_GEOM is None:
+                _scan_cap = _open_video(video_path)
+                FOUND = _locate_minimap(_scan_cap if _scan_cap is not None else CAP,
+                                        ts, MAP_NAME, FRAME)
+                if _scan_cap is not None:
+                    _scan_cap.release()
+                else:
+                    # Le fallback a seek'd le main CAP : force un re-seek.
+                    NEXT_FRAME_IDX = -1
+                if FOUND is not None:
+                    CAPTURABLE_GEOM = {
+                        'scale_x': FOUND['scale_x'],
+                        'polys': {
+                            cp['letter']: _capture_state.project_polygon(
+                                cp['polygon'], FOUND['box'],
+                                FOUND['scale_x'], FOUND['scale_y'])
+                            for cp in CAPTURABLE_POINTS_TPL
+                        },
+                    }
+                    if DEBUG:
+                        _emit({'log': f'[_analyze_chunks] {GAME_ID} capturable geom locked '
+                                      f'(score={FOUND["score"]:.2f}, points=' +
+                                      ''.join(sorted(CAPTURABLE_GEOM['polys'])) + ')'})
 
             # Verrouille la couleur d'équipe sur la 1ère frame exploitable du
             # chunk. On le fait ICI (avant les submit OCR) plutôt que dans
@@ -6069,6 +6200,30 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     O_PCT, B_PCT = _compute_point_fill(frame, PT, ORG_C, BLU_C)
                     POINT_OBSERVATIONS.setdefault(PT['letter'], {}) \
                         .setdefault(ELAPSED, []).append((O_PCT, B_PCT))
+
+            # État « capturable » par point, lu sur la minimap (1 obs / s).
+            # Décision pixel-wise (fond blanc translucide), cf. capture_state.py.
+            # `frame` est en RGB : seuls S et V du HSV sont lus, identiques à la
+            # conversion depuis BGR. Deux fiabilisations métier par-dessus :
+            #   - maps exclusives (Outlaw) : au plus un point capturable
+            #     simultanément, le meilleur seul est retenu ;
+            #   - veto « possédé » : si la jauge HUD du point montre une
+            #     possession/capture par une équipe à cette seconde, il ne peut
+            #     pas être capturable-blanc — écarte le cas pastille joueur
+            #     blanche posée sur un fond couleur équipe.
+            if CAPTURABLE_GEOM is not None:
+                FRAME_HSV = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+                STATES = _capture_state.detect_frame(
+                    FRAME_HSV, CAPTURABLE_GEOM['polys'], CAPTURABLE_GEOM['scale_x'],
+                    exclusive=(MAP_NAME in _capture_state.EXCLUSIVE_MAPS),
+                )
+                for LETTER, IS_ON in STATES.items():
+                    if IS_ON:
+                        OBS_PT = POINT_OBSERVATIONS.get(LETTER, {}).get(ELAPSED)
+                        if OBS_PT and any(o >= 15 or b >= 15 for o, b in OBS_PT):
+                            IS_ON = False
+                    CAPTURABLE_OBSERVATIONS.setdefault(LETTER, {}) \
+                        .setdefault(ELAPSED, []).append(1 if IS_ON else 0)
 
             # Killfeed : detect → split → OCR killer/victim. On stocke les
             # lectures BRUTES par frame ; la résolution pseudo → slot se fait en
@@ -6263,6 +6418,52 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         if not IS_HARDPOINT and POINTS_TIMELINE:
             POINTS_TIMELINE = _smooth_points_timeline_domination(POINTS_TIMELINE)
 
+        # Timeline « point capturable » : vote majoritaire par seconde (en
+        # général une seule obs), comblement des trous courts, puis émission
+        # sparse aux changements — mirror de score_timeline, forward-fill côté
+        # consommateur. Format : { letter: { "<sec>": 0|1 } }. Vide hors maps
+        # whitelistées.
+        CAPTURABLE_TIMELINE = {}
+
+        # Secondes où le point est POSSÉDÉ (jauge à 100 %) d'après la
+        # points_timeline consolidée (sparse, forward-fill). C'est la borne
+        # « capturé » du lissage : la RAMPE de capture (1-99 %) n'en fait
+        # volontairement pas partie — pendant qu'une équipe capture, le point
+        # est encore contestable donc capturable au sens jeu, et c'est
+        # précisément le trou que la règle des _CAPTURABLE_TRANSITION_GAP_S
+        # doit combler (le pixel-détecteur voit le fond teinté couleur et le
+        # veto « possédé » de la boucle OCR force 0 pendant la rampe).
+        def _captured_seconds(letter, keys):
+            tl = POINTS_TIMELINE.get(letter) if POINTS_TIMELINE else None
+            if not tl or not keys:
+                return frozenset()
+            events = sorted((int(k), v) for k, v in tl.items())
+            out = set()
+            idx = 0
+            cur = (0, 0)
+            for sec in range(keys[0], keys[-1] + 1):
+                while idx < len(events) and events[idx][0] <= sec:
+                    cur = events[idx][1]
+                    idx += 1
+                if (cur[0] or 0) >= 100 or (cur[1] or 0) >= 100:
+                    out.add(sec)
+            return frozenset(out)
+
+        for LETTER, OBS in CAPTURABLE_OBSERVATIONS.items():
+            keys = sorted(OBS)
+            dense = _smooth_capturable_dense(
+                keys,
+                {k: (1 if sum(OBS[k]) * 2 >= len(OBS[k]) else 0) for k in keys},
+                captured=_captured_seconds(LETTER, keys),
+            )
+            timeline = {}
+            prev = None
+            for K in keys:
+                if dense[K] != prev:
+                    timeline[str(K)] = dense[K]
+                    prev = dense[K]
+            CAPTURABLE_TIMELINE[LETTER] = timeline
+
         # Killfeed : résolution pseudo → slot en 2 passes (formes killfeed
         # apprises sur les lectures victime, cf. _match_kill_observations),
         # puis dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
@@ -6362,6 +6563,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                 'payload': {
                     'score_timeline': SCORE_TIMELINE,
                     'points_timeline': POINTS_TIMELINE,
+                    'points_capturable': CAPTURABLE_TIMELINE,
                     'hp_timeline': HP_TIMELINE,
                     'focus_timeline': FOCUS_TIMELINE,
                     'cart_assignment': CART_ASSIGNMENT,
