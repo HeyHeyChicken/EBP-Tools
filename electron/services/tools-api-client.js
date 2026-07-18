@@ -96,15 +96,23 @@ function httpsRequest(options, bodyBuffer = null) {
  * JSON API call with Bearer auth and retry on network/5xx errors.
  * Throws NotAuthenticatedError immediately if no valid access token.
  * Throws ApiError on non-retryable HTTP errors (4xx other than 408/429).
+ * `requireAuth: false` → pas de cookie exigé (endpoints authentifiés par la
+ * clé de salle, ex. heartbeat — le PC salle doit fonctionner même session
+ * expirée). `headers` → headers additionnels (ex. X-Arena-Token).
  */
 async function apiRequest(
     method,
     apiPath,
     body,
-    { retries = DEFAULT_RETRIES, baseDelayMs = DEFAULT_BASE_DELAY_MS } = {}
+    {
+        retries = DEFAULT_RETRIES,
+        baseDelayMs = DEFAULT_BASE_DELAY_MS,
+        headers = {},
+        requireAuth = true
+    } = {}
 ) {
-    const COOKIE = await getAuthCookie();
-    if (!COOKIE) throw new NotAuthenticatedError();
+    const COOKIE = requireAuth ? await getAuthCookie() : null;
+    if (requireAuth && !COOKIE) throw new NotAuthenticatedError();
 
     const PAYLOAD = body ? Buffer.from(JSON.stringify(body), 'utf8') : null;
     const OPTIONS = {
@@ -113,8 +121,9 @@ async function apiRequest(
         path: API_BASE_PATH + apiPath,
         method,
         headers: {
-            Cookie: `auth=${COOKIE}`,
-            Accept: 'application/json'
+            ...(COOKIE ? { Cookie: `auth=${COOKIE}` } : {}),
+            Accept: 'application/json',
+            ...headers
         }
     };
     if (PAYLOAD) {
@@ -227,6 +236,43 @@ function confirmUpload(gameID, payload) {
         `/games/${encodeURIComponent(gameID)}/confirm-upload`,
         payload
     );
+}
+
+/**
+ * POST /api/tools/arena/register
+ * Mode salle : enregistre cette machine comme PC de streaming d'une arène.
+ * Auth = cookie user classique ; la clé de salle (T_EVA_Locations.tools_token,
+ * révocable en base, IP optionnellement restreinte) est validée côté serveur.
+ * La clé elle-même sert de credential pour les futurs endpoints salle (header
+ * `X-Arena-Token`). `arenaId` = ordinal de l'arène dans la salle (1 ou 2) ;
+ * le serveur renvoie l'id du terrain réel pour le futur matching des games.
+ * Erreurs : 404 salle/arène inconnue, 422 clé refusée (clé invalide, mode
+ * désactivé ou mauvaise IP). Contrat : wiki/arena_mode_api.md.
+ *
+ * @param {{roomId:number, arenaId:number, key:string}} payload
+ * @returns {Promise<{ roomName: string, terrainId: string, terrainName: string }>}
+ */
+function registerArena(payload) {
+    return apiRequest('POST', '/arena/register', payload);
+}
+
+/**
+ * POST /api/tools/arena/heartbeat
+ * Battement de présence du mode salle (toutes les 5 min) : la page admin du
+ * site affiche l'arène "en ligne" tant que le dernier battement a moins de
+ * 15 min. Authentifié par la clé de salle seule (header X-Arena-Token, pas de
+ * cookie : doit fonctionner même session user expirée). Pas de retry — le
+ * battement suivant rattrape un échec ponctuel.
+ *
+ * @param {{roomId:number, arenaId:number}} payload
+ * @param {string} arenaToken  clé de salle stockée par arena-mode-service.
+ */
+function sendArenaHeartbeat(payload, arenaToken) {
+    return apiRequest('POST', '/arena/heartbeat', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-Arena-Token': arenaToken }
+    });
 }
 
 /**
@@ -377,6 +423,8 @@ async function uploadFileToPresignedUrl(
 
 module.exports = {
     identifyGames,
+    registerArena,
+    sendArenaHeartbeat,
     persistAnalysis,
     requestUploadUrl,
     confirmUpload,

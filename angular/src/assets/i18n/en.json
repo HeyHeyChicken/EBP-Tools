@@ -140,6 +140,32 @@
       "quality": "Quality",
       "noFormats": "No formats available",
       "urlLabel": "YouTube / Twitch URL"
+    },
+    "arena_mode": {
+      "intro": "This page sets up Tools on the streaming PC of an EVA venue. Once the venue is identified, games played in the arena are automatically recorded in original quality, analyzed, then sent to EBP.<br/><br/>When importing their games, players instantly get their videos and analyses.",
+      "roomId": "Venue ID",
+      "arenaId": "Arena ID",
+      "key": "Key",
+      "register": "Enable arena mode",
+      "registered": "Arena mode is active for {{roomName}} (venue {{roomId}}, arena {{arenaId}}).",
+      "unregister": "Disable arena mode",
+      "errors": {
+        "notAuthenticated": "You must be logged in to enable arena mode.",
+        "unknownArena": "Unknown venue or arena.",
+        "invalidKey": "Invalid key.",
+        "alreadyRegistered": "Another machine is already registered for this arena.",
+        "network": "Network error, please try again."
+      },
+      "capture": {
+        "title": "Video capture",
+        "device": "Video source",
+        "refresh": "Refresh list",
+        "recording": "Recording from \"{{device}}\". Detected games will be analyzed and uploaded automatically.",
+        "stopped": "Capture is stopped. Select a video source then start the capture.",
+        "error": "Capture stopped with an error:",
+        "start": "Start capture",
+        "stop": "Stop capture"
+      }
     }
   },
   "shared": {
@@ -152,7 +178,8 @@
       "home": "Home",
       "tools": {
         "replay_downloader": "Replay downloader",
-        "replay_cutter": "Replay cutter"
+        "replay_cutter": "Replay cutter",
+        "arena_mode": "Arena mode"
       },
       "getMoreCoins": "Get more coins"
     },

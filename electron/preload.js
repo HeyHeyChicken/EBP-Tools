@@ -67,6 +67,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
   socketEmit: (socket, path, value) => ipcRenderer.invoke("socket-emit", socket, path, value),
   // The front-end asks the server to run the Python video analyzer.
   runAnalyzer: (videoPath, settingsJSON) => ipcRenderer.invoke("run-analyzer", videoPath, settingsJSON),
+  // The front-end asks the server to return the arena (salle) mode state.
+  arenaModeGetState: () => ipcRenderer.invoke("arena-mode-get-state"),
+  // The front-end asks the server to register this machine as an arena's streaming PC.
+  arenaModeRegister: (roomId, arenaId, key) => ipcRenderer.invoke("arena-mode-register", roomId, arenaId, key),
+  // The front-end asks the server to unregister the arena mode.
+  arenaModeUnregister: () => ipcRenderer.invoke("arena-mode-unregister"),
+  // The front-end asks the server to list video capture devices.
+  arenaCaptureListDevices: () => ipcRenderer.invoke("arena-capture-list-devices"),
+  // The front-end asks the server to return the arena capture status.
+  arenaCaptureGetStatus: () => ipcRenderer.invoke("arena-capture-get-status"),
+  // The front-end asks the server to select a capture device and start capturing.
+  arenaCaptureSetDevice: (device) => ipcRenderer.invoke("arena-capture-set-device", device),
+  // The front-end asks the server to start/stop the arena capture.
+  arenaCaptureStart: () => ipcRenderer.invoke("arena-capture-start"),
+  arenaCaptureStop: () => ipcRenderer.invoke("arena-capture-stop"),
 
   //#endregion
 

@@ -140,6 +140,32 @@
       "quality": "Qualité",
       "noFormats": "Aucun format disponible",
       "urlLabel": "URL YouTube / Twitch"
+    },
+    "arena_mode": {
+      "intro": "Cette page permet d'installer Tools sur le PC de streaming d'une salle EVA. Une fois la salle identifiée, les parties jouées dans l'arène seront automatiquement enregistrées en qualité originale, analysées, puis envoyées sur EBP.<br/><br/>À l'import de leurs games, les joueurs retrouvent instantanément leurs vidéos et leurs analyses.",
+      "roomId": "ID de la salle",
+      "arenaId": "ID de l'arène",
+      "key": "Clé",
+      "register": "Activer le mode salle",
+      "registered": "Le mode salle est actif pour {{roomName}} (salle {{roomId}}, arène {{arenaId}}).",
+      "unregister": "Désactiver le mode salle",
+      "errors": {
+        "notAuthenticated": "Vous devez être connecté pour activer le mode salle.",
+        "unknownArena": "Salle ou arène inconnue.",
+        "invalidKey": "Clé invalide.",
+        "alreadyRegistered": "Une autre machine est déjà enregistrée pour cette arène.",
+        "network": "Erreur réseau, veuillez réessayer."
+      },
+      "capture": {
+        "title": "Captation vidéo",
+        "device": "Source vidéo",
+        "refresh": "Rafraîchir la liste",
+        "recording": "Enregistrement en cours depuis « {{device}} ». Les parties détectées seront analysées et envoyées automatiquement.",
+        "stopped": "La captation est arrêtée. Sélectionnez une source vidéo puis démarrez la captation.",
+        "error": "La captation s'est arrêtée avec une erreur :",
+        "start": "Démarrer la captation",
+        "stop": "Arrêter la captation"
+      }
     }
   },
   "shared": {
@@ -152,7 +178,8 @@
       "home": "Accueil",
       "tools": {
         "replay_downloader": "Téléchargeur de replay",
-        "replay_cutter": "Découpeur de replay"
+        "replay_cutter": "Découpeur de replay",
+        "arena_mode": "Mode salle"
       },
       "getMoreCoins": "Obtenir plus de pièces"
     },

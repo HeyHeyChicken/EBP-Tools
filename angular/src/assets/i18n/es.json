@@ -140,6 +140,32 @@
       "quality": "Calidad",
       "noFormats": "No hay formatos disponibles",
       "urlLabel": "URL de YouTube / Twitch"
+    },
+    "arena_mode": {
+      "intro": "Esta página permite instalar Tools en el PC de streaming de una sala EVA. Una vez identificada la sala, las partidas jugadas en la arena se graban automáticamente en calidad original, se analizan y se envían a EBP.<br/><br/>Al importar sus partidas, los jugadores encuentran al instante sus vídeos y sus análisis.",
+      "roomId": "ID de la sala",
+      "arenaId": "ID de la arena",
+      "key": "Clave",
+      "register": "Activar el modo sala",
+      "registered": "El modo sala está activo para {{roomName}} (sala {{roomId}}, arena {{arenaId}}).",
+      "unregister": "Desactivar el modo sala",
+      "errors": {
+        "notAuthenticated": "Debe iniciar sesión para activar el modo sala.",
+        "unknownArena": "Sala o arena desconocida.",
+        "invalidKey": "Clave inválida.",
+        "alreadyRegistered": "Otra máquina ya está registrada para esta arena.",
+        "network": "Error de red, inténtelo de nuevo."
+      },
+      "capture": {
+        "title": "Captura de vídeo",
+        "device": "Fuente de vídeo",
+        "refresh": "Actualizar la lista",
+        "recording": "Grabando desde «{{device}}». Las partidas detectadas se analizarán y enviarán automáticamente.",
+        "stopped": "La captura está detenida. Seleccione una fuente de vídeo y luego inicie la captura.",
+        "error": "La captura se detuvo con un error:",
+        "start": "Iniciar la captura",
+        "stop": "Detener la captura"
+      }
     }
   },
   "shared": {
@@ -152,7 +178,8 @@
       "home": "Inicio",
       "tools": {
         "replay_downloader": "Descargador de repeticiones",
-        "replay_cutter": "Cortador de repetición"
+        "replay_cutter": "Cortador de repetición",
+        "arena_mode": "Modo sala"
       },
       "getMoreCoins": "Obtener más monedas"
     },

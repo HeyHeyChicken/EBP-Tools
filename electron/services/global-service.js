@@ -25,6 +25,19 @@ function unlinkSync(path) {
     }
 }
 
+/**
+ * Sanitizes a map name for use in a filename: non-alphanumerics collapsed to
+ * dashes, trimmed. Shared by the watch-folder cuts and the arena pipeline
+ * (S3 filename convention: no underscores inside values).
+ * @param {string} mapName Raw map name ('' or nullish → 'unknown').
+ */
+function safeMapName(mapName) {
+    return (mapName || 'unknown')
+        .replace(/[^a-zA-Z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
 module.exports = {
-    unlinkSync
+    unlinkSync,
+    safeMapName
 };

@@ -140,6 +140,32 @@
       "quality": "Qualità",
       "noFormats": "Nessun formato disponibile",
       "urlLabel": "URL YouTube / Twitch"
+    },
+    "arena_mode": {
+      "intro": "Questa pagina consente di installare Tools sul PC di streaming di una sala EVA. Una volta identificata la sala, le partite giocate nell'arena vengono registrate automaticamente in qualità originale, analizzate e inviate a EBP.<br/><br/>Al momento dell'importazione, i giocatori trovano immediatamente i loro video e le loro analisi.",
+      "roomId": "ID della sala",
+      "arenaId": "ID dell'arena",
+      "key": "Chiave",
+      "register": "Attiva la modalità sala",
+      "registered": "La modalità sala è attiva per {{roomName}} (sala {{roomId}}, arena {{arenaId}}).",
+      "unregister": "Disattiva la modalità sala",
+      "errors": {
+        "notAuthenticated": "Devi essere connesso per attivare la modalità sala.",
+        "unknownArena": "Sala o arena sconosciuta.",
+        "invalidKey": "Chiave non valida.",
+        "alreadyRegistered": "Un'altra macchina è già registrata per questa arena.",
+        "network": "Errore di rete, riprova."
+      },
+      "capture": {
+        "title": "Acquisizione video",
+        "device": "Sorgente video",
+        "refresh": "Aggiorna l'elenco",
+        "recording": "Registrazione in corso da «{{device}}». Le partite rilevate saranno analizzate e inviate automaticamente.",
+        "stopped": "L'acquisizione è ferma. Seleziona una sorgente video e avvia l'acquisizione.",
+        "error": "L'acquisizione si è fermata con un errore:",
+        "start": "Avvia l'acquisizione",
+        "stop": "Ferma l'acquisizione"
+      }
     }
   },
   "shared": {
@@ -152,7 +178,8 @@
       "home": "Home",
       "tools": {
         "replay_downloader": "Downloader di replay",
-        "replay_cutter": "Taglierina replay"
+        "replay_cutter": "Taglierina replay",
+        "arena_mode": "Modalità sala"
       },
       "getMoreCoins": "Ottenere più monete"
     },

@@ -1,0 +1,159 @@
+<!--
+Copyright (c) 2026, Antoine Duval
+This file is part of a source-visible project.
+See LICENSE for terms. Unauthorized use is prohibited.
+-->
+
+<ebp-container>
+  <ebp-row>
+    <ebp-column></ebp-column>
+    <ebp-column [xs]="7">
+      @if (state) {
+        @if (state.registered) {
+          <ebp-message class="mb-2" state="success">
+            {{
+              'view.arena_mode.registered'
+                | translate
+                  : {
+                      roomName: state.roomName,
+                      roomId: state.roomId,
+                      arenaId: state.arenaId
+                    }
+            }}
+          </ebp-message>
+          <!-- Captation : source vidéo (caméra virtuelle) → segments spool -->
+          <div class="box">
+            <p>{{ 'view.arena_mode.capture.title' | translate }}</p>
+            <div class="d-flex">
+              <mat-form-field class="mr-1">
+                <mat-label>{{
+                  'view.arena_mode.capture.device' | translate
+                }}</mat-label>
+                <mat-select
+                  [(ngModel)]="selectedDeviceId"
+                  [ngModelOptions]="{ standalone: true }"
+                  (selectionChange)="applyDevice()"
+                >
+                  @for (device of devices; track device.id) {
+                    <mat-option [value]="device.id">{{
+                      device.name
+                    }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <button
+                type="button"
+                class="squared"
+                (click)="refreshDevices()"
+                matTooltip="{{
+                  'view.arena_mode.capture.refresh' | translate
+                }}"
+              >
+                <i class="fa-sharp fa-solid fa-arrows-rotate"></i>
+              </button>
+            </div>
+            @if (captureStatus) {
+              @if (captureStatus.running) {
+                <video
+                  #previewVideo
+                  class="preview"
+                  autoplay
+                  muted
+                  playsinline
+                ></video>
+                <ebp-message state="success">
+                  {{
+                    'view.arena_mode.capture.recording'
+                      | translate: { device: captureStatus.deviceName }
+                  }}
+                </ebp-message>
+              } @else if (captureStatus.lastError) {
+                <ebp-message state="error">
+                  {{ 'view.arena_mode.capture.error' | translate }}
+                  <code>{{ captureStatus.lastError }}</code>
+                </ebp-message>
+              } @else {
+                <ebp-message>
+                  {{ 'view.arena_mode.capture.stopped' | translate }}
+                </ebp-message>
+              }
+              <button
+                type="button"
+                class="w-100"
+                [class.red]="captureStatus.running"
+                [class.green]="!captureStatus.running"
+                [disabled]="!captureStatus.deviceId"
+                (click)="toggleCapture()"
+              >
+                {{
+                  (captureStatus.running
+                    ? 'view.arena_mode.capture.stop'
+                    : 'view.arena_mode.capture.start'
+                  ) | translate
+                }}
+              </button>
+            }
+          </div>
+          <div class="box mt-2">
+            <button type="button" class="w-100 red" (click)="unregister()">
+              {{ 'view.arena_mode.unregister' | translate }}
+            </button>
+          </div>
+        } @else {
+          <ebp-message
+            class="mb-2"
+            [html]="'view.arena_mode.intro' | translate"
+          ></ebp-message>
+          <div class="box">
+            <form (submit)="register()">
+              <mat-form-field>
+                <mat-label>{{
+                  'view.arena_mode.roomId' | translate
+                }}</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  [ngModelOptions]="{ standalone: true }"
+                  [(ngModel)]="roomId"
+                />
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>{{
+                  'view.arena_mode.arenaId' | translate
+                }}</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  [ngModelOptions]="{ standalone: true }"
+                  [(ngModel)]="arenaId"
+                />
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>{{ 'view.arena_mode.key' | translate }}</mat-label>
+                <input
+                  matInput
+                  type="password"
+                  [ngModelOptions]="{ standalone: true }"
+                  [(ngModel)]="key"
+                />
+              </mat-form-field>
+              <button
+                [disabled]="!roomId || !arenaId || !key || registering"
+                type="submit"
+                class="w-100 mt-1 green"
+              >
+                @if (registering) {
+                  <i class="fa-sharp fa-solid fa-spinner fa-spin"></i>
+                } @else {
+                  {{ 'view.arena_mode.register' | translate }}
+                }
+              </button>
+            </form>
+          </div>
+        }
+      }
+    </ebp-column>
+  </ebp-row>
+</ebp-container>

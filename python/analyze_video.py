@@ -5401,6 +5401,10 @@ def _analyze(
     # Fallback : pas de loading/intro screen détecté (vidéo déjà pré-coupée
     # par exemple). Le start "brut" devient 0, mais on tente quand même
     # d'affiner via le timer in-game à partir de t=0. CAP encore ouvert ici.
+    # `startFallback` marque ce cas pour les consommateurs qui ne peuvent pas
+    # s'y fier : en capture continue (mode salle), un start non borné par une
+    # loading frame est soit une game déjà extraite à un round précédent, soit
+    # une game entamée avant le début de la captation — jamais exploitable.
     if CURRENT is not None and CURRENT['start'] == -1:
         REFINED_START = _refine_game_start_with_timer(
             CAP, 0.0,
@@ -5408,6 +5412,7 @@ def _analyze(
             hud_anchor=HUD_ANCHOR,
         )
         CURRENT['start'] = REFINED_START
+        CURRENT['startFallback'] = True
         _emit({'type': 'game', 'game': CURRENT})
 
     CAP.release()

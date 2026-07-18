@@ -80,6 +80,13 @@ const UpdateService = require('./services/update-service');
 const ytDlpService = require('./services/ytdlp-service');
 const denoService = require('./services/deno-service');
 const watchFolderService = require('./services/watch-folder-service');
+const arenaModeService = require('./services/arena-mode-service');
+const arenaCaptureService = require('./services/arena-capture-service');
+const arenaPipelineService = require('./services/arena-pipeline-service');
+const {
+    NotAuthenticatedError,
+    ApiError
+} = require('./services/tools-api-client');
 
 //#endregion
 
@@ -1906,6 +1913,20 @@ if (!APP_GOT_THE_LOCK) {
             console.error('[watch-folder] failed to start', e);
         }
 
+        // Mode salle : battement de présence périodique vers le backend (no-op
+        // si le mode n'est pas actif sur cette machine), reprise de la
+        // captation si un périphérique est configuré, et consommateur du spool
+        // (segments → games découpées).
+        arenaModeService.startHeartbeat();
+        if (arenaModeService.getState().registered) {
+            arenaCaptureService.autoStart();
+            try {
+                arenaPipelineService.start({ runAnalyzer });
+            } catch (e) {
+                console.error('[arena-pipeline] failed to start', e);
+            }
+        }
+
         if (IS_DEV_MODE) {
             // We wait until the Angular server is ready before creating the window that will contain the HMI.
             waitForHttp(4201).then(() => {
@@ -2466,6 +2487,71 @@ if (!APP_GOT_THE_LOCK) {
         // The front-end asks the server to logout.
         ipcMain.handle('logout', () => {
             logout(getMainWindow);
+        });
+
+        // The front-end asks the server to return the arena (salle) mode state.
+        ipcMain.handle('arena-mode-get-state', () => {
+            return arenaModeService.getState();
+        });
+
+        // The front-end asks the server to register this machine as the
+        // streaming PC of an arena (salle). Errors are mapped to i18n keys of
+        // `view.arena_mode.errors.*` so the front only has to toast them.
+        ipcMain.handle(
+            'arena-mode-register',
+            async (event, roomId, arenaId, key) => {
+                try {
+                    const STATE = await arenaModeService.register({
+                        roomId,
+                        arenaId,
+                        key
+                    });
+                    // La salle vient d'être activée : le consommateur du spool
+                    // démarre (idempotent si déjà actif).
+                    arenaPipelineService.start({ runAnalyzer });
+                    return { success: true, state: STATE };
+                } catch (e) {
+                    console.error('[arena-mode] register failed:', e.message);
+                    let error = 'network';
+                    if (e instanceof NotAuthenticatedError) {
+                        error = 'notAuthenticated';
+                    } else if (e instanceof ApiError) {
+                        if (e.status === 404) error = 'unknownArena';
+                        else if (e.status === 422) error = 'invalidKey';
+                    }
+                    return { success: false, error };
+                }
+            }
+        );
+
+        // The front-end asks the server to unregister the arena (salle) mode.
+        ipcMain.handle('arena-mode-unregister', () => {
+            arenaCaptureService.stopCapture();
+            arenaPipelineService.stop();
+            return arenaModeService.unregister();
+        });
+
+        // The front-end asks the server to list video capture devices.
+        ipcMain.handle('arena-capture-list-devices', () => {
+            return arenaCaptureService.listVideoDevices();
+        });
+
+        // The front-end asks the server to return the capture status.
+        ipcMain.handle('arena-capture-get-status', () => {
+            return arenaCaptureService.getStatus();
+        });
+
+        // The front-end asks the server to select a device and start capturing.
+        ipcMain.handle('arena-capture-set-device', (event, device) => {
+            return arenaCaptureService.setDeviceAndRestart(device);
+        });
+
+        // The front-end asks the server to start/stop the capture.
+        ipcMain.handle('arena-capture-start', () => {
+            return arenaCaptureService.startCapture();
+        });
+        ipcMain.handle('arena-capture-stop', () => {
+            return arenaCaptureService.stopCapture();
         });
 
         // The front-end asks the server to save the current language.
