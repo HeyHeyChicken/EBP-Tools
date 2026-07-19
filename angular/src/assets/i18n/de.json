@@ -140,6 +140,33 @@
       "quality": "Qualität",
       "noFormats": "Keine Formate verfügbar",
       "urlLabel": "YouTube- / Twitch-URL"
+    },
+    "arena_mode": {
+      "intro": "Diese Seite richtet Tools auf dem Streaming-PC einer EVA-Halle ein. Sobald die Halle identifiziert ist, werden die in der Arena gespielten Partien automatisch in Originalqualität aufgezeichnet, analysiert und an EBP gesendet.<br/><br/>Beim Import ihrer Spiele erhalten die Spieler sofort ihre Videos und Analysen.",
+      "roomId": "Hallen-ID",
+      "arenaId": "Arena-ID",
+      "key": "Schlüssel",
+      "register": "Arena-Modus aktivieren",
+      "registered": "Der Arena-Modus ist aktiv für {{roomName}} (Halle {{roomId}}, Arena {{arenaId}}).",
+      "unregister": "Arena-Modus deaktivieren",
+      "errors": {
+        "notAuthenticated": "Sie müssen angemeldet sein, um den Arena-Modus zu aktivieren.",
+        "unknownArena": "Unbekannte Halle oder Arena.",
+        "invalidKey": "Ungültiger Schlüssel.",
+        "alreadyRegistered": "Für diese Arena ist bereits ein anderer Rechner registriert.",
+        "network": "Netzwerkfehler, bitte versuchen Sie es erneut."
+      },
+      "capture": {
+        "title": "Videoaufnahme",
+        "device": "Videoquelle",
+        "refresh": "Liste aktualisieren",
+        "recording": "Aufnahme läuft von „{{device}}“. Erkannte Partien werden automatisch analysiert und hochgeladen.",
+        "stopped": "Die Aufnahme ist gestoppt. Wählen Sie eine Videoquelle und starten Sie die Aufnahme.",
+        "error": "Die Aufnahme wurde mit einem Fehler beendet:",
+        "start": "Aufnahme starten",
+        "stop": "Aufnahme stoppen",
+        "openFolder": "Arbeitsordner öffnen"
+      }
     }
   },
   "shared": {
@@ -152,7 +179,8 @@
       "home": "Startseite",
       "tools": {
         "replay_downloader": "Wiederholungs-Downloader",
-        "replay_cutter": "Wiederholungs-Editor"
+        "replay_cutter": "Wiederholungs-Editor",
+        "arena_mode": "Arena-Modus"
       },
       "getMoreCoins": "Mehr Münzen erhalten"
     },

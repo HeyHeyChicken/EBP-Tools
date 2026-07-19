@@ -9,6 +9,7 @@ import { HomeComponent } from './views/home/home.component';
 import { ReplayCutterComponent } from './views/replay_cutter/replay_cutter.component';
 import { ReplayDownloaderComponent } from './views/replay_downloader/replay_downloader.component';
 import { NotificationComponent } from './views/notification/notification.component';
+import { ArenaModeComponent } from './views/arena_mode/arena_mode.component';
 
 //#endregion
 
@@ -27,6 +28,10 @@ export const routes: Routes = [
       {
         path: 'replay_downloader',
         component: ReplayDownloaderComponent
+      },
+      {
+        path: 'arena_mode',
+        component: ArenaModeComponent
       },
       {
         path: 'notification',

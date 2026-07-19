@@ -402,13 +402,22 @@ const COPY_MARGIN_SEC = 6;
  * @param {number} endSec     Fin de game (s) ; avancée de la marge.
  * @returns {Promise<string>} Resolves with outputPath on success.
  */
-async function cutCopyGame(inputPath, outputPath, startSec, endSec) {
+async function cutCopyGame(
+    inputPath,
+    outputPath,
+    startSec,
+    endSec,
+    // Marge par défaut calibrée pour les VODs au GOP grossier (~4 s). Les
+    // captations mode salle ont un GOP de 1 s → marge de 1 s suffisante pour
+    // une coupe quasi exacte.
+    marginSec = COPY_MARGIN_SEC
+) {
     if (fs.existsSync(outputPath)) {
         unlinkSync(outputPath);
     }
 
-    const FROM = Math.max(0, startSec - COPY_MARGIN_SEC);
-    const TO = endSec + COPY_MARGIN_SEC;
+    const FROM = Math.max(0, startSec - marginSec);
+    const TO = endSec + marginSec;
 
     return new Promise((resolve, reject) => {
         const FFMPEG_ARGS = [
@@ -449,6 +458,79 @@ async function cutCopyGame(inputPath, outputPath, startSec, endSec) {
         });
 
         FFMPEG.on('error', (err) => reject(err));
+    });
+}
+
+/**
+ * Concatène plusieurs segments vidéo issus du MÊME run d'encodage (codecs et
+ * paramètres identiques) en un seul fichier, en stream-copy (concat demuxer,
+ * zéro réencodage). Utilisé par le pipeline mode salle pour reconstruire la
+ * fenêtre d'analyse à partir des segments de captation.
+ * @param {string[]} inputPaths Segments dans l'ordre chronologique.
+ * @param {string} outputPath Fichier de sortie (écrasé s'il existe).
+ */
+async function concatCopySegments(inputPaths, outputPath) {
+    if (fs.existsSync(outputPath)) {
+        unlinkSync(outputPath);
+    }
+
+    // Fichier liste du concat demuxer. Quotes simples échappées (syntaxe ffmpeg).
+    const LIST_PATH = outputPath + '.txt';
+    fs.writeFileSync(
+        LIST_PATH,
+        inputPaths
+            .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
+            .join('\n'),
+        'utf8'
+    );
+
+    return new Promise((resolve, reject) => {
+        const FFMPEG_ARGS = [
+            '-f',
+            'concat',
+            '-safe',
+            '0',
+            '-i',
+            LIST_PATH,
+            '-c',
+            'copy',
+            '-avoid_negative_ts',
+            'make_zero',
+            outputPath
+        ];
+
+        console.log(
+            `[FFMPEG] Concat copy - Executing: ${FFMPEG_PATH} ${FFMPEG_ARGS.join(' ')}`
+        );
+
+        const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+
+        FFMPEG.stderr.on('data', (data) => {
+            console.log(`[FFMPEG] Concat copy - ${data.toString().trim()}`);
+        });
+
+        const cleanup = () => {
+            try {
+                unlinkSync(LIST_PATH);
+            } catch (_) {}
+        };
+
+        FFMPEG.on('close', (code) => {
+            cleanup();
+            if (code === 0 && fs.existsSync(outputPath)) {
+                resolve(outputPath);
+            } else {
+                if (fs.existsSync(outputPath)) {
+                    unlinkSync(outputPath);
+                }
+                reject(new Error(`FFmpeg process exited with code ${code}`));
+            }
+        });
+
+        FFMPEG.on('error', (err) => {
+            cleanup();
+            reject(err);
+        });
     });
 }
 
@@ -714,6 +796,7 @@ module.exports = {
     remuxToForAnalysis,
     cutAndEncodeGame,
     cutCopyGame,
+    concatCopySegments,
     appendImageTail,
     renderTeamScoreImage
 };

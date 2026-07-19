@@ -140,6 +140,33 @@
       "quality": "Calitate",
       "noFormats": "Niciun format disponibil",
       "urlLabel": "URL YouTube / Twitch"
+    },
+    "arena_mode": {
+      "intro": "Această pagină permite instalarea Tools pe PC-ul de streaming al unei săli EVA. Odată ce sala este identificată, partidele jucate în arenă sunt înregistrate automat în calitate originală, analizate și trimise către EBP.<br/><br/>La importul jocurilor, jucătorii își găsesc instantaneu videoclipurile și analizele.",
+      "roomId": "ID-ul sălii",
+      "arenaId": "ID-ul arenei",
+      "key": "Cheie",
+      "register": "Activează modul sală",
+      "registered": "Modul sală este activ pentru {{roomName}} (sala {{roomId}}, arena {{arenaId}}).",
+      "unregister": "Dezactivează modul sală",
+      "errors": {
+        "notAuthenticated": "Trebuie să fiți conectat pentru a activa modul sală.",
+        "unknownArena": "Sală sau arenă necunoscută.",
+        "invalidKey": "Cheie invalidă.",
+        "alreadyRegistered": "O altă mașină este deja înregistrată pentru această arenă.",
+        "network": "Eroare de rețea, încercați din nou."
+      },
+      "capture": {
+        "title": "Captură video",
+        "device": "Sursă video",
+        "refresh": "Reîmprospătează lista",
+        "recording": "Se înregistrează de la „{{device}}”. Partidele detectate vor fi analizate și trimise automat.",
+        "stopped": "Captura este oprită. Selectați o sursă video, apoi porniți captura.",
+        "error": "Captura s-a oprit cu o eroare:",
+        "start": "Pornește captura",
+        "stop": "Oprește captura",
+        "openFolder": "Deschide folderul de lucru"
+      }
     }
   },
   "shared": {
@@ -152,7 +179,8 @@
       "home": "Acasă",
       "tools": {
         "replay_downloader": "Descărcător replay-uri",
-        "replay_cutter": "Tăietor replay-uri"
+        "replay_cutter": "Tăietor replay-uri",
+        "arena_mode": "Mod sală"
       },
       "getMoreCoins": "Obține mai multe monede"
     },

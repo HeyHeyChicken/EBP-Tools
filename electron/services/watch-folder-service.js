@@ -11,7 +11,7 @@ const chokidar = require('chokidar');
 const { Notification, app } = require('electron');
 const StorageManager = require('../core/storage-manager');
 const { t } = require('./translate.service');
-const { unlinkSync } = require('./global-service');
+const { unlinkSync, safeMapName } = require('./global-service');
 const { cutAndEncodeGame, cutCopyGame } = require('./video-service');
 const {
     identifyGames,
@@ -681,9 +681,7 @@ async function processVideo(videoPath, deps) {
             );
             continue;
         }
-        const SAFE_MAP = (G.map || 'unknown')
-            .replace(/[^a-zA-Z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
+        const SAFE_MAP = safeMapName(G.map);
         const BLUE_SCORE = G.blueTeam ? G.blueTeam.score : '?';
         const ORANGE_SCORE = G.orangeTeam ? G.orangeTeam.score : '?';
         const OUT = path.join(

@@ -44,6 +44,31 @@ export interface AnalyzerMessage {
   code?: number;
 }
 
+export interface ArenaModeState {
+  registered: boolean;
+  roomId?: number;
+  arenaId?: number;
+  roomName?: string;
+  terrainId?: string;
+  terrainName?: string;
+}
+
+export interface ArenaCaptureDevice {
+  id: string;
+  name: string;
+}
+
+export interface ArenaCaptureStatus {
+  running: boolean;
+  deviceId: string | null;
+  deviceName: string | null;
+  encoder: string | null;
+  startedAt: number | null;
+  lastError: string | null;
+  spoolFolder: string;
+  segmentSeconds: number;
+}
+
 export interface ElectronAPI {
   //#region Client to Server
 
@@ -119,6 +144,21 @@ export interface ElectronAPI {
   ) => Promise<string>;
   socketEmit: (socket: string, path: string, value: any) => void;
   runAnalyzer: (videoPath: string, settingsJSON: string) => Promise<void>;
+  arenaModeGetState: () => Promise<ArenaModeState>;
+  arenaModeRegister: (
+    roomId: number,
+    arenaId: number,
+    key: string
+  ) => Promise<{ success: boolean; state?: ArenaModeState; error?: string }>;
+  arenaModeUnregister: () => Promise<ArenaModeState>;
+  arenaCaptureListDevices: () => Promise<ArenaCaptureDevice[]>;
+  arenaCaptureGetStatus: () => Promise<ArenaCaptureStatus>;
+  arenaCaptureSetDevice: (
+    device: ArenaCaptureDevice
+  ) => Promise<ArenaCaptureStatus>;
+  arenaCaptureStart: () => Promise<ArenaCaptureStatus>;
+  arenaCaptureStop: () => Promise<ArenaCaptureStatus>;
+  arenaOpenFolder: () => Promise<void>;
 
   //#endregion
 
