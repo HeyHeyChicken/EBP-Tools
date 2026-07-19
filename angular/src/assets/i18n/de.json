@@ -165,7 +165,9 @@
         "error": "Die Aufnahme wurde mit einem Fehler beendet:",
         "start": "Aufnahme starten",
         "stop": "Aufnahme stoppen",
-        "openFolder": "Arbeitsordner öffnen"
+        "openFolder": "Arbeitsordner öffnen",
+        "moveFolder": "Arbeitsordner verschieben",
+        "moveFolderStopFirst": "Stoppen Sie die Aufnahme, bevor Sie den Ordner verschieben"
       }
     }
   },

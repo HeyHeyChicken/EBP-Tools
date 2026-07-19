@@ -165,7 +165,9 @@
         "error": "La captation s'est arrêtée avec une erreur :",
         "start": "Démarrer la captation",
         "stop": "Arrêter la captation",
-        "openFolder": "Ouvrir le dossier de travail"
+        "openFolder": "Ouvrir le dossier de travail",
+        "moveFolder": "Déplacer le dossier de travail",
+        "moveFolderStopFirst": "Arrêtez la captation avant de déplacer le dossier"
       }
     }
   },

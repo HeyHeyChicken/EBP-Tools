@@ -274,6 +274,30 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     window.electronAPI.arenaOpenFolder();
   }
 
+  /**
+   * Déplace le dossier de travail (EBP-Tools-Arena) vers un emplacement
+   * choisi par l'utilisateur. Refusé pendant la captation ; les vidéos en
+   * attente sont déplacées avec le dossier.
+   */
+  protected moveFolder(): void {
+    window.electronAPI.arenaMoveFolder().then((result) => {
+      this.ngZone.run(() => {
+        if (result.success) {
+          this.toastrService.success(result.root ?? '');
+          this.refreshCaptureStatus();
+        } else if (result.error === 'capture_running') {
+          this.toastrService.error(
+            this.translateService.instant(
+              'view.arena_mode.capture.moveFolderStopFirst'
+            )
+          );
+        } else if (result.error) {
+          this.toastrService.error(result.error);
+        }
+      });
+    });
+  }
+
   protected toggleCapture(): void {
     const CALL = this.captureStatus?.running
       ? window.electronAPI.arenaCaptureStop()

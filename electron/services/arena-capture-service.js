@@ -153,6 +153,15 @@ function getSpoolFolder() {
     );
 }
 
+/**
+ * Change l'emplacement du spool (déplacement du dossier EBP-Tools-Arena par
+ * l'utilisateur). L'appelant (server.js) est responsable d'avoir arrêté la
+ * captation et déplacé les fichiers AVANT.
+ */
+function setSpoolFolder(spoolPath) {
+    StorageManager.setPermanentSettingsValue(SETTINGS_KEY_SPOOL, spoolPath);
+}
+
 function getDevice() {
     return StorageManager.getPermanentSettingsValue(SETTINGS_KEY_DEVICE);
 }
@@ -431,5 +440,6 @@ module.exports = {
     stopCapture,
     setDeviceAndRestart,
     autoStart,
-    getStatus
+    getStatus,
+    setSpoolFolder
 };

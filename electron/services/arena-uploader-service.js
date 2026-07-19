@@ -100,16 +100,10 @@ async function analyzeGame(filePath, meta) {
         orangePlayers,
         bluePlayers
     };
-    // Basse priorité OS : sur le PC de streaming, l'analyse prend les cycles
-    // restants et ne fait jamais ramer l'usage principal.
-    const RESULTS = await deps.runChunkAnalyzer(
-        filePath,
-        null,
-        [CHUNK],
-        {},
-        undefined,
-        true
-    );
+    // Priorité normale : dépriorisée, la phase 2 devenait interminable sur le
+    // PC de salle (constaté sur place le 2026-07-19). La protection CPU reste
+    // assurée par la sérialisation (une seule analyse à la fois).
+    const RESULTS = await deps.runChunkAnalyzer(filePath, null, [CHUNK], {});
     if (RESULTS && RESULTS.error) {
         throw new Error(`Chunk analyzer failed: ${RESULTS.error}`);
     }

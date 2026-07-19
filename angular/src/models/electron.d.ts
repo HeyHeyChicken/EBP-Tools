@@ -167,6 +167,11 @@ export interface ElectronAPI {
   arenaCaptureStart: () => Promise<ArenaCaptureStatus>;
   arenaCaptureStop: () => Promise<ArenaCaptureStatus>;
   arenaOpenFolder: () => Promise<void>;
+  arenaMoveFolder: () => Promise<{
+    success: boolean;
+    root?: string;
+    error?: string | null;
+  }>;
 
   //#endregion
 

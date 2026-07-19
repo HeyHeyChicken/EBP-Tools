@@ -165,7 +165,9 @@
         "error": "A captação parou com um erro:",
         "start": "Iniciar a captação",
         "stop": "Parar a captação",
-        "openFolder": "Abrir a pasta de trabalho"
+        "openFolder": "Abrir a pasta de trabalho",
+        "moveFolder": "Mover a pasta de trabalho",
+        "moveFolderStopFirst": "Pare a captação antes de mover a pasta"
       }
     }
   },

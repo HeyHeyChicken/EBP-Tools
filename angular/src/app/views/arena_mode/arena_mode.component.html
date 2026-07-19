@@ -53,13 +53,27 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </button>
               <button
                 type="button"
-                class="squared"
+                class="squared mr-1"
                 (click)="openFolder()"
                 matTooltip="{{
                   'view.arena_mode.capture.openFolder' | translate
                 }}"
               >
                 <i class="fa-sharp fa-solid fa-folder-open"></i>
+              </button>
+              <button
+                type="button"
+                class="squared"
+                [disabled]="captureStatus?.running"
+                (click)="moveFolder()"
+                matTooltip="{{
+                  (captureStatus?.running
+                    ? 'view.arena_mode.capture.moveFolderStopFirst'
+                    : 'view.arena_mode.capture.moveFolder'
+                  ) | translate
+                }}"
+              >
+                <i class="fa-sharp fa-solid fa-folder-tree"></i>
               </button>
             </div>
             @if (captureStatus) {

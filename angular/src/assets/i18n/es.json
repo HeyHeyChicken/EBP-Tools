@@ -165,7 +165,9 @@
         "error": "La captura se detuvo con un error:",
         "start": "Iniciar la captura",
         "stop": "Detener la captura",
-        "openFolder": "Abrir la carpeta de trabajo"
+        "openFolder": "Abrir la carpeta de trabajo",
+        "moveFolder": "Mover la carpeta de trabajo",
+        "moveFolderStopFirst": "Detenga la captura antes de mover la carpeta"
       }
     }
   },

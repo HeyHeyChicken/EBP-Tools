@@ -165,7 +165,9 @@
         "error": "Captura s-a oprit cu o eroare:",
         "start": "Pornește captura",
         "stop": "Oprește captura",
-        "openFolder": "Deschide folderul de lucru"
+        "openFolder": "Deschide folderul de lucru",
+        "moveFolder": "Mută folderul de lucru",
+        "moveFolderStopFirst": "Opriți captura înainte de a muta folderul"
       }
     }
   },

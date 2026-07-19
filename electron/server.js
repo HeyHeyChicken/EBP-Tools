@@ -2590,6 +2590,84 @@ if (!APP_GOT_THE_LOCK) {
             return arenaCaptureService.setDeviceAndRestart(device);
         });
 
+        // The front-end asks the server to move the arena working folder
+        // (EBP-Tools-Arena) to a new location chosen by the user. Refused
+        // while capture is running ; les fichiers (spool/games en attente)
+        // sont DÉPLACÉS pour ne rien perdre, puis pipeline et uploader sont
+        // redémarrés sur le nouvel emplacement.
+        ipcMain.handle('arena-move-folder', async () => {
+            if (arenaCaptureService.getStatus().running) {
+                return { success: false, error: 'capture_running' };
+            }
+            const RES = await dialog.showOpenDialog(getMainWindow(), {
+                properties: ['openDirectory', 'createDirectory']
+            });
+            if (RES.canceled || !RES.filePaths[0]) {
+                return { success: false, error: null };
+            }
+            const OLD_ROOT = path.dirname(
+                arenaCaptureService.getStatus().spoolFolder
+            );
+            const NEW_ROOT = path.join(RES.filePaths[0], 'EBP-Tools-Arena');
+            if (NEW_ROOT === OLD_ROOT) {
+                return { success: true, root: NEW_ROOT };
+            }
+            // Destination à l'intérieur de la source : copie infinie garantie.
+            if (NEW_ROOT.startsWith(OLD_ROOT + path.sep)) {
+                return { success: false, error: 'destination inside source' };
+            }
+            try {
+                // Les watchers tiennent les anciens chemins : on les coupe le
+                // temps du déplacement.
+                arenaPipelineService.stop();
+                arenaUploaderService.stop();
+
+                if (
+                    fs.existsSync(NEW_ROOT) &&
+                    fs.readdirSync(NEW_ROOT).length > 0
+                ) {
+                    throw new Error(`destination not empty: ${NEW_ROOT}`);
+                }
+                if (fs.existsSync(OLD_ROOT)) {
+                    try {
+                        fs.renameSync(OLD_ROOT, NEW_ROOT);
+                    } catch (e) {
+                        // Autre volume : rename impossible → copie + suppression.
+                        if (e.code === 'EXDEV') {
+                            fs.cpSync(OLD_ROOT, NEW_ROOT, { recursive: true });
+                            fs.rmSync(OLD_ROOT, {
+                                recursive: true,
+                                force: true
+                            });
+                        } else {
+                            throw e;
+                        }
+                    }
+                } else {
+                    fs.mkdirSync(NEW_ROOT, { recursive: true });
+                }
+                arenaCaptureService.setSpoolFolder(
+                    path.join(NEW_ROOT, 'spool')
+                );
+                console.log(`[arena] folder moved to ${NEW_ROOT}`);
+                return { success: true, root: NEW_ROOT };
+            } catch (e) {
+                console.error('[arena] folder move failed:', e.message);
+                return { success: false, error: e.message };
+            } finally {
+                // Redémarrage sur l'emplacement courant (nouveau si le move a
+                // réussi, ancien sinon) — la queue se reconstruit par re-scan.
+                if (arenaModeService.getState().registered) {
+                    try {
+                        arenaPipelineService.start({ runAnalyzer });
+                        arenaUploaderService.start({ runChunkAnalyzer });
+                    } catch (e) {
+                        console.error('[arena] services restart failed', e);
+                    }
+                }
+            }
+        });
+
         // The front-end asks the server to open the arena working folder
         // (parent of spool/, work/ and games/) in the file explorer.
         ipcMain.handle('arena-open-folder', () => {

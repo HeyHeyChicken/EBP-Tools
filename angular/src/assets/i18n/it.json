@@ -165,7 +165,9 @@
         "error": "L'acquisizione si è fermata con un errore:",
         "start": "Avvia l'acquisizione",
         "stop": "Ferma l'acquisizione",
-        "openFolder": "Apri la cartella di lavoro"
+        "openFolder": "Apri la cartella di lavoro",
+        "moveFolder": "Sposta la cartella di lavoro",
+        "moveFolderStopFirst": "Ferma l'acquisizione prima di spostare la cartella"
       }
     }
   },
