@@ -143,8 +143,8 @@
     },
     "arena_mode": {
       "intro": "This page sets up Tools on the streaming PC of an EVA venue. Once the venue is identified, games played in the arena are automatically recorded in original quality, analyzed, then sent to EBP.<br/><br/>When importing their games, players instantly get their videos and analyses.",
-      "roomId": "Venue ID",
-      "arenaId": "Arena ID",
+      "roomId": "Venue",
+      "arenaId": "Arena",
       "key": "Key",
       "register": "Enable arena mode",
       "registered": "Arena mode is active for {{roomName}} (venue {{roomId}}, arena {{arenaId}}).",

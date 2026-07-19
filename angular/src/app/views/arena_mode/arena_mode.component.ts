@@ -24,6 +24,7 @@ import { MessageComponent } from '../../shared/message/message.component';
 import {
   ArenaCaptureDevice,
   ArenaCaptureStatus,
+  ArenaLocation,
   ArenaModeState
 } from '../../../models/electron';
 
@@ -50,10 +51,15 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
   protected state?: ArenaModeState;
 
   protected roomId?: number;
-  /** Id T_EVA_Terrains de l'arène (fourni par l'admin avec la clé). */
+  /** Id T_EVA_Terrains de l'arène. */
   protected arenaId?: number;
   protected key?: string;
   protected registering: boolean = false;
+
+  /** Salles activables (clé posée par un admin), pour les listes déroulantes. */
+  protected locations: ArenaLocation[] = [];
+  /** Arène unique dans la salle choisie → présélectionnée et verrouillée. */
+  protected arenaLocked: boolean = false;
 
   protected devices: ArenaCaptureDevice[] = [];
   protected selectedDeviceId?: string;
@@ -82,9 +88,39 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
         this.state = state;
         if (state.registered) {
           this.initCapture();
+        } else {
+          this.fetchLocations();
         }
       });
     });
+  }
+
+  private fetchLocations(): void {
+    window.electronAPI
+      .arenaModeListLocations()
+      .then((locations: ArenaLocation[]) => {
+        this.ngZone.run(() => {
+          this.locations = locations;
+        });
+      });
+  }
+
+  /** Salle choisie : arène unique → présélection + verrouillage du select. */
+  protected onRoomChange(): void {
+    const LOCATION = this.locations.find(
+      (l) => Number(l.id) === this.roomId
+    );
+    if (LOCATION && LOCATION.terrains.length === 1) {
+      this.arenaId = Number(LOCATION.terrains[0].id);
+      this.arenaLocked = true;
+    } else {
+      this.arenaId = undefined;
+      this.arenaLocked = false;
+    }
+  }
+
+  protected get selectedLocation(): ArenaLocation | undefined {
+    return this.locations.find((l) => Number(l.id) === this.roomId);
   }
 
   ngOnDestroy(): void {

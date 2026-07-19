@@ -143,8 +143,8 @@
     },
     "arena_mode": {
       "intro": "Această pagină permite instalarea Tools pe PC-ul de streaming al unei săli EVA. Odată ce sala este identificată, partidele jucate în arenă sunt înregistrate automat în calitate originală, analizate și trimise către EBP.<br/><br/>La importul jocurilor, jucătorii își găsesc instantaneu videoclipurile și analizele.",
-      "roomId": "ID-ul sălii",
-      "arenaId": "ID-ul arenei",
+      "roomId": "Sală",
+      "arenaId": "Arenă",
       "key": "Cheie",
       "register": "Activează modul sală",
       "registered": "Modul sală este activ pentru {{roomName}} (sala {{roomId}}, arena {{arenaId}}).",

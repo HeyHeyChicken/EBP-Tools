@@ -257,6 +257,17 @@ function registerArena(payload) {
 }
 
 /**
+ * GET /api/tools/arena/locations
+ * Salles activables (clé posée par un admin) avec leurs arènes — alimente les
+ * listes déroulantes du formulaire mode salle. Auth cookie user (comme le
+ * register).
+ * @returns {Promise<{id:string, name:string, country:string, terrains:{id:string, name:string}[]}[]>}
+ */
+function getArenaLocations() {
+    return apiRequest('GET', '/arena/locations', null);
+}
+
+/**
  * POST /api/tools/arena/heartbeat
  * Battement de présence du mode salle (toutes les 5 min) : la page admin du
  * site affiche l'arène "en ligne" tant que le dernier battement a moins de
@@ -460,6 +471,7 @@ async function uploadFileToPresignedUrl(
 module.exports = {
     identifyGames,
     registerArena,
+    getArenaLocations,
     sendArenaHeartbeat,
     requestArenaUploadUrl,
     depositArenaGame,

@@ -97,7 +97,8 @@ arenaModeService.setUpdateHandler(() => {
 });
 const {
     NotAuthenticatedError,
-    ApiError
+    ApiError,
+    getArenaLocations: getArenaLocationsApi
 } = require('./services/tools-api-client');
 
 //#endregion
@@ -2522,6 +2523,17 @@ if (!APP_GOT_THE_LOCK) {
         // The front-end asks the server to return the arena (salle) mode state.
         ipcMain.handle('arena-mode-get-state', () => {
             return arenaModeService.getState();
+        });
+
+        // The front-end asks the server to list activable salles (with their
+        // arenas) for the arena mode form dropdowns.
+        ipcMain.handle('arena-mode-list-locations', async () => {
+            try {
+                return await getArenaLocationsApi();
+            } catch (e) {
+                console.error('[arena-mode] list locations failed:', e.message);
+                return [];
+            }
         });
 
         // The front-end asks the server to register this machine as the

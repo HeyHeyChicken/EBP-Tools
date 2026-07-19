@@ -44,6 +44,13 @@ export interface AnalyzerMessage {
   code?: number;
 }
 
+export interface ArenaLocation {
+  id: string;
+  name: string;
+  country: string;
+  terrains: { id: string; name: string }[];
+}
+
 export interface ArenaModeState {
   registered: boolean;
   roomId?: number;
@@ -145,6 +152,7 @@ export interface ElectronAPI {
   socketEmit: (socket: string, path: string, value: any) => void;
   runAnalyzer: (videoPath: string, settingsJSON: string) => Promise<void>;
   arenaModeGetState: () => Promise<ArenaModeState>;
+  arenaModeListLocations: () => Promise<ArenaLocation[]>;
   arenaModeRegister: (
     roomId: number,
     arenaId: number,

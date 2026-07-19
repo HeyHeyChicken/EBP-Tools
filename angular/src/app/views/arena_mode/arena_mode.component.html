@@ -120,25 +120,36 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 <mat-label>{{
                   'view.arena_mode.roomId' | translate
                 }}</mat-label>
-                <input
-                  matInput
-                  type="number"
-                  min="1"
-                  [ngModelOptions]="{ standalone: true }"
+                <mat-select
                   [(ngModel)]="roomId"
-                />
+                  [ngModelOptions]="{ standalone: true }"
+                  (selectionChange)="onRoomChange()"
+                >
+                  @for (location of locations; track location.id) {
+                    <mat-option [value]="+location.id"
+                      >{{ location.country }} — {{ location.name }}</mat-option
+                    >
+                  }
+                </mat-select>
               </mat-form-field>
               <mat-form-field>
                 <mat-label>{{
                   'view.arena_mode.arenaId' | translate
                 }}</mat-label>
-                <input
-                  matInput
-                  type="number"
-                  min="1"
-                  [ngModelOptions]="{ standalone: true }"
+                <mat-select
                   [(ngModel)]="arenaId"
-                />
+                  [ngModelOptions]="{ standalone: true }"
+                  [disabled]="!selectedLocation || arenaLocked"
+                >
+                  @for (
+                    terrain of selectedLocation?.terrains ?? [];
+                    track terrain.id
+                  ) {
+                    <mat-option [value]="+terrain.id">{{
+                      terrain.name
+                    }}</mat-option>
+                  }
+                </mat-select>
               </mat-form-field>
               <mat-form-field>
                 <mat-label>{{ 'view.arena_mode.key' | translate }}</mat-label>

@@ -69,6 +69,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   runAnalyzer: (videoPath, settingsJSON) => ipcRenderer.invoke("run-analyzer", videoPath, settingsJSON),
   // The front-end asks the server to return the arena (salle) mode state.
   arenaModeGetState: () => ipcRenderer.invoke("arena-mode-get-state"),
+  // The front-end asks the server to list activable salles (with arenas) for the arena mode form.
+  arenaModeListLocations: () => ipcRenderer.invoke("arena-mode-list-locations"),
   // The front-end asks the server to register this machine as an arena's streaming PC.
   arenaModeRegister: (roomId, arenaId, key) => ipcRenderer.invoke("arena-mode-register", roomId, arenaId, key),
   // The front-end asks the server to unregister the arena mode.

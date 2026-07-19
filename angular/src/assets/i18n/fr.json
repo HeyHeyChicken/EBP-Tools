@@ -143,8 +143,8 @@
     },
     "arena_mode": {
       "intro": "Cette page permet d'installer Tools sur le PC de streaming d'une salle EVA. Une fois la salle identifiée, les parties jouées dans l'arène seront automatiquement enregistrées en qualité originale, analysées, puis envoyées sur EBP.<br/><br/>À l'import de leurs games, les joueurs retrouvent instantanément leurs vidéos et leurs analyses.",
-      "roomId": "ID de la salle",
-      "arenaId": "ID de l'arène",
+      "roomId": "Salle",
+      "arenaId": "Arène",
       "key": "Clé",
       "register": "Activer le mode salle",
       "registered": "Le mode salle est actif pour {{roomName}} (salle {{roomId}}, arène {{arenaId}}).",
