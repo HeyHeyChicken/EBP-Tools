@@ -402,13 +402,22 @@ const COPY_MARGIN_SEC = 6;
  * @param {number} endSec     Fin de game (s) ; avancée de la marge.
  * @returns {Promise<string>} Resolves with outputPath on success.
  */
-async function cutCopyGame(inputPath, outputPath, startSec, endSec) {
+async function cutCopyGame(
+    inputPath,
+    outputPath,
+    startSec,
+    endSec,
+    // Marge par défaut calibrée pour les VODs au GOP grossier (~4 s). Les
+    // captations mode salle ont un GOP de 1 s → marge de 1 s suffisante pour
+    // une coupe quasi exacte.
+    marginSec = COPY_MARGIN_SEC
+) {
     if (fs.existsSync(outputPath)) {
         unlinkSync(outputPath);
     }
 
-    const FROM = Math.max(0, startSec - COPY_MARGIN_SEC);
-    const TO = endSec + COPY_MARGIN_SEC;
+    const FROM = Math.max(0, startSec - marginSec);
+    const TO = endSec + marginSec;
 
     return new Promise((resolve, reject) => {
         const FFMPEG_ARGS = [

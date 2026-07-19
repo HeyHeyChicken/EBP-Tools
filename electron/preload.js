@@ -82,6 +82,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // The front-end asks the server to start/stop the arena capture.
   arenaCaptureStart: () => ipcRenderer.invoke("arena-capture-start"),
   arenaCaptureStop: () => ipcRenderer.invoke("arena-capture-stop"),
+  // The front-end asks the server to open the arena working folder in the explorer.
+  arenaOpenFolder: () => ipcRenderer.invoke("arena-open-folder"),
 
   //#endregion
 

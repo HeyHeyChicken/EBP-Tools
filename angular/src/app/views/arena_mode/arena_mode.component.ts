@@ -91,8 +91,23 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     if (this.captureStatusTimer) {
       clearInterval(this.captureStatusTimer);
     }
+    document.removeEventListener(
+      'visibilitychange',
+      this.onVisibilityChange
+    );
     this.stopPreview();
   }
+
+  /**
+   * L'aperçu ne consomme que lorsqu'il est visible : fenêtre minimisée ou
+   * masquée → on coupe le flux caméra (un PC de salle peut rester des heures
+   * sur cette page). Le poll de statut (5 s) le relancera à la réapparition.
+   */
+  private readonly onVisibilityChange = (): void => {
+    if (document.hidden) {
+      this.ngZone.run(() => this.stopPreview());
+    }
+  };
 
   /**
    * Aperçu live de la source : la même caméra (virtuelle) que ffmpeg, ouverte
@@ -172,6 +187,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
         5000
       );
     }
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   protected refreshDevices(): void {
@@ -193,7 +209,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
           if (this.selectedDeviceId === undefined && status.deviceId) {
             this.selectedDeviceId = status.deviceId;
           }
-          if (status.running && status.deviceName) {
+          if (status.running && status.deviceName && !document.hidden) {
             this.startPreview(status.deviceName);
           } else if (!status.running) {
             this.stopPreview();
@@ -215,6 +231,11 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
           this.captureStatus = status;
         });
       });
+  }
+
+  /** Ouvre le dossier de travail du mode salle (spool/, work/, games/). */
+  protected openFolder(): void {
+    window.electronAPI.arenaOpenFolder();
   }
 
   protected toggleCapture(): void {

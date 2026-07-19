@@ -164,7 +164,8 @@
         "stopped": "La captura está detenida. Seleccione una fuente de vídeo y luego inicie la captura.",
         "error": "La captura se detuvo con un error:",
         "start": "Iniciar la captura",
-        "stop": "Detener la captura"
+        "stop": "Detener la captura",
+        "openFolder": "Abrir la carpeta de trabajo"
       }
     }
   },

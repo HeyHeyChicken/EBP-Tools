@@ -43,13 +43,23 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </mat-form-field>
               <button
                 type="button"
-                class="squared"
+                class="squared mr-1"
                 (click)="refreshDevices()"
                 matTooltip="{{
                   'view.arena_mode.capture.refresh' | translate
                 }}"
               >
                 <i class="fa-sharp fa-solid fa-arrows-rotate"></i>
+              </button>
+              <button
+                type="button"
+                class="squared"
+                (click)="openFolder()"
+                matTooltip="{{
+                  'view.arena_mode.capture.openFolder' | translate
+                }}"
+              >
+                <i class="fa-sharp fa-solid fa-folder-open"></i>
               </button>
             </div>
             @if (captureStatus) {

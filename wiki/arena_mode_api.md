@@ -71,10 +71,17 @@ register (clé + IP, TOFU inclus : une IP supprimée par un admin est
 re-verrouillée au battement suivant). Rate-limité (10/min).
 
 ```json
-{ "roomId": 6, "arenaId": 20 }
+{ "roomId": 6, "arenaId": 20, "version": "3.1.4" }
 ```
 
-- `204` : battement enregistré → `T_EVA_Terrains.tools_last_seen_at = now()`.
+- `200` `{ "update": boolean }` : battement enregistré →
+  `tools_last_seen_at = now()` + `tools_version` stockée (debug à distance,
+  affichée sur la page admin). `update: true` = un admin a ordonné la mise à
+  jour (bouton page admin quand version ≠ dernière release) : Tools l'exécute
+  IMMÉDIATEMENT (stop captation propre → installeur silencieux → relance ;
+  cooldown 45 min entre tentatives). Le flag `tools_update_requested` n'est
+  pas nettoyé à la livraison mais quand la version remontée change (= install
+  réussie) — Tools retente donc tant que ça n'a pas abouti.
 - `400/404/422` : comme le register.
 
 Côté Tools : `arena-mode-service.startHeartbeat()` — battement immédiat puis
@@ -86,18 +93,60 @@ Migration SQL à appliquer :
 
 ```sql
 ALTER TABLE T_EVA_Terrains ADD COLUMN tools_last_seen_at DATETIME(3) NULL;
+-- Version + ordre de MAJ (2026-07-19) :
+ALTER TABLE T_EVA_Terrains
+    ADD COLUMN tools_version VARCHAR(20) NULL,
+    ADD COLUMN tools_update_requested TINYINT(1) NOT NULL DEFAULT 0;
 ```
 
-## 3. Endpoints suivants (à implémenter après la visite salle)
+## 3. Upload & dépôt d'analyse — IMPLÉMENTÉS
 
-Tous avec header `X-Arena-Token`.
+Auth : header `X-Arena-Token` seul (comme le heartbeat, mêmes vérifications
+clé + IP). Nom de fichier :
+`{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{scoreOrange}-{scoreBlue}.mp4`
+(epoch UTC secondes ; map sanitizée en tirets ; scores informatifs). La
+captation encode web-ready à la source (H.264, GOP 1 s, keyframe/s pour le
+seek du lecteur web) : la découpe est un stream-copy/remux mp4 +faststart aux
+bornes de la détection (±1 s de marge) — aucun réencodage, aucune perte, CPU
+quasi nul sur le PC de salle. Le serveur vérifie que roomId/arenaId du nom =
+ceux du token.
 
-- `POST /api/tools/arena/games/upload-url` — URL présignée S3 vers
-  `pending/{roomId}/{arenaId}/{filename}` pour une game découpée.
-  Nom de fichier : `{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{scoreOrange}-{scoreBlue}.mp4`
-  (epoch UTC secondes ; map sanitizée en tirets ; pas de `_` dans les valeurs).
-- `POST /api/tools/arena/games` — dépôt du payload d'analyse de la game,
-  keyé par ce même nom de fichier (pas de manifest S3).
+- `POST /api/tools/arena/games/upload-url` `{roomId, arenaId, fileName}` →
+  `{url, key, expiresAt}` — URL présignée PUT (30 min) vers
+  `arena/pending/{roomId}/{arenaId}/{fileName}` (bucket Tools). 400 nom
+  invalide/croisé, 404/422 comme register.
+- `POST /api/tools/arena/games` `{roomId, arenaId, fileName, payload, noRosters}`
+  → upsert `T_Arena_Pending_Games` (idempotent). 412 si la vidéo n'est pas
+  encore dans `pending/` (statObject). `payload` = analyse phase 2 (nullable),
+  `noRosters` = analyse calculée sans pseudos trustés.
+
+Côté Tools : `arena-uploader-service` consomme `games/` — phase 2 via le
+`runChunkAnalyzer` existant (rosters via provider optionnel, à brancher sur
+l'API locale EVA), puis upload avec retry persistant (URL fraîche à chaque
+tentative, backoff 30 s → 10 min, infini) et dépôt. Fichier + sidecar locaux
+supprimés seulement une fois les deux réussis.
+
+Migration SQL à appliquer :
+
+```sql
+CREATE TABLE T_Arena_Pending_Games (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    file_name VARCHAR(255) NOT NULL,
+    location_id BIGINT NOT NULL,
+    terrain_id BIGINT NOT NULL,
+    map VARCHAR(100) NOT NULL,
+    start_epoch BIGINT NOT NULL,
+    end_epoch BIGINT NOT NULL,
+    payload LONGTEXT NULL,
+    no_rosters TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY T_Arena_Pending_Games_file_name_key (file_name),
+    KEY T_Arena_Pending_Games_terrain_id_start_epoch_idx (terrain_id, start_epoch)
+);
+```
+
+À poser côté infra : règle de lifecycle MinIO 14 jours sur le préfixe
+`arena/pending/` du bucket Tools.
 
 Matching à l'import EVA : salle + arène (exacts, fournis par EVA) + map +
 fenêtre temporelle (±3 min sur startEpoch). Les scores du nom de fichier sont

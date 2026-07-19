@@ -276,6 +276,42 @@ function sendArenaHeartbeat(payload, arenaToken) {
 }
 
 /**
+ * POST /api/tools/arena/games/upload-url
+ * URL présignée PUT vers `arena/pending/{roomId}/{arenaId}/{fileName}` pour
+ * une game du pipeline salle. Auth par clé de salle seule (X-Arena-Token).
+ * Pas de retry interne : l'uploader gère sa propre boucle persistante en
+ * re-demandant une URL fraîche à chaque tentative.
+ *
+ * @param {{roomId:number, arenaId:number, fileName:string}} payload
+ * @param {string} arenaToken
+ * @returns {Promise<{url:string, key:string, expiresAt:number}>}
+ */
+function requestArenaUploadUrl(payload, arenaToken) {
+    return apiRequest('POST', '/arena/games/upload-url', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-Arena-Token': arenaToken }
+    });
+}
+
+/**
+ * POST /api/tools/arena/games
+ * Dépose le payload d'analyse d'une game pré-enregistrée (APRÈS l'upload de
+ * la vidéo — le serveur vérifie sa présence en S3, 412 sinon). Upsert par
+ * fileName : idempotent, un retry après crash est sans danger.
+ *
+ * @param {{roomId:number, arenaId:number, fileName:string, payload:object|null, noRosters:boolean}} payload
+ * @param {string} arenaToken
+ */
+function depositArenaGame(payload, arenaToken) {
+    return apiRequest('POST', '/arena/games', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-Arena-Token': arenaToken }
+    });
+}
+
+/**
  * POST /api/tools/watcher/status
  * Push de l'état complet du watcher (queued/processing/failed). Le serveur
  * stamp `updatedAt` lui-même et broadcast aux sockets du user.
@@ -425,6 +461,8 @@ module.exports = {
     identifyGames,
     registerArena,
     sendArenaHeartbeat,
+    requestArenaUploadUrl,
+    depositArenaGame,
     persistAnalysis,
     requestUploadUrl,
     confirmUpload,

@@ -62,6 +62,7 @@ export interface ArenaCaptureStatus {
   running: boolean;
   deviceId: string | null;
   deviceName: string | null;
+  encoder: string | null;
   startedAt: number | null;
   lastError: string | null;
   spoolFolder: string;
@@ -157,6 +158,7 @@ export interface ElectronAPI {
   ) => Promise<ArenaCaptureStatus>;
   arenaCaptureStart: () => Promise<ArenaCaptureStatus>;
   arenaCaptureStop: () => Promise<ArenaCaptureStatus>;
+  arenaOpenFolder: () => Promise<void>;
 
   //#endregion
 

@@ -31,6 +31,80 @@ class UpdateService {
     //#region Functions
 
     /**
+     * Mode salle : mise à jour FORCÉE, sans aucun dialogue ni UI — ordonnée
+     * par un admin via le heartbeat, à exécuter immédiatement (le PC de salle
+     * tourne sans humain ; sous Windows l'installeur Squirrel est silencieux
+     * et relance l'app tout seul). No-op si déjà à jour ou en dev.
+     */
+    forceUpdate() {
+        if (IS_DEV_MODE || this.localVersion.startsWith('0')) return;
+        this.getProjectLatestVersion(() => {
+            if (!this.githubVersion || this.githubVersion === this.localVersion) {
+                return;
+            }
+            const NAMES = this.#assetNames();
+            if (!NAMES) return;
+            console.log(
+                `[update] forced update ${this.localVersion} → ${this.githubVersion}`
+            );
+            this.#downloadAndInstall(NAMES);
+        });
+    }
+
+    /**
+     * Noms de l'asset GitHub et du fichier local d'installation pour la
+     * plateforme courante. Null si plateforme non gérée.
+     */
+    #assetNames() {
+        switch (os.platform()) {
+            case 'win32':
+                return {
+                    githubFileName: `EBP-Tools-${this.githubVersion}.exe`,
+                    localFileName: 'update.exe'
+                };
+            case 'darwin': {
+                const ARCH = process.arch === 'arm64' ? 'arm64' : 'x64';
+                return {
+                    githubFileName: `EBP-Tools-${this.githubVersion}-${ARCH}.dmg`,
+                    localFileName: 'update.dmg'
+                };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Télécharge l'installeur de `githubVersion` puis le lance et quitte
+     * l'app. Partagé entre le flux interactif (autoUpdate) et le flux forcé
+     * du mode salle.
+     */
+    #downloadAndInstall({ githubFileName, localFileName }) {
+        const FILE_URL = `https://github.com/HeyHeyChicken/EBP-Tools/releases/download/${this.githubVersion}/${githubFileName}`;
+        const DESTINATION_PATH = path.join(
+            app.getPath('userData'),
+            localFileName
+        );
+        this.#download(FILE_URL, DESTINATION_PATH, () => {
+            StorageManager.setPermanentSettingsValue('justUpdated', 'true');
+            switch (os.platform()) {
+                case 'win32':
+                    spawn(DESTINATION_PATH, {
+                        detached: true,
+                        stdio: 'ignore'
+                    }).unref();
+                    break;
+                case 'darwin':
+                    spawn('open', [DESTINATION_PATH], {
+                        detached: true,
+                        stdio: 'ignore'
+                    }).unref();
+                    break;
+            }
+            app.quit();
+        });
+    }
+
+    /**
      * Automatically updates the application.
      * @param {boolean} invisible Should we hide the graphical update elements?
      */
@@ -83,12 +157,6 @@ class UpdateService {
                                 'common.updatingInProgress'
                             );
 
-                            const FILE_URL = `https://github.com/HeyHeyChicken/EBP-Tools/releases/download/${this.githubVersion}/${githubFileName}`;
-                            const DESTINATION_PATH = path.join(
-                                app.getPath('userData'),
-                                localFileName
-                            );
-
                             if (invisible === false) {
                                 getMainWindow()?.hide();
 
@@ -106,26 +174,9 @@ class UpdateService {
                                 );
                             }
 
-                            this.#download(FILE_URL, DESTINATION_PATH, () => {
-                                StorageManager.setPermanentSettingsValue(
-                                    'justUpdated',
-                                    'true'
-                                );
-                                switch (os.platform()) {
-                                    case 'win32':
-                                        spawn(DESTINATION_PATH, {
-                                            detached: true,
-                                            stdio: 'ignore'
-                                        }).unref();
-                                        break;
-                                    case 'darwin':
-                                        spawn('open', [DESTINATION_PATH], {
-                                            detached: true,
-                                            stdio: 'ignore'
-                                        }).unref();
-                                        break;
-                                }
-                                app.quit();
+                            this.#downloadAndInstall({
+                                githubFileName,
+                                localFileName
                             });
                         }
                     }
@@ -199,11 +250,12 @@ class UpdateService {
             res.on('data', (chunk) => {
                 downloaded += chunk.length;
 
-                if (TOTAL) {
+                const WINDOW = getMainWindow();
+                if (TOTAL && WINDOW && !WINDOW.isDestroyed()) {
                     const PERCENT = Math.round((downloaded / TOTAL) * 100);
                     if (PERCENT > lastPercent) {
                         lastPercent = PERCENT;
-                        getMainWindow().webContents.send(
+                        WINDOW.webContents.send(
                             'set-notification-data',
                             {
                                 percent: PERCENT,

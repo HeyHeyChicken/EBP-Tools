@@ -32,8 +32,64 @@ const SEGMENT_SECONDS = 300;
 // Réglages d'encodage : à ajuster sur le matériel réel des salles (NVENC si
 // GPU NVIDIA). videotoolbox = encodage matériel macOS (dev), libx264
 // veryfast = fallback logiciel portable.
-const DARWIN_ENCODER_ARGS = ['-c:v', 'h264_videotoolbox', '-b:v', '8M'];
-const WIN_ENCODER_ARGS = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20'];
+// Encodage WEB-READY dès la source : H.264 + GOP de 1 s (une keyframe par
+// seconde, comme `cutAndEncodeGame`) pour que la découpe des games soit un
+// simple stream-copy/remux mp4 — zéro réencodage, zéro CPU, zéro perte. Les
+// I-frames rapprochées coûtent ~15-20 % de bitrate à qualité égale : compensé
+// par le bitrate (stockage accepté).
+//
+// Encodeur : détecté automatiquement au premier démarrage — les PC de salle
+// sont toujours des Windows mais aux configs variées (dev = Mac). Chaque
+// candidat est VALIDÉ par un encodage à blanc (un GPU absent ou un driver
+// cassé fait passer au suivant), libx264 (CPU) en dernier recours. Priorité
+// aux encodeurs matériels : la captation tourne 24/7 sur un PC qui stream.
+const ENCODER_CANDIDATES =
+    process.platform === 'darwin'
+        ? [
+              { name: 'h264_videotoolbox', args: ['-c:v', 'h264_videotoolbox', '-b:v', '10M'] },
+              { name: 'libx264', args: ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20'] }
+          ]
+        : [
+              { name: 'h264_nvenc', args: ['-c:v', 'h264_nvenc', '-preset', 'p4', '-b:v', '10M'] },
+              { name: 'h264_qsv', args: ['-c:v', 'h264_qsv', '-b:v', '10M'] },
+              { name: 'h264_amf', args: ['-c:v', 'h264_amf', '-b:v', '10M'] },
+              { name: 'libx264', args: ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20'] }
+          ];
+
+let resolvedEncoder = null;
+
+/**
+ * Premier encodeur candidat qui encode réellement (1 s de noir → null muxer).
+ * Résolu une fois par session (~1-3 s au premier démarrage de la captation).
+ */
+function resolveEncoder() {
+    if (resolvedEncoder) return resolvedEncoder;
+    for (const CANDIDATE of ENCODER_CANDIDATES) {
+        const RES = spawnSync(
+            FFMPEG_PATH,
+            [
+                '-hide_banner', '-v', 'error',
+                '-f', 'lavfi', '-i', 'color=black:s=1920x1080:r=30',
+                '-frames:v', '30',
+                ...CANDIDATE.args,
+                '-f', 'null', '-'
+            ],
+            { encoding: 'utf8', timeout: 20000 }
+        );
+        if (RES.status === 0) {
+            console.log(`[arena-capture] encoder: ${CANDIDATE.name}`);
+            resolvedEncoder = CANDIDATE;
+            return CANDIDATE;
+        }
+        console.log(
+            `[arena-capture] encoder ${CANDIDATE.name} unavailable:`,
+            (RES.stderr || '').split('\n')[0]
+        );
+    }
+    // Tous les probes ont échoué (improbable) : libx264 en aveugle.
+    resolvedEncoder = ENCODER_CANDIDATES[ENCODER_CANDIDATES.length - 1];
+    return resolvedEncoder;
+}
 // Framerate de SORTIE (CFR). L'entrée reste au rythme imposé par le
 // périphérique (avfoundation exige le mode exact, ex. 60 fps) ; on jette les
 // images excédentaires à l'encodage : à bitrate égal, 30 fps = plus de qualité
@@ -160,7 +216,7 @@ function buildFfmpegArgs(device) {
               '-rtbufsize', '512M',
               '-i', `video=${device.id}`
           ];
-    const ENCODER_ARGS = IS_MAC ? DARWIN_ENCODER_ARGS : WIN_ENCODER_ARGS;
+    const ENCODER_ARGS = resolveEncoder().args;
     // Sortie en CFR : les caméras (surtout virtuelles) livrent des timestamps
     // irréguliers qui, sans ça, produisent un temps média ≠ temps réel (fps
     // annoncés délirants, frames dupliquées) — ce qui fausse la durée des
@@ -172,6 +228,9 @@ function buildFfmpegArgs(device) {
         ...ENCODER_ARGS,
         '-fps_mode', 'cfr',
         '-r', String(OUTPUT_FPS),
+        // GOP = 1 s (cf. ENCODER_ARGS) : keyframe à chaque seconde pour un
+        // seek fluide côté web ET une découpe stream-copy précise à ±1 s.
+        '-g', String(OUTPUT_FPS),
         '-pix_fmt', 'yuv420p',
         '-f', 'segment',
         '-segment_time', String(SEGMENT_SECONDS),
@@ -358,6 +417,7 @@ function getStatus() {
         running: !!ffmpegProcess,
         deviceId: DEVICE ? DEVICE.id : null,
         deviceName: DEVICE ? DEVICE.name : null,
+        encoder: resolvedEncoder ? resolvedEncoder.name : null,
         startedAt,
         lastError,
         spoolFolder: getSpoolFolder(),

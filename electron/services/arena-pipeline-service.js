@@ -21,8 +21,10 @@ const arenaCaptureService = require('./arena-capture-service');
 // l'analyseur (`runAnalyzer`) scanne à rebours et ne rapporte QUE les games
 // complètes (score frame ET loading frame trouvées). On lui donne donc la
 // concaténation (stream-copy) des segments fermés non encore consommés :
-//   - une game entièrement dans la fenêtre → détectée → découpée (stream-copy)
-//     et nommée `{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{sO}-{sB}.mkv` ;
+//   - une game entièrement dans la fenêtre → détectée → découpée en
+//     stream-copy/remux mp4 (la captation encode déjà web-ready : H.264,
+//     GOP 1 s, +faststart au remux — AUCUN réencodage, coupe précise à ±1 s),
+//     nommée `{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{sO}-{sB}.mp4` ;
 //   - une game encore en cours à la fin de la fenêtre → invisible pour la
 //     phase 1 → retrouvée au round suivant, quand le segment contenant sa
 //     score frame sera fermé. C'est ça, la gestion du "à cheval sur deux
@@ -54,6 +56,18 @@ const PURGE_MARGIN_S = 60;
 // dater la même fin à ±quelques secondes. Deux games réelles ne peuvent pas
 // se terminer à moins de quelques secondes d'écart.
 const REEXTRACT_TOLERANCE_S = 5;
+// Marge de découpe stream-copy : la captation a un GOP de 1 s, la coupe
+// démarre donc au plus 2 s avant le début détecté de la game.
+const ARENA_CUT_MARGIN_S = 1;
+// La score frame finale reste affichée ~10 s. Si la frontière de segment
+// tombe dedans, le round courant ne voit que sa première partie : la game
+// serait bornée (et découpée) au bord du segment, amputée des secondes de
+// score frame restantes — précieuses pour l'analyse (les premières peuvent
+// être floues). Une game dont la fin détectée touche la fin de fenêtre est
+// donc différée d'un round : au suivant, le segment d'après est fermé et le
+// scan à rebours borne la game sur la DERNIÈRE seconde de score frame
+// visible. Ne s'applique que si la captation tourne (sinon rien n'arrivera).
+const SCORE_FRAME_GUARD_S = 15;
 
 // Round périodique de rattrapage : à l'arrêt de la captation, le dernier
 // segment n'est jamais suivi d'un N+1 qui déclencherait son traitement.
@@ -170,8 +184,9 @@ async function processRun(run) {
     );
 
     // Phase 1 (détection uniquement — même code que le watch-folder). Pas de
-    // floating window : le pipeline salle est silencieux.
-    const DETECT = await deps.runAnalyzer(WINDOW_PATH, null, {}, false);
+    // floating window : le pipeline salle est silencieux. Basse priorité OS :
+    // le PC de streaming garde toujours la main.
+    const DETECT = await deps.runAnalyzer(WINDOW_PATH, null, {}, false, true);
     if (DETECT.type === 'error') {
         throw new Error(`Analyzer failed: ${DETECT.message}`);
     }
@@ -184,16 +199,32 @@ async function processRun(run) {
     );
     console.log(`[arena-pipeline] ${GAMES.length} complete game(s) in window`);
 
+    // Durée de la fenêtre (relative) : fin nominale du dernier segment.
+    const WINDOW_END_REL =
+        SEGMENTS[SEGMENTS.length - 1].epoch +
+        arenaCaptureService.getStatus().segmentSeconds -
+        WINDOW_START_EPOCH;
+    const CAPTURING = arenaCaptureService.getStatus().running;
+
     let maxExtractedEndEpoch = 0;
     let extractedThisRound = 0;
     for (const G of GAMES) {
         const START_EPOCH = WINDOW_START_EPOCH + Math.round(G.start);
         const END_EPOCH = WINDOW_START_EPOCH + Math.round(G.end);
         if (END_EPOCH <= watermark + REEXTRACT_TOLERANCE_S) continue;
+        // Fin de game collée à la fin de fenêtre : la score frame déborde
+        // peut-être sur le segment suivant → on attend le round d'après pour
+        // découper avec la score frame complète (cf. SCORE_FRAME_GUARD_S).
+        if (CAPTURING && WINDOW_END_REL - G.end < SCORE_FRAME_GUARD_S) {
+            console.log(
+                `[arena-pipeline] game ending at ${Math.round(G.end)}s touches window end — deferred to next round`
+            );
+            continue;
+        }
 
         const O_SCORE = G.orangeTeam ? G.orangeTeam.score : '?';
         const B_SCORE = G.blueTeam ? G.blueTeam.score : '?';
-        const NAME = `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mkv`;
+        const NAME = `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mp4`;
         const OUT = path.join(GAMES_DIR, NAME);
         // Nom déterministe → dédup entre rounds et après redémarrage.
         if (fs.existsSync(OUT)) {
@@ -201,7 +232,26 @@ async function processRun(run) {
             continue;
         }
 
-        await cutCopyGame(WINDOW_PATH, OUT, G.start, G.end);
+        // Découpe stream-copy + remux mp4 (+faststart) : la captation encode
+        // déjà au format web (H.264, GOP 1 s) — le lecteur du site lit ces
+        // fichiers comme ceux du watch-folder, sans qu'on ait payé un
+        // réencodage. Marge de 1 s : la coupe démarre à la keyframe précédente.
+        await cutCopyGame(WINDOW_PATH, OUT, G.start, G.end, ARENA_CUT_MARGIN_S);
+        // Sidecar LOCAL (jamais uploadé — la règle "pas de manifest" vaut pour
+        // le S3) : ce que le nom de fichier ne porte pas et que l'uploader
+        // (phase 2) devra savoir — le mode de jeu détecté et les bornes de la
+        // game dans le fichier DÉCOUPÉ (marge de coupe comprise).
+        fs.writeFileSync(
+            OUT + '.json',
+            JSON.stringify({
+                mode: G.mode,
+                map: G.map || '',
+                startSeconds: Math.min(G.start, ARENA_CUT_MARGIN_S),
+                endSeconds:
+                    Math.min(G.start, ARENA_CUT_MARGIN_S) + (G.end - G.start)
+            }),
+            'utf8'
+        );
         extractedThisRound++;
         extractedCount++;
         maxExtractedEndEpoch = Math.max(maxExtractedEndEpoch, END_EPOCH);

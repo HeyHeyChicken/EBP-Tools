@@ -164,7 +164,8 @@
         "stopped": "Capture is stopped. Select a video source then start the capture.",
         "error": "Capture stopped with an error:",
         "start": "Start capture",
-        "stop": "Stop capture"
+        "stop": "Stop capture",
+        "openFolder": "Open working folder"
       }
     }
   },

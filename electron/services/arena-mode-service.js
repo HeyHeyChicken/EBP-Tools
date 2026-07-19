@@ -6,6 +6,7 @@
 
 const StorageManager = require('../core/storage-manager');
 const { registerArena, sendArenaHeartbeat } = require('./tools-api-client');
+const { version: TOOLS_VERSION } = require('../../package.json');
 
 //#endregion
 
@@ -17,22 +18,51 @@ const SETTINGS_KEY = 'arenaMode';
 // Battement de présence vers le backend (la page admin du site affiche
 // l'arène "en ligne" si le dernier battement a moins de 15 min).
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+// Cooldown entre deux tentatives de mise à jour ordonnées par le serveur :
+// le flag reste posé côté back tant que la version n'a pas changé, sans ce
+// garde on relancerait un installeur défaillant à chaque battement.
+const UPDATE_ATTEMPT_COOLDOWN_MS = 45 * 60 * 1000;
 
 let heartbeatTimer = null;
+let lastUpdateAttemptAt = 0;
+// Callback d'exécution d'une mise à jour ordonnée par l'admin (posé par
+// server.js : stop captation propre puis UpdateService.forceUpdate()).
+let updateHandler = null;
+
+function setUpdateHandler(handler) {
+    updateHandler = handler;
+}
 
 /**
  * Envoie un battement si le mode salle est actif. Fire-and-forget : un échec
  * ponctuel (réseau, backend down) est loggé et rattrapé au battement suivant.
+ * Monte la version de Tools (debug à distance) ; si la réponse porte un ordre
+ * de mise à jour, il est exécuté IMMÉDIATEMENT (décision Antoine : l'admin
+ * coordonne avec la salle par téléphone, pas de garde-fou côté Tools).
  */
 function sendHeartbeat() {
     const STATE = StorageManager.getPermanentSettingsValue(SETTINGS_KEY);
     if (!STATE || !STATE.token) return;
     sendArenaHeartbeat(
-        { roomId: STATE.roomId, arenaId: STATE.arenaId },
+        {
+            roomId: STATE.roomId,
+            arenaId: STATE.arenaId,
+            version: TOOLS_VERSION
+        },
         STATE.token
-    ).catch((e) =>
-        console.warn('[arena-mode] heartbeat failed:', e.message)
-    );
+    )
+        .then((res) => {
+            if (!res || !res.update || !updateHandler) return;
+            if (Date.now() - lastUpdateAttemptAt < UPDATE_ATTEMPT_COOLDOWN_MS) {
+                return;
+            }
+            lastUpdateAttemptAt = Date.now();
+            console.log('[arena-mode] update ordered by server — updating now');
+            updateHandler();
+        })
+        .catch((e) =>
+            console.warn('[arena-mode] heartbeat failed:', e.message)
+        );
 }
 
 /**
@@ -121,5 +151,6 @@ module.exports = {
     getArenaToken,
     register,
     unregister,
-    startHeartbeat
+    startHeartbeat,
+    setUpdateHandler
 };

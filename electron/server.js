@@ -83,6 +83,18 @@ const watchFolderService = require('./services/watch-folder-service');
 const arenaModeService = require('./services/arena-mode-service');
 const arenaCaptureService = require('./services/arena-capture-service');
 const arenaPipelineService = require('./services/arena-pipeline-service');
+const arenaUploaderService = require('./services/arena-uploader-service');
+const arenaRosterService = require('./services/arena-roster-service');
+// Rosters de la phase 2 mode salle : mock fixe pour l'instant, à remplacer
+// par l'API locale EVA (cf. arena-roster-service).
+arenaUploaderService.setRosterProvider(arenaRosterService.getRosters);
+// Mise à jour ordonnée par un admin (via la réponse du heartbeat) : arrêt
+// propre de la captation (segment finalisé) puis update forcée sans dialogue —
+// l'installeur Squirrel relance l'app, qui reprend tout au boot.
+arenaModeService.setUpdateHandler(() => {
+    arenaCaptureService.stopCapture();
+    UPDATE_SERVICE.forceUpdate();
+});
 const {
     NotAuthenticatedError,
     ApiError
@@ -1207,7 +1219,22 @@ if (!APP_GOT_THE_LOCK) {
         fs.createReadStream(VIDEO_PATH).pipe(UPLOAD_REQUEST);
     }
 
-    function runAnalyzer(videoPath, socket, settings, showFloatingProgress) {
+    /**
+     * Passe un process enfant en priorité BELOW_NORMAL (cross-platform via
+     * os.setPriority). Utilisé par le mode salle : sur le PC de streaming
+     * d'une salle, l'analyse ne doit JAMAIS faire ramer l'usage principal —
+     * l'OS lui donne les cycles restants, les traitements s'allongent
+     * seulement quand la machine est occupée.
+     */
+    function lowerProcessPriority(child, label) {
+        try {
+            os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+        } catch (e) {
+            console.warn(`[${label}] setPriority failed:`, e.message);
+        }
+    }
+
+    function runAnalyzer(videoPath, socket, settings, showFloatingProgress, lowPriority) {
         const HEADLESS = !socket;
 
         // Floating window de progression pour la phase de détection. Utile au
@@ -1235,6 +1262,7 @@ if (!APP_GOT_THE_LOCK) {
                 windowsHide: true
             };
             const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            if (lowPriority) lowerProcessPriority(ANALYZER, 'analyzer');
             let BUFFER = '';
             const LINE_QUEUE = [];
             const GAMES = [];
@@ -1357,7 +1385,7 @@ if (!APP_GOT_THE_LOCK) {
      *   à chaque tick de progression PAR GAME (les MSG taggés `gameID`). Utilisé en
      *   mode headless (watch-folder) pour remonter l'état par game au backend.
      */
-    function runChunkAnalyzer(videoPath, socket, chunks, settings, onProgress) {
+    function runChunkAnalyzer(videoPath, socket, chunks, settings, onProgress, lowPriority) {
         const HEADLESS = !socket;
         const NOTIFICATION_DATA = {
             percent: 0,
@@ -1383,6 +1411,7 @@ if (!APP_GOT_THE_LOCK) {
                 windowsHide: true
             };
             const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            if (lowPriority) lowerProcessPriority(ANALYZER, 'chunk-analyzer');
             let BUFFER = '';
             const LINE_QUEUE = [];
             const RESULTS = [];
@@ -1922,6 +1951,7 @@ if (!APP_GOT_THE_LOCK) {
             arenaCaptureService.autoStart();
             try {
                 arenaPipelineService.start({ runAnalyzer });
+                arenaUploaderService.start({ runChunkAnalyzer });
             } catch (e) {
                 console.error('[arena-pipeline] failed to start', e);
             }
@@ -2506,9 +2536,10 @@ if (!APP_GOT_THE_LOCK) {
                         arenaId,
                         key
                     });
-                    // La salle vient d'être activée : le consommateur du spool
-                    // démarre (idempotent si déjà actif).
+                    // La salle vient d'être activée : consommateur du spool et
+                    // uploader démarrent (idempotents si déjà actifs).
                     arenaPipelineService.start({ runAnalyzer });
+                    arenaUploaderService.start({ runChunkAnalyzer });
                     return { success: true, state: STATE };
                 } catch (e) {
                     console.error('[arena-mode] register failed:', e.message);
@@ -2528,6 +2559,7 @@ if (!APP_GOT_THE_LOCK) {
         ipcMain.handle('arena-mode-unregister', () => {
             arenaCaptureService.stopCapture();
             arenaPipelineService.stop();
+            arenaUploaderService.stop();
             return arenaModeService.unregister();
         });
 
@@ -2544,6 +2576,16 @@ if (!APP_GOT_THE_LOCK) {
         // The front-end asks the server to select a device and start capturing.
         ipcMain.handle('arena-capture-set-device', (event, device) => {
             return arenaCaptureService.setDeviceAndRestart(device);
+        });
+
+        // The front-end asks the server to open the arena working folder
+        // (parent of spool/, work/ and games/) in the file explorer.
+        ipcMain.handle('arena-open-folder', () => {
+            const ROOT = path.dirname(
+                arenaCaptureService.getStatus().spoolFolder
+            );
+            if (!fs.existsSync(ROOT)) fs.mkdirSync(ROOT, { recursive: true });
+            shell.openPath(ROOT);
         });
 
         // The front-end asks the server to start/stop the capture.
