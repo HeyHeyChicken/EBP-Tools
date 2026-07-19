@@ -103,7 +103,7 @@ ALTER TABLE T_EVA_Terrains
 
 Auth : header `X-Arena-Token` seul (comme le heartbeat, mêmes vérifications
 clé + IP). Nom de fichier :
-`{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{scoreOrange}-{scoreBlue}.mp4`
+`{roomId}_{arenaId}_{gameId}_{SafeMap}_{startEpoch}_{endEpoch}_{scoreOrange}-{scoreBlue}.mp4`
 (epoch UTC secondes ; map sanitizée en tirets ; scores informatifs). La
 captation encode web-ready à la source (H.264, GOP 1 s, keyframe/s pour le
 seek du lecteur web) : la découpe est un stream-copy/remux mp4 +faststart aux
@@ -132,6 +132,7 @@ Migration SQL à appliquer :
 CREATE TABLE T_Arena_Pending_Games (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     file_name VARCHAR(255) NOT NULL,
+    game_id BIGINT NULL,
     location_id BIGINT NOT NULL,
     terrain_id BIGINT NOT NULL,
     map VARCHAR(100) NOT NULL,
@@ -141,17 +142,69 @@ CREATE TABLE T_Arena_Pending_Games (
     no_rosters TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     UNIQUE KEY T_Arena_Pending_Games_file_name_key (file_name),
-    KEY T_Arena_Pending_Games_terrain_id_start_epoch_idx (terrain_id, start_epoch)
+    KEY T_Arena_Pending_Games_terrain_id_start_epoch_idx (terrain_id, start_epoch),
+    KEY T_Arena_Pending_Games_game_id_idx (game_id)
 );
 ```
+
+Si la table existe déjà (créée avant l'ajout du gameId / delete_after) :
+
+```sql
+ALTER TABLE T_Arena_Pending_Games
+    ADD COLUMN game_id BIGINT NULL,
+    ADD COLUMN delete_after DATETIME(3) NULL,
+    ADD KEY T_Arena_Pending_Games_game_id_idx (game_id);
+```
+
+Rétention (job `scheduleArenaPendingCleanup`, toutes les 6 h) : à 7 j la ligne
+est flaguée (`delete_after = +3 j de grâce`), puis hard delete (ligne + objet
+S3) sous disjoncteur (refus si > 500 lignes ou > 50 % de la table en une passe).
+Versioning S3 activé → octets vidéo récupérables (delete marker) ; le flag +
+grâce protège la ligne DB.
 
 À poser côté infra : règle de lifecycle MinIO 14 jours sur le préfixe
 `arena/pending/` du bucket Tools.
 
-Matching à l'import EVA : salle + arène (exacts, fournis par EVA) + map +
-fenêtre temporelle (±3 min sur startEpoch). Les scores du nom de fichier sont
-INFORMATIFS UNIQUEMENT — l'OCR des score frames est faillible (constaté le
-2026-07-18 : 70 lu « 20 » sur Atlantis), ils ne participent jamais au matching.
+## 5. Rattachement à l'import EVA — IMPLÉMENTÉ (EBP-Site)
+
+Quand une équipe importe ses games (extension Chrome → `POST /api/chrome-extension/:TEAM_ID`
+→ `upsertEVAGames`), un hook `attachPendingArenaGames` rattache instantanément
+la vidéo + l'analyse pré-enregistrées :
+
+- Match EXACT sur **(gameId EVA, terrain)**. Le gameId (`T_Games.eva_id` =
+  `T_Arena_Pending_Games.game_id`) identifie la partie ; le **terrain** (celui
+  des données d'import = POV du joueur qui importe) désambigüe l'INTERSALLE :
+  une game intersalle a UN seul gameId mais DEUX vidéos (une par salle), chaque
+  équipe récupère celle de SON arène. Salle/scores ignorés.
+- Pour chaque match : `copyObject` de `arena/pending/{loc}/{terrain}/{file}`
+  vers `statistics/replays/{nouveau-guid}.mp4` (intra-bucket Hetzner,
+  versioning), `setEvaGameVideoKey(gameInterne, teamId, guid)`, et si payload
+  présent `upsertEvaGameAnalysis(...)`. Ownership = équipe qui importe.
+- Idempotent (skip si l'équipe a déjà une `videoS3Key`), best-effort (n'échoue
+  jamais l'import). La ligne pending n'est PAS supprimée → les deux équipes
+  peuvent chacune importer et obtenir leur vidéo dans la fenêtre de 7 j ; le job
+  de rétention nettoie ensuite.
+
+## 4. Rosters & gameId via l'API EVA (arena-eva-poller) — IMPLÉMENTÉ (Tools)
+
+Endpoint GraphQL **public** (aucune auth) : `POST https://api.eva.gg/graphql`,
+query `listLastGamesAtLocation(terrainIds:[<arenaId>], limit)`. On recopie les
+headers de la TV EVA (`eva-client-app-name: spa-tv`, `origin`/`referer`
+`tv.eva.gg`). Renvoie les 5-10 dernières parties finies sur l'arène avec :
+`gameId`, `endedAt` (**millisecondes**), `battleArena.players[].data`
+(`niceName`, `team`, `kills`, `deaths`), `map.name`, `mode.identifier`,
+`teamOne/teamTwo.name+score`. `battleArena` null = colorChaos (hors périmètre).
+
+Côté Tools : `arena-eva-poller-service` poll toutes les **90 s** (cadence de la
+TV) quand le mode salle est actif, accumule une **pile** locale persistée
+(`eva-pile.json`), dédupliquée par gameId, éviction 6 h, backoff si blocage.
+L'uploader appelle `findGame(map, endEpoch)` (map + fenêtre ±10 min ; la map
+lève l'ambiguïté d'horloge) → rosters + gameId. Mapping équipe→couleur :
+**orange = teamOne, bleu = teamTwo** — ⚠️ À CONFIRMER (les factions After H
+ALLIANCE/REBELS ont-elles une couleur fixe à l'écran ?).
+
+Gate : une game sans match pile est déférée (retry toutes les 2 min) ; au-delà
+d'1 h → `failed/` (jamais d'analyse sans rosters).
 
 Rétention : lifecycle S3 de 14 jours sur `pending/` ; à l'import EVA, le back
 déplace la vidéo vers le dossier permanent et attache l'analyse à la game.

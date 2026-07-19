@@ -76,10 +76,7 @@ const arenaModeService = require('./services/arena-mode-service');
 const arenaCaptureService = require('./services/arena-capture-service');
 const arenaPipelineService = require('./services/arena-pipeline-service');
 const arenaUploaderService = require('./services/arena-uploader-service');
-const arenaRosterService = require('./services/arena-roster-service');
-// Rosters de la phase 2 mode salle : mock fixe pour l'instant, à remplacer
-// par l'API locale EVA (cf. arena-roster-service).
-arenaUploaderService.setRosterProvider(arenaRosterService.getRosters);
+const arenaEvaPollerService = require('./services/arena-eva-poller-service');
 // Mise à jour ordonnée par un admin (via la réponse du heartbeat) : arrêt
 // propre de la captation (segment finalisé) puis update forcée sans dialogue —
 // l'installeur Squirrel relance l'app, qui reprend tout au boot.
@@ -1976,6 +1973,7 @@ if (!APP_GOT_THE_LOCK) {
         if (arenaModeService.getState().registered) {
             arenaCaptureService.autoStart();
             try {
+                arenaEvaPollerService.start();
                 arenaPipelineService.start({ runAnalyzer });
                 arenaUploaderService.start({ runChunkAnalyzer });
             } catch (e) {
@@ -2488,8 +2486,9 @@ if (!APP_GOT_THE_LOCK) {
                         arenaId,
                         key
                     });
-                    // La salle vient d'être activée : consommateur du spool et
-                    // uploader démarrent (idempotents si déjà actifs).
+                    // La salle vient d'être activée : poller EVA, consommateur
+                    // du spool et uploader démarrent (idempotents).
+                    arenaEvaPollerService.start();
                     arenaPipelineService.start({ runAnalyzer });
                     arenaUploaderService.start({ runChunkAnalyzer });
                     return { success: true, state: STATE };
@@ -2508,6 +2507,7 @@ if (!APP_GOT_THE_LOCK) {
         // The front-end asks the server to unregister the arena (salle) mode.
         ipcMain.handle('arena-mode-unregister', () => {
             arenaCaptureService.stopCapture();
+            arenaEvaPollerService.stop();
             arenaPipelineService.stop();
             arenaUploaderService.stop();
             return arenaModeService.unregister();
@@ -2555,8 +2555,9 @@ if (!APP_GOT_THE_LOCK) {
                 return { success: false, error: 'destination inside source' };
             }
             try {
-                // Les watchers tiennent les anciens chemins : on les coupe le
-                // temps du déplacement.
+                // Les watchers (et le fichier de pile EVA) tiennent les anciens
+                // chemins : on coupe les services le temps du déplacement.
+                arenaEvaPollerService.stop();
                 arenaPipelineService.stop();
                 arenaUploaderService.stop();
 
@@ -2597,6 +2598,7 @@ if (!APP_GOT_THE_LOCK) {
                 // réussi, ancien sinon) — la queue se reconstruit par re-scan.
                 if (arenaModeService.getState().registered) {
                     try {
+                        arenaEvaPollerService.start();
                         arenaPipelineService.start({ runAnalyzer });
                         arenaUploaderService.start({ runChunkAnalyzer });
                     } catch (e) {

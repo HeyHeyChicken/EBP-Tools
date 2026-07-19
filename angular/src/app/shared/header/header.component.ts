@@ -36,7 +36,7 @@ export class HeaderComponent implements OnInit {
   protected readonly pages: string[] = [
     'replay_downloader',
     'replay_cutter',
-    //'arena_mode'
+    'arena_mode'
   ];
   protected page?: string;
 
