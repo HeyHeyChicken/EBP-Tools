@@ -11,9 +11,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
     src="/assets/img/logo.svg"
     matTooltip="{{ 'shared.header.accessWebsite' | translate }}"
   />
-  @if (identityService.isBetaUser) {
-    <span class="beta" (click)="$event.stopPropagation()">beta</span>
-  }
 </a>
 <a
   class="btn squared"
@@ -32,6 +29,14 @@ See LICENSE for terms. Unauthorized use is prohibited.
     }
   </mat-select>
 </mat-form-field>
+<a
+  class="btn squared discord"
+  aria-label="Discord"
+  (click)="openURLExternalBrowser(globalService.discordServerURL)"
+  matTooltip="{{ 'shared.header.accessDiscordServer' | translate }}"
+>
+  <i class="fa-brands fa-discord"></i>
+</a>
 <!-- #endregion -->
 <!-- #region RIGHT -->
 <div class="right">
@@ -53,55 +58,6 @@ See LICENSE for terms. Unauthorized use is prohibited.
         </option>
       }
     </select>
-  </div>
-  <div>
-    <a
-      class="btn squared discord"
-      aria-label="Discord"
-      (click)="openURLExternalBrowser(globalService.discordServerURL)"
-      matTooltip="{{ 'shared.header.accessDiscordServer' | translate }}"
-    >
-      <i class="fa-brands fa-discord"></i>
-    </a>
-  </div>
-  <div>
-    <a
-      class="btn squared"
-      (click)="showMyAccountBox = true"
-      [class.disabled]="disableLogoutButton"
-    >
-      <i class="fa-sharp fa-solid fa-user"></i>
-    </a>
-
-    @if (showMyAccountBox) {
-      <div class="shadow" (click)="showMyAccountBox = false"></div>
-      <div class="box">
-        <button class="btn w-100 red" (click)="logout()">
-          {{ 'shared.header.logout' | translate }}
-        </button>
-        <mat-form-field class="mt-2">
-          <mat-label>{{ 'shared.header.chooseATeam' | translate }}</mat-label>
-          <mat-select
-            [(ngModel)]="identityService.selectedTeamsIndex"
-            (selectionChange)="showMyAccountBox = false"
-            [disabled]="identityService.teams.length == 1"
-          >
-            <mat-select-trigger>
-              {{
-                this.identityService.teams[
-                  this.identityService.selectedTeamsIndex
-                ].name
-              }}
-            </mat-select-trigger>
-            @for (team of identityService.teams; track team; let i = $index) {
-              <mat-option [value]="i">
-                {{ team.name }}
-              </mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-      </div>
-    }
   </div>
 </div>
 <!-- #endregion -->

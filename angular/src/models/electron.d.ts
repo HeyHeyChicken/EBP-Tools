@@ -4,9 +4,9 @@
 
 //#region Imports
 
-import { VideoPlatform } from './video-platform.enum';
+import { VideoPlatform } from '../app/views/replay_downloader/models/video-platform.enum';
 import { Versions } from './versions';
-import { JWT } from './jwt';
+import { LogData } from './log-data';
 import { CropperPosition } from 'ngx-image-cropper';
 import { Game } from '../app/views/replay_cutter/models/game';
 import { Message } from '../app/views/notification/models/message.model';
@@ -100,17 +100,11 @@ export interface ElectronAPI {
     formatId?: string
   ) => Promise<void>;
   getExpressPort: () => Promise<number>;
-  getJWTAccessToken: () => Promise<string>;
   getOS: () => Promise<NodeJS.Platform>;
-  getPublicPseudoGamesOutputPath: () => Promise<string>;
-  getPrivatePseudoGamesOutputPath: () => Promise<string>;
-  getReplayCutterOutputPath: () => Promise<string>;
   getReplayDownloaderOutputPath: () => Promise<string>;
   getVersion: () => Promise<Versions>;
   getVideoCutterOutputPath: () => Promise<string>;
   isDevMode: () => Promise<boolean>;
-  logout: () => Promise<void>;
-  checkJwtToken: () => Promise<void>;
   openFile: (pathFile: string) => Promise<void>;
   openFiles: (extensions: string[]) => Promise<string[]>;
   openURL: (url: string) => void;
@@ -130,8 +124,8 @@ export interface ElectronAPI {
     sortedBluePlayersNames: string[]
   ) => void;
   manualCutVideoFile: (
-    videoPath?: string,
-    chunks: VideoChunk[],
+    videoPath: string,
+    chunks: { start: number; end: number; remove: boolean }[],
     notificationData: string
   ) => Promise<string>;
   setLanguage: (language?: string) => void;
@@ -142,7 +136,7 @@ export interface ElectronAPI {
     notificationData: string
   ) => void;
   removeNotification: (showMainWindow: boolean) => void;
-  saveConsoleLogs: (logs: ElectronLogData[]) => Promise<string>;
+  saveConsoleLogs: (logs: LogData[]) => Promise<string>;
   removeBorders: (cropperPosition: CropperPosition, videoPath: string) => void;
   setVideoResolution: (
     videoPath: string,
@@ -180,7 +174,6 @@ export interface ElectronAPI {
   setManualCutPercent: (callback: (percent: number) => void) => void;
   setUpscalePercent: (callback: (percent: number) => void) => void;
   setRemoveBordersPercent: (callback: (percent: number) => void) => void;
-  setJWTAccessToken: (callback: (accessToken: string) => void) => void;
   gameIsUploaded: (callback: (gameIndex: number) => void) => void;
   analyzeVideoFile: (
     callback: (
@@ -194,7 +187,7 @@ export interface ElectronAPI {
   globalMessage: (
     callback: (i18nPath: string, i18nVariables: object) => void
   ) => void;
-  onConsoleLog: (callback: (logData: ElectronLogData) => void) => void;
+  onConsoleLog: (callback: (logData: LogData) => void) => void;
   toast: (
     callback: (
       type: 'success' | 'error' | 'warning' | 'info',

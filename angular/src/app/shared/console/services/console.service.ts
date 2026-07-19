@@ -52,14 +52,6 @@ export class ConsoleService {
     this._logsSubject.next([]);
   }
 
-  /**
-   * Filters logs by level.
-   * @param level The log level to filter by.
-   * @returns Array of logs matching the specified level.
-   */
-  public getLogsByLevel(level: LogData['level']): LogData[] {
-    return this.currentLogs.filter((log) => log.level === level);
-  }
 
   /**
    * Initializes the Electron log listener through the electronAPI.

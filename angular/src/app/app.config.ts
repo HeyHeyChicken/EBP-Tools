@@ -14,16 +14,14 @@ import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { TranslateModule } from '@ngx-translate/core';
 import { provideToastr } from 'ngx-toastr';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { APIInterceptor } from './core/api.interceptor';
 
 //#endregion
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideHttpClient(withInterceptors([APIInterceptor])),
     provideAnimations(),
     provideHttpClient(),
     provideBrowserGlobalErrorListeners(),

@@ -11,7 +11,8 @@
     "updatingInProgress": "Aggiornamento in corso, attendere prego.",
     "encoding": "Codifica in corso…",
     "encoded": "Il video è stato codificato con successo!",
-    "download": "Scaricare"
+    "download": "Scaricare",
+    "logout": "Disconnettersi"
   },
   "view": {
     "home": {
@@ -147,17 +148,13 @@
       "arenaId": "Arena",
       "key": "Chiave",
       "register": "Attiva la modalità sala",
-      "registered": "La modalità sala è attiva per {{roomName}} (sala {{roomId}}, arena {{arenaId}}).",
-      "unregister": "Disattiva la modalità sala",
       "errors": {
-        "notAuthenticated": "Devi essere connesso per attivare la modalità sala.",
         "unknownArena": "Sala o arena sconosciuta.",
         "invalidKey": "Chiave non valida.",
         "alreadyRegistered": "Un'altra macchina è già registrata per questa arena.",
         "network": "Errore di rete, riprova."
       },
       "capture": {
-        "title": "Acquisizione video",
         "device": "Sorgente video",
         "refresh": "Aggiorna l'elenco",
         "recording": "Registrazione in corso da «{{device}}». Le partite rilevate saranno analizzate e inviate automaticamente.",
@@ -176,7 +173,6 @@
       "accessWebsite": "Accedi al sito web di EBP",
       "changeTool": "Cambiare strumento",
       "accessDiscordServer": "Accedi al server Discord di EBP",
-      "logout": "Disconnettersi",
       "chooseATeam": "Scegli una squadra",
       "home": "Home",
       "tools": {

@@ -26,9 +26,6 @@ import { OpenCVService } from '../../core/services/open-cv.service';
 import { MatDialog } from '@angular/material/dialog';
 import { ReplayCutterCropDialog } from './dialogs/crop/crop.dialog';
 import { CropperPosition } from 'ngx-image-cropper';
-import { APIRestService } from '../../core/services/api-rest.service';
-import { RestGame } from './models/rest-game';
-import { IdentityService } from '../../core/services/identity/identity.service';
 import { ReplayCutterSettingsDialog } from './dialogs/settings/settings.dialog';
 import { Settings } from './models/settings';
 import { ReplayCutterUpscaleConfirmationDialog } from './dialogs/upscale-confirmation/upscale-confirmation.dialog';
@@ -36,8 +33,6 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { MODES } from './models/mode';
 import { ReplayCutterEditTeamScoreDialog } from './dialogs/edit-score/edit-score.dialog';
-import { distance } from 'fastest-levenshtein';
-import { VideoChunk } from './models/video-chunk';
 import { ReplayCutterEditMapDialog } from './dialogs/edit-map/edit-map.dialog';
 import { NotificationService } from '../notification/services/notification.service';
 import { ReplayCutterBeforeRemovingBordersDialog } from './dialogs/before-removing-borders/before-removing-borders.dialog';
@@ -144,14 +139,12 @@ export class ReplayCutterComponent {
   //#endregion
 
   constructor(
-    protected readonly identityService: IdentityService,
     protected readonly globalService: GlobalService,
     private readonly toastrService: ToastrService,
     private readonly ngZone: NgZone,
     private readonly translateService: TranslateService,
     private readonly openCVService: OpenCVService,
     private readonly dialogService: MatDialog,
-    private readonly apiRestService: APIRestService,
     private readonly notificationService: NotificationService
   ) {}
 
@@ -280,18 +273,6 @@ export class ReplayCutterComponent {
   }
 
   /**
-   * Determines whether the upload button should be disabled based on video path and map configuration.
-   * The button is disabled if no video is loaded or if the map has no configured margins.
-   * @param mapName The name of the map to check for margin configuration.
-   * @returns True if the upload button should be disabled, false otherwise.
-   */
-  protected disableUploadButton(mapName: string): boolean {
-    return (
-      !this._videoPath || !ReplayCutterService.getMapByName(mapName)?.mapMargins
-    );
-  }
-
-  /**
    * Returns true if all games in the list are checked.
    * Used to determine the checked state of the master checkbox in the table header.
    * @returns true if there are games and all are checked, false otherwise.
@@ -329,13 +310,6 @@ export class ReplayCutterComponent {
   }
 
   /**
-   * Toggles the debug mode between play and pause states during gameplay analysis.
-   */
-  protected playPauseDebug(): void {
-    this.debugPause = !this.debugPause;
-  }
-
-  /**
    * Initializes the required services for the replay cutter component.
    * This includes initializing Tesseract for OCR functionality and setting up OpenCV with proper error handling.
    * Once OpenCV is successfully loaded, enables the file input for video processing.
@@ -362,59 +336,6 @@ export class ReplayCutterComponent {
       autoFocus: false,
       disableClose: true
     });
-  }
-
-  /**
-   * Opens the browser's default browser to create a new game with the specified players.
-   * - Stores player images in localStorage for the notifications
-   * - Sets the current game as being created.
-   * - Shows a notification via the Electron API with translated text.
-   * - Prepares game data and opens the statistics page in the default browser.
-   * @param gameIndex - Index of the game in the games array.
-   * @param orangePlayersNames - Names of the orange team players.
-   * @param bluePlayersNames - Names of the blue team players.
-   * @param playersImages - Base64 of the player images.
-   */
-  protected createGame(
-    gameIndex: number,
-    orangePlayersNames: string[],
-    bluePlayersNames: string[],
-    playersImages: string[]
-  ): void {
-    localStorage.setItem('notification_images', JSON.stringify(playersImages));
-    this.translateService
-      .get('view.replay_cutter.toast.createGameOnEBPHelper')
-      .subscribe((translated: string) => {
-        window.electronAPI.showNotification(
-          false,
-          540,
-          210,
-          JSON.stringify({
-            percent: 0,
-            infinite: false,
-            icon: undefined,
-            text: translated,
-            leftRounded: false
-          })
-        );
-      });
-
-    const DATA = {
-      map: this.games[gameIndex].map,
-      date: new Date().getTime(),
-      orange: {
-        score: this.games[gameIndex].orangeTeam.score,
-        players: orangePlayersNames
-      },
-      blue: {
-        score: this.games[gameIndex].blueTeam.score,
-        players: bluePlayersNames
-      }
-    };
-
-    window.electronAPI.openURL(
-      `${this.globalService.webSiteURL}/tools/statistics?new=${encodeURIComponent(JSON.stringify(DATA))}`
-    );
   }
 
   /**
@@ -823,254 +744,6 @@ export class ReplayCutterComponent {
   }
 
   /**
-   * Generates a canvas containing the players' name banners extracted from a given frame. Each banner represents a portion of the frame corresponding to a player's nickname.
-   * @param nbPlayers Number of players in the frame.
-   * @param frame Source image or video frame.
-   * @param orange Flag to adjust horizontal cropping for team color.
-   * @returns A canvas element with the extracted player name images stacked vertically.
-   */
-  private getPlayersNamesAsImage(
-    nbPlayers: number,
-    frame: CanvasImageSource,
-    orange: boolean
-  ): HTMLCanvasElement {
-    const SOURCE_SIZE = ReplayCutterService.getSourceSize(frame);
-    const CANVAS = document.createElement('canvas');
-    const X1 = 0 + (orange ? SOURCE_SIZE.width * 0.24 : 0);
-    const X2 = SOURCE_SIZE.width - (!orange ? SOURCE_SIZE.width * 0.24 : 0);
-    const WIDTH = X2 - X1;
-    const SLICE_HEIGHT = (SOURCE_SIZE.height / nbPlayers) * 0.3; // The banner containing the player's nickname is 30% of its height.
-    const SLICE_SPACING = (SOURCE_SIZE.height / nbPlayers) * 0.7;
-    const CANVAS_HEIGHT = nbPlayers * SLICE_HEIGHT;
-
-    CANVAS.width = WIDTH;
-    CANVAS.height = CANVAS_HEIGHT;
-    const CTX = CANVAS.getContext('2d');
-
-    if (CTX) {
-      for (let i = 0; i < nbPlayers; i++) {
-        const SOURCE_Y = 0 + i * (SLICE_SPACING + SLICE_HEIGHT);
-        const TARGET_Y = i * SLICE_HEIGHT;
-
-        CTX.drawImage(
-          frame,
-          X1,
-          SOURCE_Y,
-          WIDTH,
-          SLICE_HEIGHT,
-          0,
-          TARGET_Y,
-          WIDTH,
-          SLICE_HEIGHT
-        );
-      }
-    }
-    return CANVAS;
-  }
-
-  /**
-   * Sorts a list of player names from the API to match the order detected by Tesseract OCR.
-   * The API provides correct spelling but wrong order, while Tesseract provides correct order but potentially incorrect spelling.
-   * This function combines both to get correctly spelled names in the correct order.
-   * @param original Array of player names from the API (correct spelling, wrong order).
-   * @param tesseract Array of player names detected by OCR (correct order, potentially wrong spelling).
-   * @returns Array of correctly spelled player names sorted in the order detected by Tesseract.
-   */
-  private sortByTesseractOrder(
-    original: string[],
-    tesseract: string[]
-  ): string[] {
-    const USED: Set<number> = new Set();
-
-    return tesseract.map((tPseudo) => {
-      // 1) Check if there is an exact match.
-      const EXACT_INDEX = original.findIndex(
-        (o) => o === tPseudo && !USED.has(original.indexOf(o))
-      );
-      if (EXACT_INDEX !== -1) {
-        USED.add(EXACT_INDEX);
-        return original[EXACT_INDEX];
-      }
-
-      // 2) Otherwise, find the most similar nickname not yet used.
-      let bestIndex = -1;
-      let bestDistance = Infinity;
-
-      original.forEach((o, idx) => {
-        if (USED.has(idx)) return;
-        const DISTANCE = distance(tPseudo.toLowerCase(), o.toLowerCase());
-        if (DISTANCE < bestDistance) {
-          bestDistance = DISTANCE;
-          bestIndex = idx;
-        }
-      });
-
-      if (bestIndex !== -1) {
-        USED.add(bestIndex);
-        return original[bestIndex];
-      }
-
-      // 3) If no match, return the original nickname itself.
-      return tPseudo;
-    });
-  }
-
-  /**
-   * Extracts player names from a video frame using OCR and sorts API player data based on the detected order.
-   * This function captures a frame from the game replay, reads player names using Tesseract OCR, then uses the detected order to correctly sort the player names from the API.
-   * @param gameIndex Index of the game being processed.
-   * @param gameFromStatistics Game data from the API containing player information.
-   * @param callback Function called with the sorted orange and blue player names arrays.
-   */
-  private sortPlayersFromGameFrame(
-    gameIndex: number,
-    gameFromStatistics: RestGame,
-    callback: Function
-  ): void {
-    if (this._videoPath) {
-      ReplayCutterService.videoURLToCanvas(
-        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        (this._games[gameIndex].start + 10) * 1000,
-        async (videoFrame?: HTMLCanvasElement) => {
-          if (videoFrame) {
-            const ORANGE_PLAYERS_NAMES: string[] = [];
-            const BLUE_PLAYERS_NAMES: string[] = [];
-            for (
-              let i = 0;
-              i < MODES[this._games[gameIndex].mode].gameFrame.playersY.length;
-              i++
-            ) {
-              ORANGE_PLAYERS_NAMES.push(
-                await ReplayCutterService.getTextFromImage(
-                  videoFrame,
-                  this.tesseractWorker_basic!,
-                  MODES[this._games[gameIndex].mode].gameFrame
-                    .orangePlayersX[0],
-                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][0],
-                  MODES[this._games[gameIndex].mode].gameFrame
-                    .orangePlayersX[1],
-                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][1],
-                  7,
-                  225,
-                  true
-                )
-              );
-              BLUE_PLAYERS_NAMES.push(
-                await ReplayCutterService.getTextFromImage(
-                  videoFrame,
-                  this.tesseractWorker_basic!,
-                  MODES[this._games[gameIndex].mode].gameFrame.bluePlayersX[0],
-                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][0],
-                  MODES[this._games[gameIndex].mode].gameFrame.bluePlayersX[1],
-                  MODES[this._games[gameIndex].mode].gameFrame.playersY[i][1],
-                  7,
-                  225,
-                  true
-                )
-              );
-            }
-
-            const SORTED_ORANGE_PLAYERS_NAMES = this.sortByTesseractOrder(
-              gameFromStatistics.orangePlayers,
-              ORANGE_PLAYERS_NAMES
-            );
-            const SORTED_BLUE_PLAYERS_NAMES = this.sortByTesseractOrder(
-              gameFromStatistics.bluePlayers,
-              BLUE_PLAYERS_NAMES
-            );
-            callback(SORTED_ORANGE_PLAYERS_NAMES, SORTED_BLUE_PLAYERS_NAMES);
-          }
-        }
-      );
-    }
-  }
-
-  /**
-   * Finds the nearest timestamp in a video where the game starts or ends.
-   * It seeks through the video frame by frame and uses detectGamePlaying to check.
-   * @param url The URL of the video.
-   * @param game The game object to check against.
-   * @param start Initial timestamp to start searching from.
-   * @param jump Time increment per seek (positive for forward, negative for backward).
-   * @returns A promise resolving to the timestamp where the game is detected, or null if not found.
-   */
-  private getGamePlayingBound(
-    url: string,
-    game: Game,
-    start: number,
-    jump: number
-  ): Promise<number | null> {
-    const VIDEO = document.createElement('video');
-    console.log('getGamePlayingBound', start);
-
-    return new Promise((resolve) => {
-      const ON_SEEKED = () => {
-        const FRAME_DATA = ReplayCutterService.captureFrameData(VIDEO);
-        if (
-          FRAME_DATA &&
-          ReplayCutterService.detectGamePlaying(FRAME_DATA, [game], true)
-        ) {
-          resolve(VIDEO.currentTime);
-          CLEAN();
-        } else if (VIDEO.currentTime + jump < VIDEO.duration) {
-          VIDEO.currentTime += jump;
-        } else {
-          CLEAN();
-          resolve(null);
-        }
-      };
-
-      const CLEAN = () => {
-        VIDEO.removeEventListener('seeked', ON_SEEKED);
-        VIDEO.removeEventListener('error', ON_ERROR);
-        VIDEO.pause();
-        VIDEO.src = '';
-      };
-
-      const ON_ERROR = () => {
-        console.error('Erreur chargement vidéo');
-        CLEAN();
-        resolve(null);
-      };
-
-      VIDEO.addEventListener('loadeddata', () => {
-        VIDEO.currentTime = start;
-      });
-      VIDEO.addEventListener('error', ON_ERROR);
-      VIDEO.addEventListener('seeked', ON_SEEKED);
-
-      VIDEO.src = url;
-    });
-  }
-
-  /**
-   * Gets video information (width, height, duration) by creating a video element
-   */
-  public static getVideoInfo(
-    videoUrl: string
-  ): Promise<{ width: number; height: number; duration: number }> {
-    return new Promise((resolve, reject) => {
-      const VIDEO = document.createElement('video');
-      VIDEO.preload = 'metadata';
-      VIDEO.crossOrigin = 'anonymous';
-
-      VIDEO.onloadedmetadata = () => {
-        resolve({
-          width: VIDEO.videoWidth,
-          height: VIDEO.videoHeight,
-          duration: VIDEO.duration
-        });
-      };
-
-      VIDEO.onerror = () => {
-        reject(new Error('Failed to load video metadata'));
-      };
-
-      VIDEO.src = videoUrl;
-    });
-  }
-
-  /**
    * Handles the user's click on the file input to select a replay video.
    * Initializes the state for a new replay selection and opens the file dialog.
    * @param training Indicates whether the replay is for training mode.
@@ -1205,20 +878,6 @@ export class ReplayCutterComponent {
   }
 
   /**
-   * Sets the video's playhead to the end once the video has loaded.
-   * @param event The loaded data event from the video element.
-   */
-  protected videoLoadedData(event: Event): void {
-    if (this.pythonAnalysisRunning) {
-      return;
-    }
-    if (event.target) {
-      const VIDEO = event.target as HTMLVideoElement;
-      VIDEO.currentTime = VIDEO.duration;
-    }
-  }
-
-  /**
    * Handles updates to the video's current time during playback for analysis purposes.
    * This function analyzes each frame to detect game start, end, score frames, team names, and map names.
    * It updates the progress percentage, extracts relevant images and text using OCR, and manages game states.
@@ -1279,19 +938,6 @@ export class ReplayCutterComponent {
                     GAME.end = NOW - 1;
                     //#region Orange team
 
-                    const ORANGE_TEAM_NAME: string =
-                      await ReplayCutterService.getTextFromImage(
-                        VIDEO,
-                        this.tesseractWorker_basic!,
-                        MODES[MODE].scoreFrame.orangeName[0].x,
-                        MODES[MODE].scoreFrame.orangeName[0].y,
-                        MODES[MODE].scoreFrame.orangeName[1].x,
-                        MODES[MODE].scoreFrame.orangeName[1].y,
-                        7,
-                        225,
-                        true
-                      );
-
                     const ORANGE_TEAM_SCORE: string =
                       await ReplayCutterService.getTextFromImage(
                         VIDEO,
@@ -1316,20 +962,6 @@ export class ReplayCutterComponent {
                     //#endregion
 
                     //#region Blue team
-
-                    const BLUE_TEAM_NAME: string =
-                      await ReplayCutterService.getTextFromImage(
-                        VIDEO,
-                        this.tesseractWorker_basic!,
-                        MODES[MODE].scoreFrame.blueName[0].x,
-                        MODES[MODE].scoreFrame.blueName[0].y,
-                        MODES[MODE].scoreFrame.blueName[1].x,
-                        MODES[MODE].scoreFrame.blueName[1].y,
-                        7,
-                        225,
-                        false,
-                        true
-                      );
 
                     const BLUE_TEAM_SCORE: string =
                       await ReplayCutterService.getTextFromImage(
@@ -1818,44 +1450,6 @@ export class ReplayCutterComponent {
           }
         }
       });
-  }
-
-  /**
-   * Captures a specific frame from the video at a given game time and crops it to the specified rectangle.
-   * Returns the cropped frame as a data URL.
-   * @param gameTimeMs The time in milliseconds of the frame to capture.
-   * @param x1 The left coordinate of the crop.
-   * @param y1 The top coordinate of the crop.
-   * @param x2 The right coordinate of the crop.
-   * @param y2 The bottom coordinate of the crop.
-   * @returns A promise resolving to the cropped frame as a data URL, or undefined if capture fails.
-   */
-  protected async getGameCroppedFrame(
-    gameTimeMs: number,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): Promise<string | undefined> {
-    return new Promise((resolve) => {
-      ReplayCutterService.videoURLToCanvas(
-        `http://localhost:${this.globalService.serverPort}/file?path=${this._videoPath}`,
-        gameTimeMs,
-        (videoFrame?: HTMLCanvasElement) => {
-          if (videoFrame) {
-            resolve(
-              ReplayCutterService.cropImage(
-                videoFrame,
-                x1,
-                y1,
-                x2,
-                y2
-              )?.toDataURL()
-            );
-          }
-        }
-      );
-    });
   }
 
   protected openRemoveBorderDialog(): void {

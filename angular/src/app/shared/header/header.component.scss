@@ -39,27 +39,6 @@ $paddingLeft: calc(#{variables.$margin} * 4);
       margin: calc(#{variables.$form_height} / 2) variables.$margin
         calc(#{variables.$form_height} / 2) $paddingLeft;
     }
-
-    $size: 27px;
-    > .beta {
-      color: material_colors.$material_red_500;
-      background-color: variables.$dark_color;
-      position: absolute;
-      top: 100%;
-      left: calc(50% + #{$paddingLeft} / 2 - #{variables.$margin} / 2);
-      padding: calc(#{variables.$margin} / 4) calc(#{variables.$margin} / 2);
-      font-size: variables.$margin;
-      font-weight: bold;
-      white-space: nowrap;
-      transform: translate(-50%, -50%);
-      cursor: default;
-      text-transform: uppercase;
-      border: 1px solid variables.$border_color;
-
-      &::selection {
-        background-color: transparent;
-      }
-    }
   }
 
   > .right {
@@ -71,58 +50,6 @@ $paddingLeft: calc(#{variables.$margin} * 4);
       float: left;
       cursor: pointer;
       padding: variables.$margin 0;
-
-      > .shadow {
-        background-color: rgba(0, 0, 0, 0.32);
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 100%;
-        cursor: pointer;
-      }
-
-      > .box {
-        position: absolute;
-        top: calc(100% + #{variables.$margin} / 2);
-        right: variables.$margin;
-        border: 1px solid variables.$border_color;
-        background-color: variables.$dark_color;
-        padding: variables.$margin;
-        cursor: default;
-
-        &:after,
-        &:before {
-          content: '';
-          border-style: solid;
-          border-width: 0 6px 10.4px 6px;
-          position: absolute;
-          bottom: 100%;
-        }
-
-        &:before {
-          border-color: transparent transparent variables.$border_color
-            transparent;
-          right: calc(#{variables.$margin} * 4 - #{variables.$form_height} / 4);
-        }
-
-        &:after {
-          border-color: transparent transparent variables.$dark_color
-            transparent;
-          right: calc(#{variables.$margin} * 4 - #{variables.$form_height} / 4);
-          transform: translateY(2px);
-        }
-
-        > button {
-          white-space: nowrap;
-        }
-
-        > .d-flex {
-          > button {
-            border-left: 0;
-          }
-        }
-      }
     }
 
     > .language_selector {

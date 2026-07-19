@@ -37,13 +37,6 @@ export class OpenCVService {
   public get cv(): typeof cv | null {
     return this._cv;
   }
-  /**
-   * Checks whether the OpenCV library is ready for use.
-   * @returns True if OpenCV has been successfully loaded and is available, false otherwise.
-   */
-  public isReady(): boolean {
-    return this._cv !== null;
-  }
 
   /**
    * Initializes the OpenCV library by loading it from the assets folder.

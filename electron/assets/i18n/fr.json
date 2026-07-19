@@ -1,5 +1,5 @@
 {
     "watchFolder": {
-        "notAuthenticated": "L'authentification a échoué, veuillez vous déconnecter (à partir du bouton blanc en haut à droite) et vous reconnecter."
+        "notAuthenticated": "Aucun compte associé : lancez une analyse depuis evabattleplan.com pour associer Tools à votre compte."
     }
 }

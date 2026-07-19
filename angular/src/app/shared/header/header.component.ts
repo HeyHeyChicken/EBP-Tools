@@ -4,17 +4,15 @@
 
 //#region Import
 
-import { Component, isDevMode, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Location as CommonLocation } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectChange, MatSelectModule } from '@angular/material/select';
-import { IdentityService } from '../../core/services/identity/identity.service';
 import { GlobalService } from '../../core/services/global.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { HeaderService } from './services/header.service';
 
 //#endregion
 
@@ -35,13 +33,10 @@ import { HeaderService } from './services/header.service';
 export class HeaderComponent implements OnInit {
   //#region Attributes
 
-  protected disableLogoutButton: boolean = false;
-  protected showMyAccountBox: boolean = false;
-
   protected readonly pages: string[] = [
     'replay_downloader',
     'replay_cutter',
-    'arena_mode'
+    //'arena_mode'
   ];
   protected page?: string;
 
@@ -54,9 +49,7 @@ export class HeaderComponent implements OnInit {
     protected readonly commonLocation: CommonLocation,
     protected readonly router: Router,
     protected readonly translateService: TranslateService,
-    protected readonly identityService: IdentityService,
     protected readonly globalService: GlobalService,
-    protected readonly headerService: HeaderService
   ) {}
 
   //#region Functions
@@ -95,16 +88,6 @@ export class HeaderComponent implements OnInit {
    */
   protected openURLExternalBrowser(url: string): void {
     window.electronAPI.openURL(url);
-  }
-
-  /**
-   * This function allows the user to log out.
-   */
-  protected logout(): void {
-    if (!this.disableLogoutButton) {
-      this.disableLogoutButton = true;
-      window.electronAPI.logout();
-    }
   }
 
   /**

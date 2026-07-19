@@ -24,12 +24,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openURL: (url) => ipcRenderer.invoke("open-url", url),
   // The front-end asks the server to return the web server port.
   getExpressPort: () => ipcRenderer.invoke("get-express-port"),
-  // The front-end asks the server to return the JWT token content.
-  getJWTAccessToken: () => ipcRenderer.invoke("get-jwt-access-token"),
   // The front-end asks the server to return the project version.
   getVersion: () => ipcRenderer.invoke("get-version"),
-  // The front-end asks the server to return the user's login status.
-  getLoginState: () => ipcRenderer.invoke("get-login-state"),
   // The front-end asks the server to return the game-history output path.
   // The front-end asks the server to return the replay downloader output path.
   getReplayDownloaderOutputPath: () => ipcRenderer.invoke("get-replay-downloader-output-path"),
@@ -37,10 +33,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getVideoCutterOutputPath: () => ipcRenderer.invoke("get-video-cutter-output-path"),
   // The front-end asks the server to edit the cutter output path.
   setSetting: (setting) => ipcRenderer.invoke("set-setting", setting),
-  // The front-end asks the server to logout.
-  logout: () => ipcRenderer.invoke("logout"),
-  // The front-end asks the server to check JWT token.
-  checkJwtToken: () => ipcRenderer.invoke("check-jwt-token"),
   // The front-end asks the server to cut a video file.
   cutVideoFile: (game, videoPath, customText) => ipcRenderer.invoke("cut-video-file", game, videoPath, customText),
   // The front-end asks the server to cut all video files.
@@ -99,8 +91,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setUpscalePercent: (callback) => ipcRenderer.on("set-upscale-percent", (event, percent) => callback(percent)),
   // The server send the border removing process percent to the font-end.
   setRemoveBordersPercent: (callback) => ipcRenderer.on("set-remove-borders-percent", (event, percent) => callback(percent)),
-  // The server send the JWT value to the font-end.
-  setJWTAccessToken: (callback) => ipcRenderer.on("set-jwt-access-token", (event, accessToken) => callback(accessToken)),
   // The server gives the path of the video file selected by the user.
   gameIsUploaded: (callback) => ipcRenderer.on("game-is-uploaded", (event, gameIndex) => callback(gameIndex)),
   // The server ask the front-end to analyse a video.

@@ -9,20 +9,19 @@ const https = require('https');
 const fs = require('fs');
 const { URL } = require('url');
 const { EBP_DOMAIN } = require('../config/constants');
+const sessionService = require('./session-service');
 
 // Cible REST : en dev on tape le serveur EBP local (http://localhost:3005),
 // comme le socket — sinon prod en HTTPS. Indispensable pour tester le live :
 // c'est l'appel REST `analysis-status` qui déclenche le broadcast socket, donc
 // il doit viser le même serveur que celui auquel le front est connecté.
-// Le cookie d'auth (JWT) reste lu sur evabattleplan.com (cf. getAuthCookie) et
-// est transmis tel quel — le serveur dev doit partager le secret JWT pour le
-// valider, et sa base contenir les games (pour /identify).
+// Le jeton vient du deeplink émis par le site de prod — le serveur dev doit
+// partager le secret JWT pour le valider, et sa base contenir les games
+// (pour /identify).
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_HTTP = IS_DEV_MODE ? http : https;
 const API_HOST = IS_DEV_MODE ? 'localhost' : EBP_DOMAIN;
 const API_PORT = IS_DEV_MODE ? 3005 : 443;
-// `getMainWindow` est lazy-loaded dans `getAuthCookie` pour casser le cycle
-// d'imports window-manager → watch-folder-service → tools-api-client → window-manager.
 
 //#endregion
 
@@ -50,20 +49,15 @@ class ApiError extends Error {
 }
 
 /**
- * Reads the Express `auth` cookie from the main window's session. This cookie
- * is set by EBP-Site after Discord/TV-code login and is the only token format
- * the back's `auth.middleware.ts` accepts.
- * @returns {Promise<string|null>} cookie value, or null if absent / window destroyed.
+ * Jeton signant les appels user. Tools ne se connecte plus : le jeton vient du
+ * deeplink du site, soit attaché à la vidéo traitée (`explicitToken`), soit à
+ * défaut le dernier reçu. Le back accepte ce format via `Authorization: Bearer`
+ * (cf. `auth.middleware.ts`).
+ * @param {string|undefined} explicitToken jeton de la vidéo en cours.
+ * @returns {string|null}
  */
-async function getAuthCookie() {
-    const { getMainWindow } = require('../core/window-manager');
-    const WINDOW = getMainWindow();
-    if (!WINDOW || WINDOW.isDestroyed()) return null;
-    const COOKIES = await WINDOW.webContents.session.cookies.get({
-        url: `https://${EBP_DOMAIN}`,
-        name: 'auth'
-    });
-    return COOKIES.length > 0 ? COOKIES[0].value : null;
+function resolveAuthToken(explicitToken) {
+    return explicitToken || sessionService.getToken();
 }
 
 function sleep(ms) {
@@ -96,9 +90,10 @@ function httpsRequest(options, bodyBuffer = null) {
  * JSON API call with Bearer auth and retry on network/5xx errors.
  * Throws NotAuthenticatedError immediately if no valid access token.
  * Throws ApiError on non-retryable HTTP errors (4xx other than 408/429).
- * `requireAuth: false` → pas de cookie exigé (endpoints authentifiés par la
- * clé de salle, ex. heartbeat — le PC salle doit fonctionner même session
- * expirée). `headers` → headers additionnels (ex. X-Arena-Token).
+ * `requireAuth: false` → pas de jeton exigé (endpoints du mode salle, dont le
+ * credential est la clé de salle). `authToken` → jeton de la vidéo en cours,
+ * sinon repli sur le dernier jeton reçu du site. `headers` → headers
+ * additionnels (ex. X-Arena-Token).
  */
 async function apiRequest(
     method,
@@ -108,11 +103,12 @@ async function apiRequest(
         retries = DEFAULT_RETRIES,
         baseDelayMs = DEFAULT_BASE_DELAY_MS,
         headers = {},
-        requireAuth = true
+        requireAuth = true,
+        authToken = undefined
     } = {}
 ) {
-    const COOKIE = requireAuth ? await getAuthCookie() : null;
-    if (requireAuth && !COOKIE) throw new NotAuthenticatedError();
+    const TOKEN = requireAuth ? resolveAuthToken(authToken) : null;
+    if (requireAuth && !TOKEN) throw new NotAuthenticatedError();
 
     const PAYLOAD = body ? Buffer.from(JSON.stringify(body), 'utf8') : null;
     const OPTIONS = {
@@ -121,7 +117,7 @@ async function apiRequest(
         path: API_BASE_PATH + apiPath,
         method,
         headers: {
-            ...(COOKIE ? { Cookie: `auth=${COOKIE}` } : {}),
+            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
             Accept: 'application/json',
             ...headers
         }
@@ -193,8 +189,8 @@ async function apiRequest(
  *   `hasVideo` indique qu'une vidéo est déjà attachée à la game côté serveur :
  *   le client doit alors skip découpage / réencodage / upload pour ce segment.
  */
-function identifyGames(payload) {
-    return apiRequest('POST', '/games/identify', payload);
+function identifyGames(payload, authToken) {
+    return apiRequest('POST', '/games/identify', payload, { authToken });
 }
 
 /**
@@ -208,8 +204,8 @@ function identifyGames(payload) {
  *   le serveur refuse (403) sans lui.
  * @returns {Promise<{ persisted: Array<string>, failed: Array<{gameID, reason}> }>}
  */
-function persistAnalysis(payload) {
-    return apiRequest('POST', '/games/persist-analysis', payload);
+function persistAnalysis(payload, authToken) {
+    return apiRequest('POST', '/games/persist-analysis', payload, { authToken });
 }
 
 /**
@@ -219,10 +215,13 @@ function persistAnalysis(payload) {
  *   site) — OBLIGATOIRE, le serveur refuse (403) sans lui.
  * @returns {Promise<{ url, key, expiresAt }>}
  */
-function requestUploadUrl(gameID, teamId) {
-    return apiRequest('POST', `/games/${encodeURIComponent(gameID)}/upload-url`, {
-        teamId
-    });
+function requestUploadUrl(gameID, teamId, authToken) {
+    return apiRequest(
+        'POST',
+        `/games/${encodeURIComponent(gameID)}/upload-url`,
+        { teamId },
+        { authToken }
+    );
 }
 
 /**
@@ -230,19 +229,21 @@ function requestUploadUrl(gameID, teamId) {
  * @param {object} payload { guid, teamId } — même `teamId` que l'upload-url, pour
  *   que la vidéo atterrisse sur la même ligne d'analyse (game_id, author_team_id).
  */
-function confirmUpload(gameID, payload) {
+function confirmUpload(gameID, payload, authToken) {
     return apiRequest(
         'POST',
         `/games/${encodeURIComponent(gameID)}/confirm-upload`,
-        payload
+        payload,
+        { authToken }
     );
 }
 
 /**
  * POST /api/tools/arena/register
  * Mode salle : enregistre cette machine comme PC de streaming d'une arène.
- * Auth = cookie user classique ; la clé de salle (T_EVA_Locations.tools_token,
- * révocable en base, IP optionnellement restreinte) est validée côté serveur.
+ * Pas d'auth user (Tools n'ouvre plus de session) : le credential est la clé de
+ * salle (T_EVA_Locations.tools_token, révocable en base, IP optionnellement
+ * restreinte), validée côté serveur.
  * La clé elle-même sert de credential pour les futurs endpoints salle (header
  * `X-Arena-Token`). `arenaId` = ordinal de l'arène dans la salle (1 ou 2) ;
  * le serveur renvoie l'id du terrain réel pour le futur matching des games.
@@ -253,18 +254,20 @@ function confirmUpload(gameID, payload) {
  * @returns {Promise<{ roomName: string, terrainId: string, terrainName: string }>}
  */
 function registerArena(payload) {
-    return apiRequest('POST', '/arena/register', payload);
+    return apiRequest('POST', '/arena/register', payload, {
+        requireAuth: false
+    });
 }
 
 /**
  * GET /api/tools/arena/locations
  * Salles activables (clé posée par un admin) avec leurs arènes — alimente les
- * listes déroulantes du formulaire mode salle. Auth cookie user (comme le
+ * listes déroulantes du formulaire mode salle. Pas d'auth user (comme le
  * register).
  * @returns {Promise<{id:string, name:string, country:string, terrains:{id:string, name:string}[]}[]>}
  */
 function getArenaLocations() {
-    return apiRequest('GET', '/arena/locations', null);
+    return apiRequest('GET', '/arena/locations', null, { requireAuth: false });
 }
 
 /**
@@ -333,9 +336,12 @@ function depositArenaGame(payload, arenaToken) {
  *
  * @param {{queued:Array<{name,path}>, processing:Array<{name,path}>, failed:Array<{name,path}>}} status
  */
-async function pushWatcherStatus(status) {
+async function pushWatcherStatus(status, authToken) {
     try {
-        await apiRequest('POST', '/watcher/status', status, { retries: 1 });
+        await apiRequest('POST', '/watcher/status', status, {
+            retries: 1,
+            authToken
+        });
     } catch (e) {
         if (e instanceof NotAuthenticatedError) return;
         console.warn('[tools-api] pushWatcherStatus failed:', e.message);
@@ -355,13 +361,13 @@ async function pushWatcherStatus(status) {
  * @param {{phase:'queued'|'analyzing'|'processing'|'done'|'failed', percent:number, teamId?:string}} status
  *   `teamId` = équipe de destination choisie dans Tools (informatif côté back).
  */
-async function pushGameAnalysisStatus(gameID, status) {
+async function pushGameAnalysisStatus(gameID, status, authToken) {
     try {
         await apiRequest(
             'POST',
             `/games/${encodeURIComponent(gameID)}/analysis-status`,
             status,
-            { retries: 1 }
+            { retries: 1, authToken }
         );
     } catch (e) {
         if (e instanceof NotAuthenticatedError) return;
@@ -377,9 +383,12 @@ async function pushGameAnalysisStatus(gameID, status) {
  *
  * @param {{sourceFilename:string, teamId:string, reason:'no_games'}} payload
  */
-async function reportAnalysisIssue(payload) {
+async function reportAnalysisIssue(payload, authToken) {
     try {
-        await apiRequest('POST', '/games/analysis-issue', payload, { retries: 1 });
+        await apiRequest('POST', '/games/analysis-issue', payload, {
+            retries: 1,
+            authToken
+        });
     } catch (e) {
         if (e instanceof NotAuthenticatedError) return;
         console.warn('[tools-api] reportAnalysisIssue failed:', e.message);
@@ -482,7 +491,7 @@ module.exports = {
     pushWatcherStatus,
     pushGameAnalysisStatus,
     reportAnalysisIssue,
-    getAuthCookie,
+    resolveAuthToken,
     NotAuthenticatedError,
     ApiError
 };

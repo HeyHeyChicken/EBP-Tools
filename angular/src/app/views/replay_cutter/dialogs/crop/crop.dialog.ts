@@ -25,7 +25,6 @@ import {
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AssistantComponent } from '../../../../shared/assistant/assistant.component';
 import { ReplayCutterComponent } from '../../replay_cutter.component';
-import { GlobalService } from '../../../../core/services/global.service';
 
 //#endregion
 
@@ -91,7 +90,6 @@ export class ReplayCutterCropDialog implements OnInit {
       component: ReplayCutterComponent;
       gameIndex: number;
     },
-    private readonly globalService: GlobalService,
     private readonly dialogRef: MatDialogRef<ReplayCutterCropDialog>
   ) {
     // We resize the window to full screen.

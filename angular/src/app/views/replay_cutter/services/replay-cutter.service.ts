@@ -8,10 +8,8 @@ import { Injectable } from '@angular/core';
 import { Game } from '../models/game';
 import { RGB } from '../models/rgb';
 import { MODES } from '../models/mode';
-import { PSM, createWorker } from 'tesseract.js';
+import { PSM } from 'tesseract.js';
 import { Map } from '../models/map';
-import { TranslateService } from '@ngx-translate/core';
-import { NotificationService } from '../../notification/services/notification.service';
 
 //#endregion
 
@@ -54,31 +52,6 @@ export class ReplayCutterService {
   //#endregion
 
   //#region Functions
-
-  /**
-   * This function is executed when the video scan is complete.
-   * @param games List of detected games.
-   */
-  private static videoDetectMapsEnded(games: Game[]): void {
-    /*
-    if (games.length == 0) {
-      this.translateService
-        .get('view.replay_cutter.toast.noGamesFoundInVideo')
-        .subscribe((translated: string) => {
-          this.toastrService.error(translated).onTap.subscribe(() => {
-            window.electronAPI.openURL(this.globalService.discordServerURL);
-          });
-        });
-    }
-    this.percent = -1;
-        */
-    console.log('videoDetectMapsEnded:\n', games);
-    //this.videoOldTime = undefined;
-    //window.electronAPI.removeNotification(true);
-    //this.globalService.loading = undefined;
-
-    window.electronAPI.removeNotification(false);
-  }
 
   /**
    * Captures a frame from a video URL at a specified time and converts it to a canvas element.
@@ -276,43 +249,6 @@ export class ReplayCutterService {
       frameData.data[INDEX + 1],
       frameData.data[INDEX + 2]
     );
-  }
-
-  /**
-   * This function returns the RGB color of a video pixel at a given position.
-   * @param video HTML DOM of the video from which to extract the pixel.
-   * @param x X coordinate of the pixel on the video.
-   * @param y  Y coordinate of the pixel on the video.
-   * @returns RGB color of the video pixel.
-   */
-  public static getPixelColor(
-    video: CanvasImageSource,
-    x: number,
-    y: number
-  ): RGB {
-    if (video) {
-      const CANVAS = document.createElement('canvas');
-      CANVAS.width = 1;
-      CANVAS.height = 1;
-      const CTX = CANVAS.getContext('2d');
-      if (CTX) {
-        CTX.drawImage(
-          video /* Image */,
-          x /* Image X */,
-          y /* Image Y */,
-          1 /* Image width */,
-          1 /* Image height */,
-          0 /* Canvas X */,
-          0 /* Canvas Y */,
-          1 /* Canvas width */,
-          1 /* Canvas height */
-        );
-        const FRAME_DATA = CTX.getImageData(0, 0, 1, 1).data;
-        return new RGB(FRAME_DATA[0], FRAME_DATA[1], FRAME_DATA[2]);
-      }
-    }
-
-    return new RGB(0, 0, 0);
   }
 
   /**
@@ -618,43 +554,6 @@ export class ReplayCutterService {
     }
 
     return mostCommon;
-  }
-  /**
-   * This function initializes the different instances of the OCR.
-   * @returns
-   */
-  private static async initTesseract(): Promise<{
-    tesseractWorker_basic: Tesseract.Worker;
-    tesseractWorker_number: Tesseract.Worker;
-    tesseractWorker_letter: Tesseract.Worker;
-    tesseractWorker_time: Tesseract.Worker;
-  }> {
-    const tesseractWorker_basic = await createWorker('eng');
-    const tesseractWorker_number = await createWorker('eng');
-    const tesseractWorker_letter = await createWorker('eng');
-    const tesseractWorker_time = await createWorker('eng');
-
-    await tesseractWorker_basic.setParameters({
-      tessedit_char_whitelist:
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    });
-    await tesseractWorker_number.setParameters({
-      tessedit_char_whitelist: '0123456789'
-    });
-    await tesseractWorker_letter.setParameters({
-      tessedit_char_whitelist:
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz '
-    });
-    await tesseractWorker_time.setParameters({
-      tessedit_char_whitelist: '0123456789:'
-    });
-
-    return {
-      tesseractWorker_basic,
-      tesseractWorker_number,
-      tesseractWorker_letter,
-      tesseractWorker_time
-    };
   }
 
   /**
@@ -1146,37 +1045,6 @@ export class ReplayCutterService {
       return RESULT;
     }
     return undefined;
-  }
-
-  /**
-   * This function allows you to set the timecode of the video.
-   * @param video HTML DOM of the video element to set the timecode to
-   * @param time Timecode in seconds to apply.
-   * @param games List of games already detected.
-   * @param discordServerURL EBP Discord server URL.
-   */
-  private static setVideoCurrentTime(
-    video: HTMLVideoElement,
-    time: number,
-    games: Game[],
-    videoOldTime: number | undefined
-  ): number | undefined {
-    if (video) {
-      if (time < video.duration) {
-        if (videoOldTime == time) {
-          console.warn(
-            'The "setVideoCurrentTime" function seems to fail to change the video time. The analysis is considered finished.'
-          );
-          ReplayCutterService.videoDetectMapsEnded(games);
-        } else {
-          video.currentTime = time;
-          videoOldTime = time;
-        }
-      } else {
-        ReplayCutterService.videoDetectMapsEnded(games);
-      }
-    }
-    return videoOldTime;
   }
 
   //#endregion

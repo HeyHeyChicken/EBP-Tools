@@ -4,14 +4,7 @@
 
 //#region Imports
 
-const {
-    app,
-    BrowserWindow,
-    ipcMain,
-    session,
-    dialog,
-    shell
-} = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 
 //#region Configure auto-updater
 
@@ -42,7 +35,6 @@ require('./discord-rpc');
 const util = require('util');
 const execAsync = util.promisify(exec);
 const {
-    EBP_DOMAIN,
     IS_DEV_MODE,
     ROOT_PATH,
     DEFAULT_VIDEO_HEIGHT,
@@ -65,7 +57,7 @@ const {
 } = require('./core/window-manager');
 const StorageManager = require('./core/storage-manager');
 const socketEmit = require('./services/socket-service');
-const { checkJwtToken, logout } = require('./services/auth-service');
+const sessionService = require('./services/session-service');
 const { setupExpressServer } = require('./express/express-server');
 const {
     changeVideoResolution,
@@ -96,7 +88,6 @@ arenaModeService.setUpdateHandler(() => {
     UPDATE_SERVICE.forceUpdate();
 });
 const {
-    NotAuthenticatedError,
     ApiError,
     getArenaLocations: getArenaLocationsApi
 } = require('./services/tools-api-client');
@@ -152,12 +143,28 @@ if (!APP_GOT_THE_LOCK) {
 
     //#endregion
 
+    // Le deeplink d'analyse transporte un jeton de session (JWT 24 h). Ces logs
+    // sont redirigés vers la console du front et exportables en fichier : on
+    // masque le jeton pour ne pas répandre un credential valide.
+    function redactToken(data) {
+        if (!data || typeof data !== 'object') return data;
+        return data.token ? { ...data, token: '***' } : data;
+    }
+    // Version chaîne : le payload est du JSON URL-encodé, le JWT ne contient ni
+    // `%` ni `"` ni `/`. On coupe la valeur après `"token":"` (encodé ou non).
+    function redactTokenInUrl(str) {
+        return String(str).replace(
+            /((?:%22|")token(?:%22|")\s*(?:%3A|:)\s*(?:%22|"))[^%"/]+/gi,
+            '$1***'
+        );
+    }
+
     /**
      * Handle deep link URL (ebp://...)
      * @param {string} url The deep link URL to handle
      */
     async function handleDeepLink(url) {
-        console.log('[DEEP-LINK] Received URL:', url);
+        console.log('[DEEP-LINK] Received URL:', redactTokenInUrl(url));
 
         if (!url || !url.startsWith(`${PROTOCOL_NAME}://`)) {
             return;
@@ -165,7 +172,7 @@ if (!APP_GOT_THE_LOCK) {
 
         // Remove protocol prefix (ebp://)
         const PATH = url.replace(`${PROTOCOL_NAME}://`, '');
-        console.log('[DEEP-LINK] Path:', PATH);
+        console.log('[DEEP-LINK] Path:', redactTokenInUrl(PATH));
 
         // Parse the URL to extract action and parameters
         // Example: ebp://open-game/12345
@@ -184,7 +191,12 @@ if (!APP_GOT_THE_LOCK) {
      * @param {*} data
      */
     async function handleDeepLinkData(action, data) {
-        console.log('[DEEP-LINK] Action:', action, 'Params:', data);
+        console.log('[DEEP-LINK] Action:', action, 'Params:', redactToken(data));
+
+        // Tools ne se connecte plus : chaque deeplink d'analyse rafraîchit le
+        // jeton, donc un changement de compte côté site est suivi ici sans
+        // action de l'utilisateur.
+        sessionService.setFromDeepLink(data);
 
         switch (action) {
             case 'openFolder':
@@ -1129,6 +1141,13 @@ if (!APP_GOT_THE_LOCK) {
         // matchera que ces guids. Trop longs pour être encodés dans le nom de
         // fichier (UUIDs, limite 255 chars) → sidecar JSON `<video>.json` écrit
         // à côté du fichier remuxé (voir parseMeta côté watch-folder-service).
+        // Jeton du deeplink, à défaut le dernier reçu (course possible : le site
+        // le précharge à l'ouverture du dialog, il peut manquer sur un clic très
+        // rapide).
+        const SESSION_TOKEN =
+            typeof data.token === 'string' && data.token
+                ? data.token
+                : sessionService.getToken();
         const GAME_GUIDS = Array.isArray(data.gameGuids)
             ? data.gameGuids
                   .filter(
@@ -1160,10 +1179,16 @@ if (!APP_GOT_THE_LOCK) {
             );
             // Sidecar écrit AVANT le remux : la vidéo n'apparaît jamais dans le
             // watch folder sans son scope (le watcher n'enfile que les vidéos).
-            if (GAME_GUIDS.length > 0) {
+            // Le jeton y est attaché plutôt que lu au moment du traitement : la
+            // vidéo reste ainsi rattachée au compte qui a lancé l'analyse, même
+            // si l'utilisateur change de compte pendant que la file s'écoule.
+            if (GAME_GUIDS.length > 0 || SESSION_TOKEN) {
                 fs.writeFileSync(
                     DEST + '.json',
-                    JSON.stringify({ gameGuids: GAME_GUIDS })
+                    JSON.stringify({
+                        ...(GAME_GUIDS.length > 0 && { gameGuids: GAME_GUIDS }),
+                        ...(SESSION_TOKEN && { token: SESSION_TOKEN })
+                    })
                 );
             }
             // Remux (stream copy + faststart) : tout fichier — Twitch, YouTube ou
@@ -2370,62 +2395,6 @@ if (!APP_GOT_THE_LOCK) {
             return getCurrentPort();
         });
 
-        // The front-end asks the server to return the JWT token content.
-        ipcMain.handle('get-jwt-access-token', async () => {
-            // Authentication actually relies on the EBP domain's session
-            // cookies (the JWT is not persisted). We therefore query the
-            // backend with those cookies to retrieve the user's information.
-            try {
-                const COOKIES =
-                    await getMainWindow().webContents.session.cookies.get({
-                        url: `https://${EBP_DOMAIN}`
-                    });
-                const COOKIES_HEADER = COOKIES.map(
-                    (c) => `${c.name}=${c.value}`
-                ).join('; ');
-
-                const DATA = await new Promise((resolve, reject) => {
-                    const REQUEST = https.request(
-                        {
-                            hostname: EBP_DOMAIN,
-                            port: 443,
-                            path: '/back/api/?c=user&r=token',
-                            method: 'GET',
-                            headers: {
-                                Cookie: COOKIES_HEADER,
-                                Accept: 'application/json'
-                            }
-                        },
-                        (res) => {
-                            let body = '';
-                            res.on('data', (chunk) => (body += chunk));
-                            res.on('end', () => resolve(body));
-                        }
-                    );
-                    REQUEST.on('error', reject);
-                    REQUEST.end();
-                });
-
-                const PARSED = JSON.parse(DATA);
-
-                if (PARSED.access_token) {
-                    const PAYLOAD = JSON.parse(
-                        Buffer.from(
-                            PARSED.access_token.split('.')[1],
-                            'base64'
-                        ).toString()
-                    );
-                    if(PAYLOAD.email) {
-                        console.log('[USER] User\'s email:', PAYLOAD.email);
-                    }
-                }
-            } catch (e) {
-                console.error('[USER] Could not retrieve user:', e.message);
-            }
-
-            return undefined;
-        });
-
         // The front-end asks the server to return the project version.
         ipcMain.handle('get-version', () => {
             //#region Binaries versions
@@ -2491,35 +2460,6 @@ if (!APP_GOT_THE_LOCK) {
             );
         });
 
-        // The front-end asks the server to return the user's login status.
-        ipcMain.handle('get-login-state', () => {
-            return session.defaultSession.cookies
-                .get({ domain: EBP_DOMAIN })
-                .then((cookies) => {
-                    const WORDPRESS_COOKIE = cookies.find((c) =>
-                        c.name.startsWith('wordpress_logged_in')
-                    );
-                    if (IS_DEV_MODE) {
-                        return true;
-                    }
-                    return !!WORDPRESS_COOKIE;
-                });
-        });
-
-        // The front-end asks the server to check JWT token.
-        ipcMain.handle('check-jwt-token', () => {
-            return new Promise((resolve) => {
-                checkJwtToken(getMainWindow, false, () => {
-                    resolve();
-                });
-            });
-        });
-
-        // The front-end asks the server to logout.
-        ipcMain.handle('logout', () => {
-            logout(getMainWindow);
-        });
-
         // The front-end asks the server to return the arena (salle) mode state.
         ipcMain.handle('arena-mode-get-state', () => {
             return arenaModeService.getState();
@@ -2556,9 +2496,7 @@ if (!APP_GOT_THE_LOCK) {
                 } catch (e) {
                     console.error('[arena-mode] register failed:', e.message);
                     let error = 'network';
-                    if (e instanceof NotAuthenticatedError) {
-                        error = 'notAuthenticated';
-                    } else if (e instanceof ApiError) {
+                    if (e instanceof ApiError) {
                         if (e.status === 404) error = 'unknownArena';
                         else if (e.status === 422) error = 'invalidKey';
                     }

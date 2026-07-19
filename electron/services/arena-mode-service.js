@@ -11,9 +11,7 @@ const { version: TOOLS_VERSION } = require('../../package.json');
 //#endregion
 
 // Mode salle : cette machine est le PC de streaming d'une arène EVA. L'état
-// vit dans les settings permanents — attention, `logout()` (auth-service)
-// vide TOUS les settings permanents, donc un logout user désenregistre aussi
-// l'arène (à re-saisir). Contrat backend : wiki/arena_mode_api.md.
+// vit dans les settings permanents. Contrat backend : wiki/arena_mode_api.md.
 const SETTINGS_KEY = 'arenaMode';
 // Battement de présence vers le backend (la page admin du site affiche
 // l'arène "en ligne" si le dernier battement a moins de 15 min).

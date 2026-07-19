@@ -48,12 +48,8 @@ export class Game {
   public map: string = '';
   public mapImage: string | undefined;
 
-  public splitted: boolean = false;
-
   public orangeTeam: Team = new Team();
   public blueTeam: Team = new Team();
-
-  public sentForAnalysis: boolean = false;
 
   //#endregion
 

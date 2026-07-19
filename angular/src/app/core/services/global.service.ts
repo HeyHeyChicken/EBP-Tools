@@ -30,9 +30,6 @@ export class GlobalService {
   /** URL to access the EBP Discord server. */
   public readonly discordServerURL: string = 'https://discord.gg/tAHAc9q3aX';
 
-  /** Holds an optional list of user IDs that are part of the beta program. */
-  public betaUsers: number[] | undefined;
-
   //#endregion
 
   constructor(private readonly translateService: TranslateService) {}

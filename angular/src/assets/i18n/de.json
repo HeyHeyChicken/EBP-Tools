@@ -11,7 +11,8 @@
     "updatingInProgress": "Aktualisierung läuft, bitte warten.",
     "encoding": "Kodierung läuft…",
     "encoded": "Das Video wurde erfolgreich kodiert!",
-    "download": "Herunterladen"
+    "download": "Herunterladen",
+    "logout": "Abmelden"
   },
   "view": {
     "home": {
@@ -147,17 +148,13 @@
       "arenaId": "Arena",
       "key": "Schlüssel",
       "register": "Arena-Modus aktivieren",
-      "registered": "Der Arena-Modus ist aktiv für {{roomName}} (Halle {{roomId}}, Arena {{arenaId}}).",
-      "unregister": "Arena-Modus deaktivieren",
       "errors": {
-        "notAuthenticated": "Sie müssen angemeldet sein, um den Arena-Modus zu aktivieren.",
         "unknownArena": "Unbekannte Halle oder Arena.",
         "invalidKey": "Ungültiger Schlüssel.",
         "alreadyRegistered": "Für diese Arena ist bereits ein anderer Rechner registriert.",
         "network": "Netzwerkfehler, bitte versuchen Sie es erneut."
       },
       "capture": {
-        "title": "Videoaufnahme",
         "device": "Videoquelle",
         "refresh": "Liste aktualisieren",
         "recording": "Aufnahme läuft von „{{device}}“. Erkannte Partien werden automatisch analysiert und hochgeladen.",
@@ -176,7 +173,6 @@
       "accessWebsite": "Zur EBP-Website gehen",
       "changeTool": "Werkzeug wechseln",
       "accessDiscordServer": "Dem EBP-Discord beitreten",
-      "logout": "Abmelden",
       "chooseATeam": "Wähle ein Team",
       "home": "Startseite",
       "tools": {

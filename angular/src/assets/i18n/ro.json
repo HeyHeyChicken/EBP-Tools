@@ -11,7 +11,8 @@
     "updatingInProgress": "Actualizare în curs, vă rugăm să așteptați.",
     "encoding": "Codificare în curs…",
     "encoded": "Videoclipul a fost codificat cu succes!",
-    "download": "Descărca"
+    "download": "Descărca",
+    "logout": "Deconectează-te"
   },
   "view": {
     "home": {
@@ -147,17 +148,13 @@
       "arenaId": "Arenă",
       "key": "Cheie",
       "register": "Activează modul sală",
-      "registered": "Modul sală este activ pentru {{roomName}} (sala {{roomId}}, arena {{arenaId}}).",
-      "unregister": "Dezactivează modul sală",
       "errors": {
-        "notAuthenticated": "Trebuie să fiți conectat pentru a activa modul sală.",
         "unknownArena": "Sală sau arenă necunoscută.",
         "invalidKey": "Cheie invalidă.",
         "alreadyRegistered": "O altă mașină este deja înregistrată pentru această arenă.",
         "network": "Eroare de rețea, încercați din nou."
       },
       "capture": {
-        "title": "Captură video",
         "device": "Sursă video",
         "refresh": "Reîmprospătează lista",
         "recording": "Se înregistrează de la „{{device}}”. Partidele detectate vor fi analizate și trimise automat.",
@@ -176,7 +173,6 @@
       "accessWebsite": "Accesează site-ul EBP",
       "changeTool": "Schimbă unealta",
       "accessDiscordServer": "Accesează serverul Discord EBP",
-      "logout": "Deconectează-te",
       "chooseATeam": "Alege o echipă",
       "home": "Acasă",
       "tools": {

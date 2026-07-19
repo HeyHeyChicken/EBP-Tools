@@ -26,7 +26,6 @@ const {
     getCurrentPort,
     PROTOCOL_NAME
 } = require('../config/constants');
-const { checkJwtToken } = require('../services/auth-service');
 const watchFolderService = require('../services/watch-folder-service');
 const StorageManager = require('./storage-manager');
 
@@ -425,16 +424,9 @@ function createWindow(updateService) {
     // Setup console log redirection to frontend
     setupConsoleRedirection(mainWindow);
 
-    checkJwtToken(getMainWindow, false, (isLoggedIn) => {
-        // Loads the application's index.html.
-        mainWindow.loadURL(
-            isLoggedIn
-                ? HOME_URL
-                : `https://${EBP_DOMAIN}/${language}/login?app=cutter&redirect_uri=${encodeURIComponent(
-                      HOME_URL
-                  )}`
-        );
-    });
+    // Plus de connexion : l'identité vient des deeplinks du site (cf.
+    // session-service), donc l'application s'ouvre directement.
+    mainWindow.loadURL(HOME_URL);
 }
 
 function hideMainWindow() {

@@ -22,7 +22,7 @@ const {
     pushWatcherStatus,
     pushGameAnalysisStatus,
     reportAnalysisIssue,
-    getAuthCookie,
+    resolveAuthToken,
     NotAuthenticatedError,
     ApiError
 } = require('./tools-api-client');
@@ -59,19 +59,23 @@ const PROGRESS_ANALYZE_END = 75; // phase 2 (analyse) terminée
 const PROGRESS_ENCODE_END = 90; // réencodage terminé (upload en cours)
 
 /**
- * Lit le sidecar `<video>.json` écrit par `ingestFilesForAnalysis` (games
- * ciblées par l'action groupée « Analyser » côté site — UUIDs trop longs pour
- * le nom de fichier). Absent ou illisible (dépôt manuel) → [].
+ * Lit le sidecar `<video>.json` écrit par `ingestFilesForAnalysis` : games
+ * ciblées par l'action groupée « Analyser » côté site (UUIDs trop longs pour le
+ * nom de fichier) et jeton de session du compte qui a lancé l'analyse. Absent
+ * ou illisible (dépôt manuel) → valeurs vides.
+ * @returns {{gameGuids: string[], token: string|undefined}}
  */
-function readSidecarGameGuids(filePath) {
+function readSidecar(filePath) {
     try {
-        const RAW = fs.readFileSync(filePath + '.json', 'utf8');
-        const GUIDS = JSON.parse(RAW).gameGuids;
-        return Array.isArray(GUIDS)
-            ? GUIDS.filter((g) => typeof g === 'string')
-            : [];
+        const RAW = JSON.parse(fs.readFileSync(filePath + '.json', 'utf8'));
+        return {
+            gameGuids: Array.isArray(RAW.gameGuids)
+                ? RAW.gameGuids.filter((g) => typeof g === 'string')
+                : [],
+            token: typeof RAW.token === 'string' ? RAW.token : undefined
+        };
     } catch (_) {
-        return [];
+        return { gameGuids: [], token: undefined };
     }
 }
 
@@ -102,7 +106,7 @@ function parseMeta(filePath) {
     const FOS = BASE.match(FOS_RE);
     const FBS = BASE.match(FBS_RE);
     const TID = BASE.match(TID_RE);
-    const GAME_GUIDS = readSidecarGameGuids(filePath);
+    const SIDECAR = readSidecar(filePath);
     if (!MTPG && !MGAST && !FOS && !FBS && !TID) {
         return {
             cleanBasename: BASE,
@@ -111,7 +115,8 @@ function parseMeta(filePath) {
             forcedOrangeScore: undefined,
             forcedBlueScore: undefined,
             teamId: undefined,
-            gameGuids: GAME_GUIDS
+            gameGuids: SIDECAR.gameGuids,
+            token: SIDECAR.token
         };
     }
     const FIRST_IDX = Math.min(
@@ -129,7 +134,8 @@ function parseMeta(filePath) {
         forcedBlueScore: FBS ? parseInt(FBS[1], 10) : undefined,
         // Gardé en string : c'est l'ID transmis tel quel au serveur (/identify).
         teamId: TID ? TID[1] : undefined,
-        gameGuids: GAME_GUIDS
+        gameGuids: SIDECAR.gameGuids,
+        token: SIDECAR.token
     };
 }
 
@@ -308,12 +314,13 @@ function notifyStatusChange() {
  * @param {string|undefined} teamId  équipe de DESTINATION choisie dans Tools
  *   (suffixe `__tid-N`) — permet à un chef qui coache une autre équipe de cibler
  *   la bonne. Transmise au backend ; `undefined` (dépôt manuel) → null en base.
+ * @param {string|undefined} token  jeton du compte qui a lancé cette analyse.
  */
-function reportGameStatus(gameID, phase, percent, teamId) {
+function reportGameStatus(gameID, phase, percent, teamId, token) {
     console.log(
         `[watch-folder] game ${gameID} → ${phase} ${percent}%`
     );
-    pushGameAnalysisStatus(gameID, { phase, percent, teamId });
+    pushGameAnalysisStatus(gameID, { phase, percent, teamId }, token);
 }
 
 /**
@@ -386,11 +393,14 @@ async function processVideo(videoPath, deps) {
         // Remonte le problème au site (ligne sans gameID) — sauf dépôt manuel
         // sans équipe ciblée (pas de teamId → on ne sait pas où l'afficher).
         if (META.teamId) {
-            reportAnalysisIssue({
-                sourceFilename: META.cleanBasename + path.extname(videoPath),
-                teamId: META.teamId,
-                reason: 'no_games'
-            });
+            reportAnalysisIssue(
+                {
+                    sourceFilename: META.cleanBasename + path.extname(videoPath),
+                    teamId: META.teamId,
+                    reason: 'no_games'
+                },
+                META.token
+            );
         }
         return;
     }
@@ -427,7 +437,7 @@ async function processVideo(videoPath, deps) {
         '[watch-folder] identify payload:',
         JSON.stringify(IDENTIFY_PAYLOAD, null, 2)
     );
-    const IDENTIFY_RES = await identifyGames(IDENTIFY_PAYLOAD);
+    const IDENTIFY_RES = await identifyGames(IDENTIFY_PAYLOAD, META.token);
     console.log(
         '[watch-folder] identify response:',
         JSON.stringify(IDENTIFY_RES, null, 2)
@@ -460,7 +470,7 @@ async function processVideo(videoPath, deps) {
     // non matchées n'ont pas de ligne côté site → on les ignore).
     const MATCHED_GAME_IDS = new Set(MATCHES.map((m) => String(m.gameID)));
     for (const ID of MATCHED_GAME_IDS) {
-        reportGameStatus(ID, 'queued', PROGRESS_DETECT_END, META.teamId);
+        reportGameStatus(ID, 'queued', PROGRESS_DETECT_END, META.teamId, META.token);
     }
 
     // Phase 2: deep analysis sur les seules games identifiées par /identify.
@@ -505,7 +515,7 @@ async function processVideo(videoPath, deps) {
                     ((PROGRESS_ANALYZE_END - PROGRESS_DETECT_END) * p.percent) /
                         100
                 );
-            reportGameStatus(p.gameID, 'analyzing', UNIFIED, META.teamId);
+            reportGameStatus(p.gameID, 'analyzing', UNIFIED, META.teamId, META.token);
         })
     );
     const DEEP_ELAPSED_S = ((Date.now() - DEEP_T0) / 1000).toFixed(1);
@@ -541,10 +551,13 @@ async function processVideo(videoPath, deps) {
     // analyse persistée.
     let PERSISTED_IDS = new Set();
     if (ANALYSES_TO_PERSIST.length > 0) {
-        const PERSIST_RES = await persistAnalysis({
-            analyses: ANALYSES_TO_PERSIST,
-            teamId: META.teamId
-        });
+        const PERSIST_RES = await persistAnalysis(
+            {
+                analyses: ANALYSES_TO_PERSIST,
+                teamId: META.teamId
+            },
+            META.token
+        );
         PERSISTED_IDS = new Set(
             (PERSIST_RES.persisted || []).map((id) => String(id))
         );
@@ -560,7 +573,7 @@ async function processVideo(videoPath, deps) {
     // games ne passeront pas par la phase upload qui émet normalement le statut.
     for (const ID of MATCHED_GAME_IDS) {
         if (!PERSISTED_IDS.has(ID)) {
-            reportGameStatus(ID, 'failed', PROGRESS_ANALYZE_END, META.teamId);
+            reportGameStatus(ID, 'failed', PROGRESS_ANALYZE_END, META.teamId, META.token);
         }
     }
 
@@ -596,8 +609,8 @@ async function processVideo(videoPath, deps) {
         }
         try {
             // Upload en cours : le site garde un loader (étape "processing").
-            reportGameStatus(GAME_ID, 'processing', PROGRESS_ENCODE_END, META.teamId);
-            const UPLOAD = await requestUploadUrl(GAME_ID, META.teamId);
+            reportGameStatus(GAME_ID, 'processing', PROGRESS_ENCODE_END, META.teamId, META.token);
+            const UPLOAD = await requestUploadUrl(GAME_ID, META.teamId, META.token);
             // Progression de l'upload (0-100% du fichier) remappée sur la bande
             // [ENCODE_END, 100] de la barre unifiée, dédup par palier.
             let lastUnified = -1;
@@ -608,16 +621,20 @@ async function processVideo(videoPath, deps) {
                         Math.round(((100 - PROGRESS_ENCODE_END) * pct) / 100);
                     if (UNIFIED === lastUnified) return;
                     lastUnified = UNIFIED;
-                    reportGameStatus(GAME_ID, 'processing', UNIFIED, META.teamId);
+                    reportGameStatus(GAME_ID, 'processing', UNIFIED, META.teamId, META.token);
                 }
             });
-            await confirmUpload(GAME_ID, {
-                guid: UPLOAD.guid,
-                teamId: META.teamId
-            });
+            await confirmUpload(
+                GAME_ID,
+                {
+                    guid: UPLOAD.guid,
+                    teamId: META.teamId
+                },
+                META.token
+            );
             safeUnlink(CUT.file);
             // Tout est bon : le loader disparaît, le site charge l'analyse.
-            reportGameStatus(GAME_ID, 'done', 100, META.teamId);
+            reportGameStatus(GAME_ID, 'done', 100, META.teamId, META.token);
             console.log(
                 `[watch-folder] uploaded game ${GAME_ID} (tempId=${CUT.tempId})`
             );
@@ -626,7 +643,7 @@ async function processVideo(videoPath, deps) {
             // Filet de sécurité serveur : la game a déjà une vidéo (race ou flag
             // hasVideo manqué). On ne re-upload pas, on jette le cut local.
             if (e instanceof ApiError && e.status === 409) {
-                reportGameStatus(GAME_ID, 'done', 100, META.teamId);
+                reportGameStatus(GAME_ID, 'done', 100, META.teamId, META.token);
                 console.log(
                     `[watch-folder] skipped upload for game ${GAME_ID} — already uploaded (409)`
                 );
@@ -637,7 +654,7 @@ async function processVideo(videoPath, deps) {
                 `[watch-folder] upload failed for game ${GAME_ID}:`,
                 e.message
             );
-            reportGameStatus(GAME_ID, 'failed', PROGRESS_ENCODE_END, META.teamId);
+            reportGameStatus(GAME_ID, 'failed', PROGRESS_ENCODE_END, META.teamId, META.token);
             const DEST = await moveTo(CUT.file, FAILED_DIR);
             console.log('[watch-folder] failed →', DEST);
         }
@@ -674,7 +691,7 @@ async function processVideo(videoPath, deps) {
             // l'analyse a bien été persistée — sinon on laisse le statut "failed"
             // émis après le persist.
             if (PERSISTED_IDS.has(String(M.gameID))) {
-                reportGameStatus(M.gameID, 'done', 100, META.teamId);
+                reportGameStatus(M.gameID, 'done', 100, META.teamId, META.token);
             }
             console.log(
                 `[watch-folder] skipped cut/upload for game ${M.gameID} (tempId=${TEMP_ID}) — video already uploaded`
@@ -694,7 +711,7 @@ async function processVideo(videoPath, deps) {
             M && M.gameID != null && PERSISTED_IDS.has(String(M.gameID));
         // Réencodage : le site affiche un loader (étape "processing").
         if (WILL_UPLOAD) {
-            reportGameStatus(M.gameID, 'processing', PROGRESS_ANALYZE_END, META.teamId);
+            reportGameStatus(M.gameID, 'processing', PROGRESS_ANALYZE_END, META.teamId, META.token);
         }
         try {
             // Games identifiées → réencodage libx264 (keyframe/s pour le lecteur
@@ -716,7 +733,7 @@ async function processVideo(videoPath, deps) {
                         );
                     if (UNIFIED === lastUnified) return;
                     lastUnified = UNIFIED;
-                    reportGameStatus(M.gameID, 'processing', UNIFIED, META.teamId);
+                    reportGameStatus(M.gameID, 'processing', UNIFIED, META.teamId, META.token);
                 });
             } else {
                 await cutCopyGame(videoPath, OUT, G.start, G.end);
@@ -730,7 +747,7 @@ async function processVideo(videoPath, deps) {
                 e.message
             );
             if (M && M.gameID != null) {
-                reportGameStatus(M.gameID, 'failed', PROGRESS_ANALYZE_END, META.teamId);
+                reportGameStatus(M.gameID, 'failed', PROGRESS_ANALYZE_END, META.teamId, META.token);
             }
         }
     }
@@ -767,7 +784,10 @@ async function workerLoop(deps) {
                 notifyStatusChange();
                 continue;
             }
-            if (!(await getAuthCookie())) {
+            // Sans jeton (ni sur la vidéo, ni en repli), aucun appel API ne
+            // passera : on attend qu'une analyse lancée depuis le site en
+            // apporte un, plutôt que de faire échouer la vidéo.
+            if (!resolveAuthToken(readSidecar(NEXT).token)) {
                 console.log(`[watch-folder] ${t('watchFolder.notAuthenticated')}`);
                 await sleep(AUTH_RETRY_INTERVAL_MS);
                 continue;

@@ -11,7 +11,8 @@
     "updatingInProgress": "Updating in progress, please wait.",
     "encoding": "Encoding in progress…",
     "encoded": "The video has been successfully encoded!",
-    "download": "Download"
+    "download": "Download",
+    "logout": "Log out"
   },
   "view": {
     "home": {
@@ -147,17 +148,13 @@
       "arenaId": "Arena",
       "key": "Key",
       "register": "Enable arena mode",
-      "registered": "Arena mode is active for {{roomName}} (venue {{roomId}}, arena {{arenaId}}).",
-      "unregister": "Disable arena mode",
       "errors": {
-        "notAuthenticated": "You must be logged in to enable arena mode.",
         "unknownArena": "Unknown venue or arena.",
         "invalidKey": "Invalid key.",
         "alreadyRegistered": "Another machine is already registered for this arena.",
         "network": "Network error, please try again."
       },
       "capture": {
-        "title": "Video capture",
         "device": "Video source",
         "refresh": "Refresh list",
         "recording": "Recording from \"{{device}}\". Detected games will be analyzed and uploaded automatically.",
@@ -176,7 +173,6 @@
       "accessWebsite": "Access the EBP website",
       "changeTool": "Switch tool",
       "accessDiscordServer": "Access the EBP Discord server",
-      "logout": "Log out",
       "chooseATeam": "Choose a team",
       "home": "Home",
       "tools": {
