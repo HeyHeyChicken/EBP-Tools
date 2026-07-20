@@ -64,6 +64,8 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
   protected devices: ArenaCaptureDevice[] = [];
   protected selectedDeviceId?: string;
   protected captureStatus?: ArenaCaptureStatus;
+  /** Bascule start/stop en cours : désactive le bouton (anti double-clic). */
+  protected capturePending: boolean = false;
   private captureStatusTimer?: ReturnType<typeof setInterval>;
 
   @ViewChild('previewVideo')
@@ -363,6 +365,10 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
   }
 
   protected toggleCapture(): void {
+    if (this.capturePending) {
+      return;
+    }
+    this.capturePending = true;
     const WAS_RUNNING = this.captureStatus?.running;
     const CALL = WAS_RUNNING
       ? window.electronAPI.arenaCaptureStop()
@@ -370,16 +376,26 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     CALL.then((status: ArenaCaptureStatus) => {
       this.ngZone.run(() => {
         this.captureStatus = status;
+        // L'arrêt est gracieux : ffmpeg finalise le segment en cours avant de
+        // se fermer, et ce n'est qu'à sa fermeture que le service repasse à
+        // running=false. Le statut renvoyé ici est donc encore "running". On
+        // re-poll rapidement le statut réel pour rafraîchir le bouton sans
+        // attendre le poll de 5 s, et on garde le bouton désactivé jusqu'à ce
+        // que l'état soit stabilisé (anti double-clic). Le start, lui, est
+        // immédiatement à jour → on ré-active tout de suite.
+        if (WAS_RUNNING) {
+          setTimeout(() => this.refreshCaptureStatus(), 600);
+          setTimeout(() => {
+            this.refreshCaptureStatus();
+            this.capturePending = false;
+          }, 1800);
+        } else {
+          this.capturePending = false;
+        }
       });
-      // L'arrêt est gracieux : ffmpeg finalise le segment en cours avant de se
-      // fermer, et ce n'est qu'à sa fermeture que le service repasse à
-      // running=false. Le statut renvoyé ici est donc encore "running". On
-      // re-poll rapidement le statut réel pour rafraîchir le bouton sans
-      // attendre le poll de 5 s (le start, lui, est immédiatement à jour).
-      if (WAS_RUNNING) {
-        setTimeout(() => this.refreshCaptureStatus(), 600);
-        setTimeout(() => this.refreshCaptureStatus(), 1800);
-      }
+    }).catch(() => {
+      // Échec de l'IPC : sans ça le bouton resterait désactivé indéfiniment.
+      this.ngZone.run(() => (this.capturePending = false));
     });
   }
 

@@ -96,7 +96,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                 class="w-100"
                 [class.red]="captureStatus.running"
                 [class.green]="!captureStatus.running"
-                [disabled]="!captureStatus.deviceId"
+                [disabled]="!captureStatus.deviceId || capturePending"
                 (click)="toggleCapture()"
               >
                 {{
