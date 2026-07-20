@@ -42,7 +42,7 @@ const GQL_QUERY =
     'listLastGamesAtLocation(terrainIds:$terrainIds,limit:$limit){' +
     'gameId endedAt terrainId ' +
     'battleArena{data{teamOne{score name}teamTwo{score name}}' +
-    'players{data{niceName team kills deaths}}' +
+    'players{data{niceName team}}' +
     'map{name identifier}mode{identifier category}}}}';
 
 let pollTimer = null;
@@ -148,9 +148,7 @@ function toPileEntry(g) {
         teamTwoName: BA.data.teamTwo ? BA.data.teamTwo.name : null,
         players: (BA.players || []).map((p) => ({
             name: p.data.niceName,
-            team: p.data.team,
-            kills: p.data.kills,
-            deaths: p.data.deaths
+            team: p.data.team
         })),
         fetchedAtMs: null, // rempli à l'insertion
         consumed: false
@@ -243,7 +241,9 @@ function findGame(mapName, endEpochSec) {
  * matchera les noms contre la mauvaise équipe).
  */
 function buildRosters(entry) {
-    const toP = (p) => ({ name: p.name, K: p.kills, D: p.deaths });
+    // Seuls les NOMS servent en phase 2 (fuzzy-match du killfeed + user_words
+    // Tesseract) ; le K/D officiel n'est jamais consommé, on ne le stocke plus.
+    const toP = (p) => ({ name: p.name });
     return {
         orangePlayers: entry.players
             .filter((p) => p.team === entry.teamOneName)
