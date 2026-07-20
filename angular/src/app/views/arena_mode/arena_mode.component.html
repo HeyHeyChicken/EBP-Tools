@@ -65,7 +65,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </button>
             </div>
             @if (captureStatus) {
-              @if (captureStatus.running) {
+              @if (captureStatus.deviceId) {
                 <video
                   #previewVideo
                   class="preview"
@@ -73,6 +73,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   muted
                   playsinline
                 ></video>
+              }
+              @if (captureStatus.running) {
                 <ebp-message state="success">
                   {{
                     'view.arena_mode.capture.recording'

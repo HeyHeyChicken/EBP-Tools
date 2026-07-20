@@ -69,7 +69,15 @@ export class ConsoleService {
    * @param logData The log data to add.
    */
   private addLog(logData: LogData): void {
-    this._logsSubject.next([...this.currentLogs, logData]);
+    const LOGS = [...this.currentLogs, logData];
+    // Borne dure sur le tableau lui-même : sans ça il croît sans fin et chaque
+    // addLog recopie tout (O(n²)). Sous un flux soutenu (dumps ffmpeg, spam
+    // d'erreurs socket) le renderer finit par ramer. MAX_LOGS n'était jusqu'ici
+    // appliqué qu'à l'affichage, pas au stockage.
+    if (LOGS.length > ConsoleService.MAX_LOGS) {
+      LOGS.splice(0, LOGS.length - ConsoleService.MAX_LOGS);
+    }
+    this._logsSubject.next(LOGS);
   }
 
   private setupConsoleRedirection() {

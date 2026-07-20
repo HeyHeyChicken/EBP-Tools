@@ -197,13 +197,30 @@ function listVideoDevices() {
             if (M) DEVICES.push({ id: M[1], name: M[2].trim() });
         }
     } else {
-        // Lignes `"Nom" (video)`.
-        for (const LINE of OUT.split('\n')) {
-            const M = LINE.match(/"([^"]+)"\s+\((video)\)/);
-            if (M) DEVICES.push({ id: M[1], name: M[1] });
+        // Lignes `"Nom" (video)` suivies d'une ligne `Alternative name "@device_pnp_…"`.
+        // Deux caméras du même modèle ont un nom IDENTIQUE mais un chemin
+        // (alternative name) UNIQUE → on l'utilise comme id pour les
+        // distinguer (dropdown sans clés dupliquées, sélection, adressage
+        // ffmpeg de la bonne caméra). Fallback sur le nom si le chemin manque.
+        const LINES = OUT.split('\n');
+        for (let i = 0; i < LINES.length; i++) {
+            const M = LINES[i].match(/"([^"]+)"\s+\((video)\)/);
+            if (!M) continue;
+            const NAME = M[1];
+            const ALT = (LINES[i + 1] || '').match(
+                /Alternative name\s+"([^"]+)"/
+            );
+            DEVICES.push({ id: ALT ? ALT[1] : NAME, name: NAME });
         }
     }
-    return DEVICES;
+    // Le pipeline salle ne capte QUE des caméras VIRTUELLES (le flux du jeu via
+    // OBS Virtual Camera & co) : la source doit être un rendu 1080p, pas une
+    // webcam physique. Les webcams physiques sont de toute façon exclusives
+    // sous Windows (impossible à prévisualiser pendant qu'on les enregistre),
+    // donc on les retire de la liste. Filtre par nom — à étendre si d'autres
+    // logiciels de caméra virtuelle sont utilisés en salle.
+    const IS_VIRTUAL = /virtual|obs|vcam|streamlabs|xsplit|manycam|\bndi\b/i;
+    return DEVICES.filter((d) => IS_VIRTUAL.test(d.name));
 }
 
 function buildFfmpegArgs(device) {
@@ -396,7 +413,10 @@ function stopCapture() {
 }
 
 /**
- * Sélectionne le périphérique et (re)démarre la captation dessus.
+ * Sélectionne le périphérique. Ne démarre PAS la captation de lui-même : le
+ * simple choix d'une source ne sert qu'à la prévisualisation. En revanche, si
+ * une captation est déjà en cours, on bascule dessus sans interruption voulue
+ * par l'utilisateur.
  * @param {{id: string, name: string}} device
  */
 function setDeviceAndRestart(device) {
@@ -407,9 +427,8 @@ function setDeviceAndRestart(device) {
         const OLD = ffmpegProcess;
         stopCapture();
         OLD.on('close', () => startCapture());
-        return getStatus();
     }
-    return startCapture();
+    return getStatus();
 }
 
 /**

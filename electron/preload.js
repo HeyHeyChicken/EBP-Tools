@@ -71,7 +71,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   arenaCaptureListDevices: () => ipcRenderer.invoke("arena-capture-list-devices"),
   // The front-end asks the server to return the arena capture status.
   arenaCaptureGetStatus: () => ipcRenderer.invoke("arena-capture-get-status"),
-  // The front-end asks the server to select a capture device and start capturing.
+  // The front-end asks the server to select a capture device (preview only; capture is not started).
   arenaCaptureSetDevice: (device) => ipcRenderer.invoke("arena-capture-set-device", device),
   // The front-end asks the server to start/stop the arena capture.
   arenaCaptureStart: () => ipcRenderer.invoke("arena-capture-start"),

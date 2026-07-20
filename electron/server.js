@@ -2523,7 +2523,7 @@ if (!APP_GOT_THE_LOCK) {
             return arenaCaptureService.getStatus();
         });
 
-        // The front-end asks the server to select a device and start capturing.
+        // The front-end asks the server to select a device (preview only; capture is not started).
         ipcMain.handle('arena-capture-set-device', (event, device) => {
             return arenaCaptureService.setDeviceAndRestart(device);
         });

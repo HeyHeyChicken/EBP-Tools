@@ -127,22 +127,24 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     if (this.captureStatusTimer) {
       clearInterval(this.captureStatusTimer);
     }
-    document.removeEventListener(
-      'visibilitychange',
-      this.onVisibilityChange
-    );
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.stopPreview();
   }
 
   /**
-   * L'aperçu ne consomme que lorsqu'il est visible : fenêtre minimisée ou
-   * masquée → on coupe le flux caméra (un PC de salle peut rester des heures
-   * sur cette page). Le poll de statut (5 s) le relancera à la réapparition.
+   * L'aperçu ne consomme le flux caméra que lorsqu'il est visible : fenêtre
+   * minimisée ou masquée → on coupe (un PC de salle peut rester des heures sur
+   * cette page). Au retour, on relance aussitôt sur la source courante plutôt
+   * que d'attendre le prochain poll de statut.
    */
   private readonly onVisibilityChange = (): void => {
-    if (document.hidden) {
-      this.ngZone.run(() => this.stopPreview());
-    }
+    this.ngZone.run(() => {
+      if (document.hidden) {
+        this.stopPreview();
+      } else if (this.captureStatus?.deviceName) {
+        this.startPreview(this.captureStatus.deviceName);
+      }
+    });
   };
 
   /**
@@ -154,19 +156,49 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     if (this.previewDeviceName === deviceName) {
       return;
     }
-    this.stopPreview();
     this.previewDeviceName = deviceName;
+    // On garde l'ancien flux vivant jusqu'à l'acquisition du nouveau. Couper
+    // avant de rouvrir (track.stop() puis getUserMedia) laisse certaines
+    // caméras virtuelles renvoyer une image noire : le device est encore en
+    // cours de libération côté OS quand on le réacquiert. C'est ce qui
+    // noircissait l'aperçu au changement de source.
+    const PREVIOUS = this.previewStream;
     try {
-      // Le label Chromium correspond au nom du périphérique système (même
-      // source que la liste ffmpeg).
-      const DEVICES = await navigator.mediaDevices.enumerateDevices();
-      const MATCH = DEVICES.find(
-        (d) => d.kind === 'videoinput' && d.label === deviceName
-      );
-      if (!MATCH) {
+      // ffmpeg/dshow renvoie le nom nu ("Logitech BRIO") tandis que Chromium
+      // suffixe le label des webcams USB avec l'ID matériel ("Logitech BRIO
+      // (046d:085e)"). L'égalité stricte marche pour OBS (nom identique des
+      // deux côtés) mais échoue pour les caméras → on tolère préfixe/inclusion.
+      const FIND_MATCH = (
+        list: MediaDeviceInfo[]
+      ): MediaDeviceInfo | undefined => {
+        const CAMS = list.filter((d) => d.kind === 'videoinput');
+        return (
+          CAMS.find((d) => d.label === deviceName) ??
+          CAMS.find((d) => d.label.startsWith(deviceName)) ??
+          CAMS.find((d) => d.label.includes(deviceName))
+        );
+      };
+      let devices = await navigator.mediaDevices.enumerateDevices();
+      let match = FIND_MATCH(devices);
+      // Chromium masque labels et deviceId tant qu'aucun flux caméra n'a été
+      // accordé au document : sur un profil neuf (PC de salle) l'énumération
+      // renvoie des labels vides → aucun match, aperçu noir. On débloque en
+      // ouvrant un flux générique jetable, puis on ré-énumère.
+      if (!match) {
+        const PRIMER = await navigator.mediaDevices.getUserMedia({
+          video: true
+        });
+        for (const TRACK of PRIMER.getTracks()) {
+          TRACK.stop();
+        }
+        devices = await navigator.mediaDevices.enumerateDevices();
+        match = FIND_MATCH(devices);
+      }
+      if (!match) {
         this.previewDeviceName = undefined;
         return;
       }
+      const MATCH = match;
       const STREAM = await navigator.mediaDevices.getUserMedia({
         video: {
           deviceId: { exact: MATCH.deviceId },
@@ -176,8 +208,22 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
       this.previewStream = STREAM;
       this.attachPreview();
     } catch (e) {
-      console.warn('Preview unavailable:', e);
+      // Une DOMException n'a pas de champs énumérables → JSON.stringify donne
+      // "{}". On extrait name+message pour un diagnostic exploitable.
+      const ERR = e as { name?: string; message?: string };
+      console.warn(
+        `Preview unavailable for ${deviceName}: ${ERR?.name} - ${ERR?.message}`
+      );
       this.previewDeviceName = undefined;
+    } finally {
+      // Libération de l'ancien flux seulement après coup. Sur échec (STREAM non
+      // acquis), this.previewStream vaut toujours PREVIOUS → on le garde, donc
+      // un switch raté ne noircit pas l'aperçu en cours.
+      if (PREVIOUS && PREVIOUS !== this.previewStream) {
+        for (const TRACK of PREVIOUS.getTracks()) {
+          TRACK.stop();
+        }
+      }
     }
   }
 
@@ -190,7 +236,15 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
       return;
     }
     if (this.previewVideo) {
-      this.previewVideo.nativeElement.srcObject = this.previewStream;
+      const VIDEO = this.previewVideo.nativeElement;
+      VIDEO.srcObject = this.previewStream;
+      // `autoplay` ne joue qu'au chargement initial. Après un switch ou un
+      // masquage/refocus, on réassigne `srcObject` sur une vidéo mise en pause
+      // (srcObject=null) : sans play() explicite elle reste figée = écran noir
+      // alors que le flux est bien vivant.
+      VIDEO.play().catch(() => {
+        // Lecture interrompue par un nouveau switch immédiat : sans gravité.
+      });
     } else if (attempt < 10) {
       setTimeout(() => this.attachPreview(attempt + 1), 100);
     }
@@ -245,16 +299,23 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
           if (this.selectedDeviceId === undefined && status.deviceId) {
             this.selectedDeviceId = status.deviceId;
           }
-          if (status.running && status.deviceName && !document.hidden) {
+          // Prévisu dès qu'une source est sélectionnée, que la captation
+          // tourne ou non (choisir une source ne sert qu'à la prévisualiser),
+          // mais seulement si la page est visible — sinon on laisse coupé.
+          if (status.deviceName && !document.hidden) {
             this.startPreview(status.deviceName);
-          } else if (!status.running) {
+          } else if (!status.deviceName) {
             this.stopPreview();
           }
         });
       });
   }
 
-  /** Sélectionne le périphérique et (re)démarre la captation dessus. */
+  /**
+   * Sélectionne le périphérique et met à jour la prévisualisation. Ne démarre
+   * pas la captation : seul le bouton Démarrer le fait. Si une captation est
+   * déjà en cours, le main process bascule dessus tout seul.
+   */
   protected applyDevice(): void {
     const DEVICE = this.devices.find((d) => d.id === this.selectedDeviceId);
     if (!DEVICE) {
@@ -265,6 +326,9 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
       .then((status: ArenaCaptureStatus) => {
         this.ngZone.run(() => {
           this.captureStatus = status;
+          if (!document.hidden) {
+            this.startPreview(DEVICE.name);
+          }
         });
       });
   }
@@ -299,13 +363,23 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
   }
 
   protected toggleCapture(): void {
-    const CALL = this.captureStatus?.running
+    const WAS_RUNNING = this.captureStatus?.running;
+    const CALL = WAS_RUNNING
       ? window.electronAPI.arenaCaptureStop()
       : window.electronAPI.arenaCaptureStart();
     CALL.then((status: ArenaCaptureStatus) => {
       this.ngZone.run(() => {
         this.captureStatus = status;
       });
+      // L'arrêt est gracieux : ffmpeg finalise le segment en cours avant de se
+      // fermer, et ce n'est qu'à sa fermeture que le service repasse à
+      // running=false. Le statut renvoyé ici est donc encore "running". On
+      // re-poll rapidement le statut réel pour rafraîchir le bouton sans
+      // attendre le poll de 5 s (le start, lui, est immédiatement à jour).
+      if (WAS_RUNNING) {
+        setTimeout(() => this.refreshCaptureStatus(), 600);
+        setTimeout(() => this.refreshCaptureStatus(), 1800);
+      }
     });
   }
 
