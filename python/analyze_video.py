@@ -848,10 +848,21 @@ def _split_kill_row(frame: np.ndarray, bbox, orange_color, blue_color,
     }
 
 
+# Debug/outillage : si la variable d'env `EVA_KF_DUMP` pointe un dossier, chaque
+# crop killfeed traité par `_ocr_kill_name` y est sauvegardé (l'image binarisée
+# telle que Tesseract la reçoit, après masque couleur). Sert à extraire des
+# vrais crops killfeed pour (ré)entraîner `evakillfeed` : on les labellise
+# ensuite via `label_kf_crops.py` contre `kills.txt`. Non définie (défaut '')
+# = inerte, aucun impact en prod (le test court-circuite avant toute I/O).
+# `_KF_DUMP_N` : compteur d'unicité pour les noms de fichiers dumpés.
+_KF_DUMP_DIR = os.environ.get('EVA_KF_DUMP', '')
+_KF_DUMP_N = [0]
+
+
 def _ocr_kill_name(frame: np.ndarray, box, target_color,
                    tol_color: int = 80, pad: int = 20,
                    y_extend: int = 3, user_words_path: str = None,
-                   whitelist: str = None) -> list:
+                   whitelist: str = None, dump_tag: str = None) -> list:
     """
     OCR un nom de joueur dans une bbox killfeed. Masque par couleur d'équipe
     (texte couleur cible → noir, fond → blanc, polarité standard Tesseract),
@@ -896,11 +907,15 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
         mask = (np.abs(big - target).max(axis=2) <= tol_color)
         bw = np.where(mask, 0, 255).astype(np.uint8)
         pil = ImageOps.expand(Image.fromarray(bw), border=pad, fill=255).convert('RGB')
+        if _KF_DUMP_DIR and upscale == 4 and dump_tag:
+            _KF_DUMP_N[0] += 1
+            pil.save(os.path.join(
+                _KF_DUMP_DIR, f'{dump_tag}_{_KF_DUMP_N[0]:05d}.png'))
         for psm in psms:
             try:
                 txt = eva_ocr.recognize(
-                    pil, lang='eng', psm=psm, whitelist=whitelist,
-                    user_words_file=user_words_path,
+                    pil, lang=os.environ.get('EVA_KF_LANG', 'evakillfeed'),
+                    psm=psm, whitelist=whitelist, user_words_file=user_words_path,
                 ).replace('\r', '').replace('\n', '').strip()
                 if txt:
                     candidates.append(txt)
@@ -6248,8 +6263,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     KT, VT = SPLIT['killer']['team'], SPLIT['victim']['team']
                     KT_COLOR = KF_ORANGE if KT == 'orange' else KF_BLUE
                     VT_COLOR = KF_ORANGE if VT == 'orange' else KF_BLUE
-                    KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR, user_words_path=USER_WORDS_PATH)
-                    VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR, user_words_path=USER_WORDS_PATH)
+                    KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR, user_words_path=USER_WORDS_PATH,
+                                          dump_tag=f'{ELAPSED}_{KT}_killer')
+                    VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR, user_words_path=USER_WORDS_PATH,
+                                          dump_tag=f'{ELAPSED}_{VT}_victim')
                     # Identifie l'arme et le headshot via template matching.
                     # Stocké par observation (= par frame) pour que le dédup
                     # puisse voter sur l'arme la plus fréquemment matchée

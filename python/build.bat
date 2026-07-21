@@ -34,6 +34,7 @@ pyinstaller --onefile --name win32 %TESSEROCR_FLAG% ^
   --add-data "tessdata\evadigits.traineddata;tesseract\tessdata" ^
   --add-data "tessdata\evapseudos.traineddata;tesseract\tessdata" ^
   --add-data "tessdata\evascores.traineddata;tesseract\tessdata" ^
+  --add-data "tessdata\evakillfeed.traineddata;tesseract\tessdata" ^
   --add-data "templates;templates" ^
   --add-data "models;models" ^
   analyze_video.py
