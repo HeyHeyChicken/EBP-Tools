@@ -62,6 +62,22 @@ KILLFEED_TEXT_COLORS = {
     2: ((207, 190, 57), (75, 155, 190)),
 }
 
+# Fallback d'identification par LARGEUR de texte killfeed (indépendant de
+# l'OCR, donc robuste à un changement de HUD.
+# Principe : la largeur du texte d'un pseudo est une signature stable (std
+# < 1 px mesuré) et IDENTIQUE des deux côtés (tueur voilé ≈ victime claire,
+# la géométrie ne change pas). On apprend la largeur de référence de chaque
+# joueur sur ses lectures OCR confirmées (surtout la victime, fiable), puis on
+# devine l'identité des côtés OCR-illisibles par proximité de largeur, au sein
+# de la seule équipe donnée par la couleur (5 candidats). On n'attribue que si
+# le match est NON AMBIGU : deux joueurs de largeurs trop proches restent
+# indiscernables (donc non résolus) plutôt que faux-attribués.
+KF_WIDTH_REF_MIN_RATIO = 0.75   # ratio fuzzy min d'une lecture OCR pour nourrir une référence
+KF_WIDTH_REF_MIN_OBS = 2        # nb min de lectures confirmées pour figer une référence
+KF_WIDTH_TOL = 3                # écart max (px) largeur observée ↔ référence pour accepter
+KF_WIDTH_MARGIN = 4             # le 2e candidat doit être ≥ ce nb de px plus loin (garde d'ambiguïté)
+KF_WIDTH_FALLBACK_RATIO = 0.5   # ratio attribué à un match par largeur (< OCR réel → l'OCR gagne le vote dédup)
+
 
 def _killfeed_text_colors(resolved_orange, resolved_blue):
     """Couleurs de texte killfeed du thème résolu ; fallback = couleurs résolues."""
@@ -842,10 +858,18 @@ def _split_kill_row(frame: np.ndarray, bbox, orange_color, blue_color,
         # Blocs s'overlap : split non fiable.
         return None
 
+    # Largeur du TEXTE seul (plus gros bloc chroma contigu, pas le cartouche) —
+    # signature stable par pseudo (std < 1 px mesuré), réutilisée en fallback
+    # d'identification quand l'OCR échoue (cf. _match_kill_observations). On
+    # prend le bloc et non l'extent brut pour résister au décor coloré happé
+    # par l'extension gauche du bbox killer (fond transparent).
+    killer_width = killer_block[1] - killer_block[0] + 1
+    victim_width = victim_block[1] - victim_block[0] + 1
+
     return {
-        'killer': {'box': ((x1,                y1), (x1 + killer_right, y2)), 'team': killer_team},
+        'killer': {'box': ((x1,                y1), (x1 + killer_right, y2)), 'team': killer_team, 'width': killer_width},
         'weapon': {'box': ((x1 + killer_right, y1), (x1 + victim_left,  y2))},
-        'victim': {'box': ((x1 + victim_left,  y1), (x2,                y2)), 'team': victim_team},
+        'victim': {'box': ((x1 + victim_left,  y1), (x2,                y2)), 'team': victim_team, 'width': victim_width},
     }
 
 
@@ -1293,9 +1317,17 @@ def _match_kill_observations(raw_observations: dict, roster_o: list,
     a sa forme). Passe 2 — re-matche tueur ET victime contre
     {pseudo roster + forme apprise} et convertit en slots.
 
-    Entrée : {elapsed: [{'kt','vt','killer_raw','victim_raw','weapon',
-    'headshot'}]}. Sortie : format attendu par `_dedup_kills`. Les obs dont le
-    tueur ou la victime ne matchent pas sont écartées (rows parasites, decor)."""
+    Fallback LARGEUR (indépendant de l'OCR, cf. constantes KF_WIDTH_*) : un
+    côté que l'OCR ne lit pas est deviné par la largeur de son texte, comparée
+    aux largeurs de référence apprises sur les lectures confirmées, au sein de
+    la seule équipe (couleur). Rend le killfeed résilient à un HUD qui casse
+    l'OCR d'un côté (ex. voile V2 sur le tueur) tant que l'autre côté (victime)
+    reste lisible pour ancrer les références.
+
+    Entrée : {elapsed: [{'kt','vt','killer_raw','victim_raw','killer_width',
+    'victim_width','weapon','headshot'}]}. Sortie : format attendu par
+    `_dedup_kills`. Les obs dont le tueur ou la victime ne matchent (ni OCR ni
+    largeur) sont écartées (rows parasites, decor)."""
     base_o = {n: n for n in roster_o}
     base_b = {n: n for n in roster_b}
 
@@ -1314,23 +1346,67 @@ def _match_kill_observations(raw_observations: dict, roster_o: list,
         if count >= 3 and len(form) >= len(name):
             (cand_o if name in base_o else cand_b)[form] = name
 
-    out = {}
+    # Passe 2a — matche tueur ET victime par OCR, et accumule la LARGEUR de
+    # texte de chaque côté CONFIRMÉ (ratio ≥ seuil) sous l'identité résolue.
+    # On mémorise le résultat par obs pour la passe 2b (fallback largeur).
+    matched = []
+    widths = {}  # (team, name) -> [largeurs de lectures confirmées]
     for elapsed, obs_list in raw_observations.items():
         for obs in obs_list:
             k_map = cand_o if obs['kt'] == 'orange' else cand_b
             v_map = cand_o if obs['vt'] == 'orange' else cand_b
             km, kr = _match_player_kf(obs['killer_raw'], k_map)
             vm, vr = _match_player_kf(obs['victim_raw'], v_map)
-            if km is None or vm is None:
-                continue
-            k_roster = roster_o if obs['kt'] == 'orange' else roster_b
-            v_roster = roster_o if obs['vt'] == 'orange' else roster_b
-            out.setdefault(elapsed, []).append({
-                'killer': _player_slot(obs['kt'], k_roster.index(km)),
-                'victim': _player_slot(obs['vt'], v_roster.index(vm)),
-                'killer_ratio': kr, 'victim_ratio': vr,
-                'weapon': obs.get('weapon'), 'headshot': obs.get('headshot', False),
-            })
+            if km is not None and kr >= KF_WIDTH_REF_MIN_RATIO and obs.get('killer_width'):
+                widths.setdefault((obs['kt'], km), []).append(obs['killer_width'])
+            if vm is not None and vr >= KF_WIDTH_REF_MIN_RATIO and obs.get('victim_width'):
+                widths.setdefault((obs['vt'], vm), []).append(obs['victim_width'])
+            matched.append((elapsed, obs, km, kr, vm, vr))
+
+    # Largeur de référence par joueur = médiane de ses lectures confirmées
+    # (robuste aux outliers de mesure côté tueur voilé). Ignore les joueurs vus
+    # trop peu de fois pour une référence fiable.
+    def _median(vals):
+        s = sorted(vals); n = len(s)
+        return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
+    width_ref = {key: _median(v) for key, v in widths.items()
+                 if len(v) >= KF_WIDTH_REF_MIN_OBS}
+
+    def _guess_by_width(team, width):
+        """Devine le joueur de `team` dont la largeur de référence colle à
+        `width`. Retourne le nom si le match est non ambigu (plus proche ≤ TOL
+        et 2e plus proche ≥ MARGE plus loin), sinon None."""
+        if not width:
+            return None
+        dists = sorted(((abs(width - ref), name)
+                        for (t, name), ref in width_ref.items() if t == team))
+        if not dists or dists[0][0] > KF_WIDTH_TOL:
+            return None
+        if len(dists) >= 2 and (dists[1][0] - dists[0][0]) < KF_WIDTH_MARGIN:
+            return None  # deux candidats trop proches → indiscernable
+        return dists[0][1]
+
+    # Passe 2b — résout, avec fallback largeur pour les côtés OCR-illisibles.
+    out = {}
+    for elapsed, obs, km, kr, vm, vr in matched:
+        if km is None:
+            g = _guess_by_width(obs['kt'], obs.get('killer_width'))
+            if g is not None:
+                km, kr = g, KF_WIDTH_FALLBACK_RATIO
+        if vm is None:
+            g = _guess_by_width(obs['vt'], obs.get('victim_width'))
+            if g is not None:
+                vm, vr = g, KF_WIDTH_FALLBACK_RATIO
+        if km is None or vm is None:
+            continue
+        k_roster = roster_o if obs['kt'] == 'orange' else roster_b
+        v_roster = roster_o if obs['vt'] == 'orange' else roster_b
+        out.setdefault(elapsed, []).append({
+            'killer': _player_slot(obs['kt'], k_roster.index(km)),
+            'victim': _player_slot(obs['vt'], v_roster.index(vm)),
+            'killer_ratio': kr, 'victim_ratio': vr,
+            'weapon': obs.get('weapon'), 'headshot': obs.get('headshot', False),
+        })
     return out
 
 
@@ -6279,6 +6355,8 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     KILL_OBSERVATIONS.setdefault(ELAPSED, []).append({
                         'kt': KT, 'vt': VT,
                         'killer_raw': KRAW, 'victim_raw': VRAW,
+                        'killer_width': SPLIT['killer']['width'],
+                        'victim_width': SPLIT['victim']['width'],
                         'weapon': WEAPON, 'headshot': HEADSHOT,
                     })
 
