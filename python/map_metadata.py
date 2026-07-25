@@ -62,6 +62,7 @@ _METADATA_FILES = {
     'Lunar Outpost':  'lunar_outpost.json',
     'Outlaw':         'outlaw.json',
     'Polaris':        'polaris.json',
+    'Reef Point':     'reef_point.json',
     'Silva':          'silva.json',
     'The Cliff':      'the_cliff.json',
     'The Rock':       'the_rock.json',

@@ -38,6 +38,7 @@ _TEMPLATE_FILES = {
     'Lunar Outpost':  'lunar_outpost.png',
     'Outlaw':         'outlaw.png',
     'Polaris':        'polaris.png',
+    'Reef Point':     'reef_point.png',
     'Silva':          'silva.png',
     'The Cliff':      'the_cliff.png',
     'The Rock':       'the_rock.png',

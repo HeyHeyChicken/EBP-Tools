@@ -1971,11 +1971,16 @@ if (!APP_GOT_THE_LOCK) {
         // (segments → games découpées).
         arenaModeService.startHeartbeat();
         if (arenaModeService.getState().registered) {
-            arenaCaptureService.autoStart();
+            // En dev, on ne démarre pas la captation au boot (évite d'accaparer
+            // la caméra/OBS pendant le développement) — elle reste lançable à la
+            // main depuis l'UI.
+            if (!IS_DEV_MODE) {
+                arenaCaptureService.autoStart();
+            }
             try {
                 arenaEvaPollerService.start();
                 arenaPipelineService.start({ runAnalyzer });
-                arenaUploaderService.start({ runChunkAnalyzer });
+                arenaUploaderService.start();
             } catch (e) {
                 console.error('[arena-pipeline] failed to start', e);
             }
@@ -2490,7 +2495,7 @@ if (!APP_GOT_THE_LOCK) {
                     // du spool et uploader démarrent (idempotents).
                     arenaEvaPollerService.start();
                     arenaPipelineService.start({ runAnalyzer });
-                    arenaUploaderService.start({ runChunkAnalyzer });
+                    arenaUploaderService.start();
                     return { success: true, state: STATE };
                 } catch (e) {
                     console.error('[arena-mode] register failed:', e.message);
@@ -2600,7 +2605,7 @@ if (!APP_GOT_THE_LOCK) {
                     try {
                         arenaEvaPollerService.start();
                         arenaPipelineService.start({ runAnalyzer });
-                        arenaUploaderService.start({ runChunkAnalyzer });
+                        arenaUploaderService.start();
                     } catch (e) {
                         console.error('[arena] services restart failed', e);
                     }

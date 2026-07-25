@@ -326,6 +326,25 @@ function depositArenaGame(payload, arenaToken) {
 }
 
 /**
+ * POST /api/tools/arena/games/ingest
+ * Mode salle : pousse vers EBP les nœuds bruts `listLastGamesAtLocation` des
+ * nouvelles games vues par le poller, pour qu'EBP les upsert dans sa BDD
+ * (T_Games) sans attendre son propre poll ni un import d'équipe. Auth clé de
+ * salle (X-Arena-Token). Best-effort : le poller serveur d'EBP reste le filet.
+ *
+ * @param {{roomId:number, arenaId:number, games:object[]}} payload
+ * @param {string} arenaToken
+ * @returns {Promise<{upserted:number}>}
+ */
+function ingestArenaGames(payload, arenaToken) {
+    return apiRequest('POST', '/arena/games/ingest', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-Arena-Token': arenaToken }
+    });
+}
+
+/**
  * POST /api/tools/watcher/status
  * Push de l'état complet du watcher (queued/processing/failed). Le serveur
  * stamp `updatedAt` lui-même et broadcast aux sockets du user.
@@ -484,6 +503,7 @@ module.exports = {
     sendArenaHeartbeat,
     requestArenaUploadUrl,
     depositArenaGame,
+    ingestArenaGames,
     persistAnalysis,
     requestUploadUrl,
     confirmUpload,

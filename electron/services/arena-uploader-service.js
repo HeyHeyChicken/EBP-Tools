@@ -20,16 +20,21 @@ const {
 
 // Mode salle — UPLOADER. Consomme les games découpées par le pipeline
 // (dossier `games/`). Chaque game est d'abord MATCHÉE contre la pile EVA
-// (arena-eva-poller) : on n'analyse une game que quand on a récupéré ses
-// rosters + son gameId depuis l'API EVA. Ensuite : phase 2 (rosters trustés),
-// upload S3 `arena/pending/` sous un nom PORTANT le gameId (matching exact à
-// l'import), dépôt du payload. Fichier + sidecar supprimés une fois les deux
-// faits — reprise après crash garantie par le re-scan + l'upsert idempotent.
+// (arena-eva-poller) : on n'upload une game que quand on a récupéré son
+// gameId depuis l'API EVA. Ensuite : upload S3 `arena/pending/` sous un nom
+// PORTANT le gameId (matching exact à l'import), dépôt SANS payload. Fichier +
+// sidecar supprimés une fois les deux faits — reprise après crash garantie par
+// le re-scan + l'upsert idempotent.
 //
-// Gate roster : si la game n'est pas encore dans la pile, on la DÉFÈRE (elle
+// V1 : plus d'analyse phase 2 (killfeed) sur le PC de salle. Le but n'est plus
+// l'analyse mais que les games soient uploadées et rattachées ; le hook
+// d'import EVA attache la vidéo par (gameId, terrain), les joueurs sont déjà
+// connus côté serveur. Le killfeed pourra être rebranché plus tard.
+//
+// Gate gameId : si la game n'est pas encore dans la pile, on la DÉFÈRE (elle
 // reste dans games/, retentée toutes les 2 min). Au-delà d'1 h sans match
-// (EVA n'a jamais publié la game), on la déplace en `failed/` (ni analyse ni
-// upload) — décision Antoine : jamais d'analyse sans rosters.
+// (EVA n'a jamais publié la game), on la déplace en `failed/` (pas d'upload)
+// — décision Antoine : jamais d'upload sans gameId.
 //
 // Résilience réseau : upload + dépôt ont chacun une boucle de retry
 // PERSISTANTE (URL présignée fraîche à chaque tentative, backoff 30 s → 10 min,
@@ -49,7 +54,6 @@ const ROSTER_BACKSTOP_MS = 60 * 60 * 1000;
 
 let watcher = null;
 let retryTimer = null;
-let deps = null;
 let workerRunning = false;
 let stopRequested = false;
 const QUEUE = [];
@@ -104,32 +108,6 @@ function buildS3FileName(provisionalName, gameId) {
     if (!M) return null;
     const [, roomId, arenaId, map, start, end, scores] = M;
     return `${roomId}_${arenaId}_${gameId}_${map}_${start}_${end}_${scores}.mp4`;
-}
-
-/**
- * Phase 2 sur la game découpée avec les rosters trustés de la pile EVA.
- * @returns {object|null} payload d'analyse.
- */
-async function analyzeGame(filePath, meta, rosters) {
-    const CHUNK = {
-        startSeconds: meta.startSeconds,
-        endSeconds: meta.endSeconds,
-        gameID: path.basename(filePath),
-        mode: meta.mode,
-        map: meta.map || '',
-        orangePlayers: rosters.orangePlayers || [],
-        bluePlayers: rosters.bluePlayers || []
-    };
-    // Priorité normale : dépriorisée, la phase 2 devenait interminable sur le
-    // PC de salle (constaté le 2026-07-19). Protection CPU = sérialisation.
-    const RESULTS = await deps.runChunkAnalyzer(filePath, null, [CHUNK], {});
-    if (RESULTS && RESULTS.error) {
-        throw new Error(`Chunk analyzer failed: ${RESULTS.error}`);
-    }
-    const R = ((RESULTS && RESULTS.results) || []).find(
-        (x) => x.gameID === CHUNK.gameID
-    );
-    return R ? R.payload : null;
 }
 
 /** Upload S3 avec retry persistant. `s3FileName` = nom PORTANT le gameId. */
@@ -227,13 +205,13 @@ async function processGame(filePath) {
     console.log(
         `[arena-uploader] processing ${NAME} → EVA game ${ENTRY.gameId}`
     );
-    const ROSTERS = arenaEvaPoller.buildRosters(ENTRY);
     const S3_NAME = buildS3FileName(NAME, ENTRY.gameId);
 
-    const PAYLOAD = await analyzeGame(filePath, META, ROSTERS);
-
+    // V1 : dépôt sans payload d'analyse. Le hook d'import EVA rattache la vidéo
+    // par (gameId, terrain) ; il n'upsert une analyse que si le payload est
+    // présent (cf. wiki/arena_mode_api.md §5).
     await uploadWithPersistentRetry(filePath, S3_NAME, IDS, TOKEN);
-    await depositWithPersistentRetry(S3_NAME, IDS, TOKEN, PAYLOAD);
+    await depositWithPersistentRetry(S3_NAME, IDS, TOKEN, null);
     // Game rattachée côté serveur : on ne la re-matchera plus, on libère le disque.
     arenaEvaPoller.markConsumed(ENTRY.gameId);
     for (const P of [filePath, filePath + '.json']) {
@@ -310,16 +288,9 @@ function rescanGames() {
 /**
  * Démarre l'uploader sur `games/`. Re-scan initial (chokidar ignoreInitial:
  * false) + re-scan périodique pour les games déférées.
- * @param {{runChunkAnalyzer: Function}} dependencies
  */
-function start(dependencies) {
+function start() {
     if (watcher) return;
-    if (!dependencies || !dependencies.runChunkAnalyzer) {
-        throw new Error(
-            'arena-uploader-service.start: missing runChunkAnalyzer dep'
-        );
-    }
-    deps = dependencies;
     stopRequested = false;
 
     const GAMES_DIR = getGamesDir();
@@ -352,7 +323,6 @@ function stop() {
         clearInterval(retryTimer);
         retryTimer = null;
     }
-    deps = null;
 }
 
 function getStatus() {

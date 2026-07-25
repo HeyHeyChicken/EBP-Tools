@@ -10,6 +10,7 @@ const https = require('https');
 const { safeMapName } = require('./global-service');
 const arenaModeService = require('./arena-mode-service');
 const arenaCaptureService = require('./arena-capture-service');
+const { ingestArenaGames } = require('./tools-api-client');
 
 //#endregion
 
@@ -36,14 +37,18 @@ const PILE_TTL_MS = 6 * 60 * 60 * 1000;
 const MATCH_WINDOW_S = 10 * 60;
 const FETCH_LIMIT = 10;
 
-// Requête trimmée (mêmes champs que la TV, mais on ne demande que l'utile).
+// Requête COMPLÈTE (upsertable) : identique à celle du poller serveur EBP
+// (eva.service `ARENA_GQL_QUERY`). En plus de la pile (`toPileEntry` n'en lit
+// qu'un sous-ensemble), on renvoie les nœuds bruts à EBP (`/games/ingest`) pour
+// qu'il les upsert dans T_Games via `toFullGame` + `upsertEVAGames`.
 const GQL_QUERY =
     'query($terrainIds:[Int!],$limit:Int){' +
     'listLastGamesAtLocation(terrainIds:$terrainIds,limit:$limit){' +
-    'gameId endedAt terrainId ' +
-    'battleArena{data{teamOne{score name}teamTwo{score name}}' +
-    'players{data{niceName team}}' +
-    'map{name identifier}mode{identifier category}}}}';
+    'gameId endedAt terrainId battleArena{' +
+    'data{duration teamOne{name score}teamTwo{name score}}' +
+    'players{id userId data{niceName team outcome score kills deaths assists inflictedDamage firedAccuracy}}' +
+    'map{id name identifier maxPlayerCount}mode{id identifier category}' +
+    'terrain{id name location{id name department identifier country language}}}}}';
 
 let pollTimer = null;
 let stopped = true;
@@ -144,8 +149,6 @@ function toPileEntry(g) {
         mapName: BA.map ? BA.map.name : '',
         mapIdentifier: BA.map ? BA.map.identifier : '',
         mode: BA.mode ? BA.mode.identifier : '',
-        teamOneName: BA.data.teamOne ? BA.data.teamOne.name : null,
-        teamTwoName: BA.data.teamTwo ? BA.data.teamTwo.name : null,
         players: (BA.players || []).map((p) => ({
             name: p.data.niceName,
             team: p.data.team
@@ -163,12 +166,16 @@ async function pollOnce() {
     // comme une pile, sans jamais réécrire une entrée déjà connue (ni son flag
     // `consumed`).
     let added = 0;
+    // Nœuds bruts des NOUVELLES games (pour le push EBP). Seuls ceux ayant une
+    // entrée de pile valide (battleArena) — les colorChaos sont écartés.
+    const NEW_RAW = [];
     for (const G of GAMES) {
         const ENTRY = toPileEntry(G);
         if (!ENTRY) continue;
         if (pile.has(ENTRY.gameId)) continue;
         ENTRY.fetchedAtMs = lastPollNowMs();
         pile.set(ENTRY.gameId, ENTRY);
+        NEW_RAW.push(G);
         added++;
     }
     // Éviction des vieilles entrées (par âge de fetch).
@@ -178,6 +185,26 @@ async function pollOnce() {
     }
     if (added > 0) persistPile();
     else persistPile(); // persiste aussi les évictions
+
+    // Push best-effort des nouvelles games vers EBP (upsert T_Games) : rend les
+    // games de la salle dispo sans attendre le poll serveur ni un import
+    // d'équipe. Un échec n'interrompt pas le poll — le poller serveur EBP est le
+    // filet.
+    if (NEW_RAW.length > 0) {
+        pushNewGames(STATE, NEW_RAW);
+    }
+}
+
+/** Envoie (fire-and-forget) les nœuds bruts des nouvelles games à EBP. */
+function pushNewGames(state, rawGames) {
+    const TOKEN = arenaModeService.getArenaToken();
+    if (!TOKEN) return;
+    ingestArenaGames(
+        { roomId: state.roomId, arenaId: state.arenaId, games: rawGames },
+        TOKEN
+    ).catch((e) =>
+        console.warn('[arena-eva-poller] ingest push failed:', e.message)
+    );
 }
 
 // Horloge injectable-friendly (un seul point d'accès à Date.now()).
@@ -233,27 +260,6 @@ function findGame(mapName, endEpochSec) {
     return POOL[0];
 }
 
-/**
- * Construit les rosters {orangePlayers, bluePlayers} au format phase 2 depuis
- * une entrée de pile. ⚠️ Mapping équipe→couleur : orange = teamOne, bleu =
- * teamTwo (À CONFIRMER avec Antoine — les factions After H, ex. ALLIANCE /
- * REBELS, ont-elles une couleur fixe à l'écran ? sinon le killfeed OCR
- * matchera les noms contre la mauvaise équipe).
- */
-function buildRosters(entry) {
-    // Seuls les NOMS servent en phase 2 (fuzzy-match du killfeed + user_words
-    // Tesseract) ; le K/D officiel n'est jamais consommé, on ne le stocke plus.
-    const toP = (p) => ({ name: p.name });
-    return {
-        orangePlayers: entry.players
-            .filter((p) => p.team === entry.teamOneName)
-            .map(toP),
-        bluePlayers: entry.players
-            .filter((p) => p.team === entry.teamTwoName)
-            .map(toP)
-    };
-}
-
 /** Marque une game consommée (après dépôt réussi) pour ne pas la re-matcher. */
 function markConsumed(gameId) {
     const G = pile.get(String(gameId));
@@ -304,7 +310,6 @@ module.exports = {
     start,
     stop,
     findGame,
-    buildRosters,
     markConsumed,
     getStatus
 };

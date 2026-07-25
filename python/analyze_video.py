@@ -258,6 +258,7 @@ _MAPS = {
     'The Cliff':      {'aliases': ['cliff', 'citt', 'clit', 'cltt', 'cit', 'ciitt', 'theclife', 'the clife', 'theclifen'], 'points': 1, 'respawn': 17},
     'The Rock':       {'aliases': ['rock', 'therock'], 'points': 1},
     'Horizon':        {'aliases': ['horizon'], 'points': 2, 'respawn': 15},
+    'Reef Point':     {'aliases': ['reef', 'point', 'reefpoint'], 'points': 1, 'respawn': 15},
 }
 
 # Délai de respawn par défaut (s) pour les maps sans clé `respawn` dans _MAPS.

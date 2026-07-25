@@ -59,7 +59,7 @@ MAPS = {
     'Lunar Outpost': ['lunar', 'outpost', 'lunaroutpost'],
     'Outlaw': ['outlaw', 'qutlaw'], 'Polaris': ['polaris'], 'Silva': ['silva'],
     'The Cliff': ['cliff', 'thecliff'], 'The Rock': ['rock', 'therock'],
-    'Horizon': ['horizon'],
+    'Horizon': ['horizon'], 'Reef Point': ['reef', 'point', 'reefpoint'],
 }
 
 

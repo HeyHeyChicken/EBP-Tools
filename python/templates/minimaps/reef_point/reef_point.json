@@ -1,0 +1,46 @@
+{
+    "name": "Reef Point",
+    "template": "reef_point.png",
+    "size": [422, 222],
+    "margins": {
+        "top": 10,
+        "right": 10,
+        "bottom": 10,
+        "left": 10
+    },
+    "spawns": {
+        "orange": [
+            {
+                "polygon": [
+                    [3, 143],
+                    [45, 143],
+                    [45, 199],
+                    [3, 199]
+                ]
+            }
+        ],
+        "blue": [
+            {
+                "polygon": [
+                    [356, 143],
+                    [399, 143],
+                    [399, 199],
+                    [356, 199]
+                ]
+            }
+        ]
+    },
+    "teleporters": [
+    ],
+    "capture_points": [
+        {
+            "letter": "A",
+            "polygon": [
+                [180, 98],
+                [210, 98],
+                [210, 137],
+                [180, 137]
+            ]
+        }
+    ]
+}
