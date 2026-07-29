@@ -873,6 +873,118 @@ def _split_kill_row(frame: np.ndarray, bbox, orange_color, blue_color,
     }
 
 
+# ─── TEMPORAIRE — aplat blanc du tueur (HUD EVA de juillet 2026) ───────────
+# EVA a ajouté derrière le pseudo du TUEUR un aplat blanc semi-transparent
+# censé le rendre plus lisible… mais il est dessiné PAR-DESSUS le texte : le
+# pseudo est délavé (tiré vers le gris de l'aplat, contraste ÷2) au lieu d'être
+# détaché. Le côté victime et le picto arme sont inchangés (fond noir).
+#
+# Deux étapes du pipeline killfeed cassent, réparées par les deux helpers
+# ci-dessous :
+#   1. `_detect_kill_rows` étend le bbox vers la gauche tant qu'il voit des
+#      pixels couleur d'équipe ; sur l'aplat il n'y en a plus assez, l'extension
+#      s'arrête au picto arme et le tueur reste hors du bbox → `_kf_plate_left`
+#      récupère le bord gauche de l'aplat lui-même ;
+#   2. `_ocr_kill_name` masque par proximité RGB à la couleur d'équipe ; le
+#      texte délavé est hors tolérance, le masque sort vide → `_kf_unwash`
+#      réinverse l'alpha-blend avant le masquage.
+#
+# Cette version de Tools ne lit QUE le nouveau HUD : pour analyser des vidéos
+# enregistrées avant la maj, installer une version antérieure de Tools.
+# À SUPPRIMER dès qu'EVA aura repassé l'aplat derrière le texte.
+KF_PLATE_MIN_BRIGHT = 45    # luminance min d'un pixel d'aplat (fond noir killfeed ≈ 0-20)
+KF_PLATE_MIN_WIDTH = 25     # largeur min (px) d'un aplat (le plus court mesuré ≈ 60 px)
+KF_PLATE_MAX_GAP = 60       # trou toléré entre le bbox et l'aplat (picto arme + marges)
+# Signature de l'aplat, mesurée sur 436 crops de new.mp4 : quasiment aucun pixel
+# sombre, fond neutre (gris) et luminance plate. Sert à ne pas confondre l'aplat
+# avec un décor clair visible sous un killfeed en fondu (le fond du killfeed est
+# semi-transparent) — un décor est chromatique et/ou contrasté.
+KF_PLATE_MIN_NEUTRAL_RATIO = 0.15  # part min de pixels quasi gris (le fond de l'aplat)
+KF_PLATE_MAX_LUM_MAD = 30.0        # écart absolu moyen max à la luminance du fond
+KF_UNWASH_MAX_GAIN = 6.0    # garde-fou : pas d'amplification délirante si l'aplat est ~vide
+
+
+def _kf_is_plate(sub: np.ndarray) -> bool:
+    """True si le crop a la signature de l'aplat : pas de pixel sombre, un fond
+    gris qui domine, et une luminance plate."""
+    f = sub.astype(np.float32)
+    lum = f.mean(axis=2)
+    if lum.size == 0 or float(np.mean(lum < KF_PLATE_MIN_BRIGHT)) > 0.10:
+        return False
+    neutral = np.linalg.norm(f - lum[:, :, None], axis=2) <= 20
+    if float(neutral.mean()) < KF_PLATE_MIN_NEUTRAL_RATIO:
+        return False
+    return float(np.abs(lum - np.median(lum[neutral])).mean()) <= KF_PLATE_MAX_LUM_MAD
+
+
+def _kf_plate_left(frame: np.ndarray, x_from: int, y1: int, y2: int, x_limit: int):
+    """Bord gauche de l'aplat blanc du tueur, ou None s'il n'y en a pas.
+
+    Une colonne appartient à l'aplat si AUCUN de ses pixels sur la bande de
+    texte n'est sombre : l'aplat couvre toute la hauteur de la bande, alors que
+    le fond du killfeed (et le décor autour) laisse toujours passer des pixels
+    sombres. On part de `x_from` (bord gauche du bbox courant) vers la gauche,
+    on saute le trou éventuel (picto arme sur fond noir), puis on remonte le run
+    d'aplat jusqu'à son bord gauche.
+    """
+    x_limit = max(0, int(x_limit))
+    if x_from - x_limit < KF_PLATE_MIN_WIDTH:
+        return None
+    band = frame[y1:y2, x_limit:x_from]
+    if band.size == 0:
+        return None
+    is_plate = band.astype(np.float32).mean(axis=2).min(axis=0) >= KF_PLATE_MIN_BRIGHT
+
+    i = len(is_plate) - 1
+    gap = 0
+    while i >= 0 and not is_plate[i]:
+        gap += 1
+        if gap > KF_PLATE_MAX_GAP:
+            return None
+        i -= 1
+    if i < 0:
+        return None
+    end = i
+    while i >= 0 and is_plate[i]:
+        i -= 1
+    if end - i < KF_PLATE_MIN_WIDTH:
+        return None
+    # Un décor clair aussi peut n'avoir aucun pixel sombre : on ne retient le run
+    # que s'il a bien la signature de l'aplat.
+    if not _kf_is_plate(band[:, i + 1:end + 1]):
+        return None
+    return x_limit + i + 1
+
+
+def _kf_unwash(sub: np.ndarray, target_color) -> np.ndarray:
+    """Réinverse l'alpha-blend de l'aplat blanc sur un crop de pseudo tueur.
+
+    L'aplat compose `affiché = (1-a)·original + a·blanc`, soit une
+    transformation AFFINE par canal. On la réinverse sans connaître `a` en
+    recalant le crop sur deux repères mesurés dessus :
+      - le fond de l'aplat (médiane des pixels neutres) → ramené au noir ;
+      - le pixel de texte le plus coloré → ramené à l'amplitude de chroma de la
+        couleur d'équipe.
+    Le gain est donc auto-calibré crop par crop, ce qui encaisse un décor plus
+    ou moins clair derrière l'aplat semi-transparent.
+
+    Retourne `sub` inchangé si le crop n'est pas posé sur l'aplat (killfeed en
+    fondu sur un décor sombre : rien à dé-délaver, et le masque couleur standard
+    fonctionne déjà).
+    """
+    if not _kf_is_plate(sub):
+        return sub
+    f = sub.astype(np.float32)
+    norm = np.linalg.norm(f - f.mean(axis=2)[:, :, None], axis=2)
+    neutral = norm <= 8
+    bg = np.median(f[neutral], axis=0) if int(neutral.sum()) >= 20 \
+        else np.full(3, float(np.median(f.mean(axis=2))), dtype=np.float32)
+    target = np.asarray(target_color, dtype=np.float32)
+    gain = min(float(np.linalg.norm(target - target.mean())) /
+               max(float(np.percentile(norm, 99.5)), 1.0), KF_UNWASH_MAX_GAIN)
+    return np.clip(gain * (f - bg), 0, 255).astype(np.uint8)
+
+
 # Debug/outillage : si la variable d'env `EVA_KF_DUMP` pointe un dossier, chaque
 # crop killfeed traité par `_ocr_kill_name` y est sauvegardé (l'image binarisée
 # telle que Tesseract la reçoit, après masque couleur). Sert à extraire des
@@ -887,7 +999,8 @@ _KF_DUMP_N = [0]
 def _ocr_kill_name(frame: np.ndarray, box, target_color,
                    tol_color: int = 80, pad: int = 20,
                    y_extend: int = 3, user_words_path: str = None,
-                   whitelist: str = None, dump_tag: str = None) -> list:
+                   whitelist: str = None, dump_tag: str = None,
+                   unwash: bool = False) -> list:
     """
     OCR un nom de joueur dans une bbox killfeed. Masque par couleur d'équipe
     (texte couleur cible → noir, fond → blanc, polarité standard Tesseract),
@@ -912,6 +1025,9 @@ def _ocr_kill_name(frame: np.ndarray, box, target_color,
     if x2 <= x1 or y2 <= y1:
         return []
     sub = frame[y1:y2, x1:x2]
+    if unwash:
+        # TEMPORAIRE — aplat blanc du tueur (cf. `_kf_unwash`).
+        sub = _kf_unwash(sub, target_color)
     target = np.array(target_color, dtype=np.int16)
 
     if whitelist is None:
@@ -1654,20 +1770,30 @@ def _detect_kill_rows(frame: np.ndarray, kf_spec: dict, orange_color, blue_color
         cols = np.where(slab_o.any(axis=0) | slab_b.any(axis=0) | slab_w.any(axis=0))[0]
         if len(cols) == 0:
             continue
-        width = int(cols.max()) - int(cols.min()) + 1
-        if width < min_width:
-            continue
         bbox_x1 = rx1 + int(cols.min())
         bbox_x2 = rx1 + int(cols.max()) + 1
         bbox_y1 = ry1 + t_start
         bbox_y2 = ry1 + t_end
+        left_limit = kf_spec.get('leftExtendLimit')
+
+        # TEMPORAIRE — aplat blanc du tueur : le pseudo du tueur délavé n'a plus
+        # de pixel couleur d'équipe, il ne compte donc plus dans `cols` et la
+        # largeur mesurée se réduit au picto arme + victime. Un kill dont la
+        # victime a un pseudo court (« Stan » → 79 px) tombe alors sous
+        # `minWidth`. On détecte l'aplat AVANT le test de largeur : il fait
+        # partie de la row, sa présence vaut donc validation.
+        plate_x1 = _kf_plate_left(frame, bbox_x1, bbox_y1, bbox_y2, left_limit) \
+            if left_limit is not None else None
+
+        width = int(cols.max()) - int(cols.min()) + 1
+        if width < min_width and plate_x1 is None:
+            continue
 
         # Extension dynamique vers la gauche pour les pseudos killer longs.
         # La row a été détectée par la VICTIME (fond noir, dans la zone
         # conservatrice x≥1690). Le killer (fond transparent) peut s'étendre
         # bien plus à gauche. On scanne col par col vers la gauche tant qu'il
         # y a du signal team-color sur la y-band, jusqu'à `leftExtendLimit`.
-        left_limit = kf_spec.get('leftExtendLimit')
         if left_limit is not None and bbox_x1 > left_limit:
             ext_max_gap = kf_spec.get('leftExtendMaxGap', 8)
             ext_x1 = max(0, int(left_limit))
@@ -1711,6 +1837,12 @@ def _detect_kill_rows(frame: np.ndarray, kf_spec: dict, orange_color, blue_color
                     if gap_run >= ext_max_gap:
                         break
             bbox_x1 = new_x1
+
+        # TEMPORAIRE — aplat blanc du tueur : l'extension ci-dessus s'arrête au
+        # picto arme, le pseudo du tueur délavé n'ayant plus assez de pixels
+        # couleur d'équipe. On repart du bord gauche de l'aplat.
+        if plate_x1 is not None:
+            bbox_x1 = min(bbox_x1, plate_x1)
 
         bbox = ((bbox_x1, bbox_y1), (bbox_x2, bbox_y2))
         if not _validate_kill_row(frame, bbox, kf_spec):
@@ -6340,8 +6472,10 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                     KT, VT = SPLIT['killer']['team'], SPLIT['victim']['team']
                     KT_COLOR = KF_ORANGE if KT == 'orange' else KF_BLUE
                     VT_COLOR = KF_ORANGE if VT == 'orange' else KF_BLUE
+                    # unwash=True : TEMPORAIRE, dé-délave le pseudo du tueur
+                    # recouvert par l'aplat blanc du HUD de juillet 2026.
                     KRAW = _ocr_kill_name(frame, SPLIT['killer']['box'], KT_COLOR, user_words_path=USER_WORDS_PATH,
-                                          dump_tag=f'{ELAPSED}_{KT}_killer')
+                                          dump_tag=f'{ELAPSED}_{KT}_killer', unwash=True)
                     VRAW = _ocr_kill_name(frame, SPLIT['victim']['box'], VT_COLOR, user_words_path=USER_WORDS_PATH,
                                           dump_tag=f'{ELAPSED}_{VT}_victim')
                     # Identifie l'arme et le headshot via template matching.
