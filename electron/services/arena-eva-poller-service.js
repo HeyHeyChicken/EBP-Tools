@@ -45,7 +45,7 @@ const GQL_QUERY =
     'data{duration teamOne{name score}teamTwo{name score}}' +
     'players{id userId data{niceName team outcome score kills deaths assists inflictedDamage firedAccuracy}}' +
     'map{id name identifier maxPlayerCount}mode{id identifier category}' +
-    'terrain{id name location{id name department identifier country language}}}}}';
+    'terrain{id location{id name department identifier country language}}}}}';
 
 // Seul état du service : la cadence courante (allongée par le backoff).
 let pollDelayMs = POLL_INTERVAL_MS;
