@@ -7,16 +7,21 @@ REM LOCALE de la machine).
 REM
 REM   temp_repool.bat <video> ["AAAA-MM-JJ HH:MM:SS"] [spool]
 REM
-REM <video> peut etre un chemin complet OU le simple nom du fichier s'il est
-REM deja dans le spool.
-REM
-REM Le 2e argument est l'heure d'horloge de la PREMIERE IMAGE de la video (pas
-REM celle de la 1re game) : c'est l'ancre du recalage. Elle doit etre juste a
-REM moins de 3 min, sinon /arena/games/resolve ne retrouvera pas les games.
+REM <video>  chemin complet OU simple nom de fichier s'il est deja dans le spool.
+REM <ancre>  heure d'horloge de la PREMIERE IMAGE de la video (pas celle de la
+REM          1re game). Accepte "HH:MM:SS" et "HH-MM-SS". Omise, elle est lue
+REM          dans le nom du fichier (nommage OBS "AAAA-MM-JJ HH-MM-SS.mkv").
+REM          Elle doit etre juste a moins de 3 min, sinon
+REM          /arena/games/resolve ne retrouvera pas les games.
 REM
 REM Pourquoi pas -strftime : il nomme les segments avec l'heure COURANTE, pas
 REM l'heure video. Un stream-copy durant quelques secondes, tous les segments
 REM porteraient la meme minute.
+REM
+REM Les dates sont calculees par UN SEUL appel PowerShell qui produit la liste
+REM complete "ancien|nouveau" ; le batch ne fait ensuite que deplacer. Les
+REM valeurs sont passees par VARIABLES D'ENVIRONNEMENT, pas par interpolation
+REM dans la ligne de commande : aucun probleme d'echappement possible.
 REM ============================================================================
 
 if "%~1"=="" (
@@ -26,7 +31,6 @@ if "%~1"=="" (
 
 set "SRC=%~1"
 set "BASE_LOCAL=%~2"
-if "%BASE_LOCAL%"=="" set "BASE_LOCAL=2026-07-29 22:48:00"
 set "SPOOL=%~3"
 if "%SPOOL%"=="" set "SPOOL=%USERPROFILE%\EBP-Tools-Arena\spool"
 set "SEGMENT_SECONDS=300"
@@ -42,6 +46,12 @@ if not exist "%SRC%" (
     exit /b 1
 )
 
+REM Ancre omise : on la lit dans le nom du fichier (nommage OBS).
+if "%BASE_LOCAL%"=="" (
+    for %%f in ("%SRC%") do set "BASE_LOCAL=%%~nf"
+    echo == Ancre deduite du nom du fichier.
+)
+
 REM --- 1. Controles prealables ------------------------------------------------
 echo == Source : %SRC%
 "%FFMPEG%" -hide_banner -i "%SRC%" 2>&1 | findstr /C:"Duration" /C:"Video:"
@@ -54,7 +64,19 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo == Ancre : %BASE_LOCAL%
+REM Validation de l'ancre AVANT tout traitement : c'est le seul reglage que
+REM l'utilisateur peut se tromper, et une ancre invalide doit arreter le script
+REM tout de suite, pas au milieu du renommage.
+set "PS_PARSE=[datetime]::ParseExact($env:BASE_LOCAL.Trim(), [string[]]@('yyyy-MM-dd HH:mm:ss','yyyy-MM-dd HH-mm-ss'), [cultureinfo]::InvariantCulture, 0)"
+set "ANCHOR="
+for /f "usebackq delims=" %%d in (`powershell -NoProfile -Command "try { (%PS_PARSE%).ToString('yyyy-MM-dd HH:mm:ss') } catch { '' }"`) do set "ANCHOR=%%d"
+if "%ANCHOR%"=="" (
+    echo.
+    echo !! Ancre illisible : "%BASE_LOCAL%"
+    echo !! Formats acceptes : "AAAA-MM-JJ HH:MM:SS" ou "AAAA-MM-JJ HH-MM-SS".
+    exit /b 1
+)
+echo == Ancre : %ANCHOR%
 
 REM --- 2. Decoupe stream-copy + liste des offsets reels -----------------------
 set "WORK=%TEMP%\repool_%RANDOM%%RANDOM%"
@@ -71,15 +93,34 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM --- 3. Renommage d'apres les offsets reels ---------------------------------
+REM --- 3. Calcul de TOUS les noms en un appel ---------------------------------
 REM En stream-copy les coupes tombent sur les keyframes : les segments ne font
 REM pas exactement 300 s. On lit donc le start REEL de chaque segment (colonne 2
-REM du CSV) plutot que i x 300. Les lignes du CSV sont dans l'ordre de sortie,
-REM donc la ligne N correspond a part_00N.
+REM du CSV) plutot que i x 300.
+set "LIST=%WORK%\list.csv"
+set "PAIRS=%WORK%\pairs.txt"
+powershell -NoProfile -Command "$b = %PS_PARSE%; Import-Csv $env:LIST -Header f,start,end | ForEach-Object { (Split-Path $_.f -Leaf) + '|rec_' + $b.AddSeconds([int][double]$_.start).ToString('yyyyMMdd-HHmmss') + '.mkv' }" > "%PAIRS%"
+
+REM Aucun nom calcule = on ne touche a rien (c'est ce qui a produit des
+REM "rec_.mkv" ecrases les uns par les autres dans la version precedente).
+for /f %%c in ('type "%PAIRS%" ^| find /c "rec_"') do set "NB=%%c"
+if "%NB%"=="0" (
+    echo !! Calcul des noms echoue : aucun fichier deplace.
+    rd /s /q "%WORK%"
+    exit /b 1
+)
+
+REM --- 4. Deplacement dans le spool -------------------------------------------
 if not exist "%SPOOL%" mkdir "%SPOOL%"
-set /a IDX=-1
-echo == Segments ecrits dans %SPOOL% :
-for /f "usebackq tokens=2 delims=," %%s in ("%WORK%\list.csv") do call :emit "%%s"
+echo == %NB% segment(s) ecrit(s) dans %SPOOL% :
+for /f "usebackq tokens=1,2 delims=|" %%a in ("%PAIRS%") do (
+    if exist "%WORK%\%%a" (
+        move "%WORK%\%%a" "%SPOOL%\%%b" >nul
+        echo    %%b
+    ) else (
+        echo    !! segment manquant : %%a
+    )
+)
 
 rd /s /q "%WORK%"
 echo.
@@ -88,27 +129,3 @@ echo    immediatement. La video source reste dans le spool mais est IGNOREE par
 echo    le pipeline (son nom ne correspond pas a rec_*.mkv) : tu peux la
 echo    supprimer, elle occupe juste de la place.
 exit /b 0
-
-REM ---------------------------------------------------------------------------
-:emit
-set /a IDX+=1
-set "PAD=00%IDX%"
-set "PAD=%PAD:~-3%"
-set "PART=%WORK%\part_%PAD%.mkv"
-if not exist "%PART%" (
-    echo    !! segment attendu manquant : %PART%
-    goto :eof
-)
-REM Offset entier (le CSV donne des secondes decimales).
-for /f "tokens=1 delims=." %%x in ("%~1") do set "OFFSET=%%x"
-if "%OFFSET%"=="" set "OFFSET=0"
-REM Arithmetique de dates : PowerShell, en culture invariante pour que le format
-REM de l'ancre soit lu pareil quelle que soit la locale de la machine.
-for /f "usebackq delims=" %%d in (`powershell -NoProfile -Command "[datetime]::ParseExact('%BASE_LOCAL%','yyyy-MM-dd HH:mm:ss',[cultureinfo]::InvariantCulture).AddSeconds(%OFFSET%).ToString('yyyyMMdd-HHmmss')"`) do set "STAMP=%%d"
-if "%STAMP%"=="" (
-    echo    !! calcul de date echoue pour l'offset %OFFSET%s
-    goto :eof
-)
-move "%PART%" "%SPOOL%\rec_%STAMP%.mkv" >nul
-echo    rec_%STAMP%.mkv  ^(offset %OFFSET%s^)
-goto :eof
