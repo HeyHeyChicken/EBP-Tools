@@ -290,6 +290,29 @@ function sendArenaHeartbeat(payload, arenaToken) {
 }
 
 /**
+ * POST /api/tools/arena/games/resolve
+ * Demande à EBP l'identité EVA d'une game découpée localement : match sur
+ * (arène du token, fin de game ±3 min) avec la map en garde-fou. EBP est la
+ * source de référence des games (poller serveur, push du poller salle, imports
+ * d'équipe), donc la question ne se pose qu'à lui.
+ *
+ * Répond toujours 200 hors erreur : `{gameId}` si identifiée, sinon
+ * `{gameId: null, reason}` — une exception signifie donc « échec réseau /
+ * serveur », à réessayer, jamais « pas identifiable ».
+ *
+ * @param {{roomId:number, arenaId:number, endEpoch:number, map:string}} payload
+ * @param {string} arenaToken
+ * @returns {Promise<{gameId:string|null, reason?:string}>}
+ */
+function resolveArenaGameId(payload, arenaToken) {
+    return apiRequest('POST', '/arena/games/resolve', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-Arena-Token': arenaToken }
+    });
+}
+
+/**
  * POST /api/tools/arena/games/upload-url
  * URL présignée PUT vers `arena/pending/{roomId}/{arenaId}/{fileName}` pour
  * une game du pipeline salle. Auth par clé de salle seule (X-Arena-Token).
@@ -504,6 +527,7 @@ module.exports = {
     requestArenaUploadUrl,
     depositArenaGame,
     ingestArenaGames,
+    resolveArenaGameId,
     persistAnalysis,
     requestUploadUrl,
     confirmUpload,

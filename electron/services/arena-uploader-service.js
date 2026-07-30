@@ -28,24 +28,23 @@ const {
 // d'import EVA attache la vidéo par (gameId, terrain), les joueurs sont déjà
 // connus côté serveur. Le killfeed pourra être rebranché plus tard.
 //
-// ⚠️ Gate gameId EN ATTENTE DE SERVICE : la pile locale du poller EVA a été
-// supprimée (EvaBattlePlan est désormais la source de référence des games). Le
-// service qui raccroche une game découpée à son gameId reste à écrire ; d'ici
-// là `resolveEvaGameId` renvoie null et TOUTE game est DÉFÉRÉE : elle reste
-// découpée dans `games/`, retentée toutes les 2 min, jamais déplacée ni
-// supprimée.
+// Il n'y a AUCUNE gate ici : le gameId est déjà dans le nom du fichier, posé par
+// le service d'identification (arena-identify-service). L'uploader ne voit que
+// les noms à 7 champs — une game pas encore identifiée en porte 6 et lui est
+// invisible. Le nom local EST le nom S3.
 //
 // Résilience réseau : upload + dépôt ont chacun une boucle de retry
 // PERSISTANTE (URL présignée fraîche à chaque tentative, backoff 30 s → 10 min,
 // à l'infini). Sérialisé : une seule game traitée à la fois (protection CPU).
 
-// Nom PROVISOIRE écrit par le pipeline (sans gameId — inconnu à l'extraction) :
-// {roomId}_{arenaId}_{SafeMap}_{start}_{end}_{scores}.mp4
-const GAME_FILE_RE = /^(\d+)_(\d+)_([A-Za-z0-9-]+)_(\d+)_(\d+)_([^_]+)\.mp4$/;
+// Nom d'une game IDENTIFIÉE (7 champs, gameId en 3e position) :
+// {roomId}_{arenaId}_{gameId}_{SafeMap}_{start}_{end}_{scores}.mp4
+const GAME_FILE_RE =
+    /^(\d+)_(\d+)_(\d+)_([A-Za-z0-9-]+)_(\d+)_(\d+)_([^_]+)\.mp4$/;
 const RETRY_BASE_DELAY_MS = 30 * 1000;
 const RETRY_MAX_DELAY_MS = 10 * 60 * 1000;
-// Re-scan périodique de games/ : rattrape les games déférées (en attente de
-// leur gameId EVA) que chokidar ne ré-émet pas.
+// Re-scan périodique de games/ : rattrape les games identifiées par un simple
+// renommage, que chokidar peut ne pas ré-émettre.
 const RETRY_SCAN_MS = 2 * 60 * 1000;
 
 let watcher = null;
@@ -55,7 +54,6 @@ let stopRequested = false;
 const QUEUE = [];
 let currentFile = null;
 let uploadedCount = 0;
-let deferredCount = 0;
 let lastError = null;
 
 function sleep(ms) {
@@ -70,16 +68,7 @@ function getFailedDir() {
     return path.join(path.dirname(getGamesDir()), 'failed');
 }
 
-/** Lit le sidecar `<video>.json` du pipeline (mode, map, bornes). Null si absent. */
-function readSidecar(filePath) {
-    try {
-        return JSON.parse(fs.readFileSync(filePath + '.json', 'utf8'));
-    } catch (_) {
-        return null;
-    }
-}
-
-/** Déplace la game + son sidecar vers failed/ (analyse impossible). */
+/** Déplace la game + son sidecar vers failed/ (fichier inexploitable). */
 function moveToFailed(filePath) {
     const FAILED = getFailedDir();
     if (!fs.existsSync(FAILED)) fs.mkdirSync(FAILED, { recursive: true });
@@ -91,17 +80,6 @@ function moveToFailed(filePath) {
             console.error('[arena-uploader] move to failed failed:', SRC, e.message);
         }
     }
-}
-
-/**
- * Insère le gameId EVA dans le nom provisoire pour produire le nom S3 :
- * {roomId}_{arenaId}_{gameId}_{SafeMap}_{start}_{end}_{scores}.mp4
- */
-function buildS3FileName(provisionalName, gameId) {
-    const M = provisionalName.match(GAME_FILE_RE);
-    if (!M) return null;
-    const [, roomId, arenaId, map, start, end, scores] = M;
-    return `${roomId}_${arenaId}_${gameId}_${map}_${start}_${end}_${scores}.mp4`;
 }
 
 /** Upload S3 avec retry persistant. `s3FileName` = nom PORTANT le gameId. */
@@ -158,27 +136,8 @@ async function depositWithPersistentRetry(s3FileName, ids, token, payload) {
 }
 
 /**
- * gameId EVA d'une game découpée, ou null si on ne le connaît pas (encore).
- *
- * TODO — service à écrire : le raccrochage doit interroger EvaBattlePlan, seule
- * source de référence des games (il les obtient par le push du poller, son
- * propre poller et les imports d'équipe). Tant que ce service n'existe pas,
- * cette fonction renvoie null et aucune game n'est uploadée : elles restent
- * découpées dans `games/`.
- * @param {string} mapName map détectée par la phase 1.
- * @param {number} endEpochSec fin de la game (secondes).
- * @returns {Promise<string|null>}
- */
-async function resolveEvaGameId(mapName, endEpochSec) {
-    console.log(
-        `[arena-uploader] no EVA game id (resolver not implemented) map=${mapName} end=${endEpochSec}`
-    );
-    return null;
-}
-
-/**
- * Traite une game. Renvoie 'done' | 'deferred' | 'failed'.
- * @returns {Promise<'done'|'deferred'|'failed'>}
+ * Traite une game identifiée. Renvoie 'done' | 'failed'.
+ * @returns {Promise<'done'|'failed'>}
  */
 async function processGame(filePath) {
     const STATE = arenaModeService.getState();
@@ -189,24 +148,16 @@ async function processGame(filePath) {
     const IDS = { roomId: STATE.roomId, arenaId: STATE.arenaId };
     const NAME = path.basename(filePath);
 
-    const M = NAME.match(GAME_FILE_RE);
-    const META = readSidecar(filePath);
-    if (!M || !META) {
-        console.warn('[arena-uploader] unparseable / no sidecar →', NAME);
+    if (!GAME_FILE_RE.test(NAME)) {
+        console.warn('[arena-uploader] unparseable name →', NAME);
         moveToFailed(filePath);
         return 'failed';
     }
-    const END_EPOCH = parseInt(M[5], 10);
 
-    // Gate gameId : jamais d'upload sans identité EVA (décision Antoine).
-    const GAME_ID = await resolveEvaGameId(META.map || '', END_EPOCH);
-    if (GAME_ID == null) {
-        console.log(`[arena-uploader] deferring ${NAME}`);
-        return 'deferred';
-    }
-
-    console.log(`[arena-uploader] processing ${NAME} → EVA game ${GAME_ID}`);
-    const S3_NAME = buildS3FileName(NAME, GAME_ID);
+    console.log(`[arena-uploader] processing ${NAME}`);
+    // Le nom local porte déjà le gameId : c'est tel quel le nom S3 attendu par
+    // le backend (`parseArenaGameFileName`).
+    const S3_NAME = NAME;
 
     // V1 : dépôt sans payload d'analyse. Le hook d'import EVA rattache la vidéo
     // par (gameId, terrain) ; il n'upsert une analyse que si le payload est
@@ -239,10 +190,7 @@ async function workerLoop() {
             }
             currentFile = NEXT;
             try {
-                const RESULT = await processGame(NEXT);
-                if (RESULT === 'deferred') deferredCount++;
-                // 'deferred' : on retire de la queue active — le re-scan
-                // périodique la ré-enfilera.
+                await processGame(NEXT);
                 QUEUE.shift();
             } catch (e) {
                 console.error(
@@ -269,7 +217,7 @@ function enqueue(filePath) {
     );
 }
 
-/** Re-scan de games/ : ré-enfile les games déférées (hors sous-dossiers). */
+/** Re-scan de games/ : ré-enfile les games identifiées (hors sous-dossiers). */
 function rescanGames() {
     const DIR = getGamesDir();
     let entries;
@@ -329,7 +277,6 @@ function getStatus() {
         queued: QUEUE.length,
         currentFile: currentFile ? path.basename(currentFile) : null,
         uploadedCount,
-        deferredCount,
         lastError
     };
 }

@@ -98,6 +98,27 @@ function getGamesFolder() {
 }
 
 /**
+ * La game est-elle déjà extraite ? Le nom écrit ici porte 6 champs, mais le
+ * service d'identification y INSÈRE le gameId en 3e position dès qu'EBP a
+ * répondu — le fichier ne s'appelle alors plus pareil. On teste donc le nom
+ * exact ET son suffixe `_{map}_{start}_{end}_{scores}.mp4`, invariant entre les
+ * deux formes (les epochs absolus le rendent unique), sinon on re-découperait la
+ * game après un redémarrage.
+ * @param {string} gamesDir
+ * @param {string} name nom à 6 champs tel que produit par ce service.
+ */
+function alreadyExtracted(gamesDir, name) {
+    if (fs.existsSync(path.join(gamesDir, name))) return true;
+    const I1 = name.indexOf('_');
+    const SUFFIX = name.slice(name.indexOf('_', I1 + 1));
+    try {
+        return fs.readdirSync(gamesDir).some((f) => f.endsWith(SUFFIX));
+    } catch (_) {
+        return false;
+    }
+}
+
+/**
  * Epoch (secondes UTC) encodé dans le nom d'un segment `rec_%Y%m%d-%H%M%S.mkv`
  * (strftime ffmpeg en heure LOCALE — Date.UTC ne convient donc pas).
  * @returns {number|null}
@@ -184,9 +205,10 @@ async function processRun(run) {
     );
 
     // Phase 1 (détection uniquement — même code que le watch-folder). Pas de
-    // floating window : le pipeline salle est silencieux. Basse priorité OS :
-    // le PC de streaming garde toujours la main.
-    const DETECT = await deps.runAnalyzer(WINDOW_PATH, null, {}, false, true);
+    // floating window : le pipeline salle est silencieux. Priorité OS normale
+    // (décision Antoine) : la détection ne doit pas traîner derrière la
+    // captation, sinon les games s'accumulent dans le spool.
+    const DETECT = await deps.runAnalyzer(WINDOW_PATH, null, {}, false, false);
     if (DETECT.type === 'error') {
         throw new Error(`Analyzer failed: ${DETECT.message}`);
     }
@@ -227,7 +249,7 @@ async function processRun(run) {
         const NAME = `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mp4`;
         const OUT = path.join(GAMES_DIR, NAME);
         // Nom déterministe → dédup entre rounds et après redémarrage.
-        if (fs.existsSync(OUT)) {
+        if (alreadyExtracted(GAMES_DIR, NAME)) {
             maxExtractedEndEpoch = Math.max(maxExtractedEndEpoch, END_EPOCH);
             continue;
         }

@@ -76,8 +76,10 @@ const arenaModeService = require('./services/arena-mode-service');
 const arenaCaptureService = require('./services/arena-capture-service');
 const arenaPipelineService = require('./services/arena-pipeline-service');
 const arenaUploaderService = require('./services/arena-uploader-service');
-// Poller EVA du mode salle : se démarre seul au `require` (rien à appeler).
+// Poller EVA et identification des games (mode salle) : ces deux services se
+// démarrent seuls au `require` et vérifient eux-mêmes si le mode salle est actif.
 require('./services/arena-eva-poller-service');
+require('./services/arena-identify-service');
 // Mise à jour ordonnée par un admin (via la réponse du heartbeat) : arrêt
 // propre de la captation (segment finalisé) puis update forcée sans dialogue —
 // l'installeur Squirrel relance l'app, qui reprend tout au boot.
