@@ -76,7 +76,8 @@ const arenaModeService = require('./services/arena-mode-service');
 const arenaCaptureService = require('./services/arena-capture-service');
 const arenaPipelineService = require('./services/arena-pipeline-service');
 const arenaUploaderService = require('./services/arena-uploader-service');
-const arenaEvaPollerService = require('./services/arena-eva-poller-service');
+// Poller EVA du mode salle : se démarre seul au `require` (rien à appeler).
+require('./services/arena-eva-poller-service');
 // Mise à jour ordonnée par un admin (via la réponse du heartbeat) : arrêt
 // propre de la captation (segment finalisé) puis update forcée sans dialogue —
 // l'installeur Squirrel relance l'app, qui reprend tout au boot.
@@ -1978,7 +1979,6 @@ if (!APP_GOT_THE_LOCK) {
                 arenaCaptureService.autoStart();
             }
             try {
-                arenaEvaPollerService.start();
                 arenaPipelineService.start({ runAnalyzer });
                 arenaUploaderService.start();
             } catch (e) {
@@ -2491,9 +2491,9 @@ if (!APP_GOT_THE_LOCK) {
                         arenaId,
                         key
                     });
-                    // La salle vient d'être activée : poller EVA, consommateur
-                    // du spool et uploader démarrent (idempotents).
-                    arenaEvaPollerService.start();
+                    // La salle vient d'être activée : consommateur du spool et
+                    // uploader démarrent (idempotents). Le poller EVA tourne
+                    // déjà, il verra le mode actif au tour suivant.
                     arenaPipelineService.start({ runAnalyzer });
                     arenaUploaderService.start();
                     return { success: true, state: STATE };
@@ -2512,7 +2512,6 @@ if (!APP_GOT_THE_LOCK) {
         // The front-end asks the server to unregister the arena (salle) mode.
         ipcMain.handle('arena-mode-unregister', () => {
             arenaCaptureService.stopCapture();
-            arenaEvaPollerService.stop();
             arenaPipelineService.stop();
             arenaUploaderService.stop();
             return arenaModeService.unregister();
@@ -2560,9 +2559,9 @@ if (!APP_GOT_THE_LOCK) {
                 return { success: false, error: 'destination inside source' };
             }
             try {
-                // Les watchers (et le fichier de pile EVA) tiennent les anciens
-                // chemins : on coupe les services le temps du déplacement.
-                arenaEvaPollerService.stop();
+                // Les watchers tiennent les anciens chemins : on coupe les
+                // services le temps du déplacement. Le poller EVA ne touche
+                // aucun fichier, il n'est pas concerné.
                 arenaPipelineService.stop();
                 arenaUploaderService.stop();
 
@@ -2603,7 +2602,6 @@ if (!APP_GOT_THE_LOCK) {
                 // réussi, ancien sinon) — la queue se reconstruit par re-scan.
                 if (arenaModeService.getState().registered) {
                     try {
-                        arenaEvaPollerService.start();
                         arenaPipelineService.start({ runAnalyzer });
                         arenaUploaderService.start();
                     } catch (e) {
