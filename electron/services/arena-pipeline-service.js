@@ -259,21 +259,10 @@ async function processRun(run) {
         // fichiers comme ceux du watch-folder, sans qu'on ait payé un
         // réencodage. Marge de 1 s : la coupe démarre à la keyframe précédente.
         await cutCopyGame(WINDOW_PATH, OUT, G.start, G.end, ARENA_CUT_MARGIN_S);
-        // Sidecar LOCAL (jamais uploadé — la règle "pas de manifest" vaut pour
-        // le S3) : ce que le nom de fichier ne porte pas et que l'uploader
-        // (phase 2) devra savoir — le mode de jeu détecté et les bornes de la
-        // game dans le fichier DÉCOUPÉ (marge de coupe comprise).
-        fs.writeFileSync(
-            OUT + '.json',
-            JSON.stringify({
-                mode: G.mode,
-                map: G.map || '',
-                startSeconds: Math.min(G.start, ARENA_CUT_MARGIN_S),
-                endSeconds:
-                    Math.min(G.start, ARENA_CUT_MARGIN_S) + (G.end - G.start)
-            }),
-            'utf8'
-        );
+        // Pas de sidecar : le PC de salle ne fait JAMAIS l'analyse (phase 2), qui
+        // reste sur le PC du joueur. Tout ce dont la suite a besoin — arène,
+        // gameId après identification, map, bornes absolues — est dans le nom du
+        // fichier.
         extractedThisRound++;
         extractedCount++;
         maxExtractedEndEpoch = Math.max(maxExtractedEndEpoch, END_EPOCH);

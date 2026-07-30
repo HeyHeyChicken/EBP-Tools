@@ -49,20 +49,9 @@ function buildIdentifiedName(pendingName, gameId) {
     return `${ROOM}_${ARENA}_${gameId}_${MAP}_${START}_${END}_${SCORES}.mp4`;
 }
 
-/**
- * Renomme la vidéo ET son sidecar. La vidéo en dernier : c'est elle que
- * l'uploader surveille, elle ne doit apparaître sous son nom identifié qu'une
- * fois le sidecar déjà en place.
- */
+/** Renomme la vidéo : le nom est le seul porteur d'état de la chaîne. */
 function renameGame(dir, fromName, toName) {
-    for (const [FROM, TO] of [
-        [fromName + '.json', toName + '.json'],
-        [fromName, toName]
-    ]) {
-        const SRC = path.join(dir, FROM);
-        if (!fs.existsSync(SRC)) continue;
-        fs.renameSync(SRC, path.join(dir, TO));
-    }
+    fs.renameSync(path.join(dir, fromName), path.join(dir, toName));
 }
 
 /**

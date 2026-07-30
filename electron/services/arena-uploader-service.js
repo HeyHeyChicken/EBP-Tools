@@ -11,31 +11,30 @@ const arenaModeService = require('./arena-mode-service');
 const arenaPipelineService = require('./arena-pipeline-service');
 const {
     requestArenaUploadUrl,
-    depositArenaGame,
     uploadFileToPresignedUrl
 } = require('./tools-api-client');
 
 //#endregion
 
 // Mode salle — UPLOADER. Consomme les games découpées par le pipeline
-// (dossier `games/`). Une game n'est uploadée que porteuse de son gameId EVA :
-// upload S3 `arena/pending/` sous un nom PORTANT le gameId (matching exact à
-// l'import), dépôt SANS payload. Fichier + sidecar supprimés une fois les deux
-// faits — reprise après crash garantie par le re-scan + l'upsert idempotent.
+// (dossier `games/`) et déjà identifiées par arena-identify-service : le gameId
+// EVA est dans le nom du fichier (7 champs), une game non identifiée en porte 6
+// et reste invisible ici. Il n'y a donc AUCUNE gate à réévaluer.
 //
-// V1 : plus d'analyse phase 2 (killfeed) sur le PC de salle. Le but n'est plus
-// l'analyse mais que les games soient uploadées et rattachées ; le hook
-// d'import EVA attache la vidéo par (gameId, terrain), les joueurs sont déjà
-// connus côté serveur. Le killfeed pourra être rebranché plus tard.
+// Un seul appel réseau par game : on demande une URL présignée pour ce gameId et
+// on pousse le fichier. Le serveur écrit à l'emplacement DÉFINITIF des replays,
+// `statistics/replays/{T_Games.guid}.mp4` — même nommage qu'une analyse locale.
+// Rien à déposer ensuite : l'existence de l'objet EST la trace de l'upload, et
+// le hook d'import s'en sert pour attacher la vidéo à l'équipe. Fichier +
+// fichier local supprimé une fois l'upload confirmé.
 //
-// Il n'y a AUCUNE gate ici : le gameId est déjà dans le nom du fichier, posé par
-// le service d'identification (arena-identify-service). L'uploader ne voit que
-// les noms à 7 champs — une game pas encore identifiée en porte 6 et lui est
-// invisible. Le nom local EST le nom S3.
+// V1 : plus d'analyse phase 2 (killfeed) sur le PC de salle — les joueurs sont
+// déjà connus côté serveur. Le killfeed pourra être rebranché plus tard.
 //
-// Résilience réseau : upload + dépôt ont chacun une boucle de retry
-// PERSISTANTE (URL présignée fraîche à chaque tentative, backoff 30 s → 10 min,
-// à l'infini). Sérialisé : une seule game traitée à la fois (protection CPU).
+// Résilience réseau : boucle de retry PERSISTANTE (URL fraîche à chaque
+// tentative, backoff 30 s → 10 min, à l'infini). La clé S3 étant déterministe,
+// un retry réécrit le même objet — aucun doublon possible. Sérialisé : une seule
+// game à la fois (protection CPU).
 
 // Nom d'une game IDENTIFIÉE (7 champs, gameId en 3e position) :
 // {roomId}_{arenaId}_{gameId}_{SafeMap}_{start}_{end}_{scores}.mp4
@@ -68,66 +67,39 @@ function getFailedDir() {
     return path.join(path.dirname(getGamesDir()), 'failed');
 }
 
-/** Déplace la game + son sidecar vers failed/ (fichier inexploitable). */
+/** Déplace la game vers failed/ (fichier inexploitable). */
 function moveToFailed(filePath) {
     const FAILED = getFailedDir();
     if (!fs.existsSync(FAILED)) fs.mkdirSync(FAILED, { recursive: true });
-    for (const SRC of [filePath, filePath + '.json']) {
-        if (!fs.existsSync(SRC)) continue;
-        try {
-            fs.renameSync(SRC, path.join(FAILED, path.basename(SRC)));
-        } catch (e) {
-            console.error('[arena-uploader] move to failed failed:', SRC, e.message);
-        }
+    try {
+        fs.renameSync(filePath, path.join(FAILED, path.basename(filePath)));
+    } catch (e) {
+        console.error('[arena-uploader] move to failed failed:', filePath, e.message);
     }
 }
 
-/** Upload S3 avec retry persistant. `s3FileName` = nom PORTANT le gameId. */
-async function uploadWithPersistentRetry(filePath, s3FileName, ids, token) {
+/**
+ * Upload S3 avec retry persistant. On envoie le `gameId` EVA : c'est le serveur
+ * qui en déduit la clé (`statistics/replays/{T_Games.guid}.mp4`), Tools ne nomme
+ * jamais l'objet. Clé déterministe → un retry réécrit le même objet.
+ */
+async function uploadWithPersistentRetry(filePath, gameId, ids, token) {
     let delay = RETRY_BASE_DELAY_MS;
     for (;;) {
         if (stopRequested) throw new Error('uploader stopped');
         try {
             const UPLOAD = await requestArenaUploadUrl(
-                { roomId: ids.roomId, arenaId: ids.arenaId, fileName: s3FileName },
+                { roomId: ids.roomId, arenaId: ids.arenaId, gameId },
                 token
             );
             await uploadFileToPresignedUrl(UPLOAD.url, filePath, {
                 contentType: 'video/mp4'
             });
-            return;
+            return UPLOAD.guid;
         } catch (e) {
             lastError = e.message;
             console.warn(
                 `[arena-uploader] upload failed (${e.message}), retry in ${delay / 1000}s`
-            );
-            await sleep(delay);
-            delay = Math.min(delay * 2, RETRY_MAX_DELAY_MS);
-        }
-    }
-}
-
-/** Dépôt du payload, même politique de retry persistant. */
-async function depositWithPersistentRetry(s3FileName, ids, token, payload) {
-    let delay = RETRY_BASE_DELAY_MS;
-    for (;;) {
-        if (stopRequested) throw new Error('uploader stopped');
-        try {
-            await depositArenaGame(
-                {
-                    roomId: ids.roomId,
-                    arenaId: ids.arenaId,
-                    fileName: s3FileName,
-                    payload,
-                    noRosters: false
-                },
-                token
-            );
-            return;
-        } catch (e) {
-            lastError = e.message;
-            console.warn(
-                `[arena-uploader] deposit failed (${e.message}), retry in ${delay / 1000}s`
             );
             await sleep(delay);
             delay = Math.min(delay * 2, RETRY_MAX_DELAY_MS);
@@ -154,23 +126,17 @@ async function processGame(filePath) {
         return 'failed';
     }
 
-    console.log(`[arena-uploader] processing ${NAME}`);
-    // Le nom local porte déjà le gameId : c'est tel quel le nom S3 attendu par
-    // le backend (`parseArenaGameFileName`).
-    const S3_NAME = NAME;
+    // gameId EVA, 3e champ du nom (posé par le service d'identification).
+    const GAME_ID = NAME.match(GAME_FILE_RE)[3];
+    console.log(`[arena-uploader] processing ${NAME} (EVA game ${GAME_ID})`);
 
-    // V1 : dépôt sans payload d'analyse. Le hook d'import EVA rattache la vidéo
-    // par (gameId, terrain) ; il n'upsert une analyse que si le payload est
-    // présent (cf. wiki/arena_mode_api.md §5).
-    await uploadWithPersistentRetry(filePath, S3_NAME, IDS, TOKEN);
-    await depositWithPersistentRetry(S3_NAME, IDS, TOKEN, null);
-    // Game rattachée côté serveur : on libère le disque.
-    for (const P of [filePath, filePath + '.json']) {
-        try {
-            if (fs.existsSync(P)) fs.unlinkSync(P);
-        } catch (e) {
-            console.error('[arena-uploader] cleanup failed:', P, e.message);
-        }
+    const GUID = await uploadWithPersistentRetry(filePath, GAME_ID, IDS, TOKEN);
+    console.log(`[arena-uploader] uploaded as ${GUID}.mp4`);
+    // La vidéo est en place à l'emplacement définitif : on libère le disque.
+    try {
+        fs.unlinkSync(filePath);
+    } catch (e) {
+        console.error('[arena-uploader] cleanup failed:', filePath, e.message);
     }
     uploadedCount++;
     lastError = null;

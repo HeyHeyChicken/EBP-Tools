@@ -319,34 +319,22 @@ function resolveArenaGameId(payload, arenaToken) {
 
 /**
  * POST /api/tools/arena/games/upload-url
- * URL présignée PUT vers `arena/pending/{roomId}/{arenaId}/{fileName}` pour
- * une game du pipeline salle. Auth par clé de salle seule (X-Arena-Token).
- * Pas de retry interne : l'uploader gère sa propre boucle persistante en
- * re-demandant une URL fraîche à chaque tentative.
+ * URL présignée PUT vers `statistics/replays/{guid}.mp4` : l'emplacement ET le
+ * nommage définitifs d'un replay, identiques à ceux d'une analyse locale. On
+ * envoie le `gameId` EVA (celui que `resolveArenaGameId` a donné) et c'est le
+ * SERVEUR qui en déduit le guid — Tools ne nomme jamais l'objet. Il n'y a rien
+ * à déposer ensuite : l'existence de l'objet est la trace de l'upload.
  *
- * @param {{roomId:number, arenaId:number, fileName:string}} payload
+ * Auth par clé de salle seule (X-Arena-Token). Pas de retry interne :
+ * l'uploader gère sa propre boucle persistante en re-demandant une URL fraîche
+ * à chaque tentative — la clé étant déterministe, un retry réécrit le même objet.
+ *
+ * @param {{roomId:number, arenaId:number, gameId:string}} payload
  * @param {string} arenaToken
- * @returns {Promise<{url:string, key:string, expiresAt:number}>}
+ * @returns {Promise<{url:string, key:string, guid:string, expiresAt:number}>}
  */
 function requestArenaUploadUrl(payload, arenaToken) {
     return apiRequest('POST', '/arena/games/upload-url', payload, {
-        retries: 1,
-        requireAuth: false,
-        headers: { 'X-Arena-Token': arenaToken }
-    });
-}
-
-/**
- * POST /api/tools/arena/games
- * Dépose le payload d'analyse d'une game pré-enregistrée (APRÈS l'upload de
- * la vidéo — le serveur vérifie sa présence en S3, 412 sinon). Upsert par
- * fileName : idempotent, un retry après crash est sans danger.
- *
- * @param {{roomId:number, arenaId:number, fileName:string, payload:object|null, noRosters:boolean}} payload
- * @param {string} arenaToken
- */
-function depositArenaGame(payload, arenaToken) {
-    return apiRequest('POST', '/arena/games', payload, {
         retries: 1,
         requireAuth: false,
         headers: { 'X-Arena-Token': arenaToken }
@@ -530,7 +518,6 @@ module.exports = {
     getArenaLocations,
     sendArenaHeartbeat,
     requestArenaUploadUrl,
-    depositArenaGame,
     ingestArenaGames,
     resolveArenaGameId,
     persistAnalysis,
