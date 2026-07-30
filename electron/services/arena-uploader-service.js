@@ -11,6 +11,7 @@ const arenaModeService = require('./arena-mode-service');
 const arenaPipelineService = require('./arena-pipeline-service');
 const {
     requestArenaUploadUrl,
+    confirmArenaUpload,
     uploadFileToPresignedUrl
 } = require('./tools-api-client');
 
@@ -95,6 +96,17 @@ async function uploadWithPersistentRetry(filePath, gameId, ids, token) {
             await uploadFileToPresignedUrl(UPLOAD.url, filePath, {
                 contentType: 'video/mp4'
             });
+            // Confirme l'upload : le serveur vérifie l'objet en S3 puis indexe la
+            // vidéo (T_Terrain_Videos). Best-effort — l'objet est déjà en S3, la
+            // réconciliation serveur rattrape un échec de confirmation.
+            try {
+                await confirmArenaUpload(
+                    { roomId: ids.roomId, arenaId: ids.arenaId, gameId },
+                    token
+                );
+            } catch (e) {
+                console.warn(`[arena-uploader] confirm-upload failed (${e.message}), serveur réconciliera`);
+            }
             return UPLOAD.guid;
         } catch (e) {
             lastError = e.message;

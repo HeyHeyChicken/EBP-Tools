@@ -342,6 +342,26 @@ function requestArenaUploadUrl(payload, arenaToken) {
 }
 
 /**
+ * POST /api/tools/arena/games/confirm-upload
+ * Confirme au serveur que le PUT du replay a réussi : le serveur VÉRIFIE l'objet
+ * en S3 puis indexe la vidéo (T_Terrain_Videos), ce qui rend requêtable « quelles
+ * games ont une vidéo de salle » sans interroger S3. À appeler APRÈS un PUT réussi,
+ * avec le même `gameId` EVA que `requestArenaUploadUrl`. Best-effort : un échec
+ * n'invalide pas l'upload (la réconciliation serveur rattrape).
+ *
+ * @param {{roomId:number, arenaId:number, gameId:string}} payload
+ * @param {string} arenaToken
+ * @returns {Promise<void>}
+ */
+function confirmArenaUpload(payload, arenaToken) {
+    return apiRequest('POST', '/arena/games/confirm-upload', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-Arena-Token': arenaToken }
+    });
+}
+
+/**
  * POST /api/tools/arena/games/ingest
  * Mode salle : pousse vers EBP les nœuds bruts `listLastGamesAtLocation` des
  * nouvelles games vues par le poller, pour qu'EBP les upsert dans sa BDD
@@ -518,6 +538,7 @@ module.exports = {
     getArenaLocations,
     sendArenaHeartbeat,
     requestArenaUploadUrl,
+    confirmArenaUpload,
     ingestArenaGames,
     resolveArenaGameId,
     persistAnalysis,
