@@ -9,9 +9,13 @@ const { io } = require('socket.io-client');
 //#endregion
 
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
+// Même bascule que le client REST : `EBP_TARGET=prod` vise la prod sans quitter
+// le mode dev (cf. tools-api-client). Les deux doivent viser le MÊME serveur,
+// sinon un appel REST déclenche un broadcast socket que ce front n'écoute pas.
+const USE_PROD = !IS_DEV_MODE || process.env.EBP_TARGET === 'prod';
 
 const SOCKET = io(
-    IS_DEV_MODE ? 'http://localhost:3005' : 'https://evabattleplan.com/',
+    USE_PROD ? 'https://evabattleplan.com/' : 'http://localhost:3005',
     {
         reconnection: true,
         transports: ['websocket']

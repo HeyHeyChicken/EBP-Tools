@@ -18,10 +18,15 @@ const sessionService = require('./session-service');
 // Le jeton vient du deeplink émis par le site de prod — le serveur dev doit
 // partager le secret JWT pour le valider, et sa base contenir les games
 // (pour /identify).
+// `EBP_TARGET=prod` force la PROD tout en restant en mode dev : indispensable
+// pour tester le mode salle contre le vrai backend, puisque passer
+// NODE_ENV=production ferait chercher ffmpeg/analyzer dans process.resourcesPath
+// (layout d'app packagée) au lieu du repo.
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
-const API_HTTP = IS_DEV_MODE ? http : https;
-const API_HOST = IS_DEV_MODE ? 'localhost' : EBP_DOMAIN;
-const API_PORT = IS_DEV_MODE ? 3005 : 443;
+const USE_PROD_API = !IS_DEV_MODE || process.env.EBP_TARGET === 'prod';
+const API_HTTP = USE_PROD_API ? https : http;
+const API_HOST = USE_PROD_API ? EBP_DOMAIN : 'localhost';
+const API_PORT = USE_PROD_API ? 443 : 3005;
 
 //#endregion
 
