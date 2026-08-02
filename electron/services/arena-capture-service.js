@@ -283,17 +283,42 @@ function buildFfmpegArgs(device) {
     const IS_SCREEN = device.kind === 'screen';
     // Pas d'audio : ni la caméra virtuelle ni ddagrab n'en transportent. Le son
     // fera l'objet d'une entrée séparée (capture par processus).
+    const ENCODER = resolveEncoder();
     let inputArgs;
-    if (IS_SCREEN && !IS_MAC) {
-        // Windows : Desktop Duplication côté GPU. ddagrab est une SOURCE de
+    // Images matérielles : `-pix_fmt` n'a pas de sens dessus, c'est l'encodeur
+    // qui convertit. Renseigné par les branches logicielles uniquement.
+    let pixFmtArgs = ['-pix_fmt', 'yuv420p'];
+    if (IS_SCREEN && !IS_MAC && ENCODER.name === 'h264_nvenc') {
+        // Chemin ZÉRO-COPIE : les images restent sur le GPU de ddagrab jusqu'à
+        // NVENC, sans jamais passer en RAM.
+        //
+        // Ce n'est pas qu'une optimisation, c'est le seul montage qui marche :
+        // avec `hwdownload`, ffmpeg passe quand même le device D3D11 à
+        // l'encodeur, qui ouvre sa session dessus puis tente d'allouer des
+        // tampons système — NVENC refuse (CreateInputBuffer, invalid param).
+        const FILTERS = [
+            `ddagrab=output_idx=${device.outputIndex || 0}:framerate=${OUTPUT_FPS}`
+        ];
+        if (device.width !== 1920 || device.height !== 1080) {
+            // Redimensionnement sur GPU : redescendre en RAM pour un scale
+            // logiciel ramènerait le problème ci-dessus.
+            FILTERS.push('hwmap=derive_device=cuda', 'scale_cuda=1920:1080');
+        }
+        inputArgs = [
+            '-init_hw_device', 'd3d11va',
+            '-filter_complex', `${FILTERS.join(',')}[v]`,
+            '-map', '[v]'
+        ];
+        pixFmtArgs = [];
+    } else if (IS_SCREEN && !IS_MAC) {
+        // Windows sans NVENC (QSV, AMF, libx264). ddagrab est une SOURCE de
         // filtergraph, pas un format d'entrée — il n'y a donc aucun `-i`, et
         // c'est `-filter_complex` qui produit le flux.
         //
-        // `hwdownload` ramène les frames en RAM. C'est un coût réel (BGRA
-        // 1080p30 ≈ 240 Mo/s sur le bus) mais c'est le SEUL chemin qui marche
-        // avec les quatre encodeurs candidats. Le chemin zéro-copie vers NVENC
-        // est une optimisation à faire une fois qu'on aura mesuré sur un PC de
-        // salle — pas à deviner d'ici.
+        // `hwdownload` ramène les images en RAM pour un encodeur logiciel.
+        // Coût réel (BGRA 1080p30 ≈ 240 Mo/s sur le bus), mais sans
+        // alternative pour ces encodeurs. Chemin NON TESTÉ : les PC de salle
+        // rencontrés jusqu'ici sont tous en NVENC.
         const FILTERS = [
             `ddagrab=output_idx=${device.outputIndex || 0}:framerate=${OUTPUT_FPS}`,
             'hwdownload',
@@ -305,16 +330,11 @@ function buildFfmpegArgs(device) {
         if (device.width !== 1920 || device.height !== 1080) {
             FILTERS.push('scale=1920:1080');
         }
-        // Conversion explicite en fin de graphe. `format=bgra` est imposé par
-        // hwdownload (c'est le format des textures), mais laisser le graphe se
-        // terminer là force la sortie en BGRA alors que l'encodeur attend du
-        // yuv420p : la négociation échoue et le graphe refuse de se
-        // configurer — exactement le -22 observé. On convertit nous-mêmes.
+        // `format=bgra` est imposé par hwdownload (format des textures) ; la
+        // conversion vers l'espace attendu par l'encodeur est explicite pour
+        // ne pas dépendre de l'auto-insertion de ffmpeg.
         FILTERS.push('format=yuv420p');
         inputArgs = [
-            // Le device est nommé et passé explicitement au graphe : sans
-            // -filter_hw_device, ddagrab peut ne trouver aucun device d3d11 et
-            // échouer de la même manière.
             '-init_hw_device', 'd3d11va=dda',
             '-filter_hw_device', 'dda',
             '-filter_complex', `${FILTERS.join(',')}[v]`,
@@ -347,7 +367,7 @@ function buildFfmpegArgs(device) {
             '-i', `video=${device.id}`
         ];
     }
-    const ENCODER_ARGS = resolveEncoder().args;
+    const ENCODER_ARGS = ENCODER.args;
     // Sortie en CFR : les caméras (surtout virtuelles) livrent des timestamps
     // irréguliers qui, sans ça, produisent un temps média ≠ temps réel (fps
     // annoncés délirants, frames dupliquées) — ce qui fausse la durée des
@@ -362,7 +382,7 @@ function buildFfmpegArgs(device) {
         // GOP = 1 s (cf. ENCODER_ARGS) : keyframe à chaque seconde pour un
         // seek fluide côté web ET une découpe stream-copy précise à ±1 s.
         '-g', String(OUTPUT_FPS),
-        '-pix_fmt', 'yuv420p',
+        ...pixFmtArgs,
         '-f', 'segment',
         '-segment_time', String(SEGMENT_SECONDS),
         '-reset_timestamps', '1',
