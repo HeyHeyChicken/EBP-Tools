@@ -305,8 +305,18 @@ function buildFfmpegArgs(device) {
         if (device.width !== 1920 || device.height !== 1080) {
             FILTERS.push('scale=1920:1080');
         }
+        // Conversion explicite en fin de graphe. `format=bgra` est imposé par
+        // hwdownload (c'est le format des textures), mais laisser le graphe se
+        // terminer là force la sortie en BGRA alors que l'encodeur attend du
+        // yuv420p : la négociation échoue et le graphe refuse de se
+        // configurer — exactement le -22 observé. On convertit nous-mêmes.
+        FILTERS.push('format=yuv420p');
         inputArgs = [
-            '-init_hw_device', 'd3d11va',
+            // Le device est nommé et passé explicitement au graphe : sans
+            // -filter_hw_device, ddagrab peut ne trouver aucun device d3d11 et
+            // échouer de la même manière.
+            '-init_hw_device', 'd3d11va=dda',
+            '-filter_hw_device', 'dda',
             '-filter_complex', `${FILTERS.join(',')}[v]`,
             '-map', '[v]'
         ];
@@ -501,9 +511,10 @@ function startCapture() {
         // diagnostic et on relance avec backoff — la captation d'une salle ne
         // doit jamais rester morte en silence.
         lastError = stderrTail.slice(-3).join(' | ') || `ffmpeg exited (${code})`;
+        // Le tail COMPLET dans la console : sur un échec de filtergraph, les 3
+        // dernières lignes ne sont que la cascade, la cause est plus haut.
         console.error(
-            `[arena-capture] ffmpeg died (code ${code}), restart in ${restartDelayMs / 1000}s —`,
-            lastError
+            `[arena-capture] ffmpeg died (code ${code}), restart in ${restartDelayMs / 1000}s —\n${stderrTail.join('\n')}`
         );
         restartTimer = setTimeout(() => {
             restartTimer = null;
