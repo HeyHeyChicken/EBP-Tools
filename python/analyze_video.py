@@ -89,6 +89,20 @@ def _killfeed_text_colors(resolved_orange, resolved_blue):
 
 DEBUG = False
 
+# Remontée du gameplay à rebours (cf. `_analyze`) : taille d'un bond arrière, et
+# tolérance sur le contrôle « reculer de N secondes remonte le timer de N ».
+# La justesse ne dépend PAS de TIMER_JUMP_S (un bond incohérent est rembobiné),
+# seulement la vitesse : 10 s = ~72 atterrissages pour une game de 12 min, contre
+# 720 pas si on n'a plus le droit de sauter.
+# La tolérance, elle, n'est pas proportionnelle au bond : elle absorbe
+# l'imprécision du seek ffmpeg et l'arrondi du timer à la seconde.
+TIMER_JUMP_S = 10
+TIMER_JUMP_TOLERANCE_S = 5
+# Borne de plausibilité du timer OCR, en minutes. La durée d'une game est
+# configurée par la salle (jusqu'à 12 min, plus en cas de pause technique) : on
+# ne peut pas la supposer, seulement écarter les lectures absurdes.
+TIMER_MAX_PLAUSIBLE_MIN = 30
+
 MODES = [
     #region Mode 0
     {
@@ -5208,7 +5222,9 @@ def _locate_minimap(cap, current_timestamp: float, map_name: str, frame_rgb):
 def _new_game(mode: int) -> dict:
     """
     Crée et retourne un dict représentant un nouveau jeu en cours de détection.
-    __jumped__ : flag interne indiquant que le saut de timer a déjà été effectué pour ce jeu.
+    __timerRef__ : dernier couple (timestamp, secondes restantes) LU ET VÉRIFIÉ
+                   dans cette game, point de repli des bonds arrière.
+    __nojump__   : plus aucun bond autorisé pour cette game (on marche).
     """
     return {
         'mode': mode,
@@ -5218,7 +5234,8 @@ def _new_game(mode: int) -> dict:
         'mapImage': None,
         'minimap': None,  # {'box': ((x1,y1),(x2,y2)), 'score': float, 'scale': float}
         'points': None,  # list of {x,y,w,h,score} — détecté à la 1ère frame de gameplay
-        '__jumped__': False,
+        '__timerRef__': None,
+        '__nojump__': False,
         'orangeTeam': {
             'score': 0,
             'scoreImage': None,
@@ -5562,13 +5579,30 @@ def _analyze(
                         else:
                             _emit({"Can't find map name": T})
 
-                # Timer jump — mirrors the TS optimization exactly.
-                # When the map is collected, read the game timer and
-                # jump backward to just before the game start to find loading/intro
-                # faster, skipping the bulk of the gameplay footage.
-                if (CURRENT['map']
-                        and not CURRENT['__jumped__']
-                        and not JUST_JUMPED):
+                # Timer jump — on remonte le gameplay par BONDS BORNÉS au lieu de
+                # sauter d'un coup jusqu'au début supposé.
+                #
+                # L'ancienne version calculait le saut avec `max_time_per_game`
+                # (10 min) supposé être la durée de la game. Or le chrono
+                # décompte depuis une durée CONFIGURÉE avant la partie (7 min
+                # observé en salle, jusqu'à 12) : le saut dépassait donc
+                # systématiquement le début de (10 − T_max) minutes, la recherche
+                # du début continuait dans la game PRÉCÉDENTE et s'arrêtait sur
+                # SON intro. Le segment produit couvrait deux games et se faisait
+                # rattacher à la mauvaise (constaté en prod le 2026-08-01 :
+                # 15 min 34 pour une game de 7 min).
+                #
+                # Invariant utilisé à la place, indépendant de toute durée
+                # supposée : dans une même game, reculer de N secondes fait
+                # remonter le timer de N secondes. Tant que ça se vérifie on
+                # saute ; dès que ça dévie — timer FIGÉ (on est dans le pré-game,
+                # il affiche alors T_max), illisible, ou incohérent — on rembobine
+                # au dernier point vérifié et on repasse au pas de 1 s.
+                #
+                # C'est ce rembobinage qui fait la justesse, pas la taille du
+                # bond : l'écran de loading ne dure que ~2 s, il ne peut être
+                # atteint qu'en marchant, jamais par un bond.
+                if CURRENT['map'] and not CURRENT['__nojump__']:
                     DYN_TIMER = _find_timer_box(FRAME, anchor=HUD_ANCHOR)
                     TB = DYN_TIMER if DYN_TIMER is not None else TIMER_BOX
                     TIMER = _ocr_region(
@@ -5590,23 +5624,37 @@ def _analyze(
                         if PARTS and len(PARTS) == 2:
                             try:
                                 M, S = int(PARTS[0]), int(PARTS[1])
-                                # Sanity-check OCR : un timer valide a M ∈ [0, max_time_per_game]
-                                # et S ∈ [0, 59]. Sans ça un OCR foireux comme "0:3228"
-                                # produit un DIFF négatif → TIMESTAMP saute en avant
-                                # dans la vidéo et l'algo backward boucle indéfiniment.
-                                VALID = 0 <= M <= max_time_per_game and 0 <= S < 60
+                                # Sanity-check OCR : S ∈ [0, 59] et M borné par une
+                                # durée de game absurde. On ne borne PLUS par
+                                # `max_time_per_game` : la durée est configurée par
+                                # la salle et peut dépasser 10 min, un timer de
+                                # 12:00 est légitime.
+                                VALID = 0 <= M <= TIMER_MAX_PLAUSIBLE_MIN and 0 <= S < 60
                                 if DEBUG:
-                                    _emit({'log': f'timer parsed m={M} s={S} valid={VALID} max_time_per_game={max_time_per_game}'})
+                                    _emit({'log': f'timer parsed m={M} s={S} valid={VALID}'})
                                 if VALID:
-                                    SECURITY = 20
-                                    DIFF = (max_time_per_game - M) * 60 - S - SECURITY
-                                    if DIFF > 0:
-                                        if DEBUG:
-                                            _emit({'log': "Try to jump " + str(DIFF)})
-                                        CURRENT['__jumped__'] = True
-                                        JUST_JUMPED = True
-                                        TIMESTAMP -= DIFF
-                                        continue   # skip TIMESTAMP -= STEP
+                                    REMAINING = M * 60 + S
+                                    REF = CURRENT['__timerRef__']
+                                    if REF is not None:
+                                        # Reculer de (REF_TS − TIMESTAMP) doit avoir
+                                        # fait remonter le timer d'autant.
+                                        EXPECTED = REF[1] + (REF[0] - TIMESTAMP)
+                                        DRIFT = abs(REMAINING - EXPECTED)
+                                        if DRIFT > TIMER_JUMP_TOLERANCE_S:
+                                            if DEBUG:
+                                                _emit({'log': f'timer inconsistent (got {REMAINING}s, expected ~{EXPECTED}s) → rewind to {REF[0]:.0f}s and walk'})
+                                            # Hors de la game (pré-game figé, game
+                                            # voisine, OCR faux) : on rembobine au
+                                            # dernier point sûr et on marche.
+                                            TIMESTAMP = REF[0]
+                                            CURRENT['__nojump__'] = True
+                                            continue
+                                    CURRENT['__timerRef__'] = (TIMESTAMP, REMAINING)
+                                    if DEBUG:
+                                        _emit({'log': f'timer {M}:{S:02d} → jump back {TIMER_JUMP_S}s'})
+                                    JUST_JUMPED = True
+                                    TIMESTAMP -= TIMER_JUMP_S
+                                    continue   # skip TIMESTAMP -= STEP
                             except Exception as e:
                                 print(e)
                                 pass

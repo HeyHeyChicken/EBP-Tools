@@ -46,9 +46,17 @@ const SEGMENT_RE = /^rec_(\d{8})-(\d{6})\.mkv$/;
 // sépare deux runs de captation (crash/redémarrage de ffmpeg) — les segments
 // d'un même run sont contigus, ceux de runs différents ne se concatènent pas.
 const RUN_GAP_TOLERANCE_S = 60;
-// Durée max d'une game EVA (max_time_per_game par défaut = 10 min) + marge :
-// borne d'avance du watermark quand aucune game n'est extraite.
-const MAX_GAME_S = 10 * 60 + 120;
+// Durée max d'une game EVA + marge : borne d'avance du watermark quand aucune
+// game n'est extraite (« une game en cours ne peut pas avoir commencé avant »).
+// La durée est CONFIGURÉE par la salle avant la partie — on ne la connaît jamais
+// à l'avance — et monte jusqu'à 12 min, une pause technique pouvant l'allonger
+// encore. Trop bas, on purge les segments d'une game en cours ; trop haut, le
+// spool grossit (~4,5 Go/h).
+const MAX_GAME_S = 12 * 60 + 180;
+// Au-delà, une game détectée n'est pas « longue » mais FAUSSE : son début a été
+// pris dans la game précédente (cf. le filtre de `processRun`). Seuil distinct
+// et large, il ne sert qu'à écarter les débordements francs.
+const IMPLAUSIBLE_GAME_S = 20 * 60;
 // Marge de sécurité avant purge d'un segment sous le watermark.
 const PURGE_MARGIN_S = 60;
 // Tolérance sur la comparaison fin-de-game vs watermark : les epochs sont
@@ -216,9 +224,27 @@ async function processRun(run) {
     // atteint le début de la fenêtre sans loading frame (game déjà extraite à
     // un round précédent dont seule la fin est encore visible, ou game
     // entamée avant le lancement de la captation).
-    const GAMES = (DETECT.games || []).filter(
-        (g) => g.start !== -1 && !g.startFallback
-    );
+    //
+    // Et on écarte les durées INVRAISEMBLABLES, symptôme d'un début mal
+    // détecté : la recherche a franchi l'intro de la game et s'est arrêtée sur
+    // celle de la PRÉCÉDENTE, produisant une vidéo qui contient deux games et
+    // serait rattachée à la mauvaise. Mieux vaut perdre la game que publier ça.
+    // Cas observé en prod le 2026-08-01 : 15 min 34 pour une game.
+    //
+    // Le seuil est volontairement LARGE : la durée d'une game est configurée par
+    // la salle (7 min sur le cas observé), monte à 12 min, et une pause
+    // technique peut l'allonger encore. Ce filtre n'est donc pas une mesure de
+    // vraisemblance fine, seulement un filet contre les débordements francs.
+    const GAMES = (DETECT.games || []).filter((g) => {
+        if (g.start === -1 || g.startFallback) return false;
+        if (g.end - g.start > IMPLAUSIBLE_GAME_S) {
+            console.warn(
+                `[arena-pipeline] implausible game dropped: ${Math.round(g.end - g.start)}s (> ${IMPLAUSIBLE_GAME_S}s) map=${g.map || '?'} — début mal détecté`
+            );
+            return false;
+        }
+        return true;
+    });
     console.log(`[arena-pipeline] ${GAMES.length} complete game(s) in window`);
 
     // Durée de la fenêtre (relative) : fin nominale du dernier segment.
