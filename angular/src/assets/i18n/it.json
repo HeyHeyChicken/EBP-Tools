@@ -156,6 +156,8 @@
       },
       "capture": {
         "device": "Sorgente video",
+        "screens": "Schermi",
+        "cameras": "Fotocamere virtuali",
         "refresh": "Aggiorna l'elenco",
         "recording": "Registrazione in corso da «{{device}}». Le partite rilevate saranno analizzate e inviate automaticamente.",
         "stopped": "L'acquisizione è ferma. Seleziona una sorgente video e avvia l'acquisizione.",
@@ -164,7 +166,12 @@
         "stop": "Ferma l'acquisizione",
         "openFolder": "Apri la cartella di lavoro",
         "moveFolder": "Sposta la cartella di lavoro",
-        "moveFolderStopFirst": "Ferma l'acquisizione prima di spostare la cartella"
+        "moveFolderStopFirst": "Ferma l'acquisizione prima di spostare la cartella",
+        "audio": {
+          "level": "Livello audio",
+          "silent": "Nessun suono rilevato da più di 20 secondi. Verifica che il software registrato produca effettivamente audio e che l'uscita audio del PC non sia disattivata.",
+          "unavailable": "Il livello audio non può essere misurato su questo sistema."
+        }
       }
     }
   },

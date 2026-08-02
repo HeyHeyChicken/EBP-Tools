@@ -156,6 +156,8 @@
       },
       "capture": {
         "device": "Sursă video",
+        "screens": "Ecrane",
+        "cameras": "Camere virtuale",
         "refresh": "Reîmprospătează lista",
         "recording": "Se înregistrează de la „{{device}}”. Partidele detectate vor fi analizate și trimise automat.",
         "stopped": "Captura este oprită. Selectați o sursă video, apoi porniți captura.",
@@ -164,7 +166,12 @@
         "stop": "Oprește captura",
         "openFolder": "Deschide folderul de lucru",
         "moveFolder": "Mută folderul de lucru",
-        "moveFolderStopFirst": "Opriți captura înainte de a muta folderul"
+        "moveFolderStopFirst": "Opriți captura înainte de a muta folderul",
+        "audio": {
+          "level": "Nivel sonor",
+          "silent": "Niciun sunet detectat de peste 20 de secunde. Verificați dacă software-ul înregistrat produce sunet și dacă ieșirea audio a PC-ului nu este dezactivată.",
+          "unavailable": "Nivelul sonor nu poate fi măsurat pe acest sistem."
+        }
       }
     }
   },

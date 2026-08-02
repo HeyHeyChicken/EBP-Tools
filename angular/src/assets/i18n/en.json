@@ -156,6 +156,8 @@
       },
       "capture": {
         "device": "Video source",
+        "screens": "Screens",
+        "cameras": "Virtual cameras",
         "refresh": "Refresh list",
         "recording": "Recording from \"{{device}}\". Detected games will be analyzed and uploaded automatically.",
         "stopped": "Capture is stopped. Select a video source then start the capture.",
@@ -164,7 +166,12 @@
         "stop": "Stop capture",
         "openFolder": "Open working folder",
         "moveFolder": "Move working folder",
-        "moveFolderStopFirst": "Stop the capture before moving the folder"
+        "moveFolderStopFirst": "Stop the capture before moving the folder",
+        "audio": {
+          "level": "Audio level",
+          "silent": "No sound detected for over 20 seconds. Check that the recorded software is actually producing sound and that the PC audio output is not muted.",
+          "unavailable": "The audio level cannot be measured on this system."
+        }
       }
     }
   },

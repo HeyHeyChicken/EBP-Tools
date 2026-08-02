@@ -12,7 +12,8 @@ const {
     Menu,
     nativeImage,
     nativeTheme,
-    shell
+    shell,
+    desktopCapturer
 } = require('electron');
 const path = require('node:path');
 const { setupConsoleRedirection } = require('./console-manager');
@@ -27,6 +28,7 @@ const {
     PROTOCOL_NAME
 } = require('../config/constants');
 const watchFolderService = require('../services/watch-folder-service');
+const arenaCaptureService = require('../services/arena-capture-service');
 const StorageManager = require('./storage-manager');
 
 //#endregion
@@ -202,6 +204,48 @@ function createWindow(updateService) {
                 : MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY
         }
     });
+
+    // Mode salle : la page de captation mesure le niveau du son du PC pour
+    // alerter quand la source est muette — l'image seule ne le dit pas.
+    // Electron refuse getDisplayMedia tant qu'aucun handler n'est posé.
+    // Le loopback audio est propre à Windows (les PC de salle le sont) :
+    // ailleurs on refuse la demande, et la page affiche « mesure
+    // indisponible » plutôt que d'ouvrir une capture d'écran pour rien.
+    mainWindow.webContents.session.setDisplayMediaRequestHandler(
+        (request, callback) => {
+            // Deux usages partagent ce handler, distingués par ce qu'ils
+            // demandent : le moniteur de son (audio) et l'aperçu d'une source
+            // écran du mode salle (vidéo seule).
+            const WANTS_AUDIO = !!request.audioRequested;
+            if (WANTS_AUDIO && process.platform !== 'win32') {
+                callback({});
+                return;
+            }
+            desktopCapturer
+                .getSources({ types: ['screen'] })
+                .then((sources) => {
+                    if (!sources.length) {
+                        callback({});
+                        return;
+                    }
+                    if (WANTS_AUDIO) {
+                        // Une piste vidéo est imposée par l'API : le renderer
+                        // la coupe aussitôt pour ne garder que l'audio.
+                        callback({ video: sources[0], audio: 'loopback' });
+                        return;
+                    }
+                    // Aperçu : l'écran sélectionné pour la captation. Les
+                    // sources desktopCapturer portent le même identifiant
+                    // d'affichage que celui stocké par le service.
+                    const STATUS = arenaCaptureService.getStatus();
+                    const MATCH = sources.find(
+                        (s) => s.display_id === STATUS.deviceId
+                    );
+                    callback({ video: MATCH || sources[0] });
+                })
+                .catch(() => callback({}));
+        }
+    );
 
     let language = StorageManager.permanentSettings['language'];
     if (!language) {

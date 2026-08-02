@@ -8,6 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('child_process');
+const { screen } = require('electron');
 const { FFMPEG_PATH } = require('../config/constants');
 const StorageManager = require('../core/storage-manager');
 
@@ -174,9 +175,11 @@ function setDevice(device) {
  * Liste les périphériques vidéo via ffmpeg (avfoundation sur macOS, dshow sur
  * Windows). ffmpeg sort la liste sur stderr et se termine en erreur : c'est le
  * comportement attendu, on parse quoi qu'il arrive.
- * @returns {{id: string, name: string}[]}  id = index avfoundation ou nom dshow.
+ * Sépare les écrans (avfoundation les expose comme des caméras) des caméras
+ * virtuelles.
+ * @returns {{screens: object[], cameras: object[]}}  id = index avfoundation ou chemin dshow.
  */
-function listVideoDevices() {
+function listCaptureDevices() {
     const IS_MAC = process.platform === 'darwin';
     const ARGS = IS_MAC
         ? ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '']
@@ -213,6 +216,16 @@ function listVideoDevices() {
             DEVICES.push({ id: ALT ? ALT[1] : NAME, name: NAME });
         }
     }
+    // avfoundation expose les écrans comme des périphériques vidéo : ils sont
+    // sortis de la liste des caméras et rejoignent les écrans (dev macOS).
+    const IS_SCREEN = /capture screen/i;
+    const SCREENS = IS_MAC
+        ? DEVICES.filter((d) => IS_SCREEN.test(d.name)).map((d) => ({
+              id: d.id,
+              name: d.name,
+              kind: 'screen'
+          }))
+        : [];
     // Le pipeline salle ne capte QUE des caméras VIRTUELLES (le flux du jeu via
     // OBS Virtual Camera & co) : la source doit être un rendu 1080p, pas une
     // webcam physique. Les webcams physiques sont de toute façon exclusives
@@ -220,28 +233,110 @@ function listVideoDevices() {
     // donc on les retire de la liste. Filtre par nom — à étendre si d'autres
     // logiciels de caméra virtuelle sont utilisés en salle.
     const IS_VIRTUAL = /virtual|obs|vcam|streamlabs|xsplit|manycam|\bndi\b/i;
-    return DEVICES.filter((d) => IS_VIRTUAL.test(d.name));
+    const CAMERAS = DEVICES.filter(
+        (d) => !IS_SCREEN.test(d.name) && IS_VIRTUAL.test(d.name)
+    ).map((d) => ({ id: d.id, name: d.name, kind: 'camera' }));
+    return { screens: SCREENS, cameras: CAMERAS };
+}
+
+/**
+ * Écrans capturables sous Windows. La capture passe par `ddagrab`, qui adresse
+ * les sorties par INDEX DXGI : on suppose que cet index suit l'ordre des
+ * écrans rapporté par Electron, ce qui est le cas courant mais n'est garanti
+ * par rien. Une inversion se voit immédiatement dans l'aperçu, et se corrige
+ * en choisissant l'autre entrée — d'où le libellé qui porte la résolution.
+ * @returns {{id: string, name: string, kind: string, outputIndex: number, width: number, height: number}[]}
+ */
+function listWindowsScreens() {
+    return screen.getAllDisplays().map((display, index) => {
+        // `size` est en pixels indépendants du périphérique : ddagrab capture
+        // des pixels PHYSIQUES. Sans le facteur d'échelle, un écran 1440p en
+        // affichage à 150 % serait annoncé en 1707×960 et refusé à tort.
+        const WIDTH = Math.round(display.size.width * display.scaleFactor);
+        const HEIGHT = Math.round(display.size.height * display.scaleFactor);
+        return {
+            id: String(display.id),
+            name: `Écran ${index + 1} (${WIDTH}×${HEIGHT})`,
+            kind: 'screen',
+            outputIndex: index,
+            width: WIDTH,
+            height: HEIGHT
+        };
+    });
+}
+
+/**
+ * Sources sélectionnables : écrans d'abord (la cible du mode salle depuis
+ * qu'on capte le logiciel de jeu directement), caméras virtuelles ensuite
+ * (montages existants encore en service).
+ */
+function listVideoDevices() {
+    const { screens, cameras } = listCaptureDevices();
+    const SCREENS =
+        process.platform === 'darwin' ? screens : listWindowsScreens();
+    return [...SCREENS, ...cameras];
 }
 
 function buildFfmpegArgs(device) {
     const IS_MAC = process.platform === 'darwin';
     const SPOOL = getSpoolFolder();
-    // Pas d'audio : la caméra virtuelle n'en transporte pas (à revoir sur le
-    // setup réel si le flux salle contient l'audio observer).
-    const INPUT_ARGS = IS_MAC
-        ? [
-              '-f', 'avfoundation',
-              '-framerate', String(detectedMode ? detectedMode.fps : 30),
-              ...(detectedMode
-                  ? ['-video_size', `${detectedMode.width}x${detectedMode.height}`]
-                  : []),
-              '-i', `${device.id}:none`
-          ]
-        : [
-              '-f', 'dshow',
-              '-rtbufsize', '512M',
-              '-i', `video=${device.id}`
-          ];
+    const IS_SCREEN = device.kind === 'screen';
+    // Pas d'audio : ni la caméra virtuelle ni ddagrab n'en transportent. Le son
+    // fera l'objet d'une entrée séparée (capture par processus).
+    let inputArgs;
+    if (IS_SCREEN && !IS_MAC) {
+        // Windows : Desktop Duplication côté GPU. ddagrab est une SOURCE de
+        // filtergraph, pas un format d'entrée — il n'y a donc aucun `-i`, et
+        // c'est `-filter_complex` qui produit le flux.
+        //
+        // `hwdownload` ramène les frames en RAM. C'est un coût réel (BGRA
+        // 1080p30 ≈ 240 Mo/s sur le bus) mais c'est le SEUL chemin qui marche
+        // avec les quatre encodeurs candidats. Le chemin zéro-copie vers NVENC
+        // est une optimisation à faire une fois qu'on aura mesuré sur un PC de
+        // salle — pas à deviner d'ici.
+        const FILTERS = [
+            `ddagrab=output_idx=${device.outputIndex || 0}:framerate=${OUTPUT_FPS}`,
+            'hwdownload',
+            'format=bgra'
+        ];
+        // L'analyseur travaille en coordonnées 1920×1080 absolues. Un écran
+        // plus grand est réduit ; un écran plus petit est refusé en amont
+        // (startCapture) — pas d'upscale, décision Antoine.
+        if (device.width !== 1920 || device.height !== 1080) {
+            FILTERS.push('scale=1920:1080');
+        }
+        inputArgs = [
+            '-init_hw_device', 'd3d11va',
+            '-filter_complex', `${FILTERS.join(',')}[v]`,
+            '-map', '[v]'
+        ];
+    } else if (IS_SCREEN) {
+        // macOS (dev) : avfoundation expose les écrans comme des
+        // périphériques. Pas de contrôle de format ici — sur un écran qui
+        // n'est pas en 16/9 (les portables Apple sont en 16/10), l'image sera
+        // déformée. Acceptable pour du dev, refusé sous Windows.
+        inputArgs = [
+            '-f', 'avfoundation',
+            '-framerate', String(OUTPUT_FPS),
+            '-i', `${device.id}:none`,
+            '-vf', 'scale=1920:1080'
+        ];
+    } else if (IS_MAC) {
+        inputArgs = [
+            '-f', 'avfoundation',
+            '-framerate', String(detectedMode ? detectedMode.fps : 30),
+            ...(detectedMode
+                ? ['-video_size', `${detectedMode.width}x${detectedMode.height}`]
+                : []),
+            '-i', `${device.id}:none`
+        ];
+    } else {
+        inputArgs = [
+            '-f', 'dshow',
+            '-rtbufsize', '512M',
+            '-i', `video=${device.id}`
+        ];
+    }
     const ENCODER_ARGS = resolveEncoder().args;
     // Sortie en CFR : les caméras (surtout virtuelles) livrent des timestamps
     // irréguliers qui, sans ça, produisent un temps média ≠ temps réel (fps
@@ -250,7 +345,7 @@ function buildFfmpegArgs(device) {
     // temporel du pipeline.
     return [
         '-hide_banner',
-        ...INPUT_ARGS,
+        ...inputArgs,
         ...ENCODER_ARGS,
         '-fps_mode', 'cfr',
         '-r', String(OUTPUT_FPS),
@@ -298,6 +393,38 @@ function startCapture() {
             return getStatus();
         }
         resolvedDevice = MATCH;
+    } else if (DEVICE.kind === 'screen') {
+        // L'index de sortie et la définition d'un écran changent au gré des
+        // branchements : on les relit au démarrage plutôt que de faire
+        // confiance à ce qui a été enregistré dans les settings.
+        const MATCH = listWindowsScreens().find((s) => s.id === DEVICE.id);
+        if (!MATCH) {
+            lastError = `screen_not_found: ${DEVICE.name}`;
+            console.error('[arena-capture]', lastError);
+            return getStatus();
+        }
+        resolvedDevice = MATCH;
+    }
+
+    // Pas d'upscale (décision Antoine) : un écran plus petit que 1080p ne peut
+    // pas alimenter l'analyseur, qui raisonne en coordonnées 1920×1080.
+    // Le format doit aussi être du 16/9 : réduire un écran 16/10 vers 1080p
+    // déformerait l'image, et l'ajouter en letterbox décalerait toutes les
+    // coordonnées de l'analyseur. Les deux cassent l'analyse en silence, donc
+    // on refuse plutôt que de produire des vidéos inexploitables.
+    if (resolvedDevice.kind === 'screen' && resolvedDevice.width) {
+        const { width: WIDTH, height: HEIGHT } = resolvedDevice;
+        if (WIDTH < 1920 || HEIGHT < 1080) {
+            resolutionRejected = true;
+            lastError = `not_1080p: écran ${WIDTH}x${HEIGHT} (1920x1080 minimum requis)`;
+        } else if (Math.abs(WIDTH / HEIGHT - 16 / 9) > 0.01) {
+            resolutionRejected = true;
+            lastError = `not_16_9: écran ${WIDTH}x${HEIGHT} (format 16/9 requis)`;
+        }
+        if (resolutionRejected) {
+            console.error('[arena-capture]', lastError);
+            return getStatus();
+        }
     }
 
     const ARGS = buildFfmpegArgs(resolvedDevice);
@@ -314,8 +441,10 @@ function startCapture() {
         if (stderrTail.length > 20) stderrTail.shift();
         // Contrôle strict 1080p sur la première ligne de stream vidéo (l'input
         // apparaît avant l'output dans le banner ffmpeg) : source ≠ 1920×1080
-        // → arrêt immédiat avec erreur, sans redémarrage automatique.
-        if (!resolutionChecked) {
+        // → arrêt immédiat avec erreur, sans redémarrage automatique. Sans
+        // objet pour un écran : sa définition est validée avant le démarrage,
+        // et la mise à l'échelle vers 1080p est délibérée.
+        if (!resolutionChecked && resolvedDevice.kind !== 'screen') {
             const M = LINE.match(/Video:.*?(\d{3,4})x(\d{3,4})/);
             if (M) {
                 resolutionChecked = true;
@@ -445,6 +574,8 @@ function getStatus() {
         running: !!ffmpegProcess,
         deviceId: DEVICE ? DEVICE.id : null,
         deviceName: DEVICE ? DEVICE.name : null,
+        // L'aperçu du renderer n'ouvre pas une source écran comme une caméra.
+        deviceKind: DEVICE ? DEVICE.kind || 'camera' : null,
         encoder: resolvedEncoder ? resolvedEncoder.name : null,
         startedAt,
         lastError,

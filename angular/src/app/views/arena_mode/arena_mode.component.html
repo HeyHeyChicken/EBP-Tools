@@ -22,10 +22,27 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   [ngModelOptions]="{ standalone: true }"
                   (selectionChange)="applyDevice()"
                 >
-                  @for (device of devices; track device.id) {
-                    <mat-option [value]="device.id">{{
-                      device.name
-                    }}</mat-option>
+                  @if (screenDevices.length) {
+                    <mat-optgroup
+                      [label]="'view.arena_mode.capture.screens' | translate"
+                    >
+                      @for (device of screenDevices; track device.id) {
+                        <mat-option [value]="device.id">{{
+                          device.name
+                        }}</mat-option>
+                      }
+                    </mat-optgroup>
+                  }
+                  @if (cameraDevices.length) {
+                    <mat-optgroup
+                      [label]="'view.arena_mode.capture.cameras' | translate"
+                    >
+                      @for (device of cameraDevices; track device.id) {
+                        <mat-option [value]="device.id">{{
+                          device.name
+                        }}</mat-option>
+                      }
+                    </mat-optgroup>
                   }
                 </mat-select>
               </mat-form-field>
@@ -73,6 +90,26 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   muted
                   playsinline
                 ></video>
+              }
+              <!-- Niveau du son du PC : l'aperçu image ne dit pas si la
+                   source produit du son, et une scène muette passerait
+                   inaperçue jusqu'à la relecture de la vidéo. -->
+              <div class="audio">
+                <span class="audio-label">{{
+                  'view.arena_mode.capture.audio.level' | translate
+                }}</span>
+                <div class="audio-track">
+                  <div #audioMeter class="audio-meter"></div>
+                </div>
+              </div>
+              @if (audioState === 'silent') {
+                <ebp-message state="error">
+                  {{ 'view.arena_mode.capture.audio.silent' | translate }}
+                </ebp-message>
+              } @else if (audioState === 'unavailable') {
+                <ebp-message>
+                  {{ 'view.arena_mode.capture.audio.unavailable' | translate }}
+                </ebp-message>
               }
               @if (captureStatus.running) {
                 <ebp-message state="success">

@@ -156,6 +156,8 @@
       },
       "capture": {
         "device": "Source vidéo",
+        "screens": "Écrans",
+        "cameras": "Caméras virtuelles",
         "refresh": "Rafraîchir la liste",
         "recording": "Enregistrement en cours depuis « {{device}} ». Les parties détectées seront analysées et envoyées automatiquement.",
         "stopped": "La captation est arrêtée. Sélectionnez une source vidéo puis démarrez la captation.",
@@ -164,7 +166,12 @@
         "stop": "Arrêter la captation",
         "openFolder": "Ouvrir le dossier de travail",
         "moveFolder": "Déplacer le dossier de travail",
-        "moveFolderStopFirst": "Arrêtez la captation avant de déplacer le dossier"
+        "moveFolderStopFirst": "Arrêtez la captation avant de déplacer le dossier",
+        "audio": {
+          "level": "Niveau sonore",
+          "silent": "Aucun son détecté depuis plus de 20 secondes. Vérifiez que le logiciel enregistré produit bien du son et que la sortie audio du PC n'est pas coupée.",
+          "unavailable": "Le niveau sonore ne peut pas être mesuré sur ce système."
+        }
       }
     }
   },

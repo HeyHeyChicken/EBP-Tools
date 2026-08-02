@@ -30,6 +30,14 @@ import {
 
 //#endregion
 
+/** Niveau RMS (~ -60 dBFS) sous lequel on considère qu'il n'y a pas de son. */
+const SILENCE_RMS: number = 0.001;
+/** Silence continu au-delà duquel on alerte (un blanc entre deux games est
+ * normal ; c'est l'absence durable qui signale une source muette). */
+const SILENCE_DELAY_MS: number = 20000;
+/** Période d'échantillonnage du niveau sonore. */
+const AUDIO_SAMPLE_MS: number = 200;
+
 @Component({
   selector: 'view-arena-mode',
   templateUrl: './arena_mode.component.html',
@@ -62,6 +70,9 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
   protected arenaLocked: boolean = false;
 
   protected devices: ArenaCaptureDevice[] = [];
+  /** Même liste, séparée pour les deux groupes du sélecteur. */
+  protected screenDevices: ArenaCaptureDevice[] = [];
+  protected cameraDevices: ArenaCaptureDevice[] = [];
   protected selectedDeviceId?: string;
   protected captureStatus?: ArenaCaptureStatus;
   /** Bascule start/stop en cours : désactive le bouton (anti double-clic). */
@@ -73,6 +84,25 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
   private previewStream?: MediaStream;
   /** Nom du device actuellement prévisualisé (évite de rouvrir en boucle). */
   private previewDeviceName?: string;
+
+  /**
+   * Suivi du son du PC. `ok` = rien à signaler (état neutre pendant la
+   * temporisation), `silent` = alerte, `unavailable` = plateforme sans
+   * loopback, on ne mesure rien et on le dit plutôt que de crier au loup.
+   */
+  protected audioState: 'off' | 'unavailable' | 'silent' | 'ok' = 'off';
+
+  @ViewChild('audioMeter')
+  private audioMeter?: ElementRef<HTMLDivElement>;
+  private audioStream?: MediaStream;
+  private audioContext?: AudioContext;
+  private audioAnalyser?: AnalyserNode;
+  private audioSamples?: Float32Array<ArrayBuffer>;
+  private audioTimer?: ReturnType<typeof setInterval>;
+  /** Acquisition du flux en cours (anti double-ouverture). */
+  private audioStarting: boolean = false;
+  /** Début du silence en cours (ms), sinon undefined. */
+  private silentSince?: number;
 
   //#endregion
 
@@ -131,6 +161,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     }
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.stopPreview();
+    this.stopAudioMonitor();
   }
 
   /**
@@ -143,8 +174,15 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     this.ngZone.run(() => {
       if (document.hidden) {
         this.stopPreview();
-      } else if (this.captureStatus?.deviceName) {
-        this.startPreview(this.captureStatus.deviceName);
+        this.stopAudioMonitor();
+      } else {
+        if (this.captureStatus?.deviceName) {
+          this.startPreview(
+            this.captureStatus.deviceName,
+            this.captureStatus.deviceKind ?? 'camera'
+          );
+        }
+        this.startAudioMonitor();
       }
     });
   };
@@ -154,7 +192,10 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
    * en parallèle via getUserMedia — les caméras virtuelles acceptent plusieurs
    * lecteurs. Résolution réduite : c'est un contrôle visuel, pas la captation.
    */
-  private async startPreview(deviceName: string): Promise<void> {
+  private async startPreview(
+    deviceName: string,
+    kind: 'screen' | 'camera'
+  ): Promise<void> {
     if (this.previewDeviceName === deviceName) {
       return;
     }
@@ -166,6 +207,18 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     // noircissait l'aperçu au changement de source.
     const PREVIOUS = this.previewStream;
     try {
+      if (kind === 'screen') {
+        // L'écran renvoyé est celui que le service a enregistré : le choix se
+        // fait côté main process, dans le handler getDisplayMedia. Le renderer
+        // n'a pas à manipuler d'identifiants d'affichage.
+        const SCREEN_STREAM = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: false
+        });
+        this.previewStream = SCREEN_STREAM;
+        this.attachPreview();
+        return;
+      }
       // ffmpeg/dshow renvoie le nom nu ("Logitech BRIO") tandis que Chromium
       // suffixe le label des webcams USB avec l'ID matériel ("Logitech BRIO
       // (046d:085e)"). L'égalité stricte marche pour OBS (nom identique des
@@ -252,6 +305,146 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Ouvre le son du PC en loopback et démarre la mesure de niveau. Le loopback
+   * est indépendant de la source vidéo : il dit si le logiciel enregistré
+   * produit du son, ce que l'aperçu image ne peut pas montrer.
+   */
+  private async startAudioMonitor(): Promise<void> {
+    // Le drapeau est posé AVANT l'await : deux bascules de visibilité
+    // rapprochées lanceraient sinon deux acquisitions concurrentes, dont la
+    // première resterait ouverte sans que personne ne la référence.
+    if (this.audioStream || this.audioStarting) {
+      return;
+    }
+    this.audioStarting = true;
+    try {
+      await this.acquireAudioMonitor();
+    } finally {
+      this.audioStarting = false;
+    }
+  }
+
+  private async acquireAudioMonitor(): Promise<void> {
+    let stream: MediaStream;
+    try {
+      // La vidéo n'est demandée que parce que getDisplayMedia l'impose ; le
+      // main process renvoie un écran qu'on coupe juste en dessous.
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+    } catch {
+      // Refus du handler (plateforme sans loopback) : pas une erreur.
+      this.audioState = 'unavailable';
+      return;
+    }
+    for (const TRACK of stream.getVideoTracks()) {
+      TRACK.stop();
+    }
+    const AUDIO = stream.getAudioTracks()[0];
+    if (!AUDIO) {
+      for (const TRACK of stream.getTracks()) {
+        TRACK.stop();
+      }
+      this.audioState = 'unavailable';
+      return;
+    }
+    // Périphérique de sortie qui disparaît, session audio coupée : on cesse de
+    // mesurer plutôt que d'afficher un niveau figé à zéro qui ferait croire à
+    // un silence de la source.
+    AUDIO.onended = (): void =>
+      this.ngZone.run(() => {
+        this.stopAudioMonitor();
+        this.audioState = 'unavailable';
+      });
+    this.audioStream = stream;
+    this.audioContext = new AudioContext();
+    this.audioAnalyser = this.audioContext.createAnalyser();
+    this.audioAnalyser.fftSize = 2048;
+    this.audioContext
+      .createMediaStreamSource(stream)
+      .connect(this.audioAnalyser);
+    this.audioSamples = new Float32Array(this.audioAnalyser.fftSize);
+    this.audioState = 'ok';
+    this.silentSince = undefined;
+    // Hors zone Angular : 5 échantillons/s ne doivent pas déclencher 5 cycles
+    // de détection de changements par seconde (le VU-mètre est écrit
+    // directement dans le DOM, seul le changement d'état rentre dans la zone).
+    this.ngZone.runOutsideAngular(() => {
+      this.audioTimer = setInterval(
+        () => this.sampleAudio(),
+        AUDIO_SAMPLE_MS
+      );
+    });
+  }
+
+  /** Mesure le niveau courant, met à jour le VU-mètre et l'état d'alerte. */
+  private sampleAudio(): void {
+    if (!this.audioAnalyser || !this.audioSamples) {
+      return;
+    }
+    this.audioAnalyser.getFloatTimeDomainData(this.audioSamples);
+    let sum = 0;
+    for (let i = 0; i < this.audioSamples.length; i++) {
+      sum += this.audioSamples[i] * this.audioSamples[i];
+    }
+    const RMS = Math.sqrt(sum / this.audioSamples.length);
+    if (this.audioMeter) {
+      // Échelle dBFS -60 → 0 : en linéaire, un niveau de jeu normal resterait
+      // collé au bas de la barre et le contrôle visuel ne servirait à rien.
+      const DB = 20 * Math.log10(Math.max(RMS, 1e-6));
+      const RATIO = Math.min(1, Math.max(0, (DB + 60) / 60));
+      this.audioMeter.nativeElement.style.width = `${Math.round(RATIO * 100)}%`;
+    }
+    if (RMS >= SILENCE_RMS) {
+      this.silentSince = undefined;
+      this.setAudioState('ok');
+      return;
+    }
+    const NOW = Date.now();
+    if (this.silentSince === undefined) {
+      this.silentSince = NOW;
+    } else if (NOW - this.silentSince >= SILENCE_DELAY_MS) {
+      this.setAudioState('silent');
+    }
+  }
+
+  /** Ne rentre dans la zone Angular que sur un vrai changement d'état. */
+  private setAudioState(state: 'silent' | 'ok'): void {
+    if (this.audioState === state) {
+      return;
+    }
+    this.ngZone.run(() => (this.audioState = state));
+  }
+
+  private stopAudioMonitor(): void {
+    if (this.audioTimer) {
+      clearInterval(this.audioTimer);
+      this.audioTimer = undefined;
+    }
+    if (this.audioMeter) {
+      // Sinon la barre reste figée sur la dernière valeur mesurée, ce qui se
+      // lit comme un niveau courant alors qu'on ne mesure plus rien.
+      this.audioMeter.nativeElement.style.width = '0';
+    }
+    if (this.audioStream) {
+      for (const TRACK of this.audioStream.getTracks()) {
+        TRACK.onended = null;
+        TRACK.stop();
+      }
+      this.audioStream = undefined;
+    }
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = undefined;
+    }
+    this.audioAnalyser = undefined;
+    this.audioSamples = undefined;
+    this.silentSince = undefined;
+    this.audioState = 'off';
+  }
+
   private stopPreview(): void {
     if (this.previewStream) {
       for (const TRACK of this.previewStream.getTracks()) {
@@ -280,6 +473,9 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
       );
     }
     document.addEventListener('visibilitychange', this.onVisibilityChange);
+    if (!document.hidden) {
+      this.startAudioMonitor();
+    }
   }
 
   protected refreshDevices(): void {
@@ -288,6 +484,8 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
       .then((devices: ArenaCaptureDevice[]) => {
         this.ngZone.run(() => {
           this.devices = devices;
+          this.screenDevices = devices.filter((d) => d.kind === 'screen');
+          this.cameraDevices = devices.filter((d) => d.kind === 'camera');
         });
       });
   }
@@ -305,7 +503,10 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
           // tourne ou non (choisir une source ne sert qu'à la prévisualiser),
           // mais seulement si la page est visible — sinon on laisse coupé.
           if (status.deviceName && !document.hidden) {
-            this.startPreview(status.deviceName);
+            this.startPreview(
+              status.deviceName,
+              status.deviceKind ?? 'camera'
+            );
           } else if (!status.deviceName) {
             this.stopPreview();
           }
@@ -329,7 +530,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
         this.ngZone.run(() => {
           this.captureStatus = status;
           if (!document.hidden) {
-            this.startPreview(DEVICE.name);
+            this.startPreview(DEVICE.name, DEVICE.kind);
           }
         });
       });
@@ -446,6 +647,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     window.electronAPI.arenaModeUnregister().then((state: ArenaModeState) => {
       this.ngZone.run(() => {
         this.state = state;
+        this.stopAudioMonitor();
       });
     });
   }

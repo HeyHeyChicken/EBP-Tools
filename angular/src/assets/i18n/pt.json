@@ -156,6 +156,8 @@
       },
       "capture": {
         "device": "Fonte de vídeo",
+        "screens": "Ecrãs",
+        "cameras": "Câmaras virtuais",
         "refresh": "Atualizar a lista",
         "recording": "A gravar a partir de «{{device}}». As partidas detetadas serão analisadas e enviadas automaticamente.",
         "stopped": "A captação está parada. Selecione uma fonte de vídeo e inicie a captação.",
@@ -164,7 +166,12 @@
         "stop": "Parar a captação",
         "openFolder": "Abrir a pasta de trabalho",
         "moveFolder": "Mover a pasta de trabalho",
-        "moveFolderStopFirst": "Pare a captação antes de mover a pasta"
+        "moveFolderStopFirst": "Pare a captação antes de mover a pasta",
+        "audio": {
+          "level": "Nível sonoro",
+          "silent": "Nenhum som detetado há mais de 20 segundos. Verifique se o software gravado está a produzir som e se a saída de áudio do PC não está silenciada.",
+          "unavailable": "O nível sonoro não pode ser medido neste sistema."
+        }
       }
     }
   },

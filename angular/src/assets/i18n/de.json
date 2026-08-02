@@ -156,6 +156,8 @@
       },
       "capture": {
         "device": "Videoquelle",
+        "screens": "Bildschirme",
+        "cameras": "Virtuelle Kameras",
         "refresh": "Liste aktualisieren",
         "recording": "Aufnahme läuft von „{{device}}“. Erkannte Partien werden automatisch analysiert und hochgeladen.",
         "stopped": "Die Aufnahme ist gestoppt. Wählen Sie eine Videoquelle und starten Sie die Aufnahme.",
@@ -164,7 +166,12 @@
         "stop": "Aufnahme stoppen",
         "openFolder": "Arbeitsordner öffnen",
         "moveFolder": "Arbeitsordner verschieben",
-        "moveFolderStopFirst": "Stoppen Sie die Aufnahme, bevor Sie den Ordner verschieben"
+        "moveFolderStopFirst": "Stoppen Sie die Aufnahme, bevor Sie den Ordner verschieben",
+        "audio": {
+          "level": "Tonpegel",
+          "silent": "Seit über 20 Sekunden kein Ton erkannt. Prüfen Sie, ob die aufgezeichnete Software tatsächlich Ton ausgibt und die Audioausgabe des PCs nicht stummgeschaltet ist.",
+          "unavailable": "Der Tonpegel kann auf diesem System nicht gemessen werden."
+        }
       }
     }
   },

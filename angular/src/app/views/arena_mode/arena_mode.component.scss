@@ -19,6 +19,31 @@ form {
   gap: variables.$margin;
 }
 
+// VU-mètre du son du PC (contrôle sonore, pendant de l'aperçu image).
+.audio {
+  display: flex;
+  align-items: center;
+  gap: variables.$margin;
+}
+
+.audio-label {
+  font-size: variables.$font_size;
+  white-space: nowrap;
+}
+
+.audio-track {
+  flex: 1;
+  height: 8px;
+  background-color: black;
+  border: 1px solid variables.$border_color;
+}
+
+.audio-meter {
+  height: 100%;
+  width: 0;
+  background-color: variables.$main_color;
+}
+
 // Aperçu live de la source capturée (contrôle visuel).
 .preview {
   width: 100%;

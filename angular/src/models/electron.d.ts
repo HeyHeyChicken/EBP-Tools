@@ -63,12 +63,18 @@ export interface ArenaModeState {
 export interface ArenaCaptureDevice {
   id: string;
   name: string;
+  kind: 'screen' | 'camera';
+  /** Écrans Windows uniquement : index de sortie DXGI passé à ddagrab. */
+  outputIndex?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface ArenaCaptureStatus {
   running: boolean;
   deviceId: string | null;
   deviceName: string | null;
+  deviceKind: 'screen' | 'camera' | null;
   encoder: string | null;
   startedAt: number | null;
   lastError: string | null;
