@@ -11,6 +11,7 @@ const { spawn, spawnSync } = require('child_process');
 const { screen } = require('electron');
 const { FFMPEG_PATH } = require('../config/constants');
 const StorageManager = require('../core/storage-manager');
+const arenaAudioService = require('./arena-audio-service');
 
 //#endregion
 
@@ -284,6 +285,24 @@ function buildFfmpegArgs(device) {
     // Pas d'audio : ni la caméra virtuelle ni ddagrab n'en transportent. Le son
     // fera l'objet d'une entrée séparée (capture par processus).
     const ENCODER = resolveEncoder();
+    // Le son n'existe que sur le chemin écran de Windows : le loopback est une
+    // API Windows, et le chemin caméra est transitoire (montages existants) —
+    // on ne touche pas à sa ligne de commande, qui fonctionne.
+    const WITH_AUDIO = IS_SCREEN && process.platform === 'win32';
+    // Entrée audio EN PREMIER : la vidéo du chemin écran vient d'un
+    // filtergraph sans `-i`, donc le tube est l'entrée 0 et `-map 0:a` est
+    // stable quel que soit l'encodeur retenu.
+    const AUDIO_INPUT = WITH_AUDIO
+        ? [
+              '-f', 's16le',
+              '-ar', String(arenaAudioService.SAMPLE_RATE),
+              '-ac', String(arenaAudioService.CHANNELS),
+              '-i', arenaAudioService.getPipePath()
+          ]
+        : [];
+    const AUDIO_OUTPUT = WITH_AUDIO
+        ? ['-map', '0:a', '-c:a', 'aac', '-b:a', '128k']
+        : [];
     let inputArgs;
     // Images matérielles : `-pix_fmt` n'a pas de sens dessus, c'est l'encodeur
     // qui convertit. Renseigné par les branches logicielles uniquement.
@@ -375,7 +394,9 @@ function buildFfmpegArgs(device) {
     // temporel du pipeline.
     return [
         '-hide_banner',
+        ...AUDIO_INPUT,
         ...inputArgs,
+        ...AUDIO_OUTPUT,
         ...ENCODER_ARGS,
         '-fps_mode', 'cfr',
         '-r', String(OUTPUT_FPS),
@@ -455,6 +476,11 @@ function startCapture() {
             console.error('[arena-capture]', lastError);
             return getStatus();
         }
+    }
+
+    // Le tube doit écouter AVANT que ffmpeg tente de l'ouvrir.
+    if (resolvedDevice.kind === 'screen' && process.platform === 'win32') {
+        arenaAudioService.start();
     }
 
     const ARGS = buildFfmpegArgs(resolvedDevice);
@@ -557,6 +583,7 @@ function startCapture() {
  */
 function stopCapture() {
     stopRequested = true;
+    arenaAudioService.stop();
     if (restartTimer) {
         clearTimeout(restartTimer);
         restartTimer = null;
@@ -607,6 +634,8 @@ function getStatus() {
         deviceName: DEVICE ? DEVICE.name : null,
         // L'aperçu du renderer n'ouvre pas une source écran comme une caméra.
         deviceKind: DEVICE ? DEVICE.kind || 'camera' : null,
+        // Le renderer n'envoie du PCM que si le tube attend réellement du son.
+        audio: arenaAudioService.getStatus(),
         encoder: resolvedEncoder ? resolvedEncoder.name : null,
         startedAt,
         lastError,

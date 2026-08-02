@@ -80,6 +80,13 @@ export interface ArenaCaptureStatus {
   lastError: string | null;
   spoolFolder: string;
   segmentSeconds: number;
+  audio: {
+    running: boolean;
+    connected: boolean;
+    receivedBytes: number;
+    sampleRate: number;
+    channels: number;
+  };
 }
 
 export interface ElectronAPI {
@@ -166,6 +173,7 @@ export interface ElectronAPI {
   ) => Promise<ArenaCaptureStatus>;
   arenaCaptureStart: () => Promise<ArenaCaptureStatus>;
   arenaCaptureStop: () => Promise<ArenaCaptureStatus>;
+  arenaAudioSendChunk: (chunk: Uint8Array) => void;
   arenaOpenFolder: () => Promise<void>;
   arenaMoveFolder: () => Promise<{
     success: boolean;

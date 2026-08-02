@@ -199,6 +199,10 @@ function createWindow(updateService) {
         resizable: false,
         contextIsolation: true,
         webPreferences: {
+            // Le renderer produit la piste audio de la captation : Chromium
+            // ralentit les fenêtres masquées, ce qui hacherait le son dès que
+            // l'opérateur réduit Tools dans la barre des tâches.
+            backgroundThrottling: false,
             preload: IS_DEV_MODE
                 ? path.join(__dirname, '..', 'preload.js')
                 : MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY

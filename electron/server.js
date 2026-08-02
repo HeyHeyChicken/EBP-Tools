@@ -74,6 +74,7 @@ const denoService = require('./services/deno-service');
 const watchFolderService = require('./services/watch-folder-service');
 const arenaModeService = require('./services/arena-mode-service');
 const arenaCaptureService = require('./services/arena-capture-service');
+const arenaAudioService = require('./services/arena-audio-service');
 const arenaPipelineService = require('./services/arena-pipeline-service');
 const arenaUploaderService = require('./services/arena-uploader-service');
 // Poller EVA et identification des games (mode salle) : ces deux services se
@@ -2629,6 +2630,11 @@ if (!APP_GOT_THE_LOCK) {
         });
         ipcMain.handle('arena-capture-stop', () => {
             return arenaCaptureService.stopCapture();
+        });
+
+        // The front-end streams loopback PCM for the arena capture soundtrack.
+        ipcMain.on('arena-audio-chunk', (event, chunk) => {
+            arenaAudioService.writeChunk(chunk);
         });
 
         // The front-end asks the server to save the current language.

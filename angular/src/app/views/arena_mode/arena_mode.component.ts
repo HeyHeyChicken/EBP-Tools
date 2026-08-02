@@ -37,6 +37,8 @@ const SILENCE_RMS: number = 0.001;
 const SILENCE_DELAY_MS: number = 20000;
 /** Période d'échantillonnage du niveau sonore. */
 const AUDIO_SAMPLE_MS: number = 200;
+/** Doit rester aligné sur ce que ffmpeg lit sur le tube (arena-audio-service). */
+const AUDIO_SAMPLE_RATE: number = 48000;
 
 @Component({
   selector: 'view-arena-mode',
@@ -97,6 +99,8 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
   private audioStream?: MediaStream;
   private audioContext?: AudioContext;
   private audioAnalyser?: AnalyserNode;
+  private audioProcessor?: ScriptProcessorNode;
+  private audioMute?: GainNode;
   private audioSamples?: Float32Array<ArrayBuffer>;
   private audioTimer?: ReturnType<typeof setInterval>;
   /** Acquisition du flux en cours (anti double-ouverture). */
@@ -359,13 +363,35 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
         this.audioState = 'unavailable';
       });
     this.audioStream = stream;
-    this.audioContext = new AudioContext();
+    // Fréquence imposée : le matériel peut tourner en 44,1 kHz, et ffmpeg lit
+    // le tube en 48 kHz en aveugle — un écart se traduirait par un son plus
+    // lent ou plus rapide dans les vidéos. Chromium rééchantillonne pour nous.
+    this.audioContext = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
+    const SOURCE = this.audioContext.createMediaStreamSource(stream);
     this.audioAnalyser = this.audioContext.createAnalyser();
     this.audioAnalyser.fftSize = 2048;
-    this.audioContext
-      .createMediaStreamSource(stream)
-      .connect(this.audioAnalyser);
+    SOURCE.connect(this.audioAnalyser);
     this.audioSamples = new Float32Array(this.audioAnalyser.fftSize);
+
+    // Extraction du PCM pour la bande son de la captation. ScriptProcessorNode
+    // est déprécié mais reste le seul moyen d'obtenir les échantillons sans
+    // charger un AudioWorklet depuis une URL — inutilement compliqué ici.
+    const PROCESSOR = this.audioContext.createScriptProcessor(4096, 2, 2);
+    SOURCE.connect(PROCESSOR);
+    // Un ScriptProcessorNode ne se déclenche QUE s'il aboutit à la sortie. On
+    // passe donc par un gain nul : le nœud tourne, et rien n'est joué — sinon
+    // le PC réémettrait le son capté et le loopback le recapterait en boucle.
+    const MUTE = this.audioContext.createGain();
+    MUTE.gain.value = 0;
+    PROCESSOR.connect(MUTE);
+    MUTE.connect(this.audioContext.destination);
+    PROCESSOR.onaudioprocess = (event: AudioProcessingEvent): void => {
+      window.electronAPI.arenaAudioSendChunk(
+        this.toInterleavedPcm(event.inputBuffer)
+      );
+    };
+    this.audioProcessor = PROCESSOR;
+    this.audioMute = MUTE;
     this.audioState = 'ok';
     this.silentSince = undefined;
     // Hors zone Angular : 5 échantillons/s ne doivent pas déclencher 5 cycles
@@ -410,6 +436,27 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Float32 par canal → s16le entrelacé, le format que ffmpeg lit sur le tube.
+   * Mono en entrée (source à un seul canal) : on duplique, la piste reste
+   * stéréo et le débit attendu par le cadencement côté main process est tenu.
+   */
+  private toInterleavedPcm(buffer: AudioBuffer): Uint8Array {
+    const LEFT = buffer.getChannelData(0);
+    const RIGHT =
+      buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : LEFT;
+    const OUT = new Int16Array(buffer.length * 2);
+    for (let i = 0; i < buffer.length; i++) {
+      // Écrêtage avant conversion : au-delà de ±1 le cast déborderait et
+      // produirait un craquement au lieu d'une saturation propre.
+      const L = Math.max(-1, Math.min(1, LEFT[i]));
+      const R = Math.max(-1, Math.min(1, RIGHT[i]));
+      OUT[i * 2] = L < 0 ? L * 0x8000 : L * 0x7fff;
+      OUT[i * 2 + 1] = R < 0 ? R * 0x8000 : R * 0x7fff;
+    }
+    return new Uint8Array(OUT.buffer);
+  }
+
   /** Ne rentre dans la zone Angular que sur un vrai changement d'état. */
   private setAudioState(state: 'silent' | 'ok'): void {
     if (this.audioState === state) {
@@ -434,6 +481,17 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
         TRACK.stop();
       }
       this.audioStream = undefined;
+    }
+    if (this.audioProcessor) {
+      // Le handler garde une référence au composant : sans ce détachement, le
+      // nœud continuerait d'émettre du PCM après la fermeture du contexte.
+      this.audioProcessor.onaudioprocess = null;
+      this.audioProcessor.disconnect();
+      this.audioProcessor = undefined;
+    }
+    if (this.audioMute) {
+      this.audioMute.disconnect();
+      this.audioMute = undefined;
     }
     if (this.audioContext) {
       this.audioContext.close();
