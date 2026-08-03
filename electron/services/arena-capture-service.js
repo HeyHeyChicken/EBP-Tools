@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('child_process');
-const { screen } = require('electron');
+const { screen, desktopCapturer } = require('electron');
 const { FFMPEG_PATH } = require('../config/constants');
 const StorageManager = require('../core/storage-manager');
 const arenaAudioService = require('./arena-audio-service');
@@ -241,27 +241,51 @@ function listCaptureDevices() {
 }
 
 /**
- * Écrans capturables sous Windows. La capture passe par `ddagrab`, qui adresse
- * les sorties par INDEX DXGI : on suppose que cet index suit l'ordre des
- * écrans rapporté par Electron, ce qui est le cas courant mais n'est garanti
- * par rien. Une inversion se voit immédiatement dans l'aperçu, et se corrige
- * en choisissant l'autre entrée — d'où le libellé qui porte la résolution.
- * @returns {{id: string, name: string, kind: string, outputIndex: number, width: number, height: number}[]}
+ * Définition PHYSIQUE d'un écran. `size` est en pixels indépendants du
+ * périphérique alors que ddagrab capture des pixels réels : sans le facteur
+ * d'échelle, un écran 1440p affiché à 150 % serait annoncé en 1707×960 et
+ * refusé à tort.
  */
-function listWindowsScreens() {
-    return screen.getAllDisplays().map((display, index) => {
-        // `size` est en pixels indépendants du périphérique : ddagrab capture
-        // des pixels PHYSIQUES. Sans le facteur d'échelle, un écran 1440p en
-        // affichage à 150 % serait annoncé en 1707×960 et refusé à tort.
-        const WIDTH = Math.round(display.size.width * display.scaleFactor);
-        const HEIGHT = Math.round(display.size.height * display.scaleFactor);
+function screenGeometry(display) {
+    return {
+        width: Math.round(display.size.width * display.scaleFactor),
+        height: Math.round(display.size.height * display.scaleFactor)
+    };
+}
+
+/**
+ * Écrans capturables sous Windows, construits à partir des sources
+ * desktopCapturer.
+ *
+ * L'index passé à ddagrab vient de l'IDENTIFIANT de source (`screen:N:0`), pas
+ * de la position dans la liste Electron : Windows n'énumère pas les écrans
+ * dans l'ordre où il les numérote. Sur un poste à trois écrans, « Écran 2 »
+ * portait l'identifiant `screen:0:0` alors qu'il occupait la position 1 —
+ * capturer l'index 1 revenait à enregistrer l'Écran 3.
+ *
+ * Le libellé reprend le nom donné par le système, celui que l'utilisateur voit
+ * dans les paramètres d'affichage Windows.
+ * @returns {Promise<object[]>}
+ */
+async function listWindowsScreens() {
+    const SOURCES = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: 0, height: 0 }
+    });
+    const DISPLAYS = screen.getAllDisplays();
+    return SOURCES.map((source, position) => {
+        const MATCH = DISPLAYS.find((d) => String(d.id) === source.display_id);
+        const GEOMETRY = MATCH ? screenGeometry(MATCH) : {};
+        const PARSED = /^screen:(\d+):/.exec(source.id);
         return {
-            id: String(display.id),
-            name: `Écran ${index + 1} (${WIDTH}×${HEIGHT})`,
+            id: source.display_id || source.id,
+            name: GEOMETRY.width
+                ? `${source.name} (${GEOMETRY.width}×${GEOMETRY.height})`
+                : source.name,
             kind: 'screen',
-            outputIndex: index,
-            width: WIDTH,
-            height: HEIGHT
+            outputIndex: PARSED ? Number(PARSED[1]) : position,
+            sourceId: source.id,
+            ...GEOMETRY
         };
     });
 }
@@ -271,10 +295,10 @@ function listWindowsScreens() {
  * qu'on capte le logiciel de jeu directement), caméras virtuelles ensuite
  * (montages existants encore en service).
  */
-function listVideoDevices() {
+async function listVideoDevices() {
     const { screens, cameras } = listCaptureDevices();
     const SCREENS =
-        process.platform === 'darwin' ? screens : listWindowsScreens();
+        process.platform === 'darwin' ? screens : await listWindowsScreens();
     return [...SCREENS, ...cameras];
 }
 
@@ -437,7 +461,10 @@ function startCapture() {
     // chaque démarrage. Windows/dshow adresse déjà par nom, rien à faire.
     let resolvedDevice = DEVICE;
     if (process.platform === 'darwin') {
-        const MATCH = listVideoDevices().find((d) => d.name === DEVICE.name);
+        const { screens, cameras } = listCaptureDevices();
+        const MATCH = [...screens, ...cameras].find(
+            (d) => d.name === DEVICE.name
+        );
         if (!MATCH) {
             lastError = `device_not_found: ${DEVICE.name}`;
             console.error('[arena-capture]', lastError);
@@ -445,16 +472,19 @@ function startCapture() {
         }
         resolvedDevice = MATCH;
     } else if (DEVICE.kind === 'screen') {
-        // L'index de sortie et la définition d'un écran changent au gré des
-        // branchements : on les relit au démarrage plutôt que de faire
-        // confiance à ce qui a été enregistré dans les settings.
-        const MATCH = listWindowsScreens().find((s) => s.id === DEVICE.id);
+        // La définition d'un écran change au gré des branchements : on la
+        // relit au démarrage. L'index de sortie, lui, vient de l'énumération
+        // desktopCapturer (asynchrone) : on garde celui qui a été enregistré
+        // au moment du choix, et l'écran disparu est refusé net.
+        const MATCH = screen
+            .getAllDisplays()
+            .find((d) => String(d.id) === DEVICE.id);
         if (!MATCH) {
             lastError = `screen_not_found: ${DEVICE.name}`;
             console.error('[arena-capture]', lastError);
             return getStatus();
         }
-        resolvedDevice = MATCH;
+        resolvedDevice = { ...DEVICE, ...screenGeometry(MATCH) };
     }
 
     // Pas d'upscale (décision Antoine) : un écran plus petit que 1080p ne peut
@@ -634,6 +664,8 @@ function getStatus() {
         deviceName: DEVICE ? DEVICE.name : null,
         // L'aperçu du renderer n'ouvre pas une source écran comme une caméra.
         deviceKind: DEVICE ? DEVICE.kind || 'camera' : null,
+        // Identifiant exact de la source d'aperçu, retenu au moment du choix.
+        deviceSourceId: DEVICE ? DEVICE.sourceId || null : null,
         // Le renderer n'envoie du PCM que si le tube attend réellement du son.
         audio: arenaAudioService.getStatus(),
         encoder: resolvedEncoder ? resolvedEncoder.name : null,

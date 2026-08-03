@@ -240,29 +240,20 @@ function createWindow(updateService) {
                     }
                     // Aperçu : l'écran sélectionné pour la captation.
                     const STATUS = arenaCaptureService.getStatus();
-                    let match = sources.find(
-                        (s) => s.display_id && s.display_id === STATUS.deviceId
-                    );
-                    if (!match) {
-                        // `display_id` est censé valoir l'id de l'écran
-                        // Electron, mais il revient VIDE sur plusieurs
-                        // versions Windows — l'aperçu tombait alors sur le
-                        // premier écran venu. On se rabat sur l'INDEX
-                        // d'écran : c'est celui que ddagrab utilise, et
-                        // l'enregistrement prouve qu'il désigne le bon.
-                        const INDEX = screen
-                            .getAllDisplays()
-                            .findIndex((d) => String(d.id) === STATUS.deviceId);
-                        if (INDEX >= 0 && INDEX < sources.length) {
-                            match = sources[INDEX];
-                        }
-                    }
+                    // L'identifiant de source est retenu au moment du choix :
+                    // c'est la correspondance exacte. `display_id` ne sert que
+                    // de secours si les sources ont été réénumérées depuis.
+                    const MATCH =
+                        sources.find((s) => s.id === STATUS.deviceSourceId) ||
+                        sources.find(
+                            (s) =>
+                                s.display_id &&
+                                s.display_id === STATUS.deviceId
+                        );
                     console.log(
-                        `[arena-preview] deviceId=${STATUS.deviceId} → ${match ? match.id : 'aucune'} ; sources: ${sources
-                            .map((s) => `${s.id}|display_id="${s.display_id}"|${s.name}`)
-                            .join(' , ')}`
+                        `[arena-preview] source=${STATUS.deviceSourceId} → ${MATCH ? MATCH.id : 'aucune'}`
                     );
-                    callback({ video: match || sources[0] });
+                    callback({ video: MATCH || sources[0] });
                 })
                 .catch(() => callback({}));
         }
