@@ -172,13 +172,16 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
    * L'aperçu ne consomme le flux caméra que lorsqu'il est visible : fenêtre
    * minimisée ou masquée → on coupe (un PC de salle peut rester des heures sur
    * cette page). Au retour, on relance aussitôt sur la source courante plutôt
-   * que d'attendre le prochain poll de statut.
+   * que d'attendre le prochain poll de statut. La capture audio, elle, ne suit
+   * PAS la visibilité — elle fait partie de l'enregistrement.
    */
   private readonly onVisibilityChange = (): void => {
     this.ngZone.run(() => {
       if (document.hidden) {
+        // L'APERÇU seul est suspendu. Le moniteur audio, lui, alimente la
+        // piste son de la captation : le couper quand l'opérateur réduit
+        // Tools dans la barre des tâches enregistrerait du silence.
         this.stopPreview();
-        this.stopAudioMonitor();
       } else {
         if (this.captureStatus?.deviceName) {
           this.startPreview(this.captureStatus.deviceName);
