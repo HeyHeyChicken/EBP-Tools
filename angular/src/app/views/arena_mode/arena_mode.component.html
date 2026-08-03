@@ -27,12 +27,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
                       [label]="'view.arena_mode.capture.screens' | translate"
                     >
                       @for (device of screenDevices; track device.id) {
-                        <mat-option [value]="device.id">
-                          @if (device.thumbnail) {
-                            <img class="option-thumb" [src]="device.thumbnail" />
-                          }
-                          {{ device.name }}
-                        </mat-option>
+                        <mat-option [value]="device.id">{{
+                          device.name
+                        }}</mat-option>
                       }
                     </mat-optgroup>
                   }

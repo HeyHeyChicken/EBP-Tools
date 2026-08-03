@@ -52,14 +52,3 @@ form {
   border: 1px solid variables.$border_color;
   box-sizing: border-box;
 }
-
-// Vignette d'une sortie ddagrab dans le sélecteur : c'est elle qui identifie
-// l'écran, la numérotation ne correspondant à aucune autre du système.
-.option-thumb {
-  height: 32px;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  vertical-align: middle;
-  margin-right: variables.$margin;
-  border: 1px solid variables.$border_color;
-}

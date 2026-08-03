@@ -64,7 +64,8 @@ export interface ArenaCaptureDevice {
   id: string;
   name: string;
   kind: 'screen' | 'camera';
-  /** Écrans Windows uniquement : index de sortie DXGI passé à ddagrab. */
+  /** Écrans Windows uniquement : adaptateur et sortie DXGI pour ddagrab. */
+  adapter?: number;
   outputIndex?: number;
   /** Écrans Windows uniquement : image captée par ddagrab, sert d'aperçu. */
   thumbnail?: string | null;

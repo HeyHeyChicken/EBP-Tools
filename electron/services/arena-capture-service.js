@@ -97,6 +97,8 @@ function resolveEncoder() {
 // images excédentaires à l'encodage : à bitrate égal, 30 fps = plus de qualité
 // par image (meilleur OCR) et moitié moins de charge encodeur.
 const OUTPUT_FPS = 30;
+// Adaptateurs graphiques sondés à la recherche de sorties capturables.
+const MAX_ADAPTERS = 4;
 const RESTART_BASE_DELAY_MS = 5 * 1000;
 const RESTART_MAX_DELAY_MS = 60 * 1000;
 
@@ -173,7 +175,8 @@ function setDevice(device) {
     // reste en mémoire, elle n'a rien à faire dans les réglages permanents.
     const { thumbnail, ...STORED } = device || {};
     if (thumbnail && typeof STORED.outputIndex === 'number') {
-        screenThumbnails[STORED.outputIndex] = thumbnail;
+        screenThumbnails[`${STORED.adapter || 0}-${STORED.outputIndex}`] =
+            thumbnail;
     }
     StorageManager.setPermanentSettingsValue(SETTINGS_KEY_DEVICE, STORED);
 }
@@ -250,6 +253,14 @@ function listCaptureDevices() {
 }
 
 /**
+ * Sélecteur d'adaptateur graphique pour ddagrab. L'adaptateur 0 garde la forme
+ * courte, celle qui est éprouvée en captation.
+ */
+function hwDeviceArg(adapter) {
+    return adapter ? `d3d11va:${adapter}` : 'd3d11va';
+}
+
+/**
  * Capture une image sur une sortie ddagrab donnée.
  *
  * C'est la seule façon FIABLE de savoir ce qu'un index de sortie désigne.
@@ -261,15 +272,15 @@ function listCaptureDevices() {
  *
  * @returns {Promise<{outputIndex: number, width: number, height: number, thumbnail: string|null}|null>}
  */
-function probeScreenOutput(outputIndex) {
+function probeScreenOutput(adapter, outputIndex) {
     return new Promise((resolve) => {
         const OUT = path.join(
             os.tmpdir(),
-            `ebp-arena-screen-${outputIndex}.jpg`
+            `ebp-arena-screen-${adapter}-${outputIndex}.jpg`
         );
         const PROC = spawn(FFMPEG_PATH, [
             '-hide_banner', '-y',
-            '-init_hw_device', 'd3d11va',
+            '-init_hw_device', hwDeviceArg(adapter),
             '-filter_complex',
             `ddagrab=output_idx=${outputIndex}:framerate=30,hwdownload,format=bgra,format=yuv420p[v]`,
             '-map', '[v]',
@@ -287,6 +298,11 @@ function probeScreenOutput(outputIndex) {
         PROC.on('close', (code) => {
             clearTimeout(TIMEOUT);
             if (code !== 0 || !fs.existsSync(OUT)) {
+                // Sans ce log, une sortie manquante dans la liste est
+                // inexplicable : c'est ici que ffmpeg dit pourquoi.
+                console.log(
+                    `[arena-capture] probe adapter ${adapter} output ${outputIndex} failed: ${(stderr.trim().split('\n').pop() || '').trim()}`
+                );
                 resolve(null);
                 return;
             }
@@ -304,6 +320,7 @@ function probeScreenOutput(outputIndex) {
                 console.error('[arena-capture] thumbnail read failed:', e.message);
             }
             resolve({
+                adapter,
                 outputIndex,
                 width: MATCH ? Number(MATCH[1]) : 0,
                 height: MATCH ? Number(MATCH[2]) : 0,
@@ -320,20 +337,37 @@ function probeScreenOutput(outputIndex) {
  * @returns {Promise<object[]>}
  */
 async function listWindowsScreens() {
-    const COUNT = Math.max(1, screen.getAllDisplays().length);
-    const PROBES = await Promise.all(
-        Array.from({ length: COUNT }, (unused, i) => probeScreenOutput(i))
-    );
+    const EXPECTED = Math.max(1, screen.getAllDisplays().length);
+    // Balayage séquentiel (adaptateur, sortie). Les sorties d'un adaptateur
+    // sont contiguës : au premier échec on passe à l'adaptateur suivant. Deux
+    // écrans peuvent très bien être sur la carte graphique et un troisième sur
+    // la sortie de la carte mère — ils ne partagent alors aucune numérotation.
+    const PROBES = [];
+    for (let adapter = 0; adapter < MAX_ADAPTERS; adapter++) {
+        for (let output = 0; output < EXPECTED; output++) {
+            const PROBE = await probeScreenOutput(adapter, output);
+            if (!PROBE) break;
+            PROBES.push(PROBE);
+        }
+        if (PROBES.length >= EXPECTED) break;
+    }
+    if (PROBES.length < EXPECTED) {
+        console.log(
+            `[arena-capture] ${PROBES.length} sortie(s) captable(s) pour ${EXPECTED} écran(s)`
+        );
+    }
     screenThumbnails = {};
-    return PROBES.filter(Boolean).map((probe) => {
-        screenThumbnails[probe.outputIndex] = probe.thumbnail;
+    return PROBES.map((probe, position) => {
+        screenThumbnails[`${probe.adapter}-${probe.outputIndex}`] =
+            probe.thumbnail;
         return {
             // Numérotation volontairement distincte de celle de Windows :
             // elle ne correspond pas, et prétendre le contraire a déjà coûté
             // assez cher. C'est la vignette qui identifie l'écran.
-            id: `ddagrab-${probe.outputIndex}`,
-            name: `Sortie ${probe.outputIndex + 1} (${probe.width}×${probe.height})`,
+            id: `ddagrab-${probe.adapter}-${probe.outputIndex}`,
+            name: `Sortie ${position + 1} (${probe.width}×${probe.height})`,
             kind: 'screen',
+            adapter: probe.adapter,
             outputIndex: probe.outputIndex,
             width: probe.width,
             height: probe.height,
@@ -400,7 +434,7 @@ function buildFfmpegArgs(device) {
             FILTERS.push('hwmap=derive_device=cuda', 'scale_cuda=1920:1080');
         }
         inputArgs = [
-            '-init_hw_device', 'd3d11va',
+            '-init_hw_device', hwDeviceArg(device.adapter),
             '-filter_complex', `${FILTERS.join(',')}[v]`,
             '-map', '[v]'
         ];
@@ -526,7 +560,7 @@ function startCapture() {
     } else if (
         DEVICE.kind === 'screen' &&
         (typeof DEVICE.outputIndex !== 'number' ||
-            !String(DEVICE.id).startsWith('ddagrab-'))
+            typeof DEVICE.adapter !== 'number')
     ) {
         // Source enregistrée par une version antérieure : son index de sortie
         // était déduit d'une autre énumération, donc faux. Démarrer dessus
@@ -718,7 +752,8 @@ function getStatus() {
         // image — captée par ddagrab, donc fidèle à ce qui est enregistré.
         deviceThumbnail:
             DEVICE && DEVICE.kind === 'screen'
-                ? screenThumbnails[DEVICE.outputIndex] || null
+                ? screenThumbnails[`${DEVICE.adapter || 0}-${DEVICE.outputIndex}`] ||
+                  null
                 : null,
         // Le renderer n'envoie du PCM que si le tube attend réellement du son.
         audio: arenaAudioService.getStatus(),
