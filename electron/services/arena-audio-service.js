@@ -79,6 +79,12 @@ function start() {
         // l'ancienne socket au profit de la nouvelle.
         if (client) client.destroy();
         client = socket;
+        // Chaque connexion est un NOUVEAU run de ffmpeg, avec sa propre
+        // origine temporelle : on désarme, sinon `pacedFrom` reste celui du
+        // run précédent et le premier tick déverse d'un coup tout le temps
+        // écoulé depuis — soit plusieurs secondes de son collées au début.
+        pacing = false;
+        resetPacing();
         socket.on('error', () => {});
         socket.on('close', () => {
             if (client === socket) client = null;

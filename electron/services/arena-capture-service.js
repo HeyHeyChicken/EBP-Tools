@@ -635,6 +635,12 @@ function startCapture() {
             const FRAME = /frame=\s*(\d+)/.exec(LINE);
             if (FRAME && Number(FRAME[1]) > 0) {
                 firstFrameSeen = true;
+                // Ce délai EST le décalage que le son subirait sans armement :
+                // il mesure le temps que ffmpeg met à sortir sa première
+                // image. À comparer au décalage constaté dans le fichier.
+                console.log(
+                    `[arena-capture] first frame after ${Date.now() - startedAt}ms`
+                );
                 arenaAudioService.beginPacing();
             }
         }
