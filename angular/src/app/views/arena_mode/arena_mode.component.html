@@ -27,9 +27,12 @@ See LICENSE for terms. Unauthorized use is prohibited.
                       [label]="'view.arena_mode.capture.screens' | translate"
                     >
                       @for (device of screenDevices; track device.id) {
-                        <mat-option [value]="device.id">{{
-                          device.name
-                        }}</mat-option>
+                        <mat-option [value]="device.id">
+                          @if (device.thumbnail) {
+                            <img class="option-thumb" [src]="device.thumbnail" />
+                          }
+                          {{ device.name }}
+                        </mat-option>
                       }
                     </mat-optgroup>
                   }
@@ -82,7 +85,13 @@ See LICENSE for terms. Unauthorized use is prohibited.
               </button>
             </div>
             @if (captureStatus) {
-              @if (captureStatus.deviceId) {
+              @if (captureStatus.deviceKind === 'screen') {
+                <!-- Aperçu d'un écran : l'image vient de ddagrab, exactement
+                     comme l'enregistrement. Fixe, rafraîchie avec la liste. -->
+                @if (captureStatus.deviceThumbnail) {
+                  <img class="preview" [src]="captureStatus.deviceThumbnail" />
+                }
+              } @else if (captureStatus.deviceId) {
                 <video
                   #previewVideo
                   class="preview"

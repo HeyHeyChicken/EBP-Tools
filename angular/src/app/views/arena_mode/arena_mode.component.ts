@@ -181,10 +181,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
         this.stopAudioMonitor();
       } else {
         if (this.captureStatus?.deviceName) {
-          this.startPreview(
-            this.captureStatus.deviceName,
-            this.captureStatus.deviceKind ?? 'camera'
-          );
+          this.startPreview(this.captureStatus.deviceName);
         }
         this.startAudioMonitor();
       }
@@ -196,11 +193,13 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
    * en parallèle via getUserMedia — les caméras virtuelles acceptent plusieurs
    * lecteurs. Résolution réduite : c'est un contrôle visuel, pas la captation.
    */
-  private async startPreview(
-    deviceName: string,
-    kind: 'screen' | 'camera'
-  ): Promise<void> {
-    if (this.previewDeviceName === deviceName) {
+  private async startPreview(deviceName: string): Promise<void> {
+    // Les sources écran n'ont pas d'aperçu live : leur vignette ddagrab, elle,
+    // montre vraiment ce qui sera enregistré.
+    if (
+      this.previewDeviceName === deviceName ||
+      this.captureStatus?.deviceKind === 'screen'
+    ) {
       return;
     }
     this.previewDeviceName = deviceName;
@@ -211,18 +210,6 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
     // noircissait l'aperçu au changement de source.
     const PREVIOUS = this.previewStream;
     try {
-      if (kind === 'screen') {
-        // L'écran renvoyé est celui que le service a enregistré : le choix se
-        // fait côté main process, dans le handler getDisplayMedia. Le renderer
-        // n'a pas à manipuler d'identifiants d'affichage.
-        const SCREEN_STREAM = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: false
-        });
-        this.previewStream = SCREEN_STREAM;
-        this.attachPreview();
-        return;
-      }
       // ffmpeg/dshow renvoie le nom nu ("Logitech BRIO") tandis que Chromium
       // suffixe le label des webcams USB avec l'ID matériel ("Logitech BRIO
       // (046d:085e)"). L'égalité stricte marche pour OBS (nom identique des
@@ -561,10 +548,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
           // tourne ou non (choisir une source ne sert qu'à la prévisualiser),
           // mais seulement si la page est visible — sinon on laisse coupé.
           if (status.deviceName && !document.hidden) {
-            this.startPreview(
-              status.deviceName,
-              status.deviceKind ?? 'camera'
-            );
+            this.startPreview(status.deviceName);
           } else if (!status.deviceName) {
             this.stopPreview();
           }
@@ -588,7 +572,7 @@ export class ArenaModeComponent implements OnInit, OnDestroy {
         this.ngZone.run(() => {
           this.captureStatus = status;
           if (!document.hidden) {
-            this.startPreview(DEVICE.name, DEVICE.kind);
+            this.startPreview(DEVICE.name);
           }
         });
       });

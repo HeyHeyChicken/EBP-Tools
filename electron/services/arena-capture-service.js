@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('child_process');
-const { screen, desktopCapturer } = require('electron');
+const { screen } = require('electron');
 const { FFMPEG_PATH } = require('../config/constants');
 const StorageManager = require('../core/storage-manager');
 const arenaAudioService = require('./arena-audio-service');
@@ -169,8 +169,17 @@ function getDevice() {
 }
 
 function setDevice(device) {
-    StorageManager.setPermanentSettingsValue(SETTINGS_KEY_DEVICE, device);
+    // La vignette est une donnée d'affichage volumineuse et périssable : elle
+    // reste en mémoire, elle n'a rien à faire dans les réglages permanents.
+    const { thumbnail, ...STORED } = device || {};
+    if (thumbnail && typeof STORED.outputIndex === 'number') {
+        screenThumbnails[STORED.outputIndex] = thumbnail;
+    }
+    StorageManager.setPermanentSettingsValue(SETTINGS_KEY_DEVICE, STORED);
 }
+
+/** Dernière image captée par sortie ddagrab, pour l'aperçu (mémoire seule). */
+let screenThumbnails = {};
 
 /**
  * Liste les périphériques vidéo via ffmpeg (avfoundation sur macOS, dshow sur
@@ -241,51 +250,94 @@ function listCaptureDevices() {
 }
 
 /**
- * Définition PHYSIQUE d'un écran. `size` est en pixels indépendants du
- * périphérique alors que ddagrab capture des pixels réels : sans le facteur
- * d'échelle, un écran 1440p affiché à 150 % serait annoncé en 1707×960 et
- * refusé à tort.
+ * Capture une image sur une sortie ddagrab donnée.
+ *
+ * C'est la seule façon FIABLE de savoir ce qu'un index de sortie désigne.
+ * L'index DXGI ne suit ni l'ordre des écrans rapporté par Electron, ni la
+ * numérotation des paramètres d'affichage Windows, ni celle des sources
+ * Chromium : les trois hypothèses ont été démenties l'une après l'autre sur un
+ * poste à trois écrans. On ne le déduit donc plus, on le constate — et c'est
+ * l'image renvoyée ici qui sert d'étiquette dans le sélecteur.
+ *
+ * @returns {Promise<{outputIndex: number, width: number, height: number, thumbnail: string|null}|null>}
  */
-function screenGeometry(display) {
-    return {
-        width: Math.round(display.size.width * display.scaleFactor),
-        height: Math.round(display.size.height * display.scaleFactor)
-    };
+function probeScreenOutput(outputIndex) {
+    return new Promise((resolve) => {
+        const OUT = path.join(
+            os.tmpdir(),
+            `ebp-arena-screen-${outputIndex}.jpg`
+        );
+        const PROC = spawn(FFMPEG_PATH, [
+            '-hide_banner', '-y',
+            '-init_hw_device', 'd3d11va',
+            '-filter_complex',
+            `ddagrab=output_idx=${outputIndex}:framerate=30,hwdownload,format=bgra,format=yuv420p[v]`,
+            '-map', '[v]',
+            '-frames:v', '1',
+            '-q:v', '20',
+            OUT
+        ]);
+        let stderr = '';
+        const TIMEOUT = setTimeout(() => PROC.kill(), 10000);
+        PROC.stderr.on('data', (d) => (stderr += d.toString()));
+        PROC.on('error', () => {
+            clearTimeout(TIMEOUT);
+            resolve(null);
+        });
+        PROC.on('close', (code) => {
+            clearTimeout(TIMEOUT);
+            if (code !== 0 || !fs.existsSync(OUT)) {
+                resolve(null);
+                return;
+            }
+            // Aucune entrée `-i` sur ce graphe : la seule ligne « Video: » est
+            // celle de la sortie, donc ses dimensions sont bien celles de
+            // l'écran capturé.
+            const MATCH = /Video:[^\n]*?(\d{3,5})x(\d{3,5})/.exec(stderr);
+            let thumbnail = null;
+            try {
+                thumbnail = `data:image/jpeg;base64,${fs
+                    .readFileSync(OUT)
+                    .toString('base64')}`;
+                fs.unlinkSync(OUT);
+            } catch (e) {
+                console.error('[arena-capture] thumbnail read failed:', e.message);
+            }
+            resolve({
+                outputIndex,
+                width: MATCH ? Number(MATCH[1]) : 0,
+                height: MATCH ? Number(MATCH[2]) : 0,
+                thumbnail
+            });
+        });
+    });
 }
 
 /**
- * Écrans capturables sous Windows, construits à partir des sources
- * desktopCapturer.
- *
- * L'index passé à ddagrab vient de l'IDENTIFIANT de source (`screen:N:0`), pas
- * de la position dans la liste Electron : Windows n'énumère pas les écrans
- * dans l'ordre où il les numérote. Sur un poste à trois écrans, « Écran 2 »
- * portait l'identifiant `screen:0:0` alors qu'il occupait la position 1 —
- * capturer l'index 1 revenait à enregistrer l'Écran 3.
- *
- * Le libellé reprend le nom donné par le système, celui que l'utilisateur voit
- * dans les paramètres d'affichage Windows.
+ * Écrans capturables sous Windows : une entrée par sortie ddagrab réellement
+ * exploitable, avec l'image qui montre ce qu'elle contient. Les sondes sont
+ * lancées en parallèle pour ne pas figer l'interface.
  * @returns {Promise<object[]>}
  */
 async function listWindowsScreens() {
-    const SOURCES = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: { width: 0, height: 0 }
-    });
-    const DISPLAYS = screen.getAllDisplays();
-    return SOURCES.map((source, position) => {
-        const MATCH = DISPLAYS.find((d) => String(d.id) === source.display_id);
-        const GEOMETRY = MATCH ? screenGeometry(MATCH) : {};
-        const PARSED = /^screen:(\d+):/.exec(source.id);
+    const COUNT = Math.max(1, screen.getAllDisplays().length);
+    const PROBES = await Promise.all(
+        Array.from({ length: COUNT }, (unused, i) => probeScreenOutput(i))
+    );
+    screenThumbnails = {};
+    return PROBES.filter(Boolean).map((probe) => {
+        screenThumbnails[probe.outputIndex] = probe.thumbnail;
         return {
-            id: source.display_id || source.id,
-            name: GEOMETRY.width
-                ? `${source.name} (${GEOMETRY.width}×${GEOMETRY.height})`
-                : source.name,
+            // Numérotation volontairement distincte de celle de Windows :
+            // elle ne correspond pas, et prétendre le contraire a déjà coûté
+            // assez cher. C'est la vignette qui identifie l'écran.
+            id: `ddagrab-${probe.outputIndex}`,
+            name: `Sortie ${probe.outputIndex + 1} (${probe.width}×${probe.height})`,
             kind: 'screen',
-            outputIndex: PARSED ? Number(PARSED[1]) : position,
-            sourceId: source.id,
-            ...GEOMETRY
+            outputIndex: probe.outputIndex,
+            width: probe.width,
+            height: probe.height,
+            thumbnail: probe.thumbnail
         };
     });
 }
@@ -471,20 +523,18 @@ function startCapture() {
             return getStatus();
         }
         resolvedDevice = MATCH;
-    } else if (DEVICE.kind === 'screen') {
-        // La définition d'un écran change au gré des branchements : on la
-        // relit au démarrage. L'index de sortie, lui, vient de l'énumération
-        // desktopCapturer (asynchrone) : on garde celui qui a été enregistré
-        // au moment du choix, et l'écran disparu est refusé net.
-        const MATCH = screen
-            .getAllDisplays()
-            .find((d) => String(d.id) === DEVICE.id);
-        if (!MATCH) {
-            lastError = `screen_not_found: ${DEVICE.name}`;
-            console.error('[arena-capture]', lastError);
-            return getStatus();
-        }
-        resolvedDevice = { ...DEVICE, ...screenGeometry(MATCH) };
+    } else if (
+        DEVICE.kind === 'screen' &&
+        (typeof DEVICE.outputIndex !== 'number' ||
+            !String(DEVICE.id).startsWith('ddagrab-'))
+    ) {
+        // Source enregistrée par une version antérieure : son index de sortie
+        // était déduit d'une autre énumération, donc faux. Démarrer dessus
+        // enregistrerait un autre écran en silence — on refuse et on demande
+        // une nouvelle sélection.
+        lastError = `screen_stale: ${DEVICE.name} — rafraîchissez la liste des sources`;
+        console.error('[arena-capture]', lastError);
+        return getStatus();
     }
 
     // Pas d'upscale (décision Antoine) : un écran plus petit que 1080p ne peut
@@ -664,8 +714,12 @@ function getStatus() {
         deviceName: DEVICE ? DEVICE.name : null,
         // L'aperçu du renderer n'ouvre pas une source écran comme une caméra.
         deviceKind: DEVICE ? DEVICE.kind || 'camera' : null,
-        // Identifiant exact de la source d'aperçu, retenu au moment du choix.
-        deviceSourceId: DEVICE ? DEVICE.sourceId || null : null,
+        // Vignette de la sortie choisie : pour un écran, l'aperçu est cette
+        // image — captée par ddagrab, donc fidèle à ce qui est enregistré.
+        deviceThumbnail:
+            DEVICE && DEVICE.kind === 'screen'
+                ? screenThumbnails[DEVICE.outputIndex] || null
+                : null,
         // Le renderer n'envoie du PCM que si le tube attend réellement du son.
         audio: arenaAudioService.getStatus(),
         encoder: resolvedEncoder ? resolvedEncoder.name : null,

@@ -28,7 +28,6 @@ const {
     PROTOCOL_NAME
 } = require('../config/constants');
 const watchFolderService = require('../services/watch-folder-service');
-const arenaCaptureService = require('../services/arena-capture-service');
 const StorageManager = require('./storage-manager');
 
 //#endregion
@@ -217,43 +216,25 @@ function createWindow(updateService) {
     // indisponible » plutôt que d'ouvrir une capture d'écran pour rien.
     mainWindow.webContents.session.setDisplayMediaRequestHandler(
         (request, callback) => {
-            // Deux usages partagent ce handler, distingués par ce qu'ils
-            // demandent : le moniteur de son (audio) et l'aperçu d'une source
-            // écran du mode salle (vidéo seule).
-            const WANTS_AUDIO = !!request.audioRequested;
-            if (WANTS_AUDIO && process.platform !== 'win32') {
+            if (process.platform !== 'win32') {
                 callback({});
                 return;
             }
+            // Ce handler ne sert QUE au son. L'aperçu d'une source écran ne
+            // passe pas par desktopCapturer : ses sources ne désignent pas les
+            // mêmes écrans que les index ddagrab, et faire correspondre les
+            // deux énumérations a échoué trois fois. L'aperçu est désormais une
+            // image produite par ddagrab lui-même.
             desktopCapturer
                 .getSources({ types: ['screen'] })
                 .then((sources) => {
-                    if (!sources.length) {
-                        callback({});
-                        return;
-                    }
-                    if (WANTS_AUDIO) {
-                        // Une piste vidéo est imposée par l'API : le renderer
-                        // la coupe aussitôt pour ne garder que l'audio.
-                        callback({ video: sources[0], audio: 'loopback' });
-                        return;
-                    }
-                    // Aperçu : l'écran sélectionné pour la captation.
-                    const STATUS = arenaCaptureService.getStatus();
-                    // L'identifiant de source est retenu au moment du choix :
-                    // c'est la correspondance exacte. `display_id` ne sert que
-                    // de secours si les sources ont été réénumérées depuis.
-                    const MATCH =
-                        sources.find((s) => s.id === STATUS.deviceSourceId) ||
-                        sources.find(
-                            (s) =>
-                                s.display_id &&
-                                s.display_id === STATUS.deviceId
-                        );
-                    console.log(
-                        `[arena-preview] source=${STATUS.deviceSourceId} → ${MATCH ? MATCH.id : 'aucune'}`
+                    // Une piste vidéo est imposée par l'API : le renderer la
+                    // coupe aussitôt pour ne garder que l'audio.
+                    callback(
+                        sources.length
+                            ? { video: sources[0], audio: 'loopback' }
+                            : {}
                     );
-                    callback({ video: MATCH || sources[0] });
                 })
                 .catch(() => callback({}));
         }

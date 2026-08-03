@@ -66,8 +66,8 @@ export interface ArenaCaptureDevice {
   kind: 'screen' | 'camera';
   /** Écrans Windows uniquement : index de sortie DXGI passé à ddagrab. */
   outputIndex?: number;
-  /** Écrans Windows uniquement : source desktopCapturer pour l'aperçu. */
-  sourceId?: string;
+  /** Écrans Windows uniquement : image captée par ddagrab, sert d'aperçu. */
+  thumbnail?: string | null;
   width?: number;
   height?: number;
 }
@@ -77,7 +77,7 @@ export interface ArenaCaptureStatus {
   deviceId: string | null;
   deviceName: string | null;
   deviceKind: 'screen' | 'camera' | null;
-  deviceSourceId: string | null;
+  deviceThumbnail: string | null;
   encoder: string | null;
   startedAt: number | null;
   lastError: string | null;
