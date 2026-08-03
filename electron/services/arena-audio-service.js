@@ -58,6 +58,12 @@ let pacedFrom = 0;
 let timer = null;
 let silenceBlock = Buffer.alloc(BYTES_PER_SECOND, 0);
 let receivedBytes = 0;
+// L'écriture n'est ARMÉE qu'à la première image vidéo. Les deux pistes sont
+// horodatées à partir de leur premier échantillon : commencer à écrire du son
+// dès l'ouverture du tube, alors que ffmpeg met encore quelques secondes à
+// initialiser D3D11, le filtergraph et NVENC, plaçait le son en avance de tout
+// ce temps de démarrage — mesuré à ~3 s sur un poste réel.
+let pacing = false;
 
 /**
  * Ouvre le tube. ffmpeg s'y connecte ensuite comme un lecteur de fichier ; le
@@ -73,9 +79,6 @@ function start() {
         // l'ancienne socket au profit de la nouvelle.
         if (client) client.destroy();
         client = socket;
-        // Le cadencement démarre à la connexion, pas à l'ouverture du tube :
-        // ffmpeg ne consomme rien avant.
-        resetPacing();
         socket.on('error', () => {});
         socket.on('close', () => {
             if (client === socket) client = null;
@@ -88,6 +91,18 @@ function start() {
     timer = setInterval(pump, TICK_MS);
     console.log(`[arena-audio] listening on ${PIPE_PATH}`);
     return PIPE_PATH;
+}
+
+/**
+ * Arme l'écriture : appelé quand la captation confirme sa première image. La
+ * file est vidée au passage — elle contient du son déjà ancien, qui serait
+ * placé au tout début de l'enregistrement.
+ */
+function beginPacing() {
+    if (pacing) return;
+    resetPacing();
+    pacing = true;
+    console.log('[arena-audio] pacing armed on first video frame');
 }
 
 function resetPacing() {
@@ -112,6 +127,7 @@ function stop() {
         server = null;
     }
     resetPacing();
+    pacing = false;
     receivedBytes = 0;
     console.log('[arena-audio] stopped');
 }
@@ -134,7 +150,7 @@ function writeChunk(chunk) {
 
 /** Écrit ce que le temps écoulé exige, en complétant par du silence. */
 function pump() {
-    if (!client) return;
+    if (!client || !pacing) return;
     const ELAPSED_MS = Date.now() - pacedFrom;
     const TARGET =
         Math.floor((ELAPSED_MS / 1000) * BYTES_PER_SECOND / BLOCK_ALIGN) *
@@ -180,6 +196,7 @@ function getStatus() {
 
 module.exports = {
     start,
+    beginPacing,
     stop,
     writeChunk,
     getPipePath,

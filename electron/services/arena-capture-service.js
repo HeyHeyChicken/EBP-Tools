@@ -504,6 +504,10 @@ function buildFfmpegArgs(device) {
     // temporel du pipeline.
     return [
         '-hide_banner',
+        // Progression toutes les 100 ms au lieu de 500 : c'est cette ligne qui
+        // signale la première image, et donc l'instant où le son doit
+        // commencer. Sa période est l'imprécision résiduelle de la synchro.
+        ...(WITH_AUDIO ? ['-stats_period', '0.1'] : []),
         ...AUDIO_INPUT,
         ...inputArgs,
         ...AUDIO_OUTPUT,
@@ -604,11 +608,36 @@ function startCapture() {
     startedAt = Date.now();
 
     let resolutionChecked = false;
+    let firstFrameSeen = false;
+    // Filet : si la ligne de progression n'arrivait jamais, la piste audio
+    // resterait muette pour toujours. Au bout de 10 s on arme quand même —
+    // mieux vaut un son décalé qu'un enregistrement silencieux.
+    const AUDIO_FALLBACK = setTimeout(() => {
+        if (!firstFrameSeen) {
+            console.log('[arena-capture] no frame line after 10s, arming audio anyway');
+            arenaAudioService.beginPacing();
+        }
+    }, 10000);
+    PROC.on('close', () => clearTimeout(AUDIO_FALLBACK));
     PROC.stderr.on('data', (d) => {
         const LINE = d.toString().trim();
         if (!LINE) return;
-        stderrTail.push(LINE);
-        if (stderrTail.length > 20) stderrTail.shift();
+        const IS_PROGRESS = /^frame=/.test(LINE);
+        // La progression sort dix fois par seconde : la laisser entrer dans le
+        // tail noierait le diagnostic qu'on y cherche en cas de mort.
+        if (!IS_PROGRESS) {
+            stderrTail.push(LINE);
+            if (stderrTail.length > 20) stderrTail.shift();
+        }
+        // Première image encodée : les deux pistes partagent enfin la même
+        // origine temporelle, on ouvre le robinet audio.
+        if (!firstFrameSeen && IS_PROGRESS) {
+            const FRAME = /frame=\s*(\d+)/.exec(LINE);
+            if (FRAME && Number(FRAME[1]) > 0) {
+                firstFrameSeen = true;
+                arenaAudioService.beginPacing();
+            }
+        }
         // Contrôle strict 1080p sur la première ligne de stream vidéo (l'input
         // apparaît avant l'output dans le banner ffmpeg) : source ≠ 1920×1080
         // → arrêt immédiat avec erreur, sans redémarrage automatique. Sans
