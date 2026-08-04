@@ -35,9 +35,12 @@ const {
 // tracking), avec les rosters trustés fournis par le serveur.
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
-// Une seule game à la fois : le serveur réserve pour une heure, et une réservation
-// qui expire pendant qu'on analyse ferait re-servir la même vidéo à un autre tour.
-const BATCH_SIZE = 1;
+// Games traitées de front — la machine est dédiée à ça. Un process Python par game
+// (sa propre VideoCapture, son propre Tesseract) : vraie parallélisation, pas de GIL.
+// Même valeur que DEEP_ANALYSIS_CONCURRENCY côté watch folder. À ne pas monter sans
+// mesurer : le serveur réserve chaque game pour une heure, et des analyses simultanées
+// qui dépasseraient ce délai se feraient re-servir, donc analyser en double.
+const CONCURRENCY = 3;
 // Au-delà, la vidéo n'est pas une game de salle plausible — on ne lance pas une
 // analyse de plusieurs heures sur un fichier aberrant.
 const MAX_VIDEO_BYTES = 4 * 1024 * 1024 * 1024;
@@ -91,7 +94,7 @@ async function processGame(game, systemKey) {
         // Phase 1 — bornes réelles de la game dans le fichier. La captation de salle
         // déborde de part et d'autre (pré-game, écran de score), et c'est aussi elle
         // qui détecte le mode : ces valeurs ne peuvent pas venir de la base.
-        const DETECT = await deps.runAnalyzer(VIDEO_PATH, null, {}, false, true);
+        const DETECT = await deps.runAnalyzer(VIDEO_PATH, null, {}, false);
         if (DETECT.type === 'error') {
             console.warn(`[system-worker] ${game.gameId} : phase 1 en échec — ${DETECT.message}`);
             return false;
@@ -123,9 +126,8 @@ async function processGame(game, systemKey) {
             orangePlayers: game.orangePlayers || [],
             bluePlayers: game.bluePlayers || []
         };
-        // lowPriority : cette machine sert aussi à autre chose, la pré-analyse n'est
-        // jamais urgente.
-        const RESULTS = await deps.runChunkAnalyzer(VIDEO_PATH, null, [CHUNK], {}, null, true);
+        // Pleine priorité : machine dédiée à la pré-analyse, rien à ménager ici.
+        const RESULTS = await deps.runChunkAnalyzer(VIDEO_PATH, null, [CHUNK], {}, null);
         if (RESULTS && RESULTS.error) {
             console.warn(`[system-worker] ${game.gameId} : phase 2 en échec — ${RESULTS.error}`);
             return false;
@@ -157,19 +159,23 @@ async function processGame(game, systemKey) {
 }
 
 /**
- * Un tour de boucle : demande du travail, le traite, et enchaîne immédiatement tant
+ * Un tour de boucle : demande un lot de games, les traite de front, et enchaîne tant
  * que le serveur en donne. File vide → on repasse dans POLL_INTERVAL_MS.
+ *
+ * Le lot suivant n'est demandé qu'une fois le précédent entièrement terminé : le
+ * serveur ne réserve donc jamais plus de CONCURRENCY games à la fois, et une game
+ * lente ne fait pas gonfler le nombre de réservations en vol.
  */
 async function tick(systemKey) {
     if (running) return;
     running = true;
     try {
-        let batch = await fetchPreAnalysisBatch(BATCH_SIZE, systemKey);
+        let batch = await fetchPreAnalysisBatch(CONCURRENCY, systemKey);
         while (batch && Array.isArray(batch.games) && batch.games.length > 0) {
-            for (const GAME of batch.games) {
-                await processGame(GAME, systemKey);
-            }
-            batch = await fetchPreAnalysisBatch(BATCH_SIZE, systemKey);
+            // processGame absorbe ses propres erreurs (retourne false) : aucun rejet
+            // à craindre ici, une game ratée n'emporte pas les autres du lot.
+            await Promise.all(batch.games.map((g) => processGame(g, systemKey)));
+            batch = await fetchPreAnalysisBatch(CONCURRENCY, systemKey);
         }
     } catch (e) {
         if (e instanceof ApiError && e.status === 422) {
