@@ -214,6 +214,51 @@ function persistAnalysis(payload, authToken) {
 }
 
 /**
+ * POST /api/tools/arena/pre-analysis/next
+ * MODE SYSTÈME : demande au serveur les prochaines vidéos de salle à pré-analyser.
+ * Le worker ne choisit rien — le serveur désigne les games (celles où joue un abonné
+ * Statistics Pro d'abord), présigne lui-même leur objet S3 et les réserve une heure.
+ *
+ * Auth par clé de service seule (X-System-Token), sans jeton utilisateur : le worker
+ * tourne en continu et n'agit pour le compte de personne. Refus = 422, jamais 401/403,
+ * pour ne pas être confondu avec une perte de session côté client.
+ *
+ * @param {number} limit 1..5
+ * @param {string} systemKey
+ * @returns {Promise<{games: Array<{gameId, guid, terrainId, map, playedAt, orangeScore,
+ *   blueScore, orangePlayers, bluePlayers, hasPro, videoUrl}>}>}
+ */
+function fetchPreAnalysisBatch(limit, systemKey) {
+    return apiRequest(
+        'POST',
+        '/arena/pre-analysis/next',
+        { limit },
+        { retries: 1, requireAuth: false, headers: { 'X-System-Token': systemKey } }
+    );
+}
+
+/**
+ * POST /api/tools/arena/pre-analysis
+ * MODE SYSTÈME : dépose le payload calculé pour une game de salle. Le serveur l'écrit
+ * sous l'équipe système et lève la réservation.
+ *
+ * 404 = la game n'a plus de vidéo de salle ; 422 = clé refusée OU analyse sans aucun
+ * kill (le champ `error` distingue les deux). Ces deux cas sont définitifs : inutile
+ * de réessayer.
+ *
+ * @param {{gameId: string, payload: object}} payload
+ * @param {string} systemKey
+ * @returns {Promise<{ok: true}>}
+ */
+function submitPreAnalysis(payload, systemKey) {
+    return apiRequest('POST', '/arena/pre-analysis', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-System-Token': systemKey }
+    });
+}
+
+/**
  * POST /api/tools/games/:gameID/upload-url
  * @param {string|number} gameID
  * @param {string|undefined} teamId  équipe-auteur de la vidéo (issue du deeplink du
@@ -451,6 +496,65 @@ async function reportAnalysisIssue(payload, authToken) {
 }
 
 /**
+ * Télécharge un objet depuis une URL présignée vers `filePath` (GET), en suivant les
+ * redirections. Pendant de `uploadFileToPresignedUrl`, pour le worker de pré-analyse
+ * qui doit rapatrier la vidéo de salle avant de l'analyser.
+ *
+ * Écrit dans un fichier `.part` renommé à la fin : un téléchargement interrompu ne
+ * laisse jamais un mp4 tronqué que l'analyseur prendrait pour une vidéo valide.
+ * Pas de retry interne — la boucle du worker relancera la game au prochain tour.
+ */
+function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
+    const URL_OBJ = new URL(presignedUrl);
+    const PART_PATH = filePath + '.part';
+    const CLIENT = URL_OBJ.protocol === 'http:' ? http : https;
+    return new Promise((resolve, reject) => {
+        const REQ = CLIENT.get(
+            {
+                hostname: URL_OBJ.hostname,
+                port: URL_OBJ.port || (URL_OBJ.protocol === 'http:' ? 80 : 443),
+                path: URL_OBJ.pathname + URL_OBJ.search
+            },
+            (res) => {
+                if (
+                    res.statusCode >= 300 &&
+                    res.statusCode < 400 &&
+                    res.headers.location &&
+                    redirectsLeft > 0
+                ) {
+                    res.resume();
+                    downloadPresignedUrlToFile(
+                        res.headers.location,
+                        filePath,
+                        redirectsLeft - 1
+                    ).then(resolve, reject);
+                    return;
+                }
+                if (res.statusCode < 200 || res.statusCode >= 300) {
+                    res.resume();
+                    reject(new ApiError(res.statusCode, 'download failed', res.headers));
+                    return;
+                }
+                const OUT = fs.createWriteStream(PART_PATH);
+                res.pipe(OUT);
+                OUT.on('finish', () => {
+                    OUT.close(() => {
+                        try {
+                            fs.renameSync(PART_PATH, filePath);
+                            resolve(filePath);
+                        } catch (e) {
+                            reject(e);
+                        }
+                    });
+                });
+                OUT.on('error', reject);
+            }
+        );
+        REQ.on('error', reject);
+    });
+}
+
+/**
  * Uploads a local file via HTTP PUT to a presigned URL with retry on
  * network/5xx errors. Resolves on 2xx, throws otherwise.
  */
@@ -542,9 +646,12 @@ module.exports = {
     ingestArenaGames,
     resolveArenaGameId,
     persistAnalysis,
+    fetchPreAnalysisBatch,
+    submitPreAnalysis,
     requestUploadUrl,
     confirmUpload,
     uploadFileToPresignedUrl,
+    downloadPresignedUrlToFile,
     pushWatcherStatus,
     pushGameAnalysisStatus,
     reportAnalysisIssue,

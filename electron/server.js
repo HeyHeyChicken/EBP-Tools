@@ -77,6 +77,7 @@ const arenaCaptureService = require('./services/arena-capture-service');
 const arenaAudioService = require('./services/arena-audio-service');
 const arenaPipelineService = require('./services/arena-pipeline-service');
 const arenaUploaderService = require('./services/arena-uploader-service');
+const systemWorkerService = require('./services/system-worker-service');
 // Poller EVA et identification des games (mode salle) : ces deux services se
 // démarrent seuls au `require` et vérifient eux-mêmes si le mode salle est actif.
 require('./services/arena-eva-poller-service');
@@ -1967,6 +1968,15 @@ if (!APP_GOT_THE_LOCK) {
             watchFolderService.start({ runAnalyzer, runChunkAnalyzer });
         } catch (e) {
             console.error('[watch-folder] failed to start', e);
+        }
+
+        // Mode système : pré-analyse des vidéos de salle. No-op sans la clé
+        // TOOLS_SYSTEM_KEY dans l'environnement, donc inerte partout sauf sur la
+        // machine dédiée.
+        try {
+            systemWorkerService.start({ runAnalyzer, runChunkAnalyzer });
+        } catch (e) {
+            console.error('[system-worker] failed to start', e);
         }
 
         // Mode salle : battement de présence périodique vers le backend (no-op
