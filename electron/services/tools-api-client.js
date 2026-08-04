@@ -33,6 +33,10 @@ const API_PORT = USE_PROD_API ? 443 : 3005;
 const API_BASE_PATH = '/api/tools';
 const DEFAULT_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
+// Téléchargement présigné : délai SANS le moindre octet reçu au-delà duquel on
+// considère le transfert mort. Rien à voir avec sa durée totale, qui se compte en
+// minutes pour une vidéo de salle.
+const DOWNLOAD_IDLE_TIMEOUT_MS = 60 * 1000;
 
 class NotAuthenticatedError extends Error {
     constructor(detail = '') {
@@ -509,6 +513,12 @@ function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
     const PART_PATH = filePath + '.part';
     const CLIENT = URL_OBJ.protocol === 'http:' ? http : https;
     return new Promise((resolve, reject) => {
+        let settled = false;
+        const fail = (err) => {
+            if (settled) return;
+            settled = true;
+            reject(err);
+        };
         const REQ = CLIENT.get(
             {
                 hostname: URL_OBJ.hostname,
@@ -523,6 +533,7 @@ function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
                     redirectsLeft > 0
                 ) {
                     res.resume();
+                    settled = true;
                     downloadPresignedUrlToFile(
                         res.headers.location,
                         filePath,
@@ -532,13 +543,33 @@ function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
                 }
                 if (res.statusCode < 200 || res.statusCode >= 300) {
                     res.resume();
-                    reject(new ApiError(res.statusCode, 'download failed', res.headers));
+                    fail(new ApiError(res.statusCode, 'download failed', res.headers));
                     return;
                 }
+                // Taille annoncée : sans elle on ne peut pas distinguer un transfert
+                // complet d'un flux coupé au milieu.
+                const EXPECTED = Number(res.headers['content-length'] || 0);
+                let received = 0;
+                res.on('data', (c) => {
+                    received += c.length;
+                });
+                // Une coupure de socket n'émet pas toujours 'error' : sans ce garde-fou,
+                // la promesse resterait pendante et le worker attendrait indéfiniment.
+                res.on('aborted', () => fail(new Error('download aborted by remote')));
                 const OUT = fs.createWriteStream(PART_PATH);
                 res.pipe(OUT);
                 OUT.on('finish', () => {
                     OUT.close(() => {
+                        if (settled) return;
+                        if (EXPECTED > 0 && received !== EXPECTED) {
+                            fail(
+                                new Error(
+                                    `download incomplete: ${received}/${EXPECTED} bytes`
+                                )
+                            );
+                            return;
+                        }
+                        settled = true;
                         try {
                             fs.renameSync(PART_PATH, filePath);
                             resolve(filePath);
@@ -547,10 +578,16 @@ function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
                         }
                     });
                 });
-                OUT.on('error', reject);
+                OUT.on('error', fail);
             }
         );
-        REQ.on('error', reject);
+        // Inactivité, pas durée totale : une vidéo de salle pèse plusieurs centaines de
+        // Mo, le transfert peut être long — c'est l'absence de données qui trahit un
+        // téléchargement mort.
+        REQ.setTimeout(DOWNLOAD_IDLE_TIMEOUT_MS, () => {
+            REQ.destroy(new Error('download stalled'));
+        });
+        REQ.on('error', fail);
     });
 }
 

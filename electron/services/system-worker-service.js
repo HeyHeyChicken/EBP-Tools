@@ -53,6 +53,18 @@ function workDir() {
     return DIR;
 }
 
+/**
+ * Vide le dossier de travail au démarrage. Un run interrompu (Ctrl+C, crash) ne passe
+ * pas par le nettoyage de fin et laisse derrière lui un `.part` de plusieurs centaines
+ * de Mo, qu'aucun tour suivant ne réclamera.
+ */
+function purgeWorkDir() {
+    const DIR = workDir();
+    for (const NAME of fs.readdirSync(DIR)) {
+        removeQuietly(path.join(DIR, NAME));
+    }
+}
+
 function removeQuietly(filePath) {
     try {
         fs.unlinkSync(filePath);
@@ -68,6 +80,7 @@ function removeQuietly(filePath) {
 async function processGame(game, systemKey) {
     const VIDEO_PATH = path.join(workDir(), `${game.guid}_${game.terrainId}.mp4`);
     try {
+        console.log(`[system-worker] ${game.gameId} — téléchargement (${game.map || 'map inconnue'})`);
         await downloadPresignedUrlToFile(game.videoUrl, VIDEO_PATH);
         const SIZE = fs.statSync(VIDEO_PATH).size;
         if (SIZE === 0 || SIZE > MAX_VIDEO_BYTES) {
@@ -92,6 +105,9 @@ async function processGame(game, systemKey) {
         // douteuses), on garde la plus longue : c'est la game, les autres sont des
         // résidus de la game voisine.
         const MAIN = DETECTED.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a));
+        console.log(
+            `[system-worker] ${game.gameId} — analyse en cours (${Math.round(MAIN.end - MAIN.start)} s de jeu)`
+        );
 
         // Phase 2 — OCR + tracking. Le serveur fournit ce que le chemin client obtient
         // de /identify : rosters trustés (fuzzy match des pseudos du killfeed) et
@@ -179,6 +195,7 @@ function start(d) {
         throw new Error('system-worker-service.start: missing runAnalyzer/runChunkAnalyzer deps');
     }
     deps = d;
+    purgeWorkDir();
     console.log('[system-worker] mode système actif — pré-analyse des vidéos de salle');
     tick(KEY);
     timer = setInterval(() => tick(KEY), POLL_INTERVAL_MS);
