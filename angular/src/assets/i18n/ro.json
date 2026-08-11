@@ -170,7 +170,8 @@
         "audio": {
           "level": "Nivel sonor",
           "silent": "Niciun sunet detectat de peste 20 de secunde. Verificați dacă software-ul înregistrat produce sunet și dacă ieșirea audio a PC-ului nu este dezactivată.",
-          "unavailable": "Nivelul sonor nu poate fi măsurat pe acest sistem."
+          "unavailable": "Nivelul sonor nu poate fi măsurat pe acest sistem.",
+          "notPiped": "Sunetul este captat, dar nu ajunge la înregistrare: ffmpeg nu a deschis canalul audio. Videoclipurile acestei capturi vor fi mute."
         }
       }
     }

@@ -170,7 +170,8 @@
         "audio": {
           "level": "Niveau sonore",
           "silent": "Aucun son détecté depuis plus de 20 secondes. Vérifiez que le logiciel enregistré produit bien du son et que la sortie audio du PC n'est pas coupée.",
-          "unavailable": "Le niveau sonore ne peut pas être mesuré sur ce système."
+          "unavailable": "Le niveau sonore ne peut pas être mesuré sur ce système.",
+          "notPiped": "Le son est bien capté, mais il n'est pas transmis à l'enregistrement : ffmpeg n'a pas ouvert le canal audio. Les vidéos de cette captation seront muettes."
         }
       }
     }

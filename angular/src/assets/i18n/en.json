@@ -170,7 +170,8 @@
         "audio": {
           "level": "Audio level",
           "silent": "No sound detected for over 20 seconds. Check that the recorded software is actually producing sound and that the PC audio output is not muted.",
-          "unavailable": "The audio level cannot be measured on this system."
+          "unavailable": "The audio level cannot be measured on this system.",
+          "notPiped": "Sound is being captured, but it is not reaching the recording: ffmpeg did not open the audio channel. Videos from this capture will be silent."
         }
       }
     }

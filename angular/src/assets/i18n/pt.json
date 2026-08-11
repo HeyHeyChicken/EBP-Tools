@@ -170,7 +170,8 @@
         "audio": {
           "level": "Nível sonoro",
           "silent": "Nenhum som detetado há mais de 20 segundos. Verifique se o software gravado está a produzir som e se a saída de áudio do PC não está silenciada.",
-          "unavailable": "O nível sonoro não pode ser medido neste sistema."
+          "unavailable": "O nível sonoro não pode ser medido neste sistema.",
+          "notPiped": "O som está a ser captado, mas não chega à gravação: o ffmpeg não abriu o canal de áudio. Os vídeos desta captação ficarão mudos."
         }
       }
     }
