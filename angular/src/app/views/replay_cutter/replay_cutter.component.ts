@@ -848,6 +848,7 @@ export class ReplayCutterComponent {
    */
   private createGameFromJSON(data: {
     mode: number;
+    gameType?: string;
     start: number;
     end: number;
     map: string;
@@ -864,6 +865,7 @@ export class ReplayCutterComponent {
     };
   }): Game {
     const GAME = new Game(data.mode ?? 0);
+    GAME.gameType = data.gameType ?? 'after-h';
     GAME.start = data.start ?? 0;
     GAME.end = data.end ?? 0;
     GAME.map = data.map ?? '';

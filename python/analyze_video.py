@@ -251,6 +251,35 @@ MODES = [
     #endregion
 ]
 
+# ── Color Chaos ────────────────────────────────────────────────────────────
+# Autre jeu que After-H, détecté dans le même passage : ses écrans n'ont aucun
+# élément commun avec ceux d'After-H, les deux familles de détecteurs ne se
+# marchent pas dessus. Une game Color Chaos n'a ni map, ni scores, ni killfeed
+# exploitables par la phase 2 — elle n'est bornée que par son intro et son outro.
+GAME_TYPE_AFTER_H = 'after-h'
+GAME_TYPE_COLOR_CHAOS = 'color-chaos'
+
+# Intro : splash de compte à rebours (disque noir cerclé de jaune, centré).
+# Géométrie relevée identique sur les 6 games d'un enregistrement de salle.
+CC_INTRO_CENTER = (966, 493)
+CC_INTRO_BLACK_R = (180, 252)          # anneau intérieur : noir, hors du chiffre
+CC_INTRO_YELLOW_R = (262, 300)         # anneau extérieur : cerclage jaune
+CC_INTRO_BLACK_MAX_CHANNEL = 40        # max(R,G,B) pour qualifier « noir »
+# Seuils volontairement en dessous du mesuré : intro = 0.95 noir / 0.71 jaune,
+# et rien d'autre dans la vidéo ne dépasse 0.26 noir sur cet anneau.
+CC_INTRO_MIN_BLACK = 0.85
+CC_INTRO_MIN_YELLOW = 0.55
+
+# Outro : bandeau « TOP joueurs » du tableau final, matché en niveaux de gris.
+CC_OUTRO_BOX = ((200, 110), (1800, 250))
+CC_OUTRO_MIN_NCC = 0.80                # mesuré 1.00 sur les 6 outros, ≤ 0.06 ailleurs
+
+# Marge de découpe, appliquée symétriquement aux deux bornes : la game commence
+# 1 s APRÈS la disparition du décompte et se termine 1 s AVANT la disparition du
+# tableau final. Le tableau reste donc dans la découpe en entier (détail par
+# joueur), sans la transition vers le lobby qui le suit.
+CC_CUT_MARGIN_S = 1.0
+
 # A-letter patterns for game intro detection — from detectGameIntro() in the service
 _A_PATTERNS = [
     [(1495, 942, 255, 30), (1512, 950, 255, 30), (1495, 962, 255, 30),
@@ -3655,6 +3684,124 @@ def _detect_game_intro(frame: np.ndarray) -> bool:
     return False
 
 
+_CC_INTRO_MASKS = None
+
+
+def _get_cc_intro_masks():
+    """
+    Masques annulaires du splash d'intro Color Chaos, calculés une fois pour
+    toutes sur la sous-fenêtre qui entoure le disque (600×600 au lieu du frame
+    entier : ~6× moins de pixels à tester par frame).
+
+    Retourne (x0, y0, size, mask_noir, mask_jaune).
+    """
+    global _CC_INTRO_MASKS
+    if _CC_INTRO_MASKS is None:
+        CX, CY = CC_INTRO_CENTER
+        R_MAX = CC_INTRO_YELLOW_R[1]
+        SIZE = 2 * R_MAX
+        YY, XX = np.mgrid[0:SIZE, 0:SIZE]
+        R = np.sqrt((XX - R_MAX) ** 2 + (YY - R_MAX) ** 2)
+        _CC_INTRO_MASKS = (
+            CX - R_MAX, CY - R_MAX, SIZE,
+            (R >= CC_INTRO_BLACK_R[0]) & (R < CC_INTRO_BLACK_R[1]),
+            (R >= CC_INTRO_YELLOW_R[0]) & (R < CC_INTRO_YELLOW_R[1]),
+        )
+    return _CC_INTRO_MASKS
+
+
+def _detect_color_chaos_intro(frame: np.ndarray) -> bool:
+    """
+    Détecte le splash de compte à rebours qui précède une game Color Chaos :
+    un disque noir cerclé de jaune, au centre de l'écran.
+
+    Détection par COULEUR, contrairement à l'outro : le splash est identique
+    d'une game à l'autre (aucune couleur d'équipe ne s'y invite), et c'est
+    justement ce disque noir qui le sépare nettement du gameplay — lui aussi
+    plein de jaune et de violet, mais jamais troué d'un disque noir de 500 px
+    en son centre.
+
+    On ne teste que deux anneaux, pas le disque entier : le chiffre du décompte
+    (blanc, centré) occupe le cœur du disque et changerait le ratio à chaque
+    seconde. L'anneau [180, 252[ est en dehors du chiffre et dans le noir,
+    l'anneau [262, 300[ tombe dans le cerclage jaune.
+    """
+    X0, Y0, SIZE, M_BLACK, M_YELLOW = _get_cc_intro_masks()
+    H, W = frame.shape[:2]
+    if X0 < 0 or Y0 < 0 or X0 + SIZE > W or Y0 + SIZE > H:
+        return False
+    SUB = frame[Y0:Y0 + SIZE, X0:X0 + SIZE]
+
+    BLACK_RATIO = float((SUB[M_BLACK].max(axis=1) < CC_INTRO_BLACK_MAX_CHANNEL).mean())
+    if BLACK_RATIO < CC_INTRO_MIN_BLACK:
+        return False
+
+    PX = SUB[M_YELLOW].astype(np.int16)
+    YELLOW_RATIO = float(((PX[:, 0] > 190) & (PX[:, 1] > 160) & (PX[:, 2] < 120)).mean())
+    return YELLOW_RATIO >= CC_INTRO_MIN_YELLOW
+
+
+_CC_OUTRO_TEMPLATE_CACHE = None
+
+
+def _get_cc_outro_template():
+    """Charge (et cache) le template grayscale du bandeau « TOP joueurs »."""
+    global _CC_OUTRO_TEMPLATE_CACHE
+    if _CC_OUTRO_TEMPLATE_CACHE is not None:
+        return _CC_OUTRO_TEMPLATE_CACHE[0]
+    BASE = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    PATH = os.path.join(BASE, 'templates', 'color_chaos', 'top_players.png')
+    GRAY = cv2.imread(PATH, cv2.IMREAD_GRAYSCALE) if os.path.isfile(PATH) else None
+    _CC_OUTRO_TEMPLATE_CACHE = (GRAY,)
+    return GRAY
+
+
+def _detect_color_chaos_outro(frame: np.ndarray) -> bool:
+    """
+    Détecte le tableau final d'une game Color Chaos (bandeau « TOP joueurs »
+    et ses 4 icônes) — dernier écran affiché, donc fin de la game.
+
+    Détection par FORME uniquement (NCC en niveaux de gris à position fixe) :
+    le titre et le panneau de gauche prennent la couleur de l'équipe gagnante
+    (jaune ou violette), la géométrie du bandeau non. Un check pixel coloré
+    trancherait sur la mauvaise moitié du signal.
+    """
+    TPL = _get_cc_outro_template()
+    if TPL is None:
+        return False
+    (X1, Y1), (X2, Y2) = CC_OUTRO_BOX
+    H, W = frame.shape[:2]
+    if X2 > W or Y2 > H:
+        return False
+    REGION = cv2.cvtColor(frame[Y1:Y2, X1:X2], cv2.COLOR_RGB2GRAY)
+    if REGION.shape != TPL.shape:
+        return False
+    # Same-size inputs → matchTemplate retourne un scalaire 1×1.
+    return float(cv2.matchTemplate(REGION, TPL, cv2.TM_CCOEFF_NORMED)[0, 0]) >= CC_OUTRO_MIN_NCC
+
+
+def _scan_while(cap: cv2.VideoCapture, timestamp: float, predicate,
+                step: float = 0.5, max_span: float = 15.0) -> float:
+    """
+    Retourne le dernier instant où *predicate* est encore vrai, en avançant
+    (step > 0) ou en reculant (step < 0) depuis *timestamp* — autrement dit la
+    fin ou le début de la fenêtre d'affichage d'un écran.
+
+    Le scan de `_analyze` remonte la vidéo à rebours par pas de 1-2 s : il
+    atterrit quelque part DANS cette fenêtre, jamais sur son bord. Or ce sont
+    les bords qui datent les frontières de game.
+    """
+    LAST = timestamp
+    PROBE = timestamp + step
+    while abs(PROBE - timestamp) <= max_span:
+        FRAME = _get_frame(cap, PROBE)
+        if FRAME is None or not predicate(FRAME):
+            break
+        LAST = PROBE
+        PROBE += step
+    return LAST
+
+
 def _detect_game_playing(frame: np.ndarray, anchor=None, ncc_thresh: float = 0.4) -> bool:
     """
     Détecte un frame de jeu en cours via la barre HUD haute (template
@@ -5219,14 +5366,18 @@ def _locate_minimap(cap, current_timestamp: float, map_name: str, frame_rgb):
 # Game dict factory
 # ---------------------------------------------------------------------------
 
-def _new_game(mode: int) -> dict:
+def _new_game(mode: int, game_type: str = GAME_TYPE_AFTER_H) -> dict:
     """
     Crée et retourne un dict représentant un nouveau jeu en cours de détection.
     __timerRef__ : dernier couple (timestamp, secondes restantes) LU ET VÉRIFIÉ
                    dans cette game, point de repli des bonds arrière.
     __nojump__   : plus aucun bond autorisé pour cette game (on marche).
+    game_type    : jeu détecté. `mode` reste l'index MODES d'After-H (géométrie
+                   du score frame) et n'a de sens que pour GAME_TYPE_AFTER_H —
+                   les consommateurs doivent lire `gameType` en premier.
     """
     return {
+        'gameType': game_type,
         'mode': mode,
         'start': -1,
         'end': -1,
@@ -5463,8 +5614,42 @@ def _analyze(
                 GAMES.insert(0, GAME)
                 CURRENT = GAME
 
+        # ── Color Chaos : outro = fin de game ───────────────────────────────
+        if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
+            if _detect_color_chaos_outro(FRAME):
+                if DEBUG:
+                    _emit({'log': 'Color Chaos outro frame found'})
+                FOUND = True
+                JUST_JUMPED = False
+                GAME = _new_game(0, game_type=GAME_TYPE_COLOR_CHAOS)
+                # Dernière frame du tableau final, moins la marge.
+                GAME['end'] = _scan_while(
+                    CAP, TIMESTAMP, _detect_color_chaos_outro,
+                ) - CC_CUT_MARGIN_S
+                GAMES.insert(0, GAME)
+                CURRENT = GAME
+
+        # ── Color Chaos : intro = début de game ─────────────────────────────
+        if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
+                and CURRENT['gameType'] == GAME_TYPE_COLOR_CHAOS):
+            if _detect_color_chaos_intro(FRAME):
+                if DEBUG:
+                    _emit({'log': 'Color Chaos intro frame found'})
+                FOUND = True
+                JUST_JUMPED = False
+                # Dernière frame du splash, plus la marge : le jeu commence une
+                # fois le décompte disparu.
+                CURRENT['start'] = _scan_while(
+                    CAP, TIMESTAMP, _detect_color_chaos_intro,
+                ) + CC_CUT_MARGIN_S
+                if DEBUG:
+                    _emit({'log': f'Color Chaos game {CURRENT["start"]:.1f}s → {CURRENT["end"]:.1f}s'})
+                _emit({'type': 'game', 'game': CURRENT})
+                CURRENT = None
+
         # ── Game start: loading screen ──────────────────────────────────────
-        if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
+        if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
+                and CURRENT['gameType'] == GAME_TYPE_AFTER_H):
             if _detect_game_loading_frame(FRAME):
                 if DEBUG:
                     _emit({'log': 'Loading frame found'})
@@ -5499,7 +5684,8 @@ def _analyze(
                 CURRENT = None   # game complete
 
         # ── Game start: map introduction ────────────────────────────────────
-        if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
+        if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
+                and CURRENT['gameType'] == GAME_TYPE_AFTER_H):
             if _detect_game_intro(FRAME):
                 if DEBUG:
                     _emit({'log': 'Game intro frame found'})
@@ -5532,7 +5718,8 @@ def _analyze(
                 CURRENT = None
 
         # ── Playing frame: OCR map / team names + timer jump ────────────────
-        if not FOUND and CURRENT is not None and CURRENT['start'] == -1:
+        if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
+                and CURRENT['gameType'] == GAME_TYPE_AFTER_H):
             if _detect_game_playing(FRAME):
                 FOUND = True
                 if DEBUG:
@@ -5678,12 +5865,16 @@ def _analyze(
     # loading frame est soit une game déjà extraite à un round précédent, soit
     # une game entamée avant le début de la captation — jamais exploitable.
     if CURRENT is not None and CURRENT['start'] == -1:
-        REFINED_START = _refine_game_start_with_timer(
-            CAP, 0.0,
-            MODES[CURRENT['mode']]['gameFrame']['timer'],
-            hud_anchor=HUD_ANCHOR,
-        )
-        CURRENT['start'] = REFINED_START
+        if CURRENT['gameType'] == GAME_TYPE_AFTER_H:
+            CURRENT['start'] = _refine_game_start_with_timer(
+                CAP, 0.0,
+                MODES[CURRENT['mode']]['gameFrame']['timer'],
+                hud_anchor=HUD_ANCHOR,
+            )
+        else:
+            # Color Chaos : pas de timer in-game exploitable pour affiner, la
+            # game commence au plus tôt au début de la vidéo.
+            CURRENT['start'] = 0.0
         CURRENT['startFallback'] = True
         _emit({'type': 'game', 'game': CURRENT})
 

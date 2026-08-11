@@ -45,6 +45,13 @@ export class Game {
 
   //#endregion
 
+  /**
+   * Jeu détecté : 'after-h' (défaut) ou 'color-chaos'. Une game Color Chaos
+   * n'est bornée que par son intro et son outro — ni map, ni scores, ni
+   * analyse approfondie. `mode` ne concerne que les games After-H.
+   */
+  public gameType: string = 'after-h';
+
   public map: string = '';
   public mapImage: string | undefined;
 

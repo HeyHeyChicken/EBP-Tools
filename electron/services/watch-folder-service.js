@@ -386,7 +386,20 @@ async function processVideo(videoPath, deps) {
     if (DETECT.type === 'error') {
         throw new Error(`Analyzer failed: ${DETECT.message}`);
     }
-    const GAMES = DETECT.games || [];
+    // Les games d'un autre jeu qu'After-H (Color Chaos) sont détectées mais
+    // s'arrêtent ici : toute la suite du pipeline (identify → phase 2 → upload)
+    // les rattache à une game EVA, or `game-histories` ne retourne que des
+    // games After-H — il n'y a rien à quoi les associer. Elles seraient donc
+    // matchées de travers, ou pas du tout. On les compte et on les laisse.
+    const DETECTED = DETECT.games || [];
+    const GAMES = DETECTED.filter(
+        (g) => (g.gameType ?? 'after-h') === 'after-h'
+    );
+    if (DETECTED.length !== GAMES.length) {
+        console.log(
+            `[watch-folder] ${DETECTED.length - GAMES.length} game(s) hors After-H ignorée(s) (non exposées par game-histories)`
+        );
+    }
     if (GAMES.length === 0) {
         const DEST = await moveTo(videoPath, FAILED_DIR);
         removeSidecar(videoPath);

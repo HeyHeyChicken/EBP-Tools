@@ -102,13 +102,21 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   </th>
                   <th
                     [style.background-image]="
-                      'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
-                      game.map.replaceAll(' ', '_') +
-                      '_EBP-300x169.webp)'
+                      game.gameType === 'color-chaos'
+                        ? ''
+                        : 'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
+                          game.map.replaceAll(' ', '_') +
+                          '_EBP-300x169.webp)'
                     "
                   >
                     <span (click)="editGameMap(game)"
-                      >{{ game.map.trim().length > 0 ? game.map : '?' }}
+                      >{{
+                        game.gameType === 'color-chaos'
+                          ? 'Color Chaos'
+                          : game.map.trim().length > 0
+                            ? game.map
+                            : '?'
+                      }}
                       @if (game.mapImage) {
                         <div class="popup">
                           <img [src]="game.mapImage" />

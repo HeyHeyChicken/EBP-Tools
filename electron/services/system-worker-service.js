@@ -99,7 +99,12 @@ async function processGame(game, systemKey) {
             console.warn(`[system-worker] ${game.gameId} : phase 1 en échec — ${DETECT.message}`);
             return false;
         }
-        const DETECTED = DETECT.games || [];
+        // La game à pré-analyser vient de la base (donc After-H) : les games
+        // d'un autre jeu vues dans la vidéo sont forcément du voisinage de
+        // captation, jamais celle qu'on traite.
+        const DETECTED = (DETECT.games || []).filter(
+            (g) => (g.gameType ?? 'after-h') === 'after-h'
+        );
         if (DETECTED.length === 0) {
             console.warn(`[system-worker] ${game.gameId} : aucune game détectée dans la vidéo`);
             return false;
