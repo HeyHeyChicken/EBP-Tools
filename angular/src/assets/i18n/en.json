@@ -156,6 +156,7 @@
       },
       "capture": {
         "device": "Video source",
+        "waitingFrame": "Waiting for the first frame from the source. Screen capture only produces a frame when the screen changes: nothing is recorded while it stays still.",
         "screens": "Screens",
         "cameras": "Virtual cameras",
         "refresh": "Refresh list",

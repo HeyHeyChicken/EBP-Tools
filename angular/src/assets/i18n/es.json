@@ -156,6 +156,7 @@
       },
       "capture": {
         "device": "Fuente de vídeo",
+        "waitingFrame": "Esperando la primera imagen de la fuente. La captura de pantalla solo produce una imagen cuando la pantalla cambia: no se graba nada mientras permanezca fija.",
         "screens": "Pantallas",
         "cameras": "Cámaras virtuales",
         "refresh": "Actualizar la lista",

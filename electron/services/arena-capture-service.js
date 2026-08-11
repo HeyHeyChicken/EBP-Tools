@@ -123,6 +123,10 @@ let detectedMode = null;
 // bloque le redémarrage automatique : relancer en boucle sur une source 720p
 // ne la transformera pas en 1080p.
 let resolutionRejected = false;
+// Première image reçue de la source. Tant qu'elle n'est pas arrivée, RIEN
+// n'est enregistré : ddagrab ne produit une image que lorsque l'écran change,
+// et sur un écran figé l'attente peut durer des dizaines de secondes.
+let videoStarted = false;
 
 /**
  * Extrait les modes supportés ("1920x1080@[15.000000 60.000000]fps") du stderr
@@ -545,6 +549,7 @@ function startCapture() {
     lastError = null;
     stderrTail = [];
     resolutionRejected = false;
+    videoStarted = false;
 
     // Les index avfoundation ne sont PAS stables (un iPhone en continuité ou
     // une webcam débranchée décale tout) : on re-résout l'index par le NOM à
@@ -632,6 +637,7 @@ function startCapture() {
             const FRAME = /frame=\s*(\d+)/.exec(LINE);
             if (FRAME && Number(FRAME[1]) > 0) {
                 firstFrameSeen = true;
+                videoStarted = true;
                 // Ce délai EST le décalage que le son subirait sans armement :
                 // il mesure le temps que ffmpeg met à sortir sa première
                 // image. À comparer au décalage constaté dans le fichier.
@@ -789,6 +795,7 @@ function getStatus() {
                 : null,
         // Le renderer n'envoie du PCM que si le tube attend réellement du son.
         audio: arenaAudioService.getStatus(),
+        videoStarted,
         encoder: resolvedEncoder ? resolvedEncoder.name : null,
         startedAt,
         lastError,

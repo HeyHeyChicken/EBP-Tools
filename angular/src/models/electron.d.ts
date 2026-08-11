@@ -84,6 +84,8 @@ export interface ArenaCaptureStatus {
   lastError: string | null;
   spoolFolder: string;
   segmentSeconds: number;
+  /** Faux tant que ddagrab n'a produit aucune image : rien n'est enregistré. */
+  videoStarted: boolean;
   audio: {
     running: boolean;
     connected: boolean;

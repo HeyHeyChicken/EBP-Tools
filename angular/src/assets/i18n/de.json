@@ -156,6 +156,7 @@
       },
       "capture": {
         "device": "Videoquelle",
+        "waitingFrame": "Warten auf das erste Bild der Quelle. Die Bildschirmaufnahme liefert nur ein Bild, wenn sich der Bildschirm ändert: Solange er unverändert bleibt, wird nichts aufgezeichnet.",
         "screens": "Bildschirme",
         "cameras": "Virtuelle Kameras",
         "refresh": "Liste aktualisieren",

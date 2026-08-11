@@ -156,6 +156,7 @@
       },
       "capture": {
         "device": "Source vidéo",
+        "waitingFrame": "En attente de la première image de la source. La capture d'écran ne produit une image que lorsque l'écran change : rien n'est enregistré tant qu'il reste figé.",
         "screens": "Écrans",
         "cameras": "Caméras virtuelles",
         "refresh": "Rafraîchir la liste",

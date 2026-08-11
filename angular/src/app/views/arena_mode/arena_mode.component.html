@@ -108,6 +108,11 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   <div #audioMeter class="audio-meter"></div>
                 </div>
               </div>
+              @if (captureStatus.running && !captureStatus.videoStarted) {
+                <ebp-message>
+                  {{ 'view.arena_mode.capture.waitingFrame' | translate }}
+                </ebp-message>
+              }
               @if (captureStatus.running && !captureStatus.audio.connected) {
                 <ebp-message state="error">
                   {{ 'view.arena_mode.capture.audio.notPiped' | translate }}
