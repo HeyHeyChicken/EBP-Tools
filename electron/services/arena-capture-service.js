@@ -608,17 +608,14 @@ function startCapture() {
     startedAt = Date.now();
 
     let resolutionChecked = false;
+    // Le son n'est JAMAIS écrit avant la première image, sans exception ni
+    // délai de secours. ddagrab ne produit une image que lorsque l'écran
+    // change : sur un écran figé, la première peut mettre plusieurs dizaines
+    // de secondes à venir. Un filet qui armerait le son au bout d'un temps
+    // fixe décalerait la piste de tout l'écart restant — c'est exactement ce
+    // qui produisait les 5 s constatées en salle. Et il ne protège de rien :
+    // sans image, il n'y a pas de vidéo à accompagner.
     let firstFrameSeen = false;
-    // Filet : si la ligne de progression n'arrivait jamais, la piste audio
-    // resterait muette pour toujours. Au bout de 10 s on arme quand même —
-    // mieux vaut un son décalé qu'un enregistrement silencieux.
-    const AUDIO_FALLBACK = setTimeout(() => {
-        if (!firstFrameSeen) {
-            console.log('[arena-capture] no frame line after 10s, arming audio anyway');
-            arenaAudioService.beginPacing();
-        }
-    }, 10000);
-    PROC.on('close', () => clearTimeout(AUDIO_FALLBACK));
     PROC.stderr.on('data', (d) => {
         const LINE = d.toString().trim();
         if (!LINE) return;
