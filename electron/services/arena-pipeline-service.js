@@ -24,7 +24,9 @@ const arenaCaptureService = require('./arena-capture-service');
 //   - une game entièrement dans la fenêtre → détectée → découpée en
 //     stream-copy/remux mp4 (la captation encode déjà web-ready : H.264,
 //     GOP 1 s, +faststart au remux — AUCUN réencodage, coupe précise à ±1 s),
-//     nommée `{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{sO}-{sB}.mp4` ;
+//     nommée `{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{sO}-{sB}.mp4`
+//     — ou `cc_{roomId}_{arenaId}_{startEpoch}_{endEpoch}.mp4` pour une game
+//     Color Chaos, qui n'a ni map ni scores et ne s'identifie pas côté EVA ;
 //   - une game encore en cours à la fin de la fenêtre → invisible pour la
 //     phase 1 → retrouvée au round suivant, quand le segment contenant sa
 //     score frame sera fermé. C'est ça, la gestion du "à cheval sur deux
@@ -270,9 +272,16 @@ async function processRun(run) {
             continue;
         }
 
+        // Color Chaos : ni map, ni scores, et rien à identifier côté EVA. Nom
+        // à part (préfixe `cc_`) — il ne doit surtout pas ressembler au nom
+        // provisoire d'une game After-H, que le service d'identification
+        // essaierait de résoudre en game EVA.
         const O_SCORE = G.orangeTeam ? G.orangeTeam.score : '?';
         const B_SCORE = G.blueTeam ? G.blueTeam.score : '?';
-        const NAME = `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mp4`;
+        const NAME =
+            (G.gameType ?? 'after-h') === 'after-h'
+                ? `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mp4`
+                : `cc_${STATE.roomId}_${STATE.arenaId}_${START_EPOCH}_${END_EPOCH}.mp4`;
         const OUT = path.join(GAMES_DIR, NAME);
         // Nom déterministe → dédup entre rounds et après redémarrage.
         if (alreadyExtracted(GAMES_DIR, NAME)) {

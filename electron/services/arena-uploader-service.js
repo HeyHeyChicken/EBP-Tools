@@ -11,6 +11,8 @@ const arenaModeService = require('./arena-mode-service');
 const arenaPipelineService = require('./arena-pipeline-service');
 const {
     requestArenaUploadUrl,
+    requestColorChaosUploadUrl,
+    confirmColorChaosUpload,
     confirmArenaUpload,
     uploadFileToPresignedUrl
 } = require('./tools-api-client');
@@ -29,6 +31,10 @@ const {
 // le hook d'import s'en sert pour attacher la vidéo à l'équipe. Fichier +
 // fichier local supprimé une fois l'upload confirmé.
 //
+// Les games Color Chaos suivent le même chemin, mais sans identification (elles
+// n'existent pas côté EVA) : le pipeline les nomme `cc_…` et elles partent dans
+// leur propre zone S3, sur une route dédiée.
+//
 // V1 : plus d'analyse phase 2 (killfeed) sur le PC de salle — les joueurs sont
 // déjà connus côté serveur. Le killfeed pourra être rebranché plus tard.
 //
@@ -41,6 +47,10 @@ const {
 // {roomId}_{arenaId}_{gameId}_{SafeMap}_{start}_{end}_{scores}.mp4
 const GAME_FILE_RE =
     /^(\d+)_(\d+)_(\d+)_([A-Za-z0-9-]+)_(\d+)_(\d+)_([^_]+)\.mp4$/;
+// Game Color Chaos : `cc_{roomId}_{arenaId}_{startEpoch}_{endEpoch}.mp4`. Elle
+// arrive ici directement, sans passer par l'identification — ces games
+// n'existent pas côté EVA, il n'y a pas de gameId à leur trouver.
+const COLOR_CHAOS_FILE_RE = /^cc_(\d+)_(\d+)_(\d+)_(\d+)\.mp4$/;
 const RETRY_BASE_DELAY_MS = 30 * 1000;
 const RETRY_MAX_DELAY_MS = 10 * 60 * 1000;
 // Re-scan périodique de games/ : rattrape les games identifiées par un simple
@@ -80,34 +90,34 @@ function moveToFailed(filePath) {
 }
 
 /**
- * Upload S3 avec retry persistant. On envoie le `gameId` EVA : c'est le serveur
- * qui en déduit la clé (`statistics/replays/{T_Games.guid}.mp4`), Tools ne nomme
- * jamais l'objet. Clé déterministe → un retry réécrit le même objet.
+ * Une game prête à partir : After-H déjà identifiée (7 champs, gameId en 3e
+ * position) ou Color Chaos. Une game After-H pas encore identifiée porte un nom
+ * à 6 champs et reste donc invisible pour l'uploader.
  */
-async function uploadWithPersistentRetry(filePath, gameId, ids, token) {
+function isUploadable(name) {
+    return GAME_FILE_RE.test(name) || COLOR_CHAOS_FILE_RE.test(name);
+}
+
+/** La vidéo est en place côté S3 : on libère le disque de la salle. */
+function cleanup(filePath) {
+    try {
+        fs.unlinkSync(filePath);
+    } catch (e) {
+        console.error('[arena-uploader] cleanup failed:', filePath, e.message);
+    }
+}
+
+/**
+ * Boucle de retry persistante. `attempt` doit faire l'aller-retour COMPLET
+ * (URL fraîche + PUT) : c'est ce qui rend le retry sûr, l'URL présignée d'une
+ * tentative ratée pouvant avoir expiré.
+ */
+async function withPersistentRetry(attempt) {
     let delay = RETRY_BASE_DELAY_MS;
     for (;;) {
         if (stopRequested) throw new Error('uploader stopped');
         try {
-            const UPLOAD = await requestArenaUploadUrl(
-                { roomId: ids.roomId, arenaId: ids.arenaId, gameId },
-                token
-            );
-            await uploadFileToPresignedUrl(UPLOAD.url, filePath, {
-                contentType: 'video/mp4'
-            });
-            // Confirme l'upload : le serveur vérifie l'objet en S3 puis indexe la
-            // vidéo (T_Terrain_Videos). Best-effort — l'objet est déjà en S3, la
-            // réconciliation serveur rattrape un échec de confirmation.
-            try {
-                await confirmArenaUpload(
-                    { roomId: ids.roomId, arenaId: ids.arenaId, gameId },
-                    token
-                );
-            } catch (e) {
-                console.warn(`[arena-uploader] confirm-upload failed (${e.message}), serveur réconciliera`);
-            }
-            return UPLOAD.guid;
+            return await attempt();
         } catch (e) {
             lastError = e.message;
             console.warn(
@@ -117,6 +127,61 @@ async function uploadWithPersistentRetry(filePath, gameId, ids, token) {
             delay = Math.min(delay * 2, RETRY_MAX_DELAY_MS);
         }
     }
+}
+
+/**
+ * Upload S3 avec retry persistant. On envoie le `gameId` EVA : c'est le serveur
+ * qui en déduit la clé (`statistics/replays/{T_Games.guid}.mp4`), Tools ne nomme
+ * jamais l'objet. Clé déterministe → un retry réécrit le même objet.
+ */
+function uploadWithPersistentRetry(filePath, gameId, ids, token) {
+    return withPersistentRetry(async () => {
+        const UPLOAD = await requestArenaUploadUrl(
+            { roomId: ids.roomId, arenaId: ids.arenaId, gameId },
+            token
+        );
+        await uploadFileToPresignedUrl(UPLOAD.url, filePath, {
+            contentType: 'video/mp4'
+        });
+        // Confirme l'upload : le serveur vérifie l'objet en S3 puis indexe la
+        // vidéo (T_Terrain_Videos). Best-effort — l'objet est déjà en S3, la
+        // réconciliation serveur rattrape un échec de confirmation.
+        try {
+            await confirmArenaUpload(
+                { roomId: ids.roomId, arenaId: ids.arenaId, gameId },
+                token
+            );
+        } catch (e) {
+            console.warn(`[arena-uploader] confirm-upload failed (${e.message}), serveur réconciliera`);
+        }
+        return UPLOAD.guid;
+    });
+}
+
+/**
+ * Idem pour une game Color Chaos : le serveur compose la clé à partir de
+ * l'epoch de début de game.
+ *
+ * La confirmation est DANS la tentative, pas en best-effort comme pour
+ * l'After-H : elle est ce qui rend le replay visible dans l'Espace Arena (rien
+ * ne réconcilie ce préfixe, il n'y a pas de game en base pour rattraper). Si
+ * elle échoue, on rejoue tout — le PUT réécrit le même objet, la clé étant
+ * déterministe.
+ */
+function uploadColorChaosWithPersistentRetry(filePath, startedAtEpoch, ids, token) {
+    const PAYLOAD = {
+        roomId: ids.roomId,
+        arenaId: ids.arenaId,
+        startedAtEpoch
+    };
+    return withPersistentRetry(async () => {
+        const UPLOAD = await requestColorChaosUploadUrl(PAYLOAD, token);
+        await uploadFileToPresignedUrl(UPLOAD.url, filePath, {
+            contentType: 'video/mp4'
+        });
+        await confirmColorChaosUpload(PAYLOAD, token);
+        return UPLOAD.key;
+    });
 }
 
 /**
@@ -132,6 +197,24 @@ async function processGame(filePath) {
     const IDS = { roomId: STATE.roomId, arenaId: STATE.arenaId };
     const NAME = path.basename(filePath);
 
+    const CC = NAME.match(COLOR_CHAOS_FILE_RE);
+    if (CC) {
+        const STARTED_AT = parseInt(CC[3], 10);
+        console.log(`[arena-uploader] processing ${NAME} (Color Chaos)`);
+        const KEY = await uploadColorChaosWithPersistentRetry(
+            filePath,
+            STARTED_AT,
+            IDS,
+            TOKEN
+        );
+        console.log(`[arena-uploader] uploaded as ${KEY}`);
+        cleanup(filePath);
+        uploadedCount++;
+        lastError = null;
+        console.log('[arena-uploader] done', NAME);
+        return 'done';
+    }
+
     if (!GAME_FILE_RE.test(NAME)) {
         console.warn('[arena-uploader] unparseable name →', NAME);
         moveToFailed(filePath);
@@ -144,12 +227,7 @@ async function processGame(filePath) {
 
     const GUID = await uploadWithPersistentRetry(filePath, GAME_ID, IDS, TOKEN);
     console.log(`[arena-uploader] uploaded as ${GUID}.mp4`);
-    // La vidéo est en place à l'emplacement définitif : on libère le disque.
-    try {
-        fs.unlinkSync(filePath);
-    } catch (e) {
-        console.error('[arena-uploader] cleanup failed:', filePath, e.message);
-    }
+    cleanup(filePath);
     uploadedCount++;
     lastError = null;
     console.log('[arena-uploader] done', NAME);
@@ -205,7 +283,7 @@ function rescanGames() {
         return;
     }
     for (const NAME of entries) {
-        if (GAME_FILE_RE.test(NAME)) enqueue(path.join(DIR, NAME));
+        if (isUploadable(NAME)) enqueue(path.join(DIR, NAME));
     }
 }
 
@@ -227,7 +305,7 @@ function start() {
         awaitWriteFinish: { stabilityThreshold: 3000, pollInterval: 500 }
     });
     watcher.on('add', (p) => {
-        if (GAME_FILE_RE.test(path.basename(p))) enqueue(p);
+        if (isUploadable(path.basename(p))) enqueue(p);
     });
     watcher.on('error', (e) =>
         console.error('[arena-uploader] watcher error', e)
