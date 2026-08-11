@@ -105,7 +105,10 @@ function start() {
  * placé au tout début de l'enregistrement.
  */
 function beginPacing() {
-    if (pacing) return;
+    // Pas de tube ouvert : la captation est sans piste son (source caméra, ou
+    // plateforme sans loopback). Sortir sans bruit évite d'annoncer un son qui
+    // n'existe pas.
+    if (!server || pacing) return;
     resetPacing();
     pacing = true;
     console.log('[arena-audio] pacing armed on first video frame');
