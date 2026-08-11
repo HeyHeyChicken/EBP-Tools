@@ -39,8 +39,11 @@ REM ffmpeg embarque du repo (meme binaire que celui utilise par Tools).
 set "FFMPEG=%~dp0binaries\ffmpeg\win32.exe"
 if not exist "%FFMPEG%" set "FFMPEG=ffmpeg"
 
-REM Video donnee par son seul nom : on la cherche dans le spool.
+REM Video donnee par son seul nom : on la cherche dans le spool de destination,
+REM puis dans le spool par defaut — la destination peut etre un dossier d'essai
+REM alors que la video, elle, est dans le vrai spool.
 if not exist "%SRC%" if exist "%SPOOL%\%SRC%" set "SRC=%SPOOL%\%SRC%"
+if not exist "%SRC%" if exist "%USERPROFILE%\EBP-Tools-Arena\spool\%SRC%" set "SRC=%USERPROFILE%\EBP-Tools-Arena\spool\%SRC%"
 if not exist "%SRC%" (
     echo !! Video introuvable : %SRC%
     exit /b 1

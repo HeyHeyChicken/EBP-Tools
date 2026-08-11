@@ -39,9 +39,10 @@ const MGAST_RE = /__mgast-(\d+)/;
 // ensemble (validés côté front + server.js avant encodage).
 const FOS_RE = /__fos-(\d+)/;
 const FBS_RE = /__fbs-(\d+)/;
-// Équipe ciblée pour le matching serveur (/identify) : ID du chef d'équipe choisi
-// côté front. Présent à chaque analyse lancée depuis le site.
-const TID_RE = /__tid-(\d+)/;
+// Équipe ciblée pour le matching serveur (/identify) : guid public de l'équipe
+// choisie côté front. Présent à chaque analyse lancée depuis le site.
+const TID_RE =
+    /__tid-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
 // Nombre de games analysées en profondeur en parallèle (un process Python par
 // game). Ajuster selon les retours terrain : plus on monte, plus on sature CPU
 // / mémoire (chaque process recharge tesseract, templates, ouvre sa propre
@@ -91,7 +92,7 @@ function removeSidecar(videoPath) {
 /**
  * Extrait les valeurs `maxTimePerGame`, `maxGamesAtSameTime`, scores forcés et
  * `teamId` encodées dans le nom du fichier par `analyzeVideoFile` (suffixes
- * `__mtpg-N`, `__mgast-M`, `__fos-/__fbs-` et `__tid-N` avant l'extension),
+ * `__mtpg-N`, `__mgast-M`, `__fos-/__fbs-` et `__tid-<guid>` avant l'extension),
  * plus les `gameGuids` du sidecar JSON éventuel, et renvoie un basename
  * "propre" pour l'aval (cut filenames, sourceFilename API).
  * Si un suffixe est absent (fichier déposé manuellement), la valeur
@@ -312,7 +313,7 @@ function notifyStatusChange() {
  * @param {'queued'|'analyzing'|'processing'|'done'|'failed'} phase
  * @param {number} percent  0-100 sur l'échelle unifiée.
  * @param {string|undefined} teamId  équipe de DESTINATION choisie dans Tools
- *   (suffixe `__tid-N`) — permet à un chef qui coache une autre équipe de cibler
+ *   (suffixe `__tid-<guid>`) — permet à un chef qui coache une autre équipe de cibler
  *   la bonne. Transmise au backend ; `undefined` (dépôt manuel) → null en base.
  * @param {string|undefined} token  jeton du compte qui a lancé cette analyse.
  */

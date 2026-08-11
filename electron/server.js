@@ -1134,9 +1134,13 @@ if (!APP_GOT_THE_LOCK) {
             isValidScore(data.forcedBlueScore)
                 ? `__fos-${data.forcedOrangeScore}__fbs-${data.forcedBlueScore}`
                 : '';
-        // Équipe ciblée pour le matching serveur (/identify). ID numérique uniquement.
+        // Équipe ciblée pour le matching serveur (/identify). Guid public de
+        // l'équipe (le site n'expose plus l'ID numérique).
         const TEAM_ID =
-            typeof data.teamId === 'string' && /^\d+$/.test(data.teamId)
+            typeof data.teamId === 'string' &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                data.teamId
+            )
                 ? `__tid-${data.teamId}`
                 : '';
         // Games ciblées (action groupée « Analyser » côté site) : /identify ne
