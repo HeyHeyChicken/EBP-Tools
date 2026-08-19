@@ -32,19 +32,49 @@ class DenoService {
     /**
      * Ensure Deno is available, downloading it on first use.
      * Unlike yt-dlp, Deno does not need to track YouTube changes, so no
-     * update check is performed once the binary is present.
+     * update check is performed once the binary is present — seulement un
+     * contrôle qu'il s'exécute.
      * @returns {Promise<string>} Path to the ready-to-use Deno binary
      */
     async ensureDeno() {
         const DENO_PATH = this.getDenoPath();
+
         if (fs.existsSync(DENO_PATH)) {
-            return DENO_PATH;
+            if (await this._isUsable(DENO_PATH)) {
+                return DENO_PATH;
+            }
+            console.warn('[DENO] Local binary unusable, downloading again.');
+        } else {
+            console.log('[DENO] Binary not found, downloading...');
         }
 
-        console.log('[DENO] Binary not found, downloading...');
         await this.downloadDeno();
         console.log('[DENO] Download complete.');
         return DENO_PATH;
+    }
+
+    /**
+     * Check that the binary in place actually runs. The atomic extraction
+     * makes a truncated binary impossible to produce, but one left by a
+     * version of the app that predates it would otherwise pass for valid,
+     * `ensureDeno` testing only its presence.
+     * @private
+     * @param {string} denoPath Path to the Deno binary.
+     * @returns {Promise<boolean>} True if the binary answers `--version`.
+     */
+    _isUsable(denoPath) {
+        return new Promise((resolve) => {
+            try {
+                execFile(denoPath, ['--version'], { timeout: 10000 }, (error) =>
+                    resolve(!error)
+                );
+            } catch (error) {
+                // `spawn` échoue de façon synchrone quand le fichier n'est pas
+                // un exécutable valide (ENOEXEC) — le cas même qu'on cherche à
+                // détecter, donc il ne doit pas remonter.
+                resolve(false);
+            }
+        });
     }
 
     /**
