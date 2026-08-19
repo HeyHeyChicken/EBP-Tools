@@ -63,6 +63,7 @@ module.exports = {
             name: '@electron-forge/maker-squirrel',
             config: {
                 setupIcon: './electron/assets/icon.ico',
+                loadingGif: './electron/assets/install.gif',
                 description: 'EBP - Tools'
             }
         },
