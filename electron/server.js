@@ -132,12 +132,25 @@ if (!APP_GOT_THE_LOCK) {
         NUMBER_OF_OPENINGS + 1
     );
 
+    // NEUTRALISÉ LE TEMPS D'UN TEST — relance silencieuse au premier lancement
+    // (cf. 66c2062c « auto reboot after install »). Sa raison d'être n'est
+    // documentée nulle part ; l'hypothèse est l'enregistrement du protocole
+    // `tools://` juste au-dessus, que Squirrel ne verrait pas au tout premier
+    // démarrage. À vérifier sous Windows : installer, puis ouvrir un deeplink
+    // `tools://` sans relancer l'app à la main. Si ça marche, ce bloc peut
+    // disparaître ; sinon, le remettre et documenter pourquoi.
+    //
+    // À noter : `numberOfOpenings` vit dans temporary_settings.json, stocké
+    // dans le dossier de l'app — donc remis à zéro à CHAQUE mise à jour, et
+    // pas seulement à la première installation.
+    /*
     if (NUMBER_OF_OPENINGS === 0) {
         app.relaunch();
         destroyMainWindow();
         app.quit();
         return;
     }
+    */
 
     //#region Express Server Setup
 
