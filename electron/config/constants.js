@@ -5,9 +5,9 @@
 const os = require('os');
 const path = require('node:path');
 const fs = require('fs');
-const { execSync } = require('child_process');
 const { default: getPort } = require('get-port');
 const { app } = require('electron');
+const COMPONENTS = require('./components.json');
 
 /**
  * Application constants and configuration values
@@ -17,31 +17,22 @@ const { app } = require('electron');
 //#region Functions
 
 /**
- * Get the path to the FFmpeg binary based on the current platform and environment
- * @returns {string} Path to FFmpeg executable
+ * Get the path to a component downloaded at runtime (see component-service).
+ * The path is derivable before the file exists: only its presence is
+ * conditional, so the call sites keep using a plain constant.
+ * @param {string} name Component name, as keyed in components.json.
+ * @returns {string} Path to the component's executable.
  */
-function getFFmpegPath(osPlatform, isDevMode, rootPath) {
-    if (osPlatform === 'linux') {
-        try {
-            return execSync('which ffmpeg').toString().trim();
-        } catch (error) {
-            console.error('FFmpeg not found in PATH on Linux');
-            throw new Error('FFmpeg binary not found');
-        }
+function getComponentPath(name) {
+    const ENTRY = COMPONENTS[name]?.[COMPONENT_PLATFORM_KEY];
+
+    if (!ENTRY) {
+        throw new Error(
+            `No "${name}" component published for ${COMPONENT_PLATFORM_KEY}`
+        );
     }
 
-    const DIRECTORY = isDevMode ? '../binaries/ffmpeg' : 'ffmpeg';
-
-    if (osPlatform === 'win32') {
-        return path.join(rootPath, DIRECTORY, 'win32.exe');
-    }
-
-    // macOS ships per-architecture binaries (darwin-arm64 / darwin-x64).
-    if (osPlatform === 'darwin') {
-        return path.join(rootPath, DIRECTORY, `darwin-${process.arch}`);
-    }
-
-    return path.join(rootPath, DIRECTORY, osPlatform);
+    return path.join(COMPONENTS_DIR, ENTRY.asset);
 }
 
 /**
@@ -65,7 +56,12 @@ const EBP_DOMAIN = 'evabattleplan.com';
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const ROOT_PATH = IS_DEV_MODE ? path.dirname(__dirname) : process.resourcesPath;
 const OS_PLATFORM = os.platform();
-const FFMPEG_PATH = getFFmpegPath(OS_PLATFORM, IS_DEV_MODE, ROOT_PATH);
+// Clé de plateforme des composants téléchargés : macOS publie un binaire par
+// architecture, les autres plateformes un seul.
+const COMPONENT_PLATFORM_KEY =
+    OS_PLATFORM === 'darwin' ? `darwin-${process.arch}` : OS_PLATFORM;
+const COMPONENTS_DIR = path.join(app.getPath('userData'), 'components');
+const FFMPEG_PATH = getComponentPath('ffmpeg');
 const ANALYZER_PATH = getAnalyzerPath(OS_PLATFORM, IS_DEV_MODE, ROOT_PATH);
 const PERMANENT_SETTINGS_PATH = path.join(
     app.getPath('userData'),
@@ -125,6 +121,10 @@ module.exports = {
 
     FFMPEG_PATH,
     ANALYZER_PATH,
+
+    COMPONENTS,
+    COMPONENTS_DIR,
+    COMPONENT_PLATFORM_KEY,
 
     PERMANENT_SETTINGS_PATH,
     TEMPORARY_SETTINGS_PATH,

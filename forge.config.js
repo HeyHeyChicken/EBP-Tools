@@ -14,7 +14,6 @@ module.exports = {
             './angular/dist/angular/browser/',
             './electron/assets/',
             './electron/template.xlsx',
-            './binaries/ffmpeg/',
             './binaries/analyzer/',
             './app-update.yml'
         ],
@@ -167,7 +166,6 @@ module.exports = {
                 );
 
                 const BINARIES = [
-                    path.join(RESOURCES_BASE, 'ffmpeg', 'darwin-' + ARCH),
                     // onedir: executable is inside the darwin/ directory
                     path.join(RESOURCES_BASE, 'analyzer', 'darwin', 'darwin')
                 ];

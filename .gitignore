@@ -1,4 +1,6 @@
 /node_modules
+# ffmpeg est téléchargé au démarrage (voir component-service), plus versionné.
+/binaries/ffmpeg
 /out
 /.webpack
 .DS_Store

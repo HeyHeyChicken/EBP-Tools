@@ -534,6 +534,16 @@ function getMainWindow() {
 }
 
 /**
+ * Gets the current floating window instance. Used to push progress to the
+ * notification HMI when the main window does not exist yet (component
+ * download at boot).
+ * @returns {BrowserWindow|undefined} The floating window instance
+ */
+function getFloatingWindow() {
+    return floatingWindow;
+}
+
+/**
  * Sets the debug mode state
  * @param {boolean} mode Debug mode state to set
  */
@@ -548,6 +558,7 @@ module.exports = {
     createWindow,
     switchDebugMode,
     getMainWindow,
+    getFloatingWindow,
     setDebugMode,
     hideMainWindow,
     showMainWindow
