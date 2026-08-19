@@ -56,23 +56,35 @@ class DenoService {
         const DOWNLOAD_URL = `https://github.com/denoland/deno/releases/latest/download/${this._getAssetName()}`;
         const ZIP_PATH = path.join(app.getPath('userData'), 'deno.zip');
         const DENO_PATH = this.getDenoPath();
+        // On extrait dans un dossier temporaire : le binaire n'apparaît à son
+        // emplacement final qu'entier, par un renommage. Sans ça, une
+        // extraction interrompue laisse un deno tronqué, que `ensureDeno`
+        // considère comme valide puisqu'il ne teste que sa présence.
+        const TEMPORARY_DIR = path.join(app.getPath('userData'), 'deno.part');
 
         console.log(`[DENO] Downloading from: ${DOWNLOAD_URL}`);
 
         try {
-            await this._downloadFile(DOWNLOAD_URL, ZIP_PATH);
-            await this._extractZip(ZIP_PATH, path.dirname(DENO_PATH));
+            fs.rmSync(TEMPORARY_DIR, { recursive: true, force: true });
+            fs.mkdirSync(TEMPORARY_DIR, { recursive: true });
 
-            if (!fs.existsSync(DENO_PATH)) {
+            await this._downloadFile(DOWNLOAD_URL, ZIP_PATH);
+            await this._extractZip(ZIP_PATH, TEMPORARY_DIR);
+
+            const EXTRACTED_PATH = path.join(
+                TEMPORARY_DIR,
+                path.basename(DENO_PATH)
+            );
+            if (!fs.existsSync(EXTRACTED_PATH)) {
                 throw new Error('Deno binary missing after extraction');
             }
             if (this.OS_PLATFORM !== 'win32') {
-                fs.chmodSync(DENO_PATH, 0o755);
+                fs.chmodSync(EXTRACTED_PATH, 0o755);
             }
+            fs.renameSync(EXTRACTED_PATH, DENO_PATH);
         } finally {
-            if (fs.existsSync(ZIP_PATH)) {
-                fs.unlinkSync(ZIP_PATH);
-            }
+            fs.rmSync(ZIP_PATH, { force: true });
+            fs.rmSync(TEMPORARY_DIR, { recursive: true, force: true });
         }
     }
 

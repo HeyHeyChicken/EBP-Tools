@@ -50,15 +50,34 @@ class YtDlpService {
             return YT_DLP_PATH;
         }
 
+        // Le binaire présent est-il exploitable ? Un téléchargement interrompu
+        // laisse un fichier tronqué, que la seule vérification d'existence
+        // ci-dessus considère comme valide. On le remplace, au lieu de rendre
+        // un chemin qui échouera à chaque usage.
+        let localVersion;
+        try {
+            localVersion = await this.getLocalVersion();
+        } catch (error) {
+            console.warn(
+                '[YT-DLP] Local binary unusable, downloading again:',
+                error.message
+            );
+            onProgress(0, 'downloading');
+
+            const LATEST_VERSION = await this.getLatestVersion();
+            await this.downloadYtDlp(LATEST_VERSION, onProgress);
+
+            return YT_DLP_PATH;
+        }
+
         // Check for updates
         try {
-            const LOCAL_VERSION = await this.getLocalVersion();
             const LATEST_VERSION = await this.getLatestVersion();
 
-            console.log(`[YT-DLP] Local version: ${LOCAL_VERSION}`);
+            console.log(`[YT-DLP] Local version: ${localVersion}`);
             console.log(`[YT-DLP] Latest version: ${LATEST_VERSION}`);
 
-            if (LOCAL_VERSION !== LATEST_VERSION) {
+            if (localVersion !== LATEST_VERSION) {
                 console.log('[YT-DLP] Update available, downloading...');
                 onProgress(0, 'updating');
 
@@ -94,11 +113,15 @@ class YtDlpService {
         const ASSET_NAME = ASSET_NAMES[this.OS_PLATFORM] || 'yt-dlp_linux';
         const DOWNLOAD_URL = `https://github.com/yt-dlp/yt-dlp/releases/download/${version}/${ASSET_NAME}`;
         const OUTPUT_PATH = this.getYtDlpPath();
+        // Le binaire n'apparaît à son emplacement final qu'entier : on écrit
+        // dans un temporaire et on renomme. Une interruption ne laisse alors
+        // qu'un `.part` ignoré, jamais un yt-dlp tronqué.
+        const TEMPORARY_PATH = `${OUTPUT_PATH}.part`;
 
         console.log(`[YT-DLP] Downloading from: ${DOWNLOAD_URL}`);
 
         return new Promise((resolve, reject) => {
-            const FILE = fs.createWriteStream(OUTPUT_PATH);
+            const FILE = fs.createWriteStream(TEMPORARY_PATH);
 
             const REQUEST = https.get(DOWNLOAD_URL, (response) => {
                 // Handle redirects (GitHub uses redirects for releases)
@@ -108,12 +131,13 @@ class YtDlpService {
                     response.headers.location
                 ) {
                     FILE.close();
-                    if (fs.existsSync(OUTPUT_PATH)) {
-                        fs.unlinkSync(OUTPUT_PATH);
+                    if (fs.existsSync(TEMPORARY_PATH)) {
+                        fs.unlinkSync(TEMPORARY_PATH);
                     }
 
                     // Create a new write stream for the redirected request
-                    const REDIRECTED_FILE = fs.createWriteStream(OUTPUT_PATH);
+                    const REDIRECTED_FILE =
+                        fs.createWriteStream(TEMPORARY_PATH);
 
                     https
                         .get(
@@ -122,6 +146,7 @@ class YtDlpService {
                                 this._handleDownloadResponse(
                                     redirectedResponse,
                                     REDIRECTED_FILE,
+                                    TEMPORARY_PATH,
                                     OUTPUT_PATH,
                                     onProgress,
                                     resolve,
@@ -131,8 +156,8 @@ class YtDlpService {
                         )
                         .on('error', (err) => {
                             REDIRECTED_FILE.close();
-                            if (fs.existsSync(OUTPUT_PATH)) {
-                                fs.unlinkSync(OUTPUT_PATH);
+                            if (fs.existsSync(TEMPORARY_PATH)) {
+                                fs.unlinkSync(TEMPORARY_PATH);
                             }
                             reject(err);
                         });
@@ -142,6 +167,7 @@ class YtDlpService {
                 this._handleDownloadResponse(
                     response,
                     FILE,
+                    TEMPORARY_PATH,
                     OUTPUT_PATH,
                     onProgress,
                     resolve,
@@ -151,8 +177,8 @@ class YtDlpService {
 
             REQUEST.on('error', (err) => {
                 FILE.close();
-                if (fs.existsSync(OUTPUT_PATH)) {
-                    fs.unlinkSync(OUTPUT_PATH);
+                if (fs.existsSync(TEMPORARY_PATH)) {
+                    fs.unlinkSync(TEMPORARY_PATH);
                 }
                 reject(err);
             });
@@ -166,6 +192,7 @@ class YtDlpService {
     _handleDownloadResponse(
         response,
         file,
+        temporaryPath,
         outputPath,
         onProgress,
         resolve,
@@ -173,8 +200,8 @@ class YtDlpService {
     ) {
         if (response.statusCode !== 200) {
             file.close();
-            if (fs.existsSync(outputPath)) {
-                fs.unlinkSync(outputPath);
+            if (fs.existsSync(temporaryPath)) {
+                fs.unlinkSync(temporaryPath);
             }
             reject(
                 new Error(
@@ -200,9 +227,12 @@ class YtDlpService {
         file.on('finish', () => {
             file.close(() => {
                 // Make executable on macOS and Linux
-                if (this.OS_PLATFORM === 'darwin' || this.OS_PLATFORM === 'linux') {
+                if (
+                    this.OS_PLATFORM === 'darwin' ||
+                    this.OS_PLATFORM === 'linux'
+                ) {
                     try {
-                        fs.chmodSync(outputPath, 0o755);
+                        fs.chmodSync(temporaryPath, 0o755);
                         console.log('[YT-DLP] Made binary executable');
                     } catch (err) {
                         console.error(
@@ -212,14 +242,25 @@ class YtDlpService {
                     }
                 }
 
+                try {
+                    // Remplace l'éventuel binaire précédent (mise à jour).
+                    fs.renameSync(temporaryPath, outputPath);
+                } catch (err) {
+                    if (fs.existsSync(temporaryPath)) {
+                        fs.unlinkSync(temporaryPath);
+                    }
+                    reject(err);
+                    return;
+                }
+
                 resolve();
             });
         });
 
         file.on('error', (err) => {
             file.close();
-            if (fs.existsSync(outputPath)) {
-                fs.unlinkSync(outputPath);
+            if (fs.existsSync(temporaryPath)) {
+                fs.unlinkSync(temporaryPath);
             }
             reject(err);
         });
