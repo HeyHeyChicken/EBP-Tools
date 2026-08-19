@@ -51,7 +51,6 @@ const {
     switchDebugMode,
     getMainWindow,
     setDebugMode,
-    destroyMainWindow,
     hideMainWindow,
     showMainWindow
 } = require('./core/window-manager');
@@ -131,13 +130,6 @@ if (!APP_GOT_THE_LOCK) {
         NUMBER_OF_OPENINGS_KEY,
         NUMBER_OF_OPENINGS + 1
     );
-
-    if (NUMBER_OF_OPENINGS === 0) {
-        app.relaunch();
-        destroyMainWindow();
-        app.quit();
-        return;
-    }
 
     //#region Express Server Setup
 

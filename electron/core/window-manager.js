@@ -518,12 +518,6 @@ function getMainWindow() {
     return mainWindow;
 }
 
-function destroyMainWindow() {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.destroy();
-    }
-}
-
 /**
  * Sets the debug mode state
  * @param {boolean} mode Debug mode state to set
@@ -540,7 +534,6 @@ module.exports = {
     switchDebugMode,
     getMainWindow,
     setDebugMode,
-    destroyMainWindow,
     hideMainWindow,
     showMainWindow
 };
