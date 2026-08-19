@@ -518,6 +518,16 @@ function getMainWindow() {
     return mainWindow;
 }
 
+/**
+ * Gets the current floating window instance. Used to push progress to the
+ * notification HMI when the main window does not exist yet (component
+ * download at boot).
+ * @returns {BrowserWindow|undefined} The floating window instance
+ */
+function getFloatingWindow() {
+    return floatingWindow;
+}
+
 function destroyMainWindow() {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.destroy();
@@ -539,6 +549,7 @@ module.exports = {
     createWindow,
     switchDebugMode,
     getMainWindow,
+    getFloatingWindow,
     setDebugMode,
     destroyMainWindow,
     hideMainWindow,

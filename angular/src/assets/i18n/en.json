@@ -9,6 +9,7 @@
     "save": "Save",
     "search": "Search",
     "updatingInProgress": "Updating in progress, please wait.",
+    "downloadingComponents": "Downloading components, please wait.",
     "encoding": "Encoding in progress…",
     "encoded": "The video has been successfully encoded!",
     "download": "Download",

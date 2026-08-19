@@ -8,6 +8,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const { default: getPort } = require('get-port');
 const { app } = require('electron');
+const COMPONENTS = require('./components.json');
 
 /**
  * Application constants and configuration values
@@ -30,18 +31,43 @@ function getFFmpegPath(osPlatform, isDevMode, rootPath) {
         }
     }
 
-    const DIRECTORY = isDevMode ? '../binaries/ffmpeg' : 'ffmpeg';
+    if (isDevMode) {
+        const DIRECTORY = '../binaries/ffmpeg';
 
-    if (osPlatform === 'win32') {
-        return path.join(rootPath, DIRECTORY, 'win32.exe');
+        if (osPlatform === 'win32') {
+            return path.join(rootPath, DIRECTORY, 'win32.exe');
+        }
+
+        // macOS ships per-architecture binaries (darwin-arm64 / darwin-x64).
+        if (osPlatform === 'darwin') {
+            return path.join(rootPath, DIRECTORY, `darwin-${process.arch}`);
+        }
+
+        return path.join(rootPath, DIRECTORY, osPlatform);
     }
 
-    // macOS ships per-architecture binaries (darwin-arm64 / darwin-x64).
-    if (osPlatform === 'darwin') {
-        return path.join(rootPath, DIRECTORY, `darwin-${process.arch}`);
+    // En production, ffmpeg n'est plus embarqué dans l'installeur : il est
+    // téléchargé au premier lancement par component-service.
+    return getComponentPath('ffmpeg');
+}
+
+/**
+ * Get the path to a component downloaded at runtime (see component-service).
+ * The path is derivable before the file exists: only its presence is
+ * conditional, so the call sites keep using a plain constant.
+ * @param {string} name Component name, as keyed in components.json.
+ * @returns {string} Path to the component's executable.
+ */
+function getComponentPath(name) {
+    const ENTRY = COMPONENTS[name]?.[COMPONENT_PLATFORM_KEY];
+
+    if (!ENTRY) {
+        throw new Error(
+            `No "${name}" component published for ${COMPONENT_PLATFORM_KEY}`
+        );
     }
 
-    return path.join(rootPath, DIRECTORY, osPlatform);
+    return path.join(COMPONENTS_DIR, ENTRY.asset);
 }
 
 /**
@@ -65,6 +91,11 @@ const EBP_DOMAIN = 'evabattleplan.com';
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const ROOT_PATH = IS_DEV_MODE ? path.dirname(__dirname) : process.resourcesPath;
 const OS_PLATFORM = os.platform();
+// Clé de plateforme des composants téléchargés : macOS publie un binaire par
+// architecture, les autres plateformes un seul.
+const COMPONENT_PLATFORM_KEY =
+    OS_PLATFORM === 'darwin' ? `darwin-${process.arch}` : OS_PLATFORM;
+const COMPONENTS_DIR = path.join(app.getPath('userData'), 'components');
 const FFMPEG_PATH = getFFmpegPath(OS_PLATFORM, IS_DEV_MODE, ROOT_PATH);
 const ANALYZER_PATH = getAnalyzerPath(OS_PLATFORM, IS_DEV_MODE, ROOT_PATH);
 const PERMANENT_SETTINGS_PATH = path.join(
@@ -125,6 +156,10 @@ module.exports = {
 
     FFMPEG_PATH,
     ANALYZER_PATH,
+
+    COMPONENTS,
+    COMPONENTS_DIR,
+    COMPONENT_PLATFORM_KEY,
 
     PERMANENT_SETTINGS_PATH,
     TEMPORARY_SETTINGS_PATH,

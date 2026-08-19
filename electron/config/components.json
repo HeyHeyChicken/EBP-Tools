@@ -1,0 +1,16 @@
+{
+    "ffmpeg": {
+        "darwin-arm64": {
+            "asset": "ffmpeg-darwin-arm64-a90e3db6a3fd",
+            "sha256": "a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584"
+        },
+        "darwin-x64": {
+            "asset": "ffmpeg-darwin-x64-cfe20936c83e",
+            "sha256": "cfe20936c83ecf5d68e424b87e8cc45b24dd6be81787810123bb964a0df686f9"
+        },
+        "win32": {
+            "asset": "ffmpeg-win32-233d60c6399e.exe",
+            "sha256": "233d60c6399e6125c6ea4ed8c9c6139a6ce335464e931916e006a36cf205b8f7"
+        }
+    }
+}

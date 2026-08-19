@@ -7,11 +7,13 @@ permissions:
 
 name: Build Windows, macOS and Linux binaries
 
-# The CICD will be launched for each tag created.
+# The CICD will be launched for each tag created, except `0-components`, which
+# only carries the runtime components (ffmpeg, ...) and is never a release.
 on:
     push:
         tags:
             - '*'
+            - '!0-components'
 
 jobs:
     # Run Jest tests.
