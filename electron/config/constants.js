@@ -60,6 +60,12 @@ function getComponentPath(name) {
 
 const EBP_DOMAIN = 'evabattleplan.com';
 
+// Dépôt GitHub interrogé pour les mises à jour. En production la valeur est
+// figée à la construction par webpack (cf. webpack.main.config.js) ; en dev,
+// la variable d'environnement est lue au lancement. Défaut : la production.
+const UPDATE_REPOSITORY =
+    process.env.TOOLS_UPDATE_REPOSITORY || 'EBP-gg/Tools';
+
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const ROOT_PATH = IS_DEV_MODE ? path.dirname(__dirname) : process.resourcesPath;
 const OS_PLATFORM = os.platform();
@@ -130,6 +136,7 @@ function getCurrentPort() {
 
 module.exports = {
     EBP_DOMAIN,
+    UPDATE_REPOSITORY,
 
     IS_DEV_MODE,
     ROOT_PATH,

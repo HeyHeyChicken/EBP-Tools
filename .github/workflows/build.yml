@@ -7,6 +7,13 @@ permissions:
 
 name: Build Windows, macOS and Linux binaries
 
+# Une build interroge pour ses mises à jour le dépôt qui l'a produite : sur le
+# banc d'essai elle reste isolée, sur le dépôt de production la valeur retombe
+# d'elle-même sur la production. Rien à surcharger à la main, et rien de
+# dangereux à fusionner d'un dépôt vers l'autre.
+env:
+    TOOLS_UPDATE_REPOSITORY: ${{ github.repository }}
+
 # The CICD will be launched for each tag created.
 on:
     push:

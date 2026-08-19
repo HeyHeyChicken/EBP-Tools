@@ -17,7 +17,7 @@ const {
     deleteFloatingWindow
 } = require('../core/window-manager');
 const StorageManager = require('../core/storage-manager');
-const { IS_DEV_MODE } = require('../config/constants');
+const { IS_DEV_MODE, UPDATE_REPOSITORY } = require('../config/constants');
 const telemetryService = require('./telemetry-service');
 
 //#endregion
@@ -84,7 +84,7 @@ class UpdateService {
      * du mode salle.
      */
     #downloadAndInstall({ githubFileName, localFileName }) {
-        const FILE_URL = `https://github.com/HeyHeyChicken/EBP-Tools/releases/download/${this.githubVersion}/${githubFileName}`;
+        const FILE_URL = `https://github.com/${UPDATE_REPOSITORY}/releases/download/${this.githubVersion}/${githubFileName}`;
         const DESTINATION_PATH = path.join(
             app.getPath('userData'),
             localFileName
@@ -213,7 +213,7 @@ class UpdateService {
     getProjectLatestVersion(callback) {
         const OPTIONS = {
             hostname: 'api.github.com',
-            path: '/repos/EBP-gg/Tools/releases',
+            path: `/repos/${UPDATE_REPOSITORY}/releases`,
             method: 'GET',
             headers: { 'User-Agent': '' }
         };
