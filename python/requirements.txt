@@ -1,6 +1,21 @@
-numpy
-Pillow
-pytesseract
+# Versions épinglées. Sans elles, chaque passage du CI réinstalle les dernières
+# versions publiées : deux constructions de la même source donnent alors des
+# analyzers différents, et surtout une publication amont peut casser l'analyzer
+# sans le moindre changement de code — ce qui ne se verrait qu'en production.
+# Le cas s'est déjà produit : le binaire construit embarque onnxruntime 1.19.2
+# alors qu'une reconstruction en installerait 1.27.0, huit versions plus loin.
+#
+# Relevé depuis le venv de build (python/.venv). Pour les faire évoluer :
+# supprimer .venv, réinstaller sans contrainte, reconstruire, vérifier que
+# `selftest` passe (il garantit l'OCR in-process), puis reporter `pip freeze`.
+#
+# Seules les dépendances directes sont épinglées ; les transitives suivent leur
+# résolution, qui diffère de toute façon d'une plateforme à l'autre (pefile sous
+# Windows, macholib sous macOS).
+
+numpy==2.5.1
+Pillow==12.3.0
+pytesseract==0.3.13
 # In-process OCR accelerator (~3.65x on the analysis phase). Native build that
 # links libtesseract/leptonica + pulls cysignals — only installable from source
 # where the dev libs exist, hence the macOS-only marker here.
@@ -9,8 +24,8 @@ pytesseract
 #     wheel (simonflueckiger) that bundles the tesseract DLLs.
 #   - Linux: add later (needs libtesseract-dev/libleptonica-dev in CI).
 # Anywhere tesserocr ends up absent, eva_ocr.py falls back to pytesseract.
-tesserocr; sys_platform == "darwin"
-opencv-python
-pyinstaller
-scipy
-onnxruntime
+tesserocr==2.10.0; sys_platform == "darwin"
+opencv-python==5.0.0.93
+pyinstaller==6.21.0
+scipy==1.18.0
+onnxruntime==1.27.0
