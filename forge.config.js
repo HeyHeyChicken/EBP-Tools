@@ -61,7 +61,18 @@ module.exports = {
             config: {
                 setupIcon: './electron/assets/icon.ico',
                 loadingGif: './electron/assets/install.gif',
-                description: 'EBP - Tools'
+                description: 'EBP - Tools',
+                // Flux des versions déjà publiées. Renseigné, il fait
+                // télécharger les paquets précédents à electron-winstaller, qui
+                // produit alors des paquets DELTA : seuls les fichiers modifiés
+                // voyagent, soit ~5 Mo au lieu de 125 pour une release typique,
+                // le moteur Electron (262 Mo) ne changeant pas d'une version à
+                // l'autre.
+                //
+                // Laissé vide en local (build hors ligne) et au tout premier
+                // passage, quand aucun RELEASES n'existe : le CI ne le renseigne
+                // qu'après avoir constaté que le flux répond.
+                remoteReleases: process.env.SQUIRREL_REMOTE_RELEASES || undefined
             }
         },
         {

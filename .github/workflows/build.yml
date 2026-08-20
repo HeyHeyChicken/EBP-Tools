@@ -13,6 +13,15 @@ name: Build Windows, macOS and Linux binaries
 # dangereux à fusionner d'un dépôt vers l'autre.
 env:
     TOOLS_UPDATE_REPOSITORY: ${{ github.repository }}
+    # Flux Squirrel.Windows auto-hébergé. Publié dès maintenant, mais AUCUN
+    # client ne le lit encore : on veut d'abord constater que les paquets delta
+    # sont produits, avant d'y brancher l'updater.
+    S3_ENDPOINT: https://storage.ebp.gg
+    S3_BUCKET: public
+    FEED_PREFIX: tools/updates/win32
+    AWS_DEFAULT_REGION: us-east-1
+    AWS_ACCESS_KEY_ID: ${{ secrets.COMPONENTS_S3_ACCESS_KEY }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.COMPONENTS_S3_SECRET_KEY }}
 
 # The CICD will be launched for each tag created.
 on:
@@ -200,8 +209,25 @@ jobs:
             # constantes, avant la moindre fenêtre.
             - name: Verify components manifest
               run: node scripts/check-components.js win32
+            # Le flux n'existe pas au premier passage : on ne demande les deltas
+            # que s'il répond, sinon electron-winstaller échouerait sur un 404.
+            - name: Probe Squirrel feed
+              shell: bash
+              run: |
+                  if curl -sfI "$S3_ENDPOINT/$S3_BUCKET/$FEED_PREFIX/RELEASES" >/dev/null 2>&1; then
+                    echo "SQUIRREL_REMOTE_RELEASES=$S3_ENDPOINT/$S3_BUCKET/$FEED_PREFIX" >> "$GITHUB_ENV"
+                    echo "flux existant : paquets delta demandes"
+                  else
+                    echo "aucun flux : premier paquet, sans delta"
+                  fi
             - name: Build Electron app
               run: npm run make
+            # Publication du flux Squirrel. AUCUN client ne le lit encore : il
+            # s'agit de constater que les paquets delta sont bien produits avant
+            # d'y brancher l'updater.
+            - name: Publish Squirrel feed
+              shell: bash
+              run: bash .github/scripts/publish-squirrel-feed.sh
             # Rename the created binary.
             - name: Rename .exe
               run: |
