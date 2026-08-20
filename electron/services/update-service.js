@@ -16,7 +16,6 @@ const {
     createFloatingWindow,
     deleteFloatingWindow
 } = require('../core/window-manager');
-const StorageManager = require('../core/storage-manager');
 const {
     IS_DEV_MODE,
     UPDATE_REPOSITORY,
@@ -235,7 +234,6 @@ class UpdateService {
         };
 
         this.#download(FILE_URL, DESTINATION_PATH, () => {
-            StorageManager.setPermanentSettingsValue('justUpdated', 'true');
             switch (os.platform()) {
                 case 'win32':
                     spawn(DESTINATION_PATH, {

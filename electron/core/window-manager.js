@@ -181,20 +181,13 @@ function createWindow(updateService) {
     );
     const IS_STARTUP_MODE = APP_ARGS.includes('--mode=startup');
 
-    let isJustUpdated = false;
-    const JUST_UPDATED =
-        StorageManager.getPermanentSettingsValue('justUpdated');
-    if (JUST_UPDATED !== undefined) {
-        isJustUpdated = true;
-        StorageManager.setPermanentSettingsValue('justUpdated', undefined);
-    }
-
-    //StorageManager.getPermanentSettingsValue('justUpdated');
-
     mainWindow = new BrowserWindow({
         width: Math.min(PRIMARY_DISPLAY.workAreaSize.width, WINDOW_WIDTH),
         height: Math.min(PRIMARY_DISPLAY.workAreaSize.height, WINDOW_HEIGHT),
-        show: !IS_STARTUP_MODE && !HAS_DEEP_LINK && !isJustUpdated,
+        // Tools est une app de barre système : la fenêtre ne s'ouvre JAMAIS
+        // d'elle-même. Le lancement se signale par une notification, et l'IHM
+        // ne s'ouvre que par l'entrée « Open » du menu du tray.
+        show: false,
         skipTaskbar: IS_STARTUP_MODE || HAS_DEEP_LINK,
         resizable: false,
         contextIsolation: true,

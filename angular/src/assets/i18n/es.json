@@ -10,6 +10,7 @@
     "search": "Buscar",
     "updatingInProgress": "Actualización en curso, por favor espere.",
     "downloadingComponents": "Descargando componentes, por favor espere.",
+    "runningInBackground": "Tools está disponible y se ejecuta en segundo plano.",
     "encoding": "Codificación en curso…",
     "encoded": "¡El vídeo se ha codificado con éxito!",
     "download": "Descargar",

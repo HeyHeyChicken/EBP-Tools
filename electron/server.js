@@ -49,7 +49,8 @@ const {
     FFMPEG_PATH,
     ANALYZER_PATH,
     PROTOCOL_NAME,
-    getCurrentPort
+    getCurrentPort,
+    EBP_DOMAIN
 } = require('./config/constants');
 const {
     setWindowSize,
@@ -121,6 +122,68 @@ if (process.defaultApp) {
 }
 
 //#endregion
+
+/**
+ * Signale que Tools tourne, sans ouvrir la fenêtre.
+ *
+ * L'app ne montre plus son IHM au lancement : sans ce signe, double-cliquer sur
+ * l'exécutable ne produirait rien de visible et serait lu comme un échec. La
+ * notification disparaît seule au bout de cinq secondes — la laisser à l'écran
+ * serait plus gênant que la fenêtre qu'elle remplace.
+ */
+function showBackgroundNotice() {
+    createFloatingWindow(
+        450,
+        150,
+        JSON.stringify({
+            percent: 100,
+            infinite: false,
+            icon: 'fa-sharp fa-solid fa-check',
+            text: '.common.runningInBackground',
+            leftRounded: true,
+            state: 'success'
+        })
+    ).catch((error) =>
+        console.error('[notice] floating window failed', error)
+    );
+
+    setTimeout(() => deleteFloatingWindow(false), 5000);
+}
+
+/**
+ * Ouvre la page d'accueil dans le navigateur, une seule fois dans la vie de
+ * l'installation.
+ *
+ * Le drapeau vit dans les réglages PERMANENTS : les réglages temporaires
+ * habitent le bundle de l'app (process.resourcesPath), donc une mise à jour les
+ * remet à zéro et la page se rouvrirait à chaque version.
+ *
+ * Cette page porte une responsabilité particulière : l'IHM ne s'ouvrant plus
+ * que par le menu du tray, c'est elle qui doit montrer où trouver l'icône et
+ * comment l'épingler — sans quoi un utilisateur de Windows 11, où les icônes
+ * sont repliées par défaut, n'aurait aucun recours.
+ */
+function openWelcomePageOnFirstRun() {
+    const FIRST_RUN_KEY = 'firstRunDone';
+
+    if (StorageManager.getPermanentSettingsValue(FIRST_RUN_KEY) !== undefined) {
+        return;
+    }
+
+    // Posé AVANT l'ouverture : si celle-ci échoue, on ne veut pas rouvrir la
+    // page à chaque lancement suivant.
+    StorageManager.setPermanentSettingsValue(FIRST_RUN_KEY, true);
+
+    const LANGUAGE = (
+        StorageManager.permanentSettings['language'] ||
+        app.getLocale() ||
+        'en'
+    ).slice(0, 2);
+
+    const URL = `https://${EBP_DOMAIN}/${LANGUAGE}/tools/installed`;
+    console.log(`[first-run] opening ${URL}`);
+    shell.openExternal(URL);
+}
 
 const UPDATE_SERVICE = new UpdateService();
 const APP_GOT_THE_LOCK = app.requestSingleInstanceLock();
@@ -2083,6 +2146,11 @@ if (!APP_GOT_THE_LOCK) {
             // concurrencer les ~190 Mo du tout premier lancement.
             UPDATE_SERVICE.startPeriodicCheck();
 
+            // Après les composants également : leur progression occupe la même
+            // fenêtre flottante, les deux se marcheraient dessus.
+            openWelcomePageOnFirstRun();
+            showBackgroundNotice();
+
             // If a second instance is launched, the first is displayed.
             app.on('second-instance', (event, commandLine) => {
                 console.log(
@@ -2101,9 +2169,10 @@ if (!APP_GOT_THE_LOCK) {
                 );
                 if (DEEP_LINK_URL) {
                     handleDeepLink(DEEP_LINK_URL);
-                }
-                else{
-                    showMainWindow();
+                } else {
+                    // Relancer l'exécutable n'ouvre plus l'IHM : on rappelle
+                    // simplement que Tools tourne déjà.
+                    showBackgroundNotice();
                 }
             });
 

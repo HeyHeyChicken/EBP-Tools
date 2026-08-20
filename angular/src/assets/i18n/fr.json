@@ -10,6 +10,7 @@
     "search": "Rechercher",
     "updatingInProgress": "Mise à jour en cours, veuillez patienter.",
     "downloadingComponents": "Téléchargement des composants, veuillez patienter.",
+    "runningInBackground": "Tools est disponible et tourne en arrière-plan.",
     "encoding": "Encodage en cours…",
     "encoded": "La vidéo est encodée avec succès !",
     "download": "Télécharger",

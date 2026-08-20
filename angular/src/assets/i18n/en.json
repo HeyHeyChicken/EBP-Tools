@@ -10,6 +10,7 @@
     "search": "Search",
     "updatingInProgress": "Updating in progress, please wait.",
     "downloadingComponents": "Downloading components, please wait.",
+    "runningInBackground": "Tools is available and running in the background.",
     "encoding": "Encoding in progress…",
     "encoded": "The video has been successfully encoded!",
     "download": "Download",
