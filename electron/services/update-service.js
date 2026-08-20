@@ -33,6 +33,9 @@ class UpdateService {
     // chemin lent que plus de chemin du tout.
     #nativeReady = false;
     #nativeFailed = false;
+    // Version téléchargée et prête, en attente du prochain démarrage. Sert au
+    // menu du tray : sans elle, rien n'indique qu'une mise à jour attend.
+    pendingVersion = undefined;
 
     constructor() {
         this.localVersion = version;
@@ -54,18 +57,36 @@ class UpdateService {
         if (!this.#nativeReady) {
             NATIVE.setFeedURL({ url: UPDATE_FEED_URL });
 
+            NATIVE.on('checking-for-update', () => {
+                console.log(`[update] native: checking ${UPDATE_FEED_URL}`);
+            });
+
+            NATIVE.on('update-not-available', () => {
+                console.log(
+                    `[update] native: up to date (${this.localVersion})`
+                );
+            });
+
             NATIVE.on('update-available', () => {
-                console.log('[update] native: update available');
+                console.log('[update] native: update available, downloading');
                 telemetryService.reportUpdate('update_available', {
                     feed: UPDATE_FEED_URL
                 });
             });
 
-            NATIVE.on('update-downloaded', () => {
-                console.log(
-                    '[update] native: installed, will apply on next launch'
-                );
-            });
+            // Sous Windows, `releaseName` porte la version. Sans elle, le log
+            // ne dirait pas CE QUI attend, ce qui est justement l'information
+            // utile quand une mise à jour ne s'applique pas.
+            NATIVE.on(
+                'update-downloaded',
+                (event, releaseNotes, releaseName) => {
+                    this.pendingVersion = releaseName || 'inconnue';
+                    console.log(
+                        `[update] native: ${this.pendingVersion} installée, ` +
+                            'sera appliquée au prochain démarrage'
+                    );
+                }
+            );
 
             NATIVE.on('error', (error) => {
                 // Repli définitif sur le flux maison pour cette session : sans
@@ -269,6 +290,23 @@ class UpdateService {
                 }
             }
         });
+    }
+
+    /**
+     * Applique une mise à jour déjà téléchargée, à la demande de l'utilisateur.
+     *
+     * `app.relaunch()` ne conviendrait pas : il relance `process.execPath`,
+     * donc l'exécutable de la version COURANTE — l'ancienne redémarrerait.
+     * Seul `quitAndInstall` passe par le lanceur Squirrel, qui bascule sur la
+     * nouvelle version. On ne l'appelle donc que sur action explicite, jamais
+     * de sa propre initiative.
+     */
+    applyPendingUpdate() {
+        if (!this.pendingVersion) {
+            return;
+        }
+        console.log(`[update] applying ${this.pendingVersion} on user request`);
+        NATIVE.quitAndInstall();
     }
 
     /**

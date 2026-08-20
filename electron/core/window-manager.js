@@ -418,13 +418,22 @@ function createWindow(updateService) {
                 ]
             },
             {
-                label: `Check for update (${updateService.localVersion})`,
+                // Quand une version attend, l'entrée cesse de proposer une
+                // vérification pour proposer l'application — c'est la seule
+                // trace visible qu'une mise à jour est prête.
+                label: updateService.pendingVersion
+                    ? `Restart to apply ${updateService.pendingVersion}`
+                    : `Check for update (${updateService.localVersion})`,
                 icon: nativeImage
                     .createFromPath(
                         path.join(ROOT_PATH, 'assets', 'context-menu', 'up.png')
                     )
                     .resize({ width: 12, height: 12 }),
                 click: () => {
+                    if (updateService.pendingVersion) {
+                        updateService.applyPendingUpdate();
+                        return;
+                    }
                     updateService.autoUpdate(false);
                 }
             },
