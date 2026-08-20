@@ -72,7 +72,14 @@ class UpdateService {
      */
     #checkNative() {
         if (!this.#nativeReady) {
-            NATIVE.setFeedURL({ url: UPDATE_FEED_URL });
+            // Squirrel.Mac attend un manifeste JSON et veut qu'on le dise ;
+            // Squirrel.Windows attend un dossier dans lequel il cherche
+            // RELEASES lui-même.
+            NATIVE.setFeedURL(
+                os.platform() === 'darwin'
+                    ? { url: UPDATE_FEED_URL, serverType: 'json' }
+                    : { url: UPDATE_FEED_URL }
+            );
 
             NATIVE.on('checking-for-update', () => {
                 console.log(`[update] native: checking ${UPDATE_FEED_URL}`);
@@ -256,9 +263,11 @@ class UpdateService {
             return;
         }
 
-        // Windows passe par Squirrel, qui télécharge et installe en tâche de
-        // fond sans rien demander. Le flux maison reste le repli.
-        if (os.platform() === 'win32' && !this.#nativeFailed) {
+        // Windows et macOS passent par Squirrel, qui télécharge et installe en
+        // tâche de fond sans rien demander. Le flux maison reste le repli, et
+        // demeure le seul chemin sous Linux, que Squirrel ne couvre pas.
+        const NATIVE_PLATFORMS = ['win32', 'darwin'];
+        if (NATIVE_PLATFORMS.includes(os.platform()) && !this.#nativeFailed) {
             this.#checkNative();
             return;
         }

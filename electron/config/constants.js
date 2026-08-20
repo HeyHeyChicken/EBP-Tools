@@ -66,15 +66,25 @@ const EBP_DOMAIN = 'evabattleplan.com';
 const UPDATE_REPOSITORY =
     process.env.TOOLS_UPDATE_REPOSITORY || 'EBP-gg/Tools';
 
-// Flux Squirrel.Windows de ce build. Dérivé du même dépôt que les mises à jour
-// et publié par le CI sous ce même chemin : le banc d'essai et la production ont
-// donc des flux distincts, sans qu'aucune valeur ne soit à tenir à jour à la
-// main de part et d'autre.
-const UPDATE_FEED_URL = `https://storage.ebp.gg/public/tools/updates/${UPDATE_REPOSITORY}/win32`;
 
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const ROOT_PATH = IS_DEV_MODE ? path.dirname(__dirname) : process.resourcesPath;
 const OS_PLATFORM = os.platform();
+
+// Flux de mise à jour de ce build. Dérivé du même dépôt que les mises à jour et
+// publié par le CI sous ce même chemin : le banc d'essai et la production ont
+// donc des flux distincts, sans qu'aucune valeur ne soit à tenir à jour à la
+// main de part et d'autre.
+//
+// Les deux plateformes ne consomment pas la même chose : Squirrel.Windows lit
+// un DOSSIER (il y cherche RELEASES lui-même), Squirrel.Mac lit le manifeste
+// JSON directement. Ce dernier est de plus propre à l'ARCHITECTURE — servir une
+// app Apple Silicon à un Mac Intel produirait un binaire qui ne démarre pas.
+const UPDATE_FEED_BASE = `https://storage.ebp.gg/public/tools/updates/${UPDATE_REPOSITORY}`;
+const UPDATE_FEED_URL =
+    OS_PLATFORM === 'darwin'
+        ? `${UPDATE_FEED_BASE}/darwin-${process.arch}/RELEASES.json`
+        : `${UPDATE_FEED_BASE}/${OS_PLATFORM}`;
 // Clé de plateforme des composants téléchargés : macOS publie un binaire par
 // architecture, les autres plateformes un seul.
 const COMPONENT_PLATFORM_KEY =
