@@ -5,13 +5,18 @@
 //#region Imports
 
 const https = require('https');
+const http = require('http');
+const os = require('os');
 const fs = require('fs');
 const path = require('node:path');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
 const {
     COMPONENTS,
     COMPONENTS_DIR,
-    COMPONENT_PLATFORM_KEY
+    COMPONENT_PLATFORM_KEY,
+    getComponentPath,
+    componentDirectory
 } = require('../config/constants');
 const {
     createFloatingWindow,
@@ -30,7 +35,9 @@ const {
  * lui qui fait autorité, pas le réseau. Un binaire dont l'empreinte ne
  * correspond pas n'est jamais exécuté.
  */
-const COMPONENTS_URL = 'https://storage.ebp.gg/public/tools/components';
+const COMPONENTS_URL =
+    process.env.TOOLS_COMPONENTS_URL ||
+    'https://storage.ebp.gg/public/tools/components';
 
 // Mode salle : le PC démarre sans personne devant, parfois avant que le réseau
 // soit disponible. On réessaie donc en tâche de fond plutôt que de laisser la
@@ -100,13 +107,21 @@ function entryOf(name) {
  * Is this component already installed? Le marqueur ne suffit pas : un binaire
  * peut disparaître après coup (mise en quarantaine par un antivirus, ménage
  * manuel du userData). On exige donc les deux, sinon l'app se croirait équipée
- * et ffmpeg échouerait indéfiniment sans jamais être retéléchargé.
- * @param {object} entry Manifest entry of the component.
+ * et le composant échouerait indéfiniment sans jamais être retéléchargé.
+ * @param {string} name Component name.
  * @returns {boolean} True if the component is usable as-is.
  */
-function isInstalled(entry) {
-    const DESTINATION = path.join(COMPONENTS_DIR, entry.asset);
-    return fs.existsSync(`${DESTINATION}.ok`) && fs.existsSync(DESTINATION);
+function isInstalled(name) {
+    const ENTRY = entryOf(name);
+
+    if (!ENTRY) {
+        return true;
+    }
+
+    return (
+        fs.existsSync(path.join(COMPONENTS_DIR, `${ENTRY.asset}.ok`)) &&
+        fs.existsSync(getComponentPath(name))
+    );
 }
 
 /**
@@ -115,8 +130,7 @@ function isInstalled(entry) {
  * @returns {boolean} True if a download is needed.
  */
 function needsDownload(name) {
-    const ENTRY = entryOf(name);
-    return ENTRY ? !isInstalled(ENTRY) : false;
+    return entryOf(name) ? !isInstalled(name) : false;
 }
 
 /**
@@ -132,16 +146,14 @@ async function install(name) {
         return;
     }
 
-    if (isInstalled(ENTRY)) {
+    if (isInstalled(name)) {
         return;
     }
 
-    const DESTINATION = path.join(COMPONENTS_DIR, ENTRY.asset);
-    const MARKER = `${DESTINATION}.ok`;
-
     fs.mkdirSync(COMPONENTS_DIR, { recursive: true });
 
-    const TEMPORARY = `${DESTINATION}.part`;
+    const MARKER = path.join(COMPONENTS_DIR, `${ENTRY.asset}.ok`);
+    const TEMPORARY = path.join(COMPONENTS_DIR, `${ENTRY.asset}.part`);
     console.log(`[components] downloading ${ENTRY.asset}`);
 
     try {
@@ -154,6 +166,8 @@ async function install(name) {
             }
         );
 
+        // L'empreinte est vérifiée AVANT toute extraction : on ne déballe
+        // jamais une archive dont on ne sait pas d'où elle vient.
         const SHA256 = await sha256Of(TEMPORARY);
         if (SHA256 !== ENTRY.sha256) {
             throw new Error(
@@ -161,8 +175,13 @@ async function install(name) {
             );
         }
 
-        fs.chmodSync(TEMPORARY, 0o755);
-        fs.renameSync(TEMPORARY, DESTINATION);
+        if (ENTRY.exec) {
+            await installArchive(ENTRY, TEMPORARY);
+        } else {
+            fs.chmodSync(TEMPORARY, 0o755);
+            fs.renameSync(TEMPORARY, path.join(COMPONENTS_DIR, ENTRY.asset));
+        }
+
         fs.writeFileSync(MARKER, ENTRY.sha256);
         console.log(`[components] installed ${ENTRY.asset}`);
     } catch (error) {
@@ -171,6 +190,58 @@ async function install(name) {
     } finally {
         PROGRESS.delete(name);
     }
+}
+
+/**
+ * Déballe une archive vérifiée dans son dossier définitif. L'extraction se fait
+ * à côté puis le dossier est renommé d'un bloc : une extraction interrompue ne
+ * laisse jamais un bundle à moitié déballé que l'app prendrait pour valide.
+ * @param {object} entry Manifest entry of the component.
+ * @param {string} archivePath Path of the verified archive.
+ */
+async function installArchive(entry, archivePath) {
+    const DIRECTORY = path.join(
+        COMPONENTS_DIR,
+        componentDirectory(entry.asset)
+    );
+    const TEMPORARY_DIRECTORY = `${DIRECTORY}.part`;
+
+    fs.rmSync(TEMPORARY_DIRECTORY, { recursive: true, force: true });
+    fs.mkdirSync(TEMPORARY_DIRECTORY, { recursive: true });
+
+    try {
+        await extract(archivePath, TEMPORARY_DIRECTORY);
+        fs.rmSync(DIRECTORY, { recursive: true, force: true });
+        fs.renameSync(TEMPORARY_DIRECTORY, DIRECTORY);
+    } catch (error) {
+        fs.rmSync(TEMPORARY_DIRECTORY, { recursive: true, force: true });
+        throw error;
+    }
+
+    // L'archive ne sert plus à rien une fois déballée, et elle pèse son poids.
+    fs.rmSync(archivePath, { force: true });
+    // Le bit d'exécution ne survit pas à tous les outils d'archivage.
+    fs.chmodSync(path.join(DIRECTORY, entry.exec), 0o755);
+}
+
+/**
+ * Décompresse une archive zip. Même patron que deno-service : bsdtar lit le zip
+ * sur macOS comme sur Windows, unzip est la voie sûre sous Linux.
+ * @param {string} archivePath Archive to extract.
+ * @param {string} destination Directory to extract into.
+ * @returns {Promise<void>} Resolves once extracted.
+ */
+function extract(archivePath, destination) {
+    const [COMMAND, ARGS] =
+        os.platform() === 'linux'
+            ? ['unzip', ['-o', '-q', archivePath, '-d', destination]]
+            : ['tar', ['-xf', archivePath, '-C', destination]];
+
+    return new Promise((resolve, reject) => {
+        execFile(COMMAND, ARGS, (error) =>
+            error ? reject(error) : resolve()
+        );
+    });
 }
 
 /**
@@ -260,8 +331,12 @@ function retryInBackground() {
  * @returns {Promise<void>} Resolves once the file is fully written.
  */
 function download(url, destination, onProgress) {
+    // Le protocole décide du client : indispensable pour pointer un serveur
+    // local en test (TOOLS_COMPONENTS_URL), la production restant en HTTPS.
+    const CLIENT = url.startsWith('http://') ? http : https;
+
     return new Promise((resolve, reject) => {
-        https
+        CLIENT
             .get(url, (res) => {
                 if (
                     (res.statusCode === 301 || res.statusCode === 302) &&

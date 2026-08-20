@@ -17,9 +17,22 @@ const COMPONENTS = require('./components.json');
 //#region Functions
 
 /**
+ * Dossier d'extraction d'un composant archivé, dérivé du nom de son asset : le
+ * dépôt distant et le disque local restent ainsi le miroir l'un de l'autre.
+ * @param {string} asset Asset file name.
+ * @returns {string} Directory name, without the archive extension.
+ */
+function componentDirectory(asset) {
+    return asset.replace(/\.zip$/, '');
+}
+
+/**
  * Get the path to a component downloaded at runtime (see component-service).
  * The path is derivable before the file exists: only its presence is
  * conditional, so the call sites keep using a plain constant.
+ *
+ * Un composant dont l'entrée porte `exec` est une archive : son exécutable vit
+ * à l'intérieur du dossier extrait. Sans `exec`, l'asset EST l'exécutable.
  * @param {string} name Component name, as keyed in components.json.
  * @returns {string} Path to the component's executable.
  */
@@ -29,6 +42,14 @@ function getComponentPath(name) {
     if (!ENTRY) {
         throw new Error(
             `No "${name}" component published for ${COMPONENT_PLATFORM_KEY}`
+        );
+    }
+
+    if (ENTRY.exec) {
+        return path.join(
+            COMPONENTS_DIR,
+            componentDirectory(ENTRY.asset),
+            ENTRY.exec
         );
     }
 
@@ -125,6 +146,8 @@ module.exports = {
     COMPONENTS,
     COMPONENTS_DIR,
     COMPONENT_PLATFORM_KEY,
+    getComponentPath,
+    componentDirectory,
 
     PERMANENT_SETTINGS_PATH,
     TEMPORARY_SETTINGS_PATH,
