@@ -351,7 +351,9 @@ jobs:
             - name: Install Python
               uses: actions/setup-python@v5
               with:
-                  python-version: '3.11'
+                  # 3.12 comme sous Windows : numpy et scipy épinglés exigent
+                  # >= 3.12, et aligner les interpréteurs supprime une variable.
+                  python-version: '3.12'
             # tesseract-ocr-eng provides eng.traineddata, which build_linux_pyi.py
             # bundles next to evadigits.traineddata so the system tesseract finds both
             # via TESSDATA_PREFIX at runtime.

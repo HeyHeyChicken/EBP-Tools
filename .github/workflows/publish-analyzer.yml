@@ -151,7 +151,9 @@ jobs:
 
             - uses: actions/setup-python@v5
               with:
-                  python-version: '3.11'
+                  # 3.12 comme sous Windows : numpy et scipy épinglés exigent
+                  # >= 3.12, et aligner les interpréteurs supprime une variable.
+                  python-version: '3.12'
 
             - name: Install Tesseract eng data
               run: sudo apt-get update && sudo apt-get install -y tesseract-ocr-eng zip
