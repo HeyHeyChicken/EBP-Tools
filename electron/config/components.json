@@ -16,5 +16,21 @@
             "asset": "ffmpeg-9.0.1-win32-72a489eccd00.exe",
             "sha256": "72a489eccd008c2ec2c0a5856c5c75bc3d8bbfa90166c4566865c246445e6aa3"
         }
+    },
+    "analyzer": {
+        "darwin-arm64": {
+            "asset": "analyzer-20260820-darwin-arm64-3267df851d78.zip",
+            "sha256": "3267df851d786de4428a9e0d2a7d80f905f8c4dff7c293b89ae4a707e4bf77d1",
+            "exec": "darwin/darwin"
+        },
+        "linux": {
+            "asset": "analyzer-20260820-linux-a861f1497ec3.zip",
+            "sha256": "a861f1497ec3eae3920165ed197716b588de7ec6868a958221e2c9b0d2d40603",
+            "exec": "linux/linux"
+        },
+        "win32": {
+            "asset": "analyzer-20260820-win32-18154061c9af.exe",
+            "sha256": "18154061c9afda74fdde1ced80c88a29fe6cb418847e7bd80c002c1860d190e5"
+        }
     }
 }

@@ -5,7 +5,6 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const path = require('path');
-const { execSync } = require('child_process');
 
 module.exports = {
     packagerConfig: {
@@ -14,7 +13,6 @@ module.exports = {
             './angular/dist/angular/browser/',
             './electron/assets/',
             './electron/template.xlsx',
-            './binaries/analyzer/',
             './app-update.yml'
         ],
         icon: 'electron/assets/icon',
@@ -150,38 +148,5 @@ module.exports = {
             [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
             [FuseV1Options.OnlyLoadAppFromAsar]: true
         })
-    ],
-    hooks: {
-        async postPackage(config) {
-            if (process.platform == 'darwin') {
-                console.log('Running "postPackage" hook on MacOS.');
-                const ARCH = process.arch; // 'arm64' or 'x64'
-                const RESOURCES_BASE = path.join(
-                    __dirname,
-                    'out',
-                    config.packagerConfig.name + '-darwin-' + ARCH,
-                    config.packagerConfig.name + '.app',
-                    'Contents',
-                    'Resources'
-                );
-
-                const BINARIES = [
-                    // onedir: executable is inside the darwin/ directory
-                    path.join(RESOURCES_BASE, 'analyzer', 'darwin', 'darwin')
-                ];
-
-                for (const BIN of BINARIES) {
-                    try {
-                        execSync(`chmod +x "${BIN}"`);
-                        console.log(`chmod +x: ${BIN}`);
-                    } catch (error) {
-                        console.error(
-                            `Erreur lors du chmod de ${BIN} :`,
-                            error
-                        );
-                    }
-                }
-            }
-        }
-    }
+    ]
 };

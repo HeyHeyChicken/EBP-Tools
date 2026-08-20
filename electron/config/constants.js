@@ -56,20 +56,6 @@ function getComponentPath(name) {
     return path.join(COMPONENTS_DIR, ENTRY.asset);
 }
 
-/**
- * Get the path to the Python video analyzer binary
- * @returns {string} Path to analyzer executable
- */
-function getAnalyzerPath(osPlatform, isDevMode, rootPath) {
-    const DIRECTORY = isDevMode ? '../binaries/analyzer' : 'analyzer';
-    if (osPlatform === 'win32') {
-        return path.join(rootPath, DIRECTORY, 'win32.exe');
-    }
-    // macOS/Linux: PyInstaller --onedir produces a directory named after the platform.
-    // The executable lives inside that directory with the same name.
-    return path.join(rootPath, DIRECTORY, osPlatform, osPlatform);
-}
-
 //#endregion
 
 const EBP_DOMAIN = 'evabattleplan.com';
@@ -83,7 +69,7 @@ const COMPONENT_PLATFORM_KEY =
     OS_PLATFORM === 'darwin' ? `darwin-${process.arch}` : OS_PLATFORM;
 const COMPONENTS_DIR = path.join(app.getPath('userData'), 'components');
 const FFMPEG_PATH = getComponentPath('ffmpeg');
-const ANALYZER_PATH = getAnalyzerPath(OS_PLATFORM, IS_DEV_MODE, ROOT_PATH);
+const ANALYZER_PATH = getComponentPath('analyzer');
 const PERMANENT_SETTINGS_PATH = path.join(
     app.getPath('userData'),
     'settings.json'

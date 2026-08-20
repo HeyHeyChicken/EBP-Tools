@@ -72,62 +72,12 @@ jobs:
             - name: Install Node dependencies
               run: npm run install_npm
 
-            # Cache Homebrew packages to avoid reinstalling on every run.
-            - name: Cache Homebrew packages
-              uses: actions/cache@v4
-              with:
-                  path: ~/Library/Caches/Homebrew
-                  key: homebrew-tesseract-${{ runner.os }}-arm64
-
-            # Install Tesseract and build the Python analyzer binary.
-            - name: Install Tesseract
-              # pkg-config lets tesserocr's source build find leptonica by its
-              # real name (-lleptonica). Without it the link fails with
-              # "library 'lept' not found" (legacy hardcoded fallback).
-              run: brew install tesseract pkg-config
-
-            - name: Build Python analyzer binary
-              run: cd python && bash build.sh
-
-            # Fail the build if the packaged binary doesn't actually use tesserocr
-            # (a bundling gap can silently fall back to slow pytesseract). Runs the
-            # unsigned binary locally; exits 0 only when in-process tesserocr inits.
-            - name: Verify packaged binary uses tesserocr (in-process OCR)
-              run: |
-                  binaries/analyzer/darwin/darwin selftest || {
-                    echo "::error::Packaged darwin binary is NOT using tesserocr — OCR would fall back to pytesseract"
-                    exit 1
-                  }
-
-            # Sign all files in the onedir bundle before Electron Forge packages them.
-            # With --onedir, Python.framework and dylibs are present at build time and
-            # can be individually signed — unlike --onefile which extracts to /tmp at
-            # runtime (where files cannot be pre-signed, causing Team ID mismatch errors).
-            # Sign inside-out: dylibs first, then the main executable.
-            - name: Sign Python analyzer binary
-              run: |
-                  find binaries/analyzer/darwin -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
-                    codesign --force \
-                      --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
-                      --options runtime \
-                      --entitlements build/entitlements.plist \
-                      --timestamp \
-                      "$f"
-                  done
-                  codesign --force \
-                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
-                    --options runtime \
-                    --entitlements build/entitlements.plist \
-                    --timestamp \
-                    binaries/analyzer/darwin/_internal/tesseract/tesseract
-                  codesign --force \
-                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
-                    --options runtime \
-                    --entitlements build/entitlements.plist \
-                    --timestamp \
-                    binaries/analyzer/darwin/darwin
-
             # Building Angular and making the Electron application.
+            # Une plateforme absente du manifeste produirait une application
+            # qui ne démarre pas : getComponentPath lève au chargement des
+            # constantes, avant la moindre fenêtre.
+            - name: Verify components manifest
+              run: node scripts/check-components.js darwin-arm64
             - name: Build Electron app
               run: npm run make
 
@@ -189,58 +139,12 @@ jobs:
             - name: Install Node dependencies
               run: npm run install_npm
 
-            # Cache Homebrew packages to avoid reinstalling on every run.
-            - name: Cache Homebrew packages
-              uses: actions/cache@v4
-              with:
-                  path: ~/Library/Caches/Homebrew
-                  key: homebrew-tesseract-${{ runner.os }}-x64
-
-            # Install Tesseract and build the Python analyzer binary.
-            - name: Install Tesseract
-              # pkg-config lets tesserocr's source build find leptonica by its
-              # real name (-lleptonica). Without it the link fails with
-              # "library 'lept' not found" (legacy hardcoded fallback).
-              run: brew install tesseract pkg-config
-
-            - name: Build Python analyzer binary
-              run: cd python && bash build.sh
-
-            # Fail the build if the packaged binary doesn't actually use tesserocr
-            # (a bundling gap can silently fall back to slow pytesseract). Runs the
-            # unsigned binary locally; exits 0 only when in-process tesserocr inits.
-            - name: Verify packaged binary uses tesserocr (in-process OCR)
-              run: |
-                  binaries/analyzer/darwin/darwin selftest || {
-                    echo "::error::Packaged darwin binary is NOT using tesserocr — OCR would fall back to pytesseract"
-                    exit 1
-                  }
-
-            # Sign all files in the onedir bundle before Electron Forge packages them.
-            - name: Sign Python analyzer binary
-              run: |
-                  find binaries/analyzer/darwin -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
-                    codesign --force \
-                      --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
-                      --options runtime \
-                      --entitlements build/entitlements.plist \
-                      --timestamp \
-                      "$f"
-                  done
-                  codesign --force \
-                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
-                    --options runtime \
-                    --entitlements build/entitlements.plist \
-                    --timestamp \
-                    binaries/analyzer/darwin/_internal/tesseract/tesseract
-                  codesign --force \
-                    --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
-                    --options runtime \
-                    --entitlements build/entitlements.plist \
-                    --timestamp \
-                    binaries/analyzer/darwin/darwin
-
             # Building Angular and making the Electron application.
+            # Une plateforme absente du manifeste produirait une application
+            # qui ne démarre pas : getComponentPath lève au chargement des
+            # constantes, avant la moindre fenêtre.
+            - name: Verify components manifest
+              run: node scripts/check-components.js darwin-x64
             - name: Build Electron app
               run: npm run make
 
@@ -280,41 +184,15 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: '20'
-            # Pin Python so the prebuilt tesserocr wheel (cp312) installed by
-            # build.bat matches the interpreter. tesserocr can't compile from
-            # source on Windows; we use simonflueckiger's prebuilt wheel which
-            # bundles tesseract+leptonica DLLs.
-            - name: Setup Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: '3.12'
             # Install NPM dependencies.
             - name: Install Node dependencies
               run: npm run install_npm
-            # Cache Tesseract installation to avoid reinstalling on every run.
-            - name: Cache Tesseract
-              uses: actions/cache@v4
-              with:
-                  path: C:\Program Files\Tesseract-OCR
-                  key: choco-tesseract-${{ runner.os }}
-            # Install Tesseract and build the Python analyzer binary.
-            - name: Install Tesseract
-              run: choco install tesseract --no-progress -y
-            - name: Build Python analyzer binary
-              run: cd python && .\build.bat
-            # Fail the build if the packaged .exe doesn't actually use tesserocr
-            # (a bundling gap can silently fall back to the slow pytesseract path,
-            # like the cysignals issue caught on macOS). `selftest` exits 0 only
-            # when the in-process tesserocr backend initialises in the frozen exe.
-            - name: Verify packaged binary uses tesserocr (in-process OCR)
-              shell: pwsh
-              run: |
-                  & "binaries\analyzer\win32.exe" selftest
-                  if ($LASTEXITCODE -ne 0) {
-                    Write-Error "Packaged win32.exe is NOT using tesserocr (exit $LASTEXITCODE) — OCR would fall back to the slow pytesseract path."
-                    exit 1
-                  }
             # Building Angular and making the Electron application.
+            # Une plateforme absente du manifeste produirait une application
+            # qui ne démarre pas : getComponentPath lève au chargement des
+            # constantes, avant la moindre fenêtre.
+            - name: Verify components manifest
+              run: node scripts/check-components.js win32
             - name: Build Electron app
               run: npm run make
             # Rename the created binary.
@@ -347,21 +225,12 @@ jobs:
             # Install NPM dependencies.
             - name: Install Node dependencies
               run: npm run install_npm
-            # Install Python and build the analyzer binary.
-            - name: Install Python
-              uses: actions/setup-python@v5
-              with:
-                  # 3.12 comme sous Windows : numpy et scipy épinglés exigent
-                  # >= 3.12, et aligner les interpréteurs supprime une variable.
-                  python-version: '3.12'
-            # tesseract-ocr-eng provides eng.traineddata, which build_linux_pyi.py
-            # bundles next to evadigits.traineddata so the system tesseract finds both
-            # via TESSDATA_PREFIX at runtime.
-            - name: Install Tesseract eng data
-              run: sudo apt-get update && sudo apt-get install -y tesseract-ocr-eng
-            - name: Build Python analyzer binary
-              run: cd python && bash build_linux.sh
             # Building Angular and making the Electron application.
+            # Une plateforme absente du manifeste produirait une application
+            # qui ne démarre pas : getComponentPath lève au chargement des
+            # constantes, avant la moindre fenêtre.
+            - name: Verify components manifest
+              run: node scripts/check-components.js linux
             - name: Build Electron app
               run: npm run make
             # Rename the created .deb.
