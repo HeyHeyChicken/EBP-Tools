@@ -17,6 +17,12 @@ EXEC="${3:-}"
 
 DATE="$(date -u +%Y%m%d)"
 
+# État de la source dont ce binaire est issu. `git rev-parse HEAD:python` donne
+# l'empreinte de l'arbre du dossier : elle change dès qu'un fichier suivi change,
+# et ne change pas autrement. C'est ce qui permettra au workflow de release de
+# refuser de livrer une version dont l'analyzer publié ne correspond plus au code.
+SOURCE="$(git rev-parse HEAD:python | cut -c1-12)"
+
 hash_of() {
     if command -v sha256sum >/dev/null 2>&1; then
         sha256sum "$1" | cut -d' ' -f1
@@ -53,6 +59,7 @@ URL="${S3_ENDPOINT}/${S3_BUCKET}/${S3_PREFIX}/${ASSET}"
 
 echo "plateforme : ${PLATFORM}"
 echo "asset      : ${ASSET}"
+echo "source     : ${SOURCE}"
 echo "poids      : $(( $(wc -c < "$PAYLOAD") / 1048576 )) Mo"
 
 # Le nom contenant l'empreinte, un objet déjà présent a forcément le même
@@ -81,9 +88,9 @@ else
 fi
 
 if [ -n "$EXEC" ]; then
-    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\", \"exec\": \"${EXEC}\" },"
+    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\", \"exec\": \"${EXEC}\", \"source\": \"${SOURCE}\" },"
 else
-    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\" },"
+    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\", \"source\": \"${SOURCE}\" },"
 fi
 
 echo "entry=${ENTRY}" >> "$GITHUB_OUTPUT"
