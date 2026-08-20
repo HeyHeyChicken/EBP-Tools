@@ -557,9 +557,15 @@ async function reportAnalysisIssue(payload, authToken) {
  */
 async function sendTelemetry(payload) {
     try {
+        // Le jeton du site est joint QUAND il existe, sans être exigé : il fait
+        // marquer l'événement « de confiance » côté serveur, seul sous-ensemble
+        // non falsifiable d'un endpoint ouvert. Un poste sans jeton doit
+        // continuer de remonter ses événements, simplement non authentifiés.
+        const TOKEN = resolveAuthToken();
         await apiRequest('POST', '/telemetry', payload, {
             retries: 1,
-            requireAuth: false
+            requireAuth: false,
+            headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}
         });
     } catch (e) {
         console.warn('[tools-api] sendTelemetry failed:', e.message);
