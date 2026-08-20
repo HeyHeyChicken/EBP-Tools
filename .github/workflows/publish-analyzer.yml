@@ -1,0 +1,225 @@
+# Copyright (c) 2026, Antoine Duval
+# This file is part of a source-visible project.
+# See LICENSE for terms. Unauthorized use is prohibited.
+
+# Publication de l'analyzer comme composant téléchargé.
+#
+# MANUELLE, et c'est délibéré : l'analyzer ne change que dans une release sur
+# deux environ, et par salves. Le construire et le publier à chaque release
+# repousserait 370 Mo pour rien. On publie quand il change ; le manifeste
+# committé (electron/config/components.json) fige ensuite ce que l'app utilise.
+#
+# Chaque job affiche l'entrée de manifeste à coller. Rien n'est commité
+# automatiquement : changer l'analyzer que reçoivent les utilisateurs doit
+# rester un acte explicite et relu.
+name: Publish analyzer component
+
+on:
+    workflow_dispatch:
+        inputs:
+            macos_arm64:
+                description: 'macOS Apple Silicon'
+                type: boolean
+                default: true
+            windows:
+                description: 'Windows'
+                type: boolean
+                default: true
+            linux:
+                description: 'Linux'
+                type: boolean
+                default: true
+            macos_intel:
+                description: 'macOS Intel (nécessite le runner self-hosted)'
+                type: boolean
+                default: false
+
+env:
+    S3_ENDPOINT: https://storage.ebp.gg
+    S3_BUCKET: public
+    S3_PREFIX: tools/components/analyzer
+    # MinIO ignore la région, mais l'AWS CLI refuse de démarrer sans.
+    AWS_DEFAULT_REGION: us-east-1
+    AWS_ACCESS_KEY_ID: ${{ secrets.COMPONENTS_S3_ACCESS_KEY }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.COMPONENTS_S3_SECRET_KEY }}
+
+jobs:
+    macos-arm64:
+        if: ${{ inputs.macos_arm64 }}
+        runs-on: macos-latest
+        outputs:
+            entry: ${{ steps.publish.outputs.entry }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Import Code-Signing Certificates
+              uses: Apple-Actions/import-codesign-certs@v3
+              with:
+                  p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
+                  p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+            - name: Install Tesseract
+              run: brew install tesseract pkg-config
+
+            - name: Build analyzer
+              run: cd python && bash build.sh
+
+            # Garde-fou historique : un défaut d'empaquetage fait retomber
+            # silencieusement l'OCR sur pytesseract, bien plus lent.
+            - name: Verify packaged binary uses tesserocr
+              run: |
+                  binaries/analyzer/darwin/darwin selftest || {
+                    echo "::error::Le binaire n'utilise PAS tesserocr"
+                    exit 1
+                  }
+
+            # Signature en cascade : les dylibs d'abord, l'exécutable ensuite.
+            # Elle est embarquée dans le Mach-O, donc elle survit à l'archivage.
+            - name: Sign analyzer
+              run: |
+                  find binaries/analyzer/darwin -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
+                    codesign --force --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                      --options runtime --entitlements build/entitlements.plist --timestamp "$f"
+                  done
+                  codesign --force --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime --entitlements build/entitlements.plist --timestamp \
+                    binaries/analyzer/darwin/_internal/tesseract/tesseract
+                  codesign --force --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime --entitlements build/entitlements.plist --timestamp \
+                    binaries/analyzer/darwin/darwin
+
+            - name: Publish
+              id: publish
+              run: bash .github/scripts/publish-component.sh darwin-arm64 binaries/analyzer/darwin darwin/darwin
+
+    macos-intel:
+        if: ${{ inputs.macos_intel }}
+        runs-on: self-hosted
+        outputs:
+            entry: ${{ steps.publish.outputs.entry }}
+        steps:
+            - uses: actions/checkout@v4
+
+            # Les runners self-hosted gardent leur état : le trousseau créé au
+            # run précédent ferait échouer l'import.
+            - name: Clean up leftover signing keychain
+              run: security delete-keychain signing_temp.keychain 2>/dev/null || true
+
+            - name: Import Code-Signing Certificates
+              uses: Apple-Actions/import-codesign-certs@v3
+              with:
+                  p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
+                  p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+            - name: Install Tesseract
+              run: brew install tesseract pkg-config
+
+            - name: Build analyzer
+              run: cd python && bash build.sh
+
+            - name: Verify packaged binary uses tesserocr
+              run: |
+                  binaries/analyzer/darwin/darwin selftest || {
+                    echo "::error::Le binaire n'utilise PAS tesserocr"
+                    exit 1
+                  }
+
+            - name: Sign analyzer
+              run: |
+                  find binaries/analyzer/darwin -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
+                    codesign --force --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                      --options runtime --entitlements build/entitlements.plist --timestamp "$f"
+                  done
+                  codesign --force --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime --entitlements build/entitlements.plist --timestamp \
+                    binaries/analyzer/darwin/_internal/tesseract/tesseract
+                  codesign --force --sign "Developer ID Application: Antoine Duval (5DQ59NSHNB)" \
+                    --options runtime --entitlements build/entitlements.plist --timestamp \
+                    binaries/analyzer/darwin/darwin
+
+            - name: Publish
+              id: publish
+              run: bash .github/scripts/publish-component.sh darwin-x64 binaries/analyzer/darwin darwin/darwin
+
+    linux:
+        if: ${{ inputs.linux }}
+        runs-on: ubuntu-22.04
+        outputs:
+            entry: ${{ steps.publish.outputs.entry }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+
+            - name: Install Tesseract eng data
+              run: sudo apt-get update && sudo apt-get install -y tesseract-ocr-eng zip
+
+            - name: Build analyzer
+              run: cd python && bash build_linux.sh
+
+            - name: Publish
+              id: publish
+              run: bash .github/scripts/publish-component.sh linux binaries/analyzer/linux linux/linux
+
+    windows:
+        if: ${{ inputs.windows }}
+        runs-on: windows-2022
+        outputs:
+            entry: ${{ steps.publish.outputs.entry }}
+        steps:
+            - uses: actions/checkout@v4
+
+            # La roue tesserocr préconstruite est en cp312 : l'interpréteur doit
+            # correspondre, tesserocr ne compilant pas depuis les sources ici.
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install Tesseract
+              run: choco install tesseract --no-progress -y
+
+            - name: Build analyzer
+              run: cd python && .\build.bat
+
+            - name: Verify packaged binary uses tesserocr
+              shell: pwsh
+              run: |
+                  & "binaries\analyzer\win32.exe" selftest
+                  if ($LASTEXITCODE -ne 0) {
+                    Write-Error "Le binaire n'utilise PAS tesserocr (exit $LASTEXITCODE)"
+                    exit 1
+                  }
+
+            # Windows livre un exécutable unique, déjà compressé par PyInstaller :
+            # l'archiver n'apporterait rien. Pas de dossier, donc pas d'`exec`.
+            - name: Publish
+              id: publish
+              shell: bash
+              run: bash .github/scripts/publish-component.sh win32 binaries/analyzer/win32.exe
+
+    manifest:
+        needs: [macos-arm64, macos-intel, linux, windows]
+        # `always()` : on publie rarement les quatre plateformes à la fois, et un
+        # job non demandé est « skipped » — sans ça le récapitulatif ne sortirait
+        # jamais.
+        if: ${{ always() }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Assemble manifest entries
+              run: |
+                  {
+                    echo '## Entrées à coller dans `electron/config/components.json`'
+                    echo
+                    echo '```json'
+                    echo '"analyzer": {'
+                    for E in '${{ needs.macos-arm64.outputs.entry }}' \
+                             '${{ needs.macos-intel.outputs.entry }}' \
+                             '${{ needs.linux.outputs.entry }}' \
+                             '${{ needs.windows.outputs.entry }}'; do
+                      [ -n "$E" ] && echo "    $E"
+                    done
+                    echo '}'
+                    echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"
