@@ -18,6 +18,7 @@ const {
 } = require('../core/window-manager');
 const StorageManager = require('../core/storage-manager');
 const { IS_DEV_MODE } = require('../config/constants');
+const telemetryService = require('./telemetry-service');
 
 //#endregion
 
@@ -47,6 +48,10 @@ class UpdateService {
             console.log(
                 `[update] forced update ${this.localVersion} → ${this.githubVersion}`
             );
+            telemetryService.reportUpdate('update_available', {
+                target: this.githubVersion,
+                forced: true
+            });
             this.#downloadAndInstall(NAMES);
         });
     }
@@ -84,6 +89,18 @@ class UpdateService {
             app.getPath('userData'),
             localFileName
         );
+        telemetryService.reportUpdate('update_started', {
+            target: this.githubVersion
+        });
+
+        const ON_ERROR = (reason) => {
+            console.error(`[update] download failed: ${reason}`);
+            telemetryService.reportUpdate('update_failed', {
+                target: this.githubVersion,
+                reason
+            });
+        };
+
         this.#download(FILE_URL, DESTINATION_PATH, () => {
             StorageManager.setPermanentSettingsValue('justUpdated', 'true');
             switch (os.platform()) {
@@ -101,7 +118,7 @@ class UpdateService {
                     break;
             }
             app.quit();
-        });
+        }, ON_ERROR);
     }
 
     /**
@@ -137,6 +154,10 @@ class UpdateService {
                         }
 
                         if (githubFileName && localFileName) {
+                            telemetryService.reportUpdate('update_available', {
+                                target: this.githubVersion
+                            });
+
                             const { response } = await dialog.showMessageBox(
                                 getMainWindow(),
                                 {
@@ -226,18 +247,24 @@ class UpdateService {
      * @param {String} dest Path to place the file.
      * @param {Function} callback Callback function.
      */
-    #download(url, dest, callback) {
-        https.get(url, (res) => {
+    #download(url, dest, callback, onError) {
+        const REQUEST = https.get(url, (res) => {
             // Redirection
             if (
                 (res.statusCode === 301 || res.statusCode === 302) &&
                 res.headers.location
             ) {
-                return this.#download(res.headers.location, dest, callback);
+                return this.#download(
+                    res.headers.location,
+                    dest,
+                    callback,
+                    onError
+                );
             }
 
             if (res.statusCode !== 200) {
-                console.error('Erreur:', res.statusCode);
+                res.resume();
+                onError?.(`HTTP ${res.statusCode}`);
                 return;
             }
 
@@ -275,6 +302,8 @@ class UpdateService {
 
             res.pipe(FILE);
 
+            FILE.on('error', (err) => onError?.(err.message));
+
             FILE.on('finish', () => {
                 FILE.close(() => {
                     // On Windows, the OS may not release the file handle immediately after close(), causing EBUSY when trying to spawn the installer.
@@ -287,6 +316,10 @@ class UpdateService {
                 });
             });
         });
+
+        // Sans cet écouteur, une coupure réseau émet un 'error' non géré, ce
+        // qui fait planter le processus principal au lieu d'échouer proprement.
+        REQUEST.on('error', (err) => onError?.(err.message));
     }
 
     //#endregion

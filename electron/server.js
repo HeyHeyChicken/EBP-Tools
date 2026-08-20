@@ -77,6 +77,7 @@ const arenaAudioService = require('./services/arena-audio-service');
 const arenaPipelineService = require('./services/arena-pipeline-service');
 const arenaUploaderService = require('./services/arena-uploader-service');
 const systemWorkerService = require('./services/system-worker-service');
+const telemetryService = require('./services/telemetry-service');
 // Poller EVA et identification des games (mode salle) : ces deux services se
 // démarrent seuls au `require` et vérifient eux-mêmes si le mode salle est actif.
 require('./services/arena-eva-poller-service');
@@ -1960,6 +1961,10 @@ if (!APP_GOT_THE_LOCK) {
      * This method will be called when Electron has finished initialization and is ready to create browser windows.
      */
     app.whenReady().then(() => {
+        // Signalé avant tout le reste : si le démarrage échoue plus loin, on
+        // veut quand même savoir que cette version s'est lancée.
+        telemetryService.reportLaunch();
+
         try {
             watchFolderService.start({ runAnalyzer, runChunkAnalyzer });
         } catch (e) {

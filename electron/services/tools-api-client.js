@@ -543,6 +543,30 @@ async function reportAnalysisIssue(payload, authToken) {
 }
 
 /**
+ * POST /api/tools/telemetry
+ * Télémétrie technique de Tools (version installée, issue des mises à jour).
+ * Pas d'auth : Tools n'ouvre pas de session, et l'événement doit remonter même
+ * pour un utilisateur qui n'a jamais ouvert de deeplink. Le serveur limite donc
+ * le débit par IP.
+ *
+ * Tolérant aux échecs, comme `pushWatcherStatus` : la télémétrie ne doit
+ * pouvoir casser aucun flux.
+ *
+ * @param {{installId:string, version:string, platform:string, arch:string,
+ *   event:string, detail?:object}} payload
+ */
+async function sendTelemetry(payload) {
+    try {
+        await apiRequest('POST', '/telemetry', payload, {
+            retries: 1,
+            requireAuth: false
+        });
+    } catch (e) {
+        console.warn('[tools-api] sendTelemetry failed:', e.message);
+    }
+}
+
+/**
  * Télécharge un objet depuis une URL présignée vers `filePath` (GET), en suivant les
  * redirections. Pendant de `uploadFileToPresignedUrl`, pour le worker de pré-analyse
  * qui doit rapatrier la vidéo de salle avant de l'analyser.
@@ -736,6 +760,7 @@ module.exports = {
     downloadPresignedUrlToFile,
     pushWatcherStatus,
     pushGameAnalysisStatus,
+    sendTelemetry,
     reportAnalysisIssue,
     resolveAuthToken,
     NotAuthenticatedError,

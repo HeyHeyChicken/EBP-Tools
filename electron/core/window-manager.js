@@ -28,6 +28,7 @@ const {
     PROTOCOL_NAME
 } = require('../config/constants');
 const watchFolderService = require('../services/watch-folder-service');
+const telemetryService = require('../services/telemetry-service');
 const StorageManager = require('./storage-manager');
 
 //#endregion
@@ -398,6 +399,20 @@ function createWindow(updateService) {
                                 mainWindow.destroy();
                             }
                             app.quit();
+                        }
+                    }
+                ]
+            },
+            {
+                label: 'Settings',
+                submenu: [
+                    {
+                        label: 'Send anonymous usage data',
+                        type: 'checkbox',
+                        checked: telemetryService.isEnabled(),
+                        click: (item) => {
+                            telemetryService.setEnabled(item.checked);
+                            TRAY.setContextMenu(buildContextMenu());
                         }
                     }
                 ]
