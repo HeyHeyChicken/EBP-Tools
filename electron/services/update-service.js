@@ -378,6 +378,21 @@ class UpdateService {
             return;
         }
         console.log(`[update] applying ${this.pendingVersion} on user request`);
+
+        // La fenêtre principale intercepte sa fermeture pour se CACHER au lieu
+        // de quitter (`event.preventDefault()` dans window-manager). Or
+        // `quitAndInstall` appelle `app.quit()`, qui déclenche cette fermeture,
+        // se fait annuler, et renonce : l'app masquait donc sa fenêtre en
+        // restant sur l'ancienne version, sans rien signaler.
+        //
+        // On détruit la fenêtre d'abord — `destroy()` court-circuite le
+        // gestionnaire de fermeture —, exactement comme le fait l'entrée
+        // « Quit » du tray, qui est la seule à fonctionner pour cette raison.
+        const WINDOW = getMainWindow();
+        if (WINDOW && !WINDOW.isDestroyed()) {
+            WINDOW.destroy();
+        }
+
         NATIVE.quitAndInstall();
     }
 
