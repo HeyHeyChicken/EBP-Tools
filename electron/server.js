@@ -193,16 +193,12 @@ function showBackgroundNotice() {
  * comment l'épingler — sans quoi un utilisateur de Windows 11, où les icônes
  * sont repliées par défaut, n'aurait aucun recours.
  */
-function openWelcomePageOnFirstRun() {
+async function openWelcomePageOnFirstRun() {
     const FIRST_RUN_KEY = 'firstRunDone';
 
     if (StorageManager.getPermanentSettingsValue(FIRST_RUN_KEY) !== undefined) {
         return;
     }
-
-    // Posé AVANT l'ouverture : si celle-ci échoue, on ne veut pas rouvrir la
-    // page à chaque lancement suivant.
-    StorageManager.setPermanentSettingsValue(FIRST_RUN_KEY, true);
 
     const LANGUAGE = (
         StorageManager.permanentSettings['language'] ||
@@ -214,7 +210,24 @@ function openWelcomePageOnFirstRun() {
     // certitude, le navigateur ne pourrait qu'en faire l'hypothèse.
     const URL = `https://${EBP_DOMAIN}/${LANGUAGE}/tools/tools/installed?os=${os.platform()}`;
     console.log(`[first-run] opening ${URL}`);
-    shell.openExternal(URL);
+
+    try {
+        await shell.openExternal(URL);
+
+        // Le drapeau n'est posé qu'après une ouverture RÉUSSIE. Le poser avant
+        // ferait qu'un échec unique — navigateur par défaut absent, session
+        // graphique indisponible au démarrage — priverait définitivement
+        // l'utilisateur de cette page, en silence. La montrer deux fois est
+        // bénin ; ne jamais la montrer ne l'est pas.
+        StorageManager.setPermanentSettingsValue(FIRST_RUN_KEY, true);
+        console.log('[first-run] welcome page opened');
+    } catch (error) {
+        // `openExternal` rejette sans bruit : sans ce message, rien ne
+        // permettrait de savoir que la page n'est jamais apparue.
+        console.error(
+            `[first-run] could not open the welcome page: ${error.message}`
+        );
+    }
 }
 
 const UPDATE_SERVICE = new UpdateService();
