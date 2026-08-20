@@ -210,7 +210,9 @@ function openWelcomePageOnFirstRun() {
         'en'
     ).slice(0, 2);
 
-    const URL = `https://${EBP_DOMAIN}/${LANGUAGE}/tools/tools/installed`;
+    // La plateforme est passée à la page : c'est l'app qui la connaît avec
+    // certitude, le navigateur ne pourrait qu'en faire l'hypothèse.
+    const URL = `https://${EBP_DOMAIN}/${LANGUAGE}/tools/tools/installed?os=${os.platform()}`;
     console.log(`[first-run] opening ${URL}`);
     shell.openExternal(URL);
 }
