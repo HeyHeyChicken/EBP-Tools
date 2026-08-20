@@ -26,6 +26,11 @@ const telemetryService = require('./telemetry-service');
 
 //#endregion
 
+// Cadence des vérifications quand l'app tourne. Assez espacé pour être
+// invisible, assez fréquent pour qu'un poste allumé toute la journée reçoive
+// une version publiée le matin.
+const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+
 class UpdateService {
     githubVersion = '';
     // L'updater natif a-t-il déjà été câblé, et a-t-il échoué ? Un échec fait
@@ -36,6 +41,7 @@ class UpdateService {
     // Version téléchargée et prête, en attente du prochain démarrage. Sert au
     // menu du tray : sans elle, rien n'indique qu'une mise à jour attend.
     pendingVersion = undefined;
+    #checkTimer = null;
 
     constructor() {
         this.localVersion = version;
@@ -290,6 +296,29 @@ class UpdateService {
                 }
             }
         });
+    }
+
+    /**
+     * Vérifie au démarrage, puis toutes les quatre heures.
+     *
+     * La vérification était auparavant accrochée à l'AFFICHAGE de la fenêtre,
+     * ce qui produisait deux défauts opposés : un poste lancé au démarrage de
+     * session garde sa fenêtre masquée et ne vérifiait donc JAMAIS, tandis
+     * qu'ouvrir et fermer la fenêtre relançait une vérification à chaque fois.
+     * La découpler de l'interface corrige les deux.
+     *
+     * Idempotent : un second appel ne crée pas un second minuteur.
+     */
+    startPeriodicCheck() {
+        if (this.#checkTimer) {
+            return;
+        }
+
+        this.autoUpdate(true);
+        this.#checkTimer = setInterval(
+            () => this.autoUpdate(true),
+            CHECK_INTERVAL_MS
+        );
     }
 
     /**

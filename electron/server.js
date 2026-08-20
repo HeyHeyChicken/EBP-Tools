@@ -2078,6 +2078,11 @@ if (!APP_GOT_THE_LOCK) {
             // We immediately create the window that will contain the HMI.
             createWindow(UPDATE_SERVICE);
 
+            // Après la fenêtre : le flux de repli (macOS) ouvre un dialogue qui
+            // a besoin d'un parent. Après les composants aussi, pour ne pas
+            // concurrencer les ~190 Mo du tout premier lancement.
+            UPDATE_SERVICE.startPeriodicCheck();
+
             // If a second instance is launched, the first is displayed.
             app.on('second-instance', (event, commandLine) => {
                 console.log(

@@ -255,10 +255,6 @@ function createWindow(updateService) {
         hideMainWindow();
     });
 
-    mainWindow.on('show', () => {
-        updateService.autoUpdate(true);
-    });
-
     const IS_MACOS = process.platform === 'darwin';
 
     function getTrayIcon() {
