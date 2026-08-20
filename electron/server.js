@@ -19,6 +19,36 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 
 //#endregion
 
+// Désinstallation Windows : Squirrel relance l'app avec ce drapeau juste avant
+// d'effacer le dossier d'installation. Les RÉGLAGES, eux, vivent dans %AppData%
+// et survivent à la désinstallation — sans ce nettoyage, une réinstallation
+// serait indiscernable d'une mise à jour, et la page d'accueil ne se rouvrirait
+// jamais.
+//
+// Écriture directe plutôt que via StorageManager : celui-ci entraîne toute la
+// chaîne des constantes, qu'on ne veut pas charger dans un processus dont la
+// seule mission est de mourir. Seul le drapeau est retiré : effacer les
+// réglages entiers ferait perdre les chemins de sortie, la langue et la
+// configuration du mode salle.
+if (process.platform === 'win32' && process.argv[1] === '--squirrel-uninstall') {
+    try {
+        const SETTINGS_PATH = require('node:path').join(
+            app.getPath('userData'),
+            'settings.json'
+        );
+        const FS = require('fs');
+
+        if (FS.existsSync(SETTINGS_PATH)) {
+            const SETTINGS = JSON.parse(FS.readFileSync(SETTINGS_PATH, 'utf-8'));
+            delete SETTINGS.firstRunDone;
+            FS.writeFileSync(SETTINGS_PATH, JSON.stringify(SETTINGS));
+            console.log('[uninstall] first-run flag cleared');
+        }
+    } catch (error) {
+        console.error('[uninstall] cleanup failed', error);
+    }
+}
+
 // Événement Squirrel (installation, mise à jour, désinstallation) : l'app est
 // relancée avec un drapeau, le temps de poser ou retirer les raccourcis.
 //
@@ -180,7 +210,7 @@ function openWelcomePageOnFirstRun() {
         'en'
     ).slice(0, 2);
 
-    const URL = `https://${EBP_DOMAIN}/${LANGUAGE}/tools/installed`;
+    const URL = `https://${EBP_DOMAIN}/${LANGUAGE}/tools/tools/installed`;
     console.log(`[first-run] opening ${URL}`);
     shell.openExternal(URL);
 }
