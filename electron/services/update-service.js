@@ -31,6 +31,13 @@ const telemetryService = require('./telemetry-service');
 // une version publiée le matin.
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
+// Nombre d'échecs consécutifs du chemin natif avant de basculer sur le flux
+// maison. Un incident ponctuel — réseau qui cligne, stockage momentanément
+// indisponible — ne doit pas condamner le chemin léger et faire retélécharger
+// 148 Mo. À la cadence de quatre heures, trois échecs représentent une
+// demi-journée : c'est une panne, plus un incident.
+const NATIVE_FAILURE_LIMIT = 3;
+
 class UpdateService {
     githubVersion = '';
     // L'updater natif a-t-il déjà été câblé, et a-t-il échoué ? Un échec fait
@@ -42,6 +49,10 @@ class UpdateService {
     // menu du tray : sans elle, rien n'indique qu'une mise à jour attend.
     pendingVersion = undefined;
     #checkTimer = null;
+    // Une vérification Squirrel est-elle en cours ? Sans ce garde, deux appels
+    // rapprochés se marchent dessus et le second échoue.
+    #checking = false;
+    #nativeFailures = 0;
 
     constructor() {
         this.localVersion = version;
@@ -68,6 +79,8 @@ class UpdateService {
             });
 
             NATIVE.on('update-not-available', () => {
+                this.#checking = false;
+                this.#nativeFailures = 0;
                 console.log(
                     `[update] native: up to date (${this.localVersion})`
                 );
@@ -86,6 +99,8 @@ class UpdateService {
             NATIVE.on(
                 'update-downloaded',
                 (event, releaseNotes, releaseName) => {
+                    this.#checking = false;
+                    this.#nativeFailures = 0;
                     this.pendingVersion = releaseName || 'inconnue';
                     console.log(
                         `[update] native: ${this.pendingVersion} installée, ` +
@@ -95,20 +110,48 @@ class UpdateService {
             );
 
             NATIVE.on('error', (error) => {
-                // Repli définitif sur le flux maison pour cette session : sans
-                // ça, un flux injoignable priverait le poste de toute mise à
-                // jour, sans que rien ne le signale.
-                this.#nativeFailed = true;
-                console.error('[update] native failed:', error.message);
+                this.#checking = false;
+
+                // Squirrel refuse une vérification quand la précédente tourne
+                // encore. Ce n'est pas une panne : c'est notre propre appel
+                // concurrent. Le compter comme un échec ferait basculer le
+                // poste sur le flux maison — donc retélécharger l'installeur
+                // entier — alors que le téléchargement en cours va aboutir.
+                if (/already running/i.test(error.message)) {
+                    console.log(
+                        '[update] native: check already in progress, ignored'
+                    );
+                    return;
+                }
+
+                this.#nativeFailures += 1;
+                console.error(
+                    `[update] native failed (${this.#nativeFailures}/${NATIVE_FAILURE_LIMIT}):`,
+                    error.message
+                );
                 telemetryService.reportUpdate('update_failed', {
                     reason: `native: ${error.message}`
                 });
-                this.autoUpdate(true);
+
+                // Repli seulement après plusieurs échecs consécutifs : un poste
+                // ne doit jamais rester sans chemin de mise à jour, mais un
+                // incident ponctuel ne justifie pas d'abandonner le chemin léger.
+                if (this.#nativeFailures >= NATIVE_FAILURE_LIMIT) {
+                    this.#nativeFailed = true;
+                    console.error('[update] native abandoned, falling back');
+                    this.autoUpdate(true);
+                }
             });
 
             this.#nativeReady = true;
         }
 
+        if (this.#checking) {
+            console.log('[update] native: check already in progress, skipped');
+            return;
+        }
+
+        this.#checking = true;
         NATIVE.checkForUpdates();
     }
 
