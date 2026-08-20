@@ -66,6 +66,12 @@ const EBP_DOMAIN = 'evabattleplan.com';
 const UPDATE_REPOSITORY =
     process.env.TOOLS_UPDATE_REPOSITORY || 'EBP-gg/Tools';
 
+// Flux Squirrel.Windows de ce build. Dérivé du même dépôt que les mises à jour
+// et publié par le CI sous ce même chemin : le banc d'essai et la production ont
+// donc des flux distincts, sans qu'aucune valeur ne soit à tenir à jour à la
+// main de part et d'autre.
+const UPDATE_FEED_URL = `https://storage.ebp.gg/public/tools/updates/${UPDATE_REPOSITORY}/win32`;
+
 const IS_DEV_MODE = process.env.NODE_ENV !== 'production';
 const ROOT_PATH = IS_DEV_MODE ? path.dirname(__dirname) : process.resourcesPath;
 const OS_PLATFORM = os.platform();
@@ -137,6 +143,7 @@ function getCurrentPort() {
 module.exports = {
     EBP_DOMAIN,
     UPDATE_REPOSITORY,
+    UPDATE_FEED_URL,
 
     IS_DEV_MODE,
     ROOT_PATH,

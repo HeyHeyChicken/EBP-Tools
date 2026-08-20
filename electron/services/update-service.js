@@ -8,7 +8,7 @@ const https = require('https');
 const fs = require('fs');
 const os = require('os');
 const { version } = require('../../package.json');
-const { app, dialog } = require('electron');
+const { app, dialog, autoUpdater: NATIVE } = require('electron');
 const path = require('node:path');
 const { spawn } = require('child_process');
 const {
@@ -17,16 +17,72 @@ const {
     deleteFloatingWindow
 } = require('../core/window-manager');
 const StorageManager = require('../core/storage-manager');
-const { IS_DEV_MODE, UPDATE_REPOSITORY } = require('../config/constants');
+const {
+    IS_DEV_MODE,
+    UPDATE_REPOSITORY,
+    UPDATE_FEED_URL
+} = require('../config/constants');
 const telemetryService = require('./telemetry-service');
 
 //#endregion
 
 class UpdateService {
     githubVersion = '';
+    // L'updater natif a-t-il déjà été câblé, et a-t-il échoué ? Un échec fait
+    // repasser définitivement ce poste sur le flux maison : mieux vaut le
+    // chemin lent que plus de chemin du tout.
+    #nativeReady = false;
+    #nativeFailed = false;
 
     constructor() {
         this.localVersion = version;
+    }
+
+    /**
+     * Mise à jour Windows par Squirrel, le mécanisme natif de l'installeur.
+     *
+     * On ne demande JAMAIS `quitAndInstall` : Squirrel dépose la nouvelle
+     * version dans un dossier versionné à côté, et le lanceur la prend au
+     * démarrage suivant. Ne pas forcer le redémarrage supprime toute modale et
+     * n'interrompt jamais une analyse en cours — c'est le comportement qu'on
+     * envie à Discord, et c'est aussi le moins risqué.
+     *
+     * Le succès n'est pas signalé : c'est l'événement `launch` suivant, portant
+     * la nouvelle version, qui le prouve mieux qu'un événement émis d'avance.
+     */
+    #checkNative() {
+        if (!this.#nativeReady) {
+            NATIVE.setFeedURL({ url: UPDATE_FEED_URL });
+
+            NATIVE.on('update-available', () => {
+                console.log('[update] native: update available');
+                telemetryService.reportUpdate('update_available', {
+                    feed: UPDATE_FEED_URL
+                });
+            });
+
+            NATIVE.on('update-downloaded', () => {
+                console.log(
+                    '[update] native: installed, will apply on next launch'
+                );
+            });
+
+            NATIVE.on('error', (error) => {
+                // Repli définitif sur le flux maison pour cette session : sans
+                // ça, un flux injoignable priverait le poste de toute mise à
+                // jour, sans que rien ne le signale.
+                this.#nativeFailed = true;
+                console.error('[update] native failed:', error.message);
+                telemetryService.reportUpdate('update_failed', {
+                    reason: `native: ${error.message}`
+                });
+                this.autoUpdate(true);
+            });
+
+            this.#nativeReady = true;
+        }
+
+        NATIVE.checkForUpdates();
     }
 
     //#region Functions
@@ -126,84 +182,93 @@ class UpdateService {
      * @param {boolean} invisible Should we hide the graphical update elements?
      */
     autoUpdate(invisible) {
-        if (!IS_DEV_MODE && !this.localVersion.startsWith('0')) {
-            this.getProjectLatestVersion(async () => {
-                if (this.githubVersion) {
-                    if (this.githubVersion != this.localVersion) {
-                        let githubFileName = '';
-                        let localFileName = '';
-                        switch (os.platform()) {
-                            case 'win32':
-                                githubFileName = `EBP-Tools-${this.githubVersion}.exe`;
-                                localFileName = `update.exe`;
-                                break;
-                            case 'darwin':
-                                // Starting with the multi-arch release, macOS
-                                // DMGs are published with an arch suffix
-                                // (`-arm64` for Apple Silicon, `-x64` for
-                                // Intel). `process.arch` reports the arch of
-                                // the currently running Electron binary, which
-                                // is what we want: an arm64 build running
-                                // under Rosetta on an Intel Mac should keep
-                                // pulling the arm64 DMG.
-                                const ARCH =
-                                    process.arch === 'arm64' ? 'arm64' : 'x64';
-                                githubFileName = `EBP-Tools-${this.githubVersion}-${ARCH}.dmg`;
-                                localFileName = `update.dmg`;
-                                break;
+        if (IS_DEV_MODE || this.localVersion.startsWith('0')) {
+            return;
+        }
+
+        // Windows passe par Squirrel, qui télécharge et installe en tâche de
+        // fond sans rien demander. Le flux maison reste le repli.
+        if (os.platform() === 'win32' && !this.#nativeFailed) {
+            this.#checkNative();
+            return;
+        }
+
+        this.getProjectLatestVersion(async () => {
+            if (this.githubVersion) {
+                if (this.githubVersion != this.localVersion) {
+                    let githubFileName = '';
+                    let localFileName = '';
+                    switch (os.platform()) {
+                        case 'win32':
+                            githubFileName = `EBP-Tools-${this.githubVersion}.exe`;
+                            localFileName = `update.exe`;
+                            break;
+                        case 'darwin':
+                            // Starting with the multi-arch release, macOS
+                            // DMGs are published with an arch suffix
+                            // (`-arm64` for Apple Silicon, `-x64` for
+                            // Intel). `process.arch` reports the arch of
+                            // the currently running Electron binary, which
+                            // is what we want: an arm64 build running
+                            // under Rosetta on an Intel Mac should keep
+                            // pulling the arm64 DMG.
+                            const ARCH =
+                                process.arch === 'arm64' ? 'arm64' : 'x64';
+                            githubFileName = `EBP-Tools-${this.githubVersion}-${ARCH}.dmg`;
+                            localFileName = `update.dmg`;
+                            break;
+                    }
+
+                    if (githubFileName && localFileName) {
+                        telemetryService.reportUpdate('update_available', {
+                            target: this.githubVersion
+                        });
+
+                        const { response } = await dialog.showMessageBox(
+                            getMainWindow(),
+                            {
+                                type: 'question',
+                                buttons: ['Update', 'Later'],
+                                defaultId: 0,
+                                cancelId: 1,
+                                title: 'Update available',
+                                message: `A new version (${this.githubVersion}) is available. Do you want to install it now?`
+                            }
+                        );
+                        if (response !== 0) {
+                            return;
                         }
 
-                        if (githubFileName && localFileName) {
-                            telemetryService.reportUpdate('update_available', {
-                                target: this.githubVersion
-                            });
+                        getMainWindow().webContents.send(
+                            'global-message',
+                            'common.updatingInProgress'
+                        );
 
-                            const { response } = await dialog.showMessageBox(
-                                getMainWindow(),
-                                {
-                                    type: 'question',
-                                    buttons: ['Update', 'Later'],
-                                    defaultId: 0,
-                                    cancelId: 1,
-                                    title: 'Update available',
-                                    message: `A new version (${this.githubVersion}) is available. Do you want to install it now?`
-                                }
+                        if (invisible === false) {
+                            getMainWindow()?.hide();
+
+                            createFloatingWindow(
+                                450,
+                                150,
+                                JSON.stringify({
+                                    percent: 0,
+                                    leftRounded: true,
+                                    infinite: false,
+                                    icon: undefined,
+                                    text: '.common.updatingInProgress',
+                                    state: 'info'
+                                })
                             );
-                            if (response !== 0) {
-                                return;
-                            }
-
-                            getMainWindow().webContents.send(
-                                'global-message',
-                                'common.updatingInProgress'
-                            );
-
-                            if (invisible === false) {
-                                getMainWindow()?.hide();
-
-                                createFloatingWindow(
-                                    450,
-                                    150,
-                                    JSON.stringify({
-                                        percent: 0,
-                                        leftRounded: true,
-                                        infinite: false,
-                                        icon: undefined,
-                                        text: '.common.updatingInProgress',
-                                        state: 'info'
-                                    })
-                                );
-                            }
-
-                            this.#downloadAndInstall({
-                                githubFileName,
-                                localFileName
-                            });
                         }
+
+                        this.#downloadAndInstall({
+                            githubFileName,
+                            localFileName
+                        });
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
     /**

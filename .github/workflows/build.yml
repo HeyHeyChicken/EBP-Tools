@@ -18,7 +18,11 @@ env:
     # sont produits, avant d'y brancher l'updater.
     S3_ENDPOINT: https://storage.ebp.gg
     S3_BUCKET: public
-    FEED_PREFIX: tools/updates/win32
+    # Un flux PAR DÉPÔT : sans ça les versions du banc d'essai et celles de la
+    # production partageraient le même RELEASES, et un client de prod se verrait
+    # proposer une version de test. Le client dérive la même URL de la même
+    # variable (cf. constants.js), donc les deux ne peuvent pas diverger.
+    FEED_PREFIX: tools/updates/${{ github.repository }}/win32
     AWS_DEFAULT_REGION: us-east-1
     AWS_ACCESS_KEY_ID: ${{ secrets.COMPONENTS_S3_ACCESS_KEY }}
     AWS_SECRET_ACCESS_KEY: ${{ secrets.COMPONENTS_S3_SECRET_KEY }}
