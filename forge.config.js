@@ -121,7 +121,17 @@ module.exports = {
         {
             // ZIP (.app) pour auto-update
             name: '@electron-forge/maker-zip',
-            platforms: ['darwin']
+            platforms: ['darwin'],
+            config: {
+                // Renseigné, le maker télécharge le RELEASES.json existant, y
+                // ajoute cette version et le réécrit — l'exact équivalent de
+                // `remoteReleases` côté Windows, en beaucoup plus simple
+                // puisqu'il gère lui-même l'absence de manifeste au premier
+                // passage. Laissé vide en local, ce qui garde le build hors
+                // ligne.
+                macUpdateManifestBaseUrl:
+                    process.env.SQUIRREL_MAC_MANIFEST_BASE_URL || undefined
+            }
         }
     ],
     plugins: [
