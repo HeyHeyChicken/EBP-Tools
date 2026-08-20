@@ -6,6 +6,7 @@
 
 const crypto = require('crypto');
 const os = require('os');
+const { app } = require('electron');
 const StorageManager = require('../core/storage-manager');
 const { sendTelemetry } = require('./tools-api-client');
 const { version: TOOLS_VERSION } = require('../../package.json');
@@ -19,11 +20,27 @@ const { version: TOOLS_VERSION } = require('../../package.json');
  * correctif à distance pour ce cas.
  *
  * Rien de personnel n'est envoyé : un identifiant d'installation tiré au sort,
- * la version, la plateforme et l'architecture. Désactivable depuis le menu du
- * tray (Settings), auquel cas plus rien ne part.
+ * la version de Tools, la plateforme, l'architecture et la version de l'OS.
+ * Désactivable depuis le menu du tray (Settings), auquel cas plus rien ne part.
  */
 const ENABLED_KEY = 'telemetryEnabled';
 const INSTALL_ID_KEY = 'telemetryInstallId';
+
+/**
+ * Version du système, pas seulement sa famille : distinguer Windows 10 de
+ * Windows 11, ou une version de macOS d'une autre, est ce qui permet de relier
+ * un échec de mise à jour à un environnement précis.
+ *
+ * `process.getSystemVersion` est fourni par Electron et donne la version réelle
+ * du système (« 10.0.22631 », « 15.5 ») ; hors Electron on retombe sur la
+ * version du noyau, seule disponible.
+ * @returns {string} OS version.
+ */
+function getOsVersion() {
+    return typeof process.getSystemVersion === 'function'
+        ? process.getSystemVersion()
+        : os.release();
+}
 
 //#region Functions
 
@@ -78,6 +95,11 @@ function send(event, detail) {
         version: TOOLS_VERSION,
         platform: os.platform(),
         arch: process.arch,
+        osVersion: getOsVersion(),
+        // `process.arch` est l'architecture de la BUILD, pas de la machine :
+        // sans ce drapeau, une build x64 installée par erreur sur un Mac Apple
+        // Silicon est indiscernable d'un vrai Intel.
+        translated: app.runningUnderARM64Translation === true,
         event,
         ...(detail ? { detail } : {})
     });
