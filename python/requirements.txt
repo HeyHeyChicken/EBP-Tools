@@ -28,4 +28,13 @@ tesserocr==2.10.0; sys_platform == "darwin"
 opencv-python==5.0.0.93
 pyinstaller==6.21.0
 scipy==1.18.0
-onnxruntime==1.27.0
+# macOS Intel : Microsoft a cessé de publier des roues x86_64 après la 1.23.2.
+# La contrainte n'est donc pas un choix, c'est ce que l'index propose encore.
+# Le modèle est un export PyTorch 2.8 que cette version charge sans difficulté,
+# mais rien ne le vérifie automatiquement : `selftest` ne contrôle que le
+# backend OCR. Les Mac Intel tournent donc sur un runtime d'inférence plus
+# ancien que les autres plateformes.
+# `not` n'existe pas dans la grammaire PEP 508 : la condition est donc
+# écrite par De Morgan, « pas macOS, ou pas Intel ».
+onnxruntime==1.27.0; sys_platform != "darwin" or platform_machine != "x86_64"
+onnxruntime==1.23.2; sys_platform == "darwin" and platform_machine == "x86_64"
