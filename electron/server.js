@@ -62,6 +62,13 @@ if (require('electron-squirrel-startup')) {
     return;
 }
 
+// Détournement de `spawn`/`execFile` pour savoir si Tools travaille. Il DOIT
+// précéder les `require` qui suivent : chacun capture ces fonctions au
+// chargement, et celui qui les capturerait avant lancerait des processus
+// invisibles au compteur — donc un redémarrage automatique au milieu d'une
+// analyse.
+require('./core/activity-tracker').install();
+
 const path = require('node:path');
 const os = require('os');
 const { exec, execFile, spawn } = require('child_process');

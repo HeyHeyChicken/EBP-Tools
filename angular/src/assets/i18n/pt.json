@@ -11,6 +11,8 @@
     "updatingInProgress": "Atualização em curso, por favor aguarde.",
     "downloadingComponents": "A transferir componentes, por favor aguarde.",
     "runningInBackground": "O Tools está disponível e a funcionar em segundo plano.",
+    "updateReadyWhenFree": "Atualização pronta. O Tools irá reiniciar assim que o trabalho em curso terminar.",
+    "alreadyUpToDate": "O Tools já está atualizado.",
     "encoding": "A codificar…",
     "encoded": "O vídeo foi codificado com sucesso!",
     "download": "Transferir",

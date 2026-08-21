@@ -10,6 +10,7 @@ const path = require('node:path');
 const chokidar = require('chokidar');
 const { Notification, app } = require('electron');
 const StorageManager = require('../core/storage-manager');
+const { markBusy } = require('../core/activity-tracker');
 const { t } = require('./translate.service');
 const { unlinkSync, safeMapName } = require('./global-service');
 const { cutAndEncodeGame, cutCopyGame } = require('./video-service');
@@ -807,6 +808,10 @@ async function workerLoop(deps) {
                 continue;
             }
             CURRENT_PATH = NEXT;
+            // Les uploads d'un replay se poursuivent après le dernier ffmpeg :
+            // le comptage des processus enfants les manquerait, et une mise à
+            // jour pourrait s'appliquer pendant l'envoi d'une vidéo.
+            const RELEASE_BUSY = markBusy();
             notifyStatusChange();
             try {
                 await processVideo(NEXT, deps);
@@ -842,6 +847,7 @@ async function workerLoop(deps) {
                     processedInSession++;
                 }
             } finally {
+                RELEASE_BUSY();
                 CURRENT_PATH = null;
                 notifyStatusChange();
             }

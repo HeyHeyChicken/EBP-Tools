@@ -11,6 +11,8 @@
     "updatingInProgress": "Actualización en curso, por favor espere.",
     "downloadingComponents": "Descargando componentes, por favor espere.",
     "runningInBackground": "Tools está disponible y se ejecuta en segundo plano.",
+    "updateReadyWhenFree": "Actualización lista. Tools se reiniciará en cuanto termine el trabajo en curso.",
+    "alreadyUpToDate": "Tools ya está actualizado.",
     "encoding": "Codificación en curso…",
     "encoded": "¡El vídeo se ha codificado con éxito!",
     "download": "Descargar",

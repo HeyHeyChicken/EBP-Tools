@@ -14,7 +14,8 @@ const { spawn } = require('child_process');
 const {
     getMainWindow,
     createFloatingWindow,
-    deleteFloatingWindow
+    deleteFloatingWindow,
+    getFloatingWindow
 } = require('../core/window-manager');
 const {
     IS_DEV_MODE,
@@ -22,6 +23,9 @@ const {
     UPDATE_FEED_URL
 } = require('../config/constants');
 const telemetryService = require('./telemetry-service');
+const arenaModeService = require('./arena-mode-service');
+const activityTracker = require('../core/activity-tracker');
+const StorageManager = require('../core/storage-manager');
 
 //#endregion
 
@@ -37,6 +41,31 @@ const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 // demi-journée : c'est une panne, plus un incident.
 const NATIVE_FAILURE_LIMIT = 3;
 
+// Inactivité requise avant que l'application applique d'elle-même une mise à
+// jour déjà téléchargée. Tools vit dans la barre système et peut tourner des
+// semaines : sans cela une version reste en attente jusqu'à ce que
+// l'utilisateur pense à redémarrer, ce qu'il ne fait pas.
+const IDLE_APPLY_DELAY_MS = 30 * 60 * 1000;
+
+// Cadence d'examen de cette inactivité. Bien plus serrée que la recherche de
+// mise à jour : le calcul est local et ne coûte rien.
+const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+// Délai laissé au processus pour mourir après `quitAndInstall`. Passé ce délai,
+// le redémarrage n'a pas eu lieu — c'est le SEUL échec observable, puisqu'un
+// succès emporte le processus et ne laisse personne pour le constater.
+const QUIT_GRACE_MS = 30 * 1000;
+
+// Réglage retenant la version dont l'application automatique a échoué. Il est
+// PERSISTANT à dessein : après un échec on relance l'application, donc un
+// compteur en mémoire repartirait de zéro et l'on redémarrerait en boucle
+// toutes les trente minutes sans jamais aboutir.
+const AUTO_APPLY_FAILED_KEY = 'autoApplyFailedVersion';
+
+// Durée d'affichage d'une notification flottante, alignée sur celle du message
+// de lancement en arrière-plan.
+const NOTICE_MS = 5000;
+
 class UpdateService {
     githubVersion = '';
     // L'updater natif a-t-il déjà été câblé, et a-t-il échoué ? Un échec fait
@@ -48,6 +77,19 @@ class UpdateService {
     // menu du tray : sans elle, rien n'indique qu'une mise à jour attend.
     pendingVersion = undefined;
     #checkTimer = null;
+    #idleTimer = null;
+    // Une application automatique est-elle en cours ? Entre `quitAndInstall` et
+    // le constat d'échec, le minuteur d'inactivité continue de battre : sans ce
+    // garde il en lancerait une seconde par-dessus la première.
+    #applying = false;
+    // La recherche en cours vient-elle d'un clic sur « Check for update » ?
+    // Une vérification périodique et une vérification demandée n'appellent pas
+    // la même conclusion : la seconde doit aboutir à quelque chose.
+    #userRequestedCheck = false;
+    // L'utilisateur a cliqué pendant un travail et on lui a promis un
+    // redémarrage « dès que ce sera terminé ». Cette promesse doit être tenue
+    // sans attendre les trente minutes d'inactivité.
+    #applyWhenFree = false;
     // Une vérification Squirrel est-elle en cours ? Sans ce garde, deux appels
     // rapprochés se marchent dessus et le second échoue.
     #checking = false;
@@ -90,6 +132,18 @@ class UpdateService {
                 console.log(
                     `[update] native: up to date (${this.localVersion})`
                 );
+
+                // Le clic mérite une réponse, même quand la réponse est « rien
+                // à faire » : sans elle, l'utilisateur ne peut pas distinguer
+                // « déjà à jour » de « le bouton ne marche pas ».
+                if (this.#userRequestedCheck) {
+                    this.#userRequestedCheck = false;
+                    this.#notice(
+                        'fa-sharp fa-solid fa-check',
+                        '.common.alreadyUpToDate',
+                        'success'
+                    );
+                }
             });
 
             NATIVE.on('update-available', () => {
@@ -112,6 +166,7 @@ class UpdateService {
                         `[update] native: ${this.pendingVersion} installée, ` +
                             'sera appliquée au prochain démarrage'
                     );
+                    this.#applyAfterUserCheck();
                 }
             );
 
@@ -129,6 +184,11 @@ class UpdateService {
                     );
                     return;
                 }
+
+                // Le clic est perdu avec cette vérification : le laisser
+                // armé ferait redémarrer l'application sur le battement des
+                // quatre heures, sans que personne l'ait demandé.
+                this.#userRequestedCheck = false;
 
                 this.#nativeFailures += 1;
                 console.error(
@@ -266,6 +326,11 @@ class UpdateService {
         // demeure le seul chemin sous Linux, que Squirrel ne couvre pas.
         const NATIVE_PLATFORMS = ['win32', 'darwin'];
         if (NATIVE_PLATFORMS.includes(os.platform()) && !this.#nativeFailed) {
+            // `invisible === false` ne vient que du menu du tray : c'est un
+            // clic de l'utilisateur, pas le battement des quatre heures.
+            if (invisible === false) {
+                this.#userRequestedCheck = true;
+            }
             this.#checkNative();
             return;
         }
@@ -369,22 +434,190 @@ class UpdateService {
             () => this.autoUpdate(true),
             CHECK_INTERVAL_MS
         );
+        this.#idleTimer = setInterval(
+            () => this.#considerIdleApply(),
+            IDLE_CHECK_INTERVAL_MS
+        );
     }
 
     /**
-     * Applique une mise à jour déjà téléchargée, à la demande de l'utilisateur.
+     * Applique d'elle-même une mise à jour téléchargée quand l'application est
+     * restée inactive assez longtemps.
+     *
+     * Le redémarrage est invisible : la fenêtre est masquée par définition (on
+     * s'abstient sinon), et l'application revient dans la barre système.
+     */
+    #considerIdleApply() {
+        if (!this.pendingVersion || this.#applying) return;
+        if (activityTracker.isBusy()) return;
+
+        // Promesse tenue : l'utilisateur a cliqué pendant un travail, la
+        // notification lui a annoncé un redémarrage à la fin de celui-ci. Ni
+        // les trente minutes ni la fenêtre ouverte ne s'y opposent — c'est lui
+        // qui l'a demandé.
+        if (this.#applyWhenFree) {
+            this.#applyWhenFree = false;
+            console.log(
+                `[update] work finished → applying ${this.pendingVersion} as promised`
+            );
+            this.applyPendingUpdate();
+            return;
+        }
+
+        // Mode salle : la machine tourne sans personne devant elle et reçoit
+        // ses mises à jour sur ordre d'un admin, coordonné par téléphone avec
+        // la salle. Redémarrer de notre propre chef couperait une captation.
+        if (arenaModeService.getState().registered) return;
+
+        // Fenêtre ouverte : l'utilisateur est devant l'IHM. On repousse le
+        // compteur, pour qu'il faille de nouveau trente minutes après sa
+        // fermeture — sinon la refermer déclencherait un redémarrage immédiat.
+        const WINDOW = getMainWindow();
+        if (WINDOW && !WINDOW.isDestroyed() && WINDOW.isVisible()) {
+            activityTracker.ping();
+            return;
+        }
+
+        if (activityTracker.idleMs() < IDLE_APPLY_DELAY_MS) return;
+
+        // Cette version a déjà fait échouer une application automatique : on ne
+        // la retente pas. Elle s'appliquera au prochain démarrage manuel, par
+        // le lanceur, sans rien casser entre-temps.
+        if (
+            StorageManager.getPermanentSettingsValue(AUTO_APPLY_FAILED_KEY) ===
+            this.pendingVersion
+        ) {
+            return;
+        }
+
+        console.log(
+            `[update] idle for ${Math.round(activityTracker.idleMs() / 60000)} min ` +
+                `→ applying ${this.pendingVersion}`
+        );
+        this.applyPendingUpdate(true);
+    }
+
+    /**
+     * Une mise à jour vient d'être téléchargée à la suite d'un clic sur
+     * « Check for update ». L'utilisateur a demandé quelque chose : laisser la
+     * version en attente, sans rien de visible, donne l'impression que son clic
+     * n'a servi à rien — il faudrait qu'il rouvre le menu pour découvrir qu'un
+     * second clic est attendu. On applique donc tout de suite.
+     *
+     * Deux abstentions, dans lesquelles le menu affichera « Restart to apply »
+     * et lui laissera la décision : un travail en cours, qu'un redémarrage
+     * couperait, et une fenêtre ouverte, qu'il regarde peut-être — « Check for
+     * update » ne promet pas de la fermer, au contraire de « Restart ».
+     */
+    #applyAfterUserCheck() {
+        if (!this.#userRequestedCheck) return;
+        this.#userRequestedCheck = false;
+
+        // Un travail tourne : le couper serait la pire réponse à un clic
+        // anodin. On l'annonce, et `#considerIdleApply` tiendra la promesse
+        // dès que la dernière tâche se sera achevée.
+        if (activityTracker.isBusy()) {
+            console.log(
+                `[update] ${this.pendingVersion} ready but Tools is busy ` +
+                    '→ will restart once free'
+            );
+            this.#applyWhenFree = true;
+            this.#notice(
+                'fa-sharp fa-solid fa-download',
+                '.common.updateReadyWhenFree',
+                'info'
+            );
+            return;
+        }
+
+        this.applyPendingUpdate();
+    }
+
+    /**
+     * Affiche une notification flottante quelques secondes.
+     *
+     * La fenêtre flottante est UNIQUE et partagée avec les barres de
+     * progression des analyses, des découpes et des téléchargements : la
+     * réquisitionner effacerait la progression qu'un travail y affiche, et
+     * l'effacer au bout de cinq secondes la lui retirerait pour de bon. Quand
+     * elle est déjà prise on s'abstient donc — l'utilisateur a de toute façon
+     * sous les yeux la preuve que Tools travaille.
+     */
+    #notice(icon, text, state) {
+        if (getFloatingWindow()) {
+            console.log(
+                `[update] notice skipped, floating window in use: ${text}`
+            );
+            return;
+        }
+
+        createFloatingWindow(
+            450,
+            150,
+            JSON.stringify({
+                percent: 100,
+                infinite: false,
+                icon,
+                text,
+                leftRounded: true,
+                state
+            })
+        ).catch((error) =>
+            console.error('[update] floating notice failed', error.message)
+        );
+
+        setTimeout(() => deleteFloatingWindow(false), NOTICE_MS);
+    }
+
+    /**
+     * Appelé quand le processus vit encore après `quitAndInstall` : le
+     * redémarrage n'a pas eu lieu, et la fenêtre principale a été détruite —
+     * « Open » ne répondrait plus, l'IHM serait injoignable et rien ne le
+     * dirait. On relance donc l'application, qui revient sur la version
+     * courante, en état de marche ; la mise à jour s'appliquera au démarrage
+     * suivant, par le lanceur.
+     *
+     * `app.exit` plutôt que `app.quit` : le second repasse par la fermeture des
+     * fenêtres, c'est-à-dire précisément le chemin qui vient d'échouer.
+     */
+    #recoverFromFailedQuit(target) {
+        console.error(
+            `[update] ${target} not applied: still running ` +
+                `${QUIT_GRACE_MS / 1000}s after quitAndInstall — relaunching`
+        );
+        telemetryService.reportUpdate('update_failed', {
+            target,
+            reason: 'quitAndInstall left the process alive'
+        });
+        app.relaunch();
+        app.exit(0);
+    }
+
+    /**
+     * Applique une mise à jour déjà téléchargée.
      *
      * `app.relaunch()` ne conviendrait pas : il relance `process.execPath`,
      * donc l'exécutable de la version COURANTE — l'ancienne redémarrerait.
      * Seul `quitAndInstall` passe par le lanceur Squirrel, qui bascule sur la
-     * nouvelle version. On ne l'appelle donc que sur action explicite, jamais
-     * de sa propre initiative.
+     * nouvelle version.
+     *
+     * L'appel se surveille lui-même quelle qu'en soit l'origine : la fenêtre
+     * vient d'être détruite, et si le redémarrage n'a pas lieu, « Open » ne
+     * répondrait plus. C'est précisément la panne observée en juillet, où trois
+     * clics sur « Confirm restart » n'ont fait que masquer la fenêtre.
+     *
+     * @param {boolean} automatic Déclenché par l'inactivité plutôt que par
+     * l'utilisateur. Seul ce cas mémorise un échec : une tentative demandée
+     * doit toujours pouvoir être retentée.
      */
-    applyPendingUpdate() {
+    applyPendingUpdate(automatic = false) {
         if (!this.pendingVersion) {
             return;
         }
-        console.log(`[update] applying ${this.pendingVersion} on user request`);
+        const TARGET = this.pendingVersion;
+        console.log(
+            `[update] applying ${TARGET} ${automatic ? 'after idle' : 'on user request'}`
+        );
 
         // La fenêtre principale intercepte sa fermeture pour se CACHER au lieu
         // de quitter (`event.preventDefault()` dans window-manager). Or
@@ -399,6 +632,21 @@ class UpdateService {
         if (WINDOW && !WINDOW.isDestroyed()) {
             WINDOW.destroy();
         }
+
+        this.#applying = true;
+
+        if (automatic) {
+            // Marqueur posé AVANT la tentative : un échec peut prendre la forme
+            // d'un plantage, dont on ne reviendrait pas pour l'écrire. Le
+            // laisser en place après une réussite est sans conséquence — la
+            // version suivante portera un autre numéro.
+            StorageManager.setPermanentSettingsValue(
+                AUTO_APPLY_FAILED_KEY,
+                TARGET
+            );
+        }
+
+        setTimeout(() => this.#recoverFromFailedQuit(TARGET), QUIT_GRACE_MS);
 
         NATIVE.quitAndInstall();
     }

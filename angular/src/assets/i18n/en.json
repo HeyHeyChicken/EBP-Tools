@@ -11,6 +11,8 @@
     "updatingInProgress": "Updating in progress, please wait.",
     "downloadingComponents": "Downloading components, please wait.",
     "runningInBackground": "Tools is available and running in the background.",
+    "updateReadyWhenFree": "Update ready. Tools will restart as soon as the current work is finished.",
+    "alreadyUpToDate": "Tools is already up to date.",
     "encoding": "Encoding in progress…",
     "encoded": "The video has been successfully encoded!",
     "download": "Download",

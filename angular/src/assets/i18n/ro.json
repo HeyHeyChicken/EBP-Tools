@@ -11,6 +11,8 @@
     "updatingInProgress": "Actualizare în curs, vă rugăm să așteptați.",
     "downloadingComponents": "Se descarcă componentele, vă rugăm să așteptați.",
     "runningInBackground": "Tools este disponibil și rulează în fundal.",
+    "updateReadyWhenFree": "Actualizare pregătită. Tools va reporni imediat ce se încheie lucrarea în curs.",
+    "alreadyUpToDate": "Tools este deja actualizat.",
     "encoding": "Codificare în curs…",
     "encoded": "Videoclipul a fost codificat cu succes!",
     "download": "Descărca",

@@ -11,6 +11,8 @@
     "updatingInProgress": "Aktualisierung läuft, bitte warten.",
     "downloadingComponents": "Komponenten werden heruntergeladen, bitte warten.",
     "runningInBackground": "Tools ist verfügbar und läuft im Hintergrund.",
+    "updateReadyWhenFree": "Update bereit. Tools startet neu, sobald die laufende Arbeit beendet ist.",
+    "alreadyUpToDate": "Tools ist bereits auf dem neuesten Stand.",
     "encoding": "Kodierung läuft…",
     "encoded": "Das Video wurde erfolgreich kodiert!",
     "download": "Herunterladen",
