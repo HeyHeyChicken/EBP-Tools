@@ -2913,10 +2913,10 @@ if (!APP_GOT_THE_LOCK) {
 
                 deleteFloatingWindow();
 
-                if (getMainWindow() && !getMainWindow().isDestroyed()) {
-                    getMainWindow().show();
-                    getMainWindow().focus();
-                }
+                // `showMainWindow` plutôt que show()+focus() : sous macOS il
+                // rend d'abord l'icône du Dock, sans quoi la fenêtre s'ouvre
+                // derrière celles des autres applications.
+                showMainWindow();
             }
         );
 

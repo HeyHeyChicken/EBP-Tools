@@ -250,6 +250,29 @@ function createWindow(updateService) {
 
     const IS_MACOS = process.platform === 'darwin';
 
+    // macOS : l'icône du Dock n'apporte rien tant que l'IHM est fermée, et Tools
+    // passe l'essentiel de sa vie fermé. On la fait donc suivre la fenêtre.
+    //
+    // Accroché aux ÉVÉNEMENTS de la fenêtre plutôt qu'aux appels de
+    // `showMainWindow`/`hideMainWindow` : plusieurs endroits appellent `show()`
+    // ou `hide()` directement (deux routes du serveur, le flux de repli des
+    // mises à jour), et un autre s'écrira. Les événements les couvrent tous.
+    //
+    // L'affichage, lui, est AUSSI demandé par `showMainWindow` avant le `show()`
+    // : réagir à l'événement suffit à faire revenir l'icône, mais trop tard pour
+    // que la fenêtre passe au premier plan — mesuré, elle s'ouvrait derrière les
+    // autres au deuxième aller-retour.
+    //
+    // Le mode « accessoire » retire aussi la barre de menus, donc les raccourcis
+    // Cmd+C/V — ce qui casserait le collage d'une URL YouTube. Sans conséquence
+    // ici : la barre revient avec l'icône, avant que la fenêtre s'affiche.
+    if (IS_MACOS) {
+        mainWindow.on('show', () => setDockVisibility(true));
+        mainWindow.on('hide', () => setDockVisibility(false));
+        // La fenêtre naît masquée : l'icône ne doit pas apparaître au lancement.
+        setDockVisibility(false);
+    }
+
     function getTrayIcon() {
         const STATUS = watchFolderService.getStatus();
         let suffix = '';
@@ -336,12 +359,7 @@ function createWindow(updateService) {
                         )
                     )
                     .resize({ width: 12, height: 12 }),
-                click: () => {
-                    if (mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.show();
-                        mainWindow.focus();
-                    }
-                }
+                click: () => showMainWindow()
             },
             {
                 label: 'Restart',
@@ -461,7 +479,7 @@ function createWindow(updateService) {
 
     // Double-click on the icon to reopen the window.
     TRAY.on('double-click', () => {
-        mainWindow.show();
+        showMainWindow();
         mainWindow.setSkipTaskbar(false);
     });
 
@@ -492,6 +510,21 @@ function createWindow(updateService) {
     mainWindow.loadURL(HOME_URL);
 }
 
+/**
+ * Affiche ou masque l'icône du Dock. Sans effet hors macOS.
+ *
+ * `app.dock.hide()` ne convient PAS : il fonctionne au lancement, mais une fois
+ * l'icône affichée macOS refuse de repasser l'application en « accessoire » par
+ * ce chemin et l'appel reste silencieusement sans effet. Mesuré : après un
+ * aller-retour, `app.dock.isVisible()` répondait toujours `true`, deux secondes
+ * plus tard comme après `app.hide()`. `setActivationPolicy` bascule, lui, dans
+ * les deux sens.
+ */
+function setDockVisibility(visible) {
+    if (process.platform !== 'darwin') return;
+    app.setActivationPolicy(visible ? 'regular' : 'accessory');
+}
+
 function hideMainWindow() {
     if (getMainWindow() && !getMainWindow().isDestroyed()) {
         getMainWindow()?.hide();
@@ -500,6 +533,9 @@ function hideMainWindow() {
 
 function showMainWindow() {
     if (getMainWindow() && !getMainWindow().isDestroyed()) {
+        // AVANT l'affichage : une app « accessoire » ne prend pas le premier
+        // plan, et la fenêtre s'ouvrirait derrière celles des autres.
+        setDockVisibility(true);
         getMainWindow().show();
         getMainWindow().focus();
     }
