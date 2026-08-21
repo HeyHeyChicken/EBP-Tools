@@ -158,6 +158,13 @@ jobs:
                     --options runtime --entitlements build/entitlements.plist --timestamp \
                     binaries/analyzer/darwin/darwin
 
+            # Machine physique : contrairement aux runners GitHub, l'AWS CLI
+            # n'y est pas préinstallée. Le binaire se construisait donc jusqu'au
+            # bout — archive de 130 Mo — avant d'échouer sur « aws: command not
+            # found », soit après dix minutes de compilation pour rien.
+            - name: Install AWS CLI
+              run: brew install awscli
+
             - name: Publish
               id: publish
               run: bash .github/scripts/publish-component.sh darwin-x64 binaries/analyzer/darwin darwin/darwin
