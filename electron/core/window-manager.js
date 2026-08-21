@@ -425,6 +425,16 @@ function createWindow(updateService) {
             },
             {
                 label: 'Settings',
+                icon: nativeImage
+                    .createFromPath(
+                        path.join(
+                            ROOT_PATH,
+                            'assets',
+                            'context-menu',
+                            'gear.png'
+                        )
+                    )
+                    .resize({ width: 12, height: 12 }),
                 submenu: [
                     {
                         label: 'Send anonymous usage data',
