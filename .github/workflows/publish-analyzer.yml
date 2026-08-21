@@ -106,18 +106,20 @@ jobs:
             # s'arrête sur « No matching distribution found for numpy==2.5.1 ».
             # Les runners GitHub, eux, arrivent avec un Python récent, d'où
             # l'absence de cette étape sur le job Apple Silicon.
-            - uses: actions/setup-python@v5
-              env:
-                  # Le script d'installation du tarball Python écrit dans
-                  # AGENT_TOOLSDIRECTORY et, à défaut, dans un chemin EN DUR
-                  # propre aux runners GitHub : /Users/runner/hostedtoolcache.
-                  # Sur une machine physique, il échoue sur « mkdir:
-                  # /Users/runner: Permission denied ». On le renvoie donc vers
-                  # le cache déclaré par le runner, avec repli s'il est absent.
-                  AGENT_TOOLSDIRECTORY:
-                      ${{ runner.tool_cache || format('{0}/../_tool', runner.workspace) }}
-              with:
-                  python-version: '3.12'
+            # Python par Homebrew, et NON par `setup-python` comme les autres
+            # jobs : le script d'installation du paquet macOS vise
+            # /Users/runner/hostedtoolcache, chemin en dur des runners GitHub.
+            # Il ignore AGENT_TOOLSDIRECTORY — vérifié, la variable était bien
+            # renseignée et il a quand même échoué sur « mkdir: /Users/runner:
+            # Permission denied ». Cette machine étant physique, ce chemin ne
+            # peut pas exister.
+            #
+            # `libexec/bin` fournit les liens non versionnés `python3`/`pip3`,
+            # que `build.sh` utilise pour créer son venv.
+            - name: Install Python 3.12
+              run: |
+                  brew install python@3.12
+                  echo "$(brew --prefix python@3.12)/libexec/bin" >> "$GITHUB_PATH"
 
             # Les runners self-hosted gardent leur état : le trousseau créé au
             # run précédent ferait échouer l'import.
