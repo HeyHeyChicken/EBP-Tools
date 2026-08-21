@@ -100,6 +100,16 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
+            # Le runner Intel est une machine physique : son python3 système
+            # est celui d'Xcode, bloqué en 3.9 avec pip 21. Les dépendances
+            # épinglées exigent >= 3.12 — sans cette étape, l'installation
+            # s'arrête sur « No matching distribution found for numpy==2.5.1 ».
+            # Les runners GitHub, eux, arrivent avec un Python récent, d'où
+            # l'absence de cette étape sur le job Apple Silicon.
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
             # Les runners self-hosted gardent leur état : le trousseau créé au
             # run précédent ferait échouer l'import.
             - name: Clean up leftover signing keychain
