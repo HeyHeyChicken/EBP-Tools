@@ -12,7 +12,7 @@
 set -euo pipefail
 
 PLATFORM="$1"
-SOURCE="$2"
+SOURCE_DIR="$2"
 EXEC="${3:-}"
 
 DATE="$(date -u +%Y%m%d)"
@@ -21,7 +21,7 @@ DATE="$(date -u +%Y%m%d)"
 # l'empreinte de l'arbre du dossier : elle change dès qu'un fichier suivi change,
 # et ne change pas autrement. C'est ce qui permettra au workflow de release de
 # refuser de livrer une version dont l'analyzer publié ne correspond plus au code.
-SOURCE="$(git rev-parse HEAD:python | cut -c1-12)"
+PYTHON_SOURCE="$(git rev-parse HEAD:python | cut -c1-12)"
 
 hash_of() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -40,16 +40,16 @@ if [ -n "$EXEC" ]; then
             # AppleDouble (._*) qui se retrouveraient extraits tels quels chez
             # l'utilisateur. La signature, elle, est embarquée dans le Mach-O et
             # survit à l'archivage.
-            ditto -c -k --norsrc --noextattr --keepParent "$SOURCE" "$ARCHIVE"
+            ditto -c -k --norsrc --noextattr --keepParent "$SOURCE_DIR" "$ARCHIVE"
             ;;
         *)
-            (cd "$(dirname "$SOURCE")" && zip -q -r -X "$ARCHIVE" "$(basename "$SOURCE")")
+            (cd "$(dirname "$SOURCE_DIR")" && zip -q -r -X "$ARCHIVE" "$(basename "$SOURCE_DIR")")
             ;;
     esac
     PAYLOAD="$ARCHIVE"
     EXTENSION="zip"
 else
-    PAYLOAD="$SOURCE"
+    PAYLOAD="$SOURCE_DIR"
     EXTENSION="exe"
 fi
 
@@ -59,7 +59,7 @@ URL="${S3_ENDPOINT}/${S3_BUCKET}/${S3_PREFIX}/${ASSET}"
 
 echo "plateforme : ${PLATFORM}"
 echo "asset      : ${ASSET}"
-echo "source     : ${SOURCE}"
+echo "source     : ${PYTHON_SOURCE}"
 echo "poids      : $(( $(wc -c < "$PAYLOAD") / 1048576 )) Mo"
 
 # Le nom contenant l'empreinte, un objet déjà présent a forcément le même
@@ -88,9 +88,9 @@ else
 fi
 
 if [ -n "$EXEC" ]; then
-    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\", \"exec\": \"${EXEC}\", \"source\": \"${SOURCE}\" },"
+    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\", \"exec\": \"${EXEC}\", \"source\": \"${PYTHON_SOURCE}\" },"
 else
-    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\", \"source\": \"${SOURCE}\" },"
+    ENTRY="\"${PLATFORM}\": { \"asset\": \"${ASSET}\", \"sha256\": \"${SHA}\", \"source\": \"${PYTHON_SOURCE}\" },"
 fi
 
 echo "entry=${ENTRY}" >> "$GITHUB_OUTPUT"
