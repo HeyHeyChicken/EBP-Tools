@@ -13,6 +13,7 @@
     "runningInBackground": "Tools este disponibil și rulează în fundal.",
     "updateReadyWhenFree": "Actualizare pregătită. Tools va reporni imediat ce se încheie lucrarea în curs.",
     "alreadyUpToDate": "Tools este deja actualizat.",
+    "updateReadyOnRestart": "Actualizare pregătită. Se va aplica la următoarea repornire a Tools.",
     "encoding": "Codificare în curs…",
     "encoded": "Videoclipul a fost codificat cu succes!",
     "download": "Descărca",

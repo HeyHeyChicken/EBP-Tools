@@ -13,6 +13,7 @@
     "runningInBackground": "Tools ist verfügbar und läuft im Hintergrund.",
     "updateReadyWhenFree": "Update bereit. Tools startet neu, sobald die laufende Arbeit beendet ist.",
     "alreadyUpToDate": "Tools ist bereits auf dem neuesten Stand.",
+    "updateReadyOnRestart": "Update bereit. Es wird beim nächsten Neustart von Tools angewendet.",
     "encoding": "Kodierung läuft…",
     "encoded": "Das Video wurde erfolgreich kodiert!",
     "download": "Herunterladen",

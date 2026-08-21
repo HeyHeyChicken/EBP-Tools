@@ -24,6 +24,7 @@ const {
 } = require('../config/constants');
 const telemetryService = require('./telemetry-service');
 const arenaModeService = require('./arena-mode-service');
+const arenaCaptureService = require('./arena-capture-service');
 const activityTracker = require('../core/activity-tracker');
 const StorageManager = require('../core/storage-manager');
 
@@ -66,6 +67,24 @@ const AUTO_APPLY_FAILED_KEY = 'autoApplyFailedVersion';
 // de lancement en arrière-plan.
 const NOTICE_MS = 5000;
 
+// Fenêtre de maintenance des postes de salle, en heure LOCALE.
+//
+// Mesuré sur les 242 090 games des douze derniers mois : 07h–09h ne concentre
+// que 0,088 % de l'activité (214 games), contre 0,73 % pour 04h–06h. Les salles
+// jouent TARD — 11 491 games à minuit — donc le petit matin n'est pas le creux
+// qu'on imagine ; c'est le milieu de matinée. Vérifié jour par jour : samedi et
+// dimanche chargent dès 06h, et le dimanche 09h remonte à 516 games. La fenêtre
+// tient donc précisément entre ces deux bornes.
+const ARENA_WINDOW_START_HOUR = 7;
+const ARENA_WINDOW_END_HOUR = 9;
+
+// Mise à jour ordonnée par un admin : délai maximal d'attente que le poste se
+// libère (ffmpeg qui finalise son segment, découpe, envois), et cadence de
+// vérification. Borné à dessein — un ordre coordonné par téléphone avec la
+// salle ne doit pas rester lettre morte parce qu'un envoi s'éternise.
+const FORCED_WAIT_MS = 60 * 1000;
+const FORCED_POLL_MS = 2000;
+
 class UpdateService {
     githubVersion = '';
     // L'updater natif a-t-il déjà été câblé, et a-t-il échoué ? Un échec fait
@@ -90,6 +109,10 @@ class UpdateService {
     // redémarrage « dès que ce sera terminé ». Cette promesse doit être tenue
     // sans attendre les trente minutes d'inactivité.
     #applyWhenFree = false;
+    // La captation a-t-elle été arrêtée pour la fenêtre de maintenance en
+    // cours ? Sert aussi à la relancer si la mise à jour n'a finalement pas eu
+    // lieu : une salle laissée sans enregistrement serait le pire des échecs.
+    #arenaCaptureStopped = false;
     // Une vérification Squirrel est-elle en cours ? Sans ce garde, deux appels
     // rapprochés se marchent dessus et le second échoue.
     #checking = false;
@@ -231,6 +254,24 @@ class UpdateService {
      */
     forceUpdate() {
         if (IS_DEV_MODE || this.localVersion.startsWith('0')) return;
+
+        // Squirrel a déjà déposé la version sur le disque : il ne reste qu'à
+        // redémarrer. Le chemin GitHub ci-dessous retéléchargerait l'installeur
+        // ENTIER (149 Mo) pour arriver exactement au même résultat — sur la
+        // connexion d'une salle, et alors que la captation est déjà à l'arrêt.
+        //
+        // `applyPendingUpdate()` sans marqueur d'échec : un ordre d'admin est
+        // une action humaine, elle doit rester rejouable. Poser le marqueur
+        // condamnerait en plus la fenêtre de maintenance pour cette version.
+        if (this.pendingVersion) {
+            console.log(
+                `[update] forced update → ${this.pendingVersion} already ` +
+                    'downloaded, waiting for the machine to be free'
+            );
+            this.#applyOnceFree(FORCED_WAIT_MS);
+            return;
+        }
+
         this.getProjectLatestVersion(() => {
             if (!this.githubVersion || this.githubVersion === this.localVersion) {
                 return;
@@ -246,6 +287,40 @@ class UpdateService {
             });
             this.#downloadAndInstall(NAMES);
         });
+    }
+
+    /**
+     * Attend que le poste se libère, puis applique la version en attente.
+     *
+     * L'appelant vient d'arrêter la captation, mais `stopCapture` est
+     * SYNCHRONE : il écrit `q` sur l'entrée de ffmpeg et rend la main aussitôt,
+     * alors que la finalisation du segment prend quelques secondes. L'ancien
+     * chemin masquait ce délai derrière le téléchargement de l'installeur ;
+     * appliquer directement couperait ffmpeg en pleine écriture.
+     *
+     * @param {number} timeoutMs Au-delà, on applique quand même.
+     */
+    #applyOnceFree(timeoutMs) {
+        const DEADLINE = Date.now() + timeoutMs;
+
+        const TICK = () => {
+            if (!this.pendingVersion) return;
+
+            if (activityTracker.isBusy() && Date.now() < DEADLINE) {
+                setTimeout(TICK, FORCED_POLL_MS);
+                return;
+            }
+
+            if (activityTracker.isBusy()) {
+                console.log(
+                    '[update] forced update: still busy after ' +
+                        `${timeoutMs / 1000}s, applying anyway`
+                );
+            }
+            this.applyPendingUpdate();
+        };
+
+        TICK();
     }
 
     /**
@@ -308,6 +383,17 @@ class UpdateService {
                     }).unref();
                     break;
             }
+
+            // Même piège que pour `quitAndInstall` : la fenêtre principale
+            // annule sa propre fermeture pour se cacher, et `app.quit()` passe
+            // par cette fermeture — il se faisait donc annuler. L'installeur
+            // démarrait alors que l'application tournait encore, et devait la
+            // tuer lui-même pour remplacer ses fichiers. On lui rend la place.
+            const WINDOW = getMainWindow();
+            if (WINDOW && !WINDOW.isDestroyed()) {
+                WINDOW.destroy();
+            }
+
             app.quit();
         }, ON_ERROR);
     }
@@ -449,6 +535,18 @@ class UpdateService {
      */
     #considerIdleApply() {
         if (!this.pendingVersion || this.#applying) return;
+
+        // Mode salle : ce poste a sa propre règle, évaluée AVANT le test
+        // d'occupation. La captation est un ffmpeg unique qui tourne en continu
+        // — la machine n'est donc jamais vue inactive, et aucune des règles qui
+        // suivent ne se déclencherait jamais. Sans ce chemin, une salle resterait
+        // sur sa version jusqu'à ce que quelqu'un redémarre le PC : personne ne
+        // le fait.
+        if (arenaModeService.getState().registered) {
+            this.#considerArenaWindow();
+            return;
+        }
+
         if (activityTracker.isBusy()) return;
 
         // Promesse tenue : l'utilisateur a cliqué pendant un travail, la
@@ -463,11 +561,6 @@ class UpdateService {
             this.applyPendingUpdate();
             return;
         }
-
-        // Mode salle : la machine tourne sans personne devant elle et reçoit
-        // ses mises à jour sur ordre d'un admin, coordonné par téléphone avec
-        // la salle. Redémarrer de notre propre chef couperait une captation.
-        if (arenaModeService.getState().registered) return;
 
         // Fenêtre ouverte : l'utilisateur est devant l'IHM. On repousse le
         // compteur, pour qu'il faille de nouveau trente minutes après sa
@@ -498,6 +591,60 @@ class UpdateService {
     }
 
     /**
+     * Applique une mise à jour sur un poste de salle, dans la fenêtre nocturne
+     * où plus personne ne joue.
+     *
+     * L'ordre compte : on arrête d'abord la captation — `stopCapture` écrit `q`
+     * sur l'entrée de ffmpeg, qui finalise son segment — puis on attend que le
+     * poste soit réellement libre avant d'appliquer. Le processus ffmpeg reste
+     * compté occupé le temps de sa finalisation, tout comme la découpe et les
+     * envois qui peuvent encore suivre : le tick de cinq minutes revient les
+     * constater, et la fenêtre de deux heures en offre vingt-quatre.
+     *
+     * Au boot, `autoStart()` reprend la captation : le redémarrage est donc
+     * auto-réparant, ce qui est la condition même de cette fonction.
+     */
+    #considerArenaWindow() {
+        const HOUR = new Date().getHours();
+        const IN_WINDOW =
+            HOUR >= ARENA_WINDOW_START_HOUR && HOUR < ARENA_WINDOW_END_HOUR;
+
+        if (!IN_WINDOW) {
+            // On sort de la fenêtre sans avoir appliqué : il faut RENDRE la
+            // captation. L'oublier laisserait une salle sans enregistrement
+            // jusqu'à ce qu'un humain s'en aperçoive — bien pire que de rester
+            // sur une vieille version.
+            if (this.#arenaCaptureStopped) {
+                console.log(
+                    '[update] arena window closed without applying ' +
+                        '→ resuming capture'
+                );
+                this.#arenaCaptureStopped = false;
+                arenaCaptureService.autoStart();
+            }
+            return;
+        }
+
+        if (!this.#arenaCaptureStopped) {
+            console.log(
+                `[update] arena maintenance window, ${this.pendingVersion} ` +
+                    'pending → stopping capture'
+            );
+            this.#arenaCaptureStopped = true;
+            arenaCaptureService.stopCapture();
+            return;
+        }
+
+        // ffmpeg finalise encore, ou la découpe et les envois se poursuivent.
+        if (activityTracker.isBusy()) return;
+
+        console.log(
+            `[update] arena idle in window → applying ${this.pendingVersion}`
+        );
+        this.applyPendingUpdate(true);
+    }
+
+    /**
      * Une mise à jour vient d'être téléchargée à la suite d'un clic sur
      * « Check for update ». L'utilisateur a demandé quelque chose : laisser la
      * version en attente, sans rien de visible, donne l'impression que son clic
@@ -517,6 +664,27 @@ class UpdateService {
         // anodin. On l'annonce, et `#considerIdleApply` tiendra la promesse
         // dès que la dernière tâche se sera achevée.
         if (activityTracker.isBusy()) {
+            // Sauf en mode salle : ce poste tourne sans personne devant lui et
+            // enchaîne les sessions. Un redémarrage différé s'y déclencherait
+            // dans un creux, sans témoin — c'est précisément ce qu'on interdit
+            // aux mises à jour automatiques. On ne promet donc rien qu'on ne
+            // tiendra pas ; la voie coordonnée reste l'ordre de l'admin.
+            //
+            // Machine LIBRE, en revanche, on redémarre même en mode salle : le
+            // clic est une action humaine, délibérée, devant l'écran.
+            if (arenaModeService.getState().registered) {
+                console.log(
+                    `[update] ${this.pendingVersion} ready, arena mode busy ` +
+                        '→ left for the next restart'
+                );
+                this.#notice(
+                    'fa-sharp fa-solid fa-download',
+                    '.common.updateReadyOnRestart',
+                    'info'
+                );
+                return;
+            }
+
             console.log(
                 `[update] ${this.pendingVersion} ready but Tools is busy ` +
                     '→ will restart once free'

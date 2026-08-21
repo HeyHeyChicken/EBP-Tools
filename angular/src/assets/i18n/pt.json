@@ -13,6 +13,7 @@
     "runningInBackground": "O Tools está disponível e a funcionar em segundo plano.",
     "updateReadyWhenFree": "Atualização pronta. O Tools irá reiniciar assim que o trabalho em curso terminar.",
     "alreadyUpToDate": "O Tools já está atualizado.",
+    "updateReadyOnRestart": "Atualização pronta. Será aplicada no próximo reinício do Tools.",
     "encoding": "A codificar…",
     "encoded": "O vídeo foi codificado com sucesso!",
     "download": "Transferir",
