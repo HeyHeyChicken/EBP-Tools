@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { app } = require('electron');
 const StorageManager = require('../core/storage-manager');
+const { IS_DEV_MODE } = require('../config/constants');
 const { sendTelemetry } = require('./tools-api-client');
 const { version: TOOLS_VERSION } = require('../../package.json');
 
@@ -87,6 +88,19 @@ function getInstallId() {
  */
 function send(event, detail) {
     if (!isEnabled()) {
+        return;
+    }
+
+    // Une build de développement n'a pas à peser sur les statistiques du parc.
+    // Le défaut n'est pas théorique : des bancs d'essai simulant un échec de
+    // mise à jour ont remonté de vrais événements en production, chacun avec un
+    // identifiant neuf, et ont faussé la répartition des versions — une dizaine
+    // d'installations fantômes pour deux postes réels. `npm start` produisait le
+    // même effet, en plus discret.
+    //
+    // Même garde que `autoUpdate`, et pour la même raison : ce qui tourne hors
+    // d'une installation ne doit rien émettre vers la production.
+    if (IS_DEV_MODE) {
         return;
     }
 
