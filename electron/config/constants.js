@@ -103,7 +103,15 @@ let PORT = null;
  */
 async function initializePort() {
     if (PORT === null) {
-        PORT = await getPort();
+        // `host` confine la SONDE de disponibilité à la boucle locale. Sans lui,
+        // get-port ouvre un socket d'écoute sur « toutes interfaces » puis sur
+        // chaque adresse réseau de la machine pour tester le port — ce qui
+        // déclenche l'alerte du pare-feu Windows au premier lancement, alors
+        // même que le serveur Express qui suivra est déjà lié à 127.0.0.1.
+        //
+        // L'IHM n'a aucune raison d'être joignable depuis le réseau : elle est
+        // servie à l'application elle-même, sur cette machine, et rien d'autre.
+        PORT = await getPort({ host: '127.0.0.1' });
     }
     return PORT;
 }

@@ -19,9 +19,17 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 
 //#endregion
 
-// When in installation mode, close the application.
+// Événement Squirrel (installation, mise à jour, désinstallation) : l'app est
+// relancée avec un drapeau, le temps de poser ou retirer les raccourcis.
+//
+// `app.quit()` est ASYNCHRONE — il amorce l'arrêt, il ne l'exécute pas. Sans le
+// `return`, la suite du module continuait de s'exécuter : sonde de port,
+// serveur Express, services… tout le démarrage avait lieu à chaque installation
+// et à chaque mise à jour, pour rien, et c'est ce qui déclenchait l'alerte du
+// pare-feu Windows à ces moments précis.
 if (require('electron-squirrel-startup')) {
     app.quit();
+    return;
 }
 
 const path = require('node:path');

@@ -88,7 +88,9 @@ function sendProgress() {
         // À 100 %, il reste la vérification de l'empreinte : on repasse en
         // indéterminé plutôt que de laisser la barre pleine et figée.
         infinite: PERCENT === 100,
-        icon: undefined,
+        // Le chargeur montre l'icône OU le pourcentage, jamais les deux : on ne
+        // la pose donc que lorsqu'il n'y a plus de progression à afficher.
+        icon: PERCENT === 100 ? 'fa-sharp fa-solid fa-download' : undefined,
         text: '.common.downloadingComponents',
         state: 'info'
     });
@@ -284,7 +286,7 @@ async function ensureAll() {
                 percent: 0,
                 leftRounded: true,
                 infinite: true,
-                icon: undefined,
+                icon: 'fa-sharp fa-solid fa-download',
                 text: '.common.downloadingComponents',
                 state: 'info'
             })
