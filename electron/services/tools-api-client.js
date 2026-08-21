@@ -9,6 +9,7 @@ const https = require('https');
 const fs = require('fs');
 const { URL } = require('url');
 const { EBP_DOMAIN } = require('../config/constants');
+const { markBusy } = require('../core/activity-tracker');
 const sessionService = require('./session-service');
 
 // Cible REST : en dev on tape le serveur EBP local (http://localhost:3005),
@@ -683,6 +684,17 @@ async function uploadFileToPresignedUrl(
 
     let lastError = null;
     for (let attempt = 1; attempt <= retries; attempt++) {
+        // Un transfert de plusieurs centaines de Mo ne lance aucun processus
+        // enfant : il est invisible au compteur d'occupation, qui les déduit.
+        // Sans ce marquage Tools se croit libre pendant l'envoi d'un replay et
+        // peut se redémarrer au milieu — l'envoi repartirait alors de zéro.
+        //
+        // Les attentes entre tentatives sont couvertes elles aussi, mais elles
+        // sont ici bornées à 1 s puis 2 s. La relance persistante du mode salle
+        // (30 s à 10 min, sans limite de tentatives) est en dehors de cette
+        // fonction : une salle privée de réseau ne reste donc jamais marquée
+        // occupée, et continue de recevoir ses mises à jour.
+        const RELEASE_BUSY = markBusy();
         try {
             const STATUS = await new Promise((resolve, reject) => {
                 const REQ = https.request(
@@ -741,6 +753,8 @@ async function uploadFileToPresignedUrl(
             if (attempt < retries) {
                 await sleep(baseDelayMs * Math.pow(2, attempt - 1));
             }
+        } finally {
+            RELEASE_BUSY();
         }
     }
     throw lastError;
