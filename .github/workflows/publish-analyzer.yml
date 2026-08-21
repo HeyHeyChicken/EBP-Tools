@@ -107,6 +107,15 @@ jobs:
             # Les runners GitHub, eux, arrivent avec un Python récent, d'où
             # l'absence de cette étape sur le job Apple Silicon.
             - uses: actions/setup-python@v5
+              env:
+                  # Le script d'installation du tarball Python écrit dans
+                  # AGENT_TOOLSDIRECTORY et, à défaut, dans un chemin EN DUR
+                  # propre aux runners GitHub : /Users/runner/hostedtoolcache.
+                  # Sur une machine physique, il échoue sur « mkdir:
+                  # /Users/runner: Permission denied ». On le renvoie donc vers
+                  # le cache déclaré par le runner, avec repli s'il est absent.
+                  AGENT_TOOLSDIRECTORY:
+                      ${{ runner.tool_cache || format('{0}/../_tool', runner.workspace) }}
               with:
                   python-version: '3.12'
 
