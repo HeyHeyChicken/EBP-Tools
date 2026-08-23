@@ -76,7 +76,14 @@ KILLFEED_TEXT_COLORS = {
 KF_TEXT_IMG_HEIGHT = 24         # hauteur normalisée des vignettes de texte (px)
 KF_TMPL_REF_MIN_RATIO = 0.8     # ratio OCR min d'une lecture victime pour nourrir la galerie
 KF_TMPL_MIN_SCORE = 0.6         # NCC min pour accepter un match template
-KF_TMPL_MARGIN = 0.05           # avance NCC min du 1er sur le 2e candidat (garde d'ambiguïté)
+KF_TMPL_MARGIN = 0.08           # avance NCC min du 1er sur le 2e candidat (garde d'ambiguïté).
+                                # Calibré sur 3 games : les pseudos DISTINCTS sont séparés de
+                                # >0.4, deux pseudos JUMEAUX (même préfixe de clan + même
+                                # longueur, ex. THDRxRayner/THDRxRxgeux) de <0.1 seulement. À
+                                # 0.08 on s'abstient sur les jumeaux (kill manqué plutôt que
+                                # crédité au mauvais coéquipier) sans rien perdre sur les
+                                # rosters distincts. Au-delà de ~0.10, on commence à s'abstenir
+                                # à tort sur des pseudos pourtant distincts.
 KF_TMPL_FALLBACK_RATIO = 0.5    # ratio attribué à un match template (< OCR réel → l'OCR gagne le vote dédup)
 
 
