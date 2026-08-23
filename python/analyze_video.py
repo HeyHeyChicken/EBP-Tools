@@ -62,21 +62,59 @@ KILLFEED_TEXT_COLORS = {
     2: ((207, 190, 57), (75, 155, 190)),
 }
 
-# Fallback d'identification par LARGEUR de texte killfeed (indépendant de
-# l'OCR, donc robuste à un changement de HUD.
-# Principe : la largeur du texte d'un pseudo est une signature stable (std
-# < 1 px mesuré) et IDENTIQUE des deux côtés (tueur voilé ≈ victime claire,
-# la géométrie ne change pas). On apprend la largeur de référence de chaque
-# joueur sur ses lectures OCR confirmées (surtout la victime, fiable), puis on
-# devine l'identité des côtés OCR-illisibles par proximité de largeur, au sein
-# de la seule équipe donnée par la couleur (5 candidats). On n'attribue que si
-# le match est NON AMBIGU : deux joueurs de largeurs trop proches restent
-# indiscernables (donc non résolus) plutôt que faux-attribués.
-KF_WIDTH_REF_MIN_RATIO = 0.75   # ratio fuzzy min d'une lecture OCR pour nourrir une référence
-KF_WIDTH_REF_MIN_OBS = 2        # nb min de lectures confirmées pour figer une référence
-KF_WIDTH_TOL = 3                # écart max (px) largeur observée ↔ référence pour accepter
-KF_WIDTH_MARGIN = 4             # le 2e candidat doit être ≥ ce nb de px plus loin (garde d'ambiguïté)
-KF_WIDTH_FALLBACK_RATIO = 0.5   # ratio attribué à un match par largeur (< OCR réel → l'OCR gagne le vote dédup)
+# Fallback d'identification par TEMPLATE-MATCHING du texte killfeed. L'OCR du
+# tueur (texte sur fond transparent/gameplay) échoue souvent là où la victime
+# (fond noir opaque) se lit bien. Plutôt que de lire le tueur, on COMPARE la
+# forme de son texte à une galerie de vignettes des pseudos DÉJÀ identifiés par
+# OCR (côté victime, fiable) : même police/taille/chaîne des deux côtés, donc
+# les glyphes matchent une fois le fond retiré (chroma-projection). C'est une
+# classification à ensemble fermé (4-5 pseudos de l'équipe donnée par la
+# couleur), bien plus robuste qu'une simple largeur : « Toto »/« John » se
+# départagent par les lettres ; seuls des pseudos très ressemblants restent
+# ambigus. On n'attribue que si le meilleur score dépasse un seuil ET devance
+# le 2e d'une marge (sinon non résolu plutôt que faux-attribué).
+KF_TEXT_IMG_HEIGHT = 24         # hauteur normalisée des vignettes de texte (px)
+KF_TMPL_REF_MIN_RATIO = 0.8     # ratio OCR min d'une lecture victime pour nourrir la galerie
+KF_TMPL_MIN_SCORE = 0.6         # NCC min pour accepter un match template
+KF_TMPL_MARGIN = 0.05           # avance NCC min du 1er sur le 2e candidat (garde d'ambiguïté)
+KF_TMPL_FALLBACK_RATIO = 0.5    # ratio attribué à un match template (< OCR réel → l'OCR gagne le vote dédup)
+
+
+def _kf_text_image(sub: np.ndarray, target):
+    """Vignette normalisée du texte killfeed pour le template-matching :
+    chroma-projection (retire le fond, ne garde que l'« intensité couleur
+    d'équipe »), rognée à la bbox du texte, puis height-normalisée à
+    KF_TEXT_IMG_HEIGHT en préservant le ratio. Retourne un array float32 (H×W)
+    dans [0,1], ou None si pas de texte exploitable."""
+    f = sub.astype(np.float32)
+    ch = f - f.mean(axis=2, keepdims=True)
+    tf = np.array(target, np.float32); tc = tf - tf.mean()
+    tc /= (np.linalg.norm(tc) + 1e-6)
+    proj = np.clip((ch * tc).sum(axis=2), 0, None)
+    if proj.max() < 1e-3:
+        return None
+    p = proj / proj.max()
+    ink = p > 0.30
+    cols = np.where(ink.sum(axis=0) >= 1)[0]
+    rows = np.where(ink.sum(axis=1) >= 1)[0]
+    if len(cols) < 3 or len(rows) < 3:
+        return None
+    crop = p[rows.min():rows.max() + 1, cols.min():cols.max() + 1]
+    h = KF_TEXT_IMG_HEIGHT
+    w = max(3, int(round(crop.shape[1] * h / crop.shape[0])))
+    return cv2.resize(crop, (w, h), interpolation=cv2.INTER_AREA)
+
+
+def _kf_ncc(a: np.ndarray, b: np.ndarray) -> float:
+    """Corrélation croisée normalisée entre deux vignettes (même hauteur). `a`
+    est étiré à la largeur de `b` avant comparaison — ça absorbe le léger biais
+    de largeur côté tueur (anti-aliasing sur fond non noir) sans casser le
+    motif des lettres. Retourne un score dans [-1, 1]."""
+    if a.shape[1] != b.shape[1]:
+        a = cv2.resize(a, (b.shape[1], KF_TEXT_IMG_HEIGHT), interpolation=cv2.INTER_AREA)
+    a = a - a.mean(); b = b - b.mean()
+    d = float(np.linalg.norm(a) * np.linalg.norm(b))
+    return float((a * b).sum() / d) if d > 1e-6 else 0.0
 
 
 def _killfeed_text_colors(resolved_orange, resolved_blue):
@@ -901,18 +939,10 @@ def _split_kill_row(frame: np.ndarray, bbox, orange_color, blue_color,
         # Blocs s'overlap : split non fiable.
         return None
 
-    # Largeur du TEXTE seul (plus gros bloc chroma contigu, pas le cartouche) —
-    # signature stable par pseudo (std < 1 px mesuré), réutilisée en fallback
-    # d'identification quand l'OCR échoue (cf. _match_kill_observations). On
-    # prend le bloc et non l'extent brut pour résister au décor coloré happé
-    # par l'extension gauche du bbox killer (fond transparent).
-    killer_width = killer_block[1] - killer_block[0] + 1
-    victim_width = victim_block[1] - victim_block[0] + 1
-
     return {
-        'killer': {'box': ((x1,                y1), (x1 + killer_right, y2)), 'team': killer_team, 'width': killer_width},
+        'killer': {'box': ((x1,                y1), (x1 + killer_right, y2)), 'team': killer_team},
         'weapon': {'box': ((x1 + killer_right, y1), (x1 + victim_left,  y2))},
-        'victim': {'box': ((x1 + victim_left,  y1), (x2,                y2)), 'team': victim_team, 'width': victim_width},
+        'victim': {'box': ((x1 + victim_left,  y1), (x2,                y2)), 'team': victim_team},
     }
 
 
@@ -1476,17 +1506,19 @@ def _match_kill_observations(raw_observations: dict, roster_o: list,
     a sa forme). Passe 2 — re-matche tueur ET victime contre
     {pseudo roster + forme apprise} et convertit en slots.
 
-    Fallback LARGEUR (indépendant de l'OCR, cf. constantes KF_WIDTH_*) : un
-    côté que l'OCR ne lit pas est deviné par la largeur de son texte, comparée
-    aux largeurs de référence apprises sur les lectures confirmées, au sein de
-    la seule équipe (couleur). Rend le killfeed résilient à un HUD qui casse
-    l'OCR d'un côté (ex. voile V2 sur le tueur) tant que l'autre côté (victime)
-    reste lisible pour ancrer les références.
+    Fallback TEMPLATE (cf. constantes KF_TMPL_*) : un côté que l'OCR ne lit pas
+    est identifié en COMPARANT la forme de son texte à une galerie de vignettes
+    des pseudos déjà lus par OCR (côté victime, fiable). Classification à
+    ensemble fermé (les 4-5 joueurs de l'équipe donnée par la couleur), robuste
+    là où la largeur seule échoue (« Toto »/« John » se départagent par les
+    lettres). Rend le killfeed résilient à un HUD qui casse l'OCR d'un côté
+    tant que l'autre reste lisible pour bâtir la galerie.
 
-    Entrée : {elapsed: [{'kt','vt','killer_raw','victim_raw','killer_width',
-    'victim_width','weapon','headshot'}]}. Sortie : format attendu par
+    Entrée : {elapsed: [{'kt','vt','killer_raw','victim_raw','killer_img',
+    'victim_img','weapon','headshot'}]} (les *_img sont des vignettes de texte
+    normalisées, cf. `_kf_text_image`). Sortie : format attendu par
     `_dedup_kills`. Les obs dont le tueur ou la victime ne matchent (ni OCR ni
-    largeur) sont écartées (rows parasites, decor)."""
+    template) sont écartées (rows parasites, decor)."""
     base_o = {n: n for n in roster_o}
     base_b = {n: n for n in roster_b}
 
@@ -1505,57 +1537,51 @@ def _match_kill_observations(raw_observations: dict, roster_o: list,
         if count >= 3 and len(form) >= len(name):
             (cand_o if name in base_o else cand_b)[form] = name
 
-    # Passe 2a — matche tueur ET victime par OCR, et accumule la LARGEUR de
-    # texte de chaque côté CONFIRMÉ (ratio ≥ seuil) sous l'identité résolue.
-    # On mémorise le résultat par obs pour la passe 2b (fallback largeur).
+    # Passe 2a — matche tueur ET victime par OCR, et construit la GALERIE de
+    # templates : la vignette du texte de chaque VICTIME bien lue (ratio ≥ seuil)
+    # sous son identité. La victime (fond noir opaque) est le côté fiable, donc
+    # la source des templates propres. On mémorise le résultat par obs pour la
+    # passe 2b (fallback template).
     matched = []
-    widths = {}  # (team, name) -> [largeurs de lectures confirmées]
+    gallery = {}  # (team, name) -> [vignettes de texte]
     for elapsed, obs_list in raw_observations.items():
         for obs in obs_list:
             k_map = cand_o if obs['kt'] == 'orange' else cand_b
             v_map = cand_o if obs['vt'] == 'orange' else cand_b
             km, kr = _match_player_kf(obs['killer_raw'], k_map)
             vm, vr = _match_player_kf(obs['victim_raw'], v_map)
-            if km is not None and kr >= KF_WIDTH_REF_MIN_RATIO and obs.get('killer_width'):
-                widths.setdefault((obs['kt'], km), []).append(obs['killer_width'])
-            if vm is not None and vr >= KF_WIDTH_REF_MIN_RATIO and obs.get('victim_width'):
-                widths.setdefault((obs['vt'], vm), []).append(obs['victim_width'])
+            if vm is not None and vr >= KF_TMPL_REF_MIN_RATIO and obs.get('victim_img') is not None:
+                gallery.setdefault((obs['vt'], vm), []).append(np.asarray(obs['victim_img'], np.float32))
             matched.append((elapsed, obs, km, kr, vm, vr))
 
-    # Largeur de référence par joueur = médiane de ses lectures confirmées
-    # (robuste aux outliers de mesure côté tueur voilé). Ignore les joueurs vus
-    # trop peu de fois pour une référence fiable.
-    def _median(vals):
-        s = sorted(vals); n = len(s)
-        return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
-    width_ref = {key: _median(v) for key, v in widths.items()
-                 if len(v) >= KF_WIDTH_REF_MIN_OBS}
-
-    def _guess_by_width(team, width):
-        """Devine le joueur de `team` dont la largeur de référence colle à
-        `width`. Retourne le nom si le match est non ambigu (plus proche ≤ TOL
-        et 2e plus proche ≥ MARGE plus loin), sinon None."""
-        if not width:
+    def _guess_by_template(team, img):
+        """Classe la vignette `img` contre les templates de `team` par NCC.
+        Retourne le nom si le meilleur score ≥ seuil ET devance le 2e d'une
+        marge (sinon None : ambigu ou aucun candidat fiable)."""
+        if img is None:
             return None
-        dists = sorted(((abs(width - ref), name)
-                        for (t, name), ref in width_ref.items() if t == team))
-        if not dists or dists[0][0] > KF_WIDTH_TOL:
+        img = np.asarray(img, np.float32)
+        scored = sorted(
+            (max(_kf_ncc(img, t) for t in tmpls), name)
+            for (tt, name), tmpls in gallery.items() if tt == team
+        )
+        if not scored or scored[-1][0] < KF_TMPL_MIN_SCORE:
             return None
-        if len(dists) >= 2 and (dists[1][0] - dists[0][0]) < KF_WIDTH_MARGIN:
+        if len(scored) >= 2 and (scored[-1][0] - scored[-2][0]) < KF_TMPL_MARGIN:
             return None  # deux candidats trop proches → indiscernable
-        return dists[0][1]
+        return scored[-1][1]
 
-    # Passe 2b — résout, avec fallback largeur pour les côtés OCR-illisibles.
+    # Passe 2b — résout, avec fallback template pour les côtés OCR-illisibles.
     out = {}
     for elapsed, obs, km, kr, vm, vr in matched:
         if km is None:
-            g = _guess_by_width(obs['kt'], obs.get('killer_width'))
+            g = _guess_by_template(obs['kt'], obs.get('killer_img'))
             if g is not None:
-                km, kr = g, KF_WIDTH_FALLBACK_RATIO
+                km, kr = g, KF_TMPL_FALLBACK_RATIO
         if vm is None:
-            g = _guess_by_width(obs['vt'], obs.get('victim_width'))
+            g = _guess_by_template(obs['vt'], obs.get('victim_img'))
             if g is not None:
-                vm, vr = g, KF_WIDTH_FALLBACK_RATIO
+                vm, vr = g, KF_TMPL_FALLBACK_RATIO
         if km is None or vm is None:
             continue
         k_roster = roster_o if obs['kt'] == 'orange' else roster_b
@@ -6725,11 +6751,16 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                         frame, SPLIT['weapon']['box'],
                         WEAPON_TEMPLATES, HEADSHOT_TEMPLATE,
                     )
+                    # Vignettes de texte normalisées (chroma-projection) pour le
+                    # fallback template : galerie côté victime, requête côté tueur
+                    # quand l'OCR échoue (cf. _match_kill_observations).
+                    (KX1, KY1), (KX2, KY2) = SPLIT['killer']['box']
+                    (VX1, VY1), (VX2, VY2) = SPLIT['victim']['box']
                     KILL_OBSERVATIONS.setdefault(ELAPSED, []).append({
                         'kt': KT, 'vt': VT,
                         'killer_raw': KRAW, 'victim_raw': VRAW,
-                        'killer_width': SPLIT['killer']['width'],
-                        'victim_width': SPLIT['victim']['width'],
+                        'killer_img': _kf_text_image(frame[KY1:KY2, KX1:KX2], KT_COLOR),
+                        'victim_img': _kf_text_image(frame[VY1:VY2, VX1:VX2], VT_COLOR),
                         'weapon': WEAPON, 'headshot': HEADSHOT,
                     })
 
