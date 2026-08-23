@@ -19,27 +19,27 @@
     },
     "analyzer": {
         "darwin-arm64": {
-            "asset": "analyzer-20260823-darwin-arm64-e1d152085b72.zip",
-            "sha256": "e1d152085b72b6537f1342a1478f8659810f60ba98d8d66bd07cc6f3463a99e5",
+            "asset": "analyzer-20260823-darwin-arm64-bc74f90d38ea.zip",
+            "sha256": "bc74f90d38ea8754d9e487f96141d9f244db0c207448e90ac9170b7783c389e2",
             "exec": "darwin/darwin",
-            "source": "7a234542f751"
+            "source": "df9ee3aa9d3c"
         },
         "darwin-x64": {
-            "asset": "analyzer-20260823-darwin-x64-d1b5def73e29.zip",
-            "sha256": "d1b5def73e29839592e2f9ff3b9a7fe8bf87e87391c37302fd5b40da4e4ad80a",
+            "asset": "analyzer-20260823-darwin-x64-41f4a04a2e69.zip",
+            "sha256": "41f4a04a2e69f614b5824404b3e31f9cb283365f08be4f3f8a900f984beb52d2",
             "exec": "darwin/darwin",
-            "source": "7a234542f751"
+            "source": "df9ee3aa9d3c"
         },
         "linux": {
-            "asset": "analyzer-20260823-linux-0491cc16f8e1.zip",
-            "sha256": "0491cc16f8e13340713a55b0df6de1b6de171c93a814ac2c99a48a15bdc82b94",
+            "asset": "analyzer-20260823-linux-05215eceda95.zip",
+            "sha256": "05215eceda95883738d71d829937e8deb98c121331955c98f78c9aaa5cce09ad",
             "exec": "linux/linux",
-            "source": "7a234542f751"
+            "source": "df9ee3aa9d3c"
         },
         "win32": {
-            "asset": "analyzer-20260823-win32-2fe75afe4783.exe",
-            "sha256": "2fe75afe478323dc3ef054713b45b01fbe3b1fbdf59156cfd51b11ed7345f9e1",
-            "source": "7a234542f751"
+            "asset": "analyzer-20260823-win32-2adbc47e04d5.exe",
+            "sha256": "2adbc47e04d50bc72f883715873f23496603d68ecfb96d70080b50f9119ee6e0",
+            "source": "df9ee3aa9d3c"
         }
     }
 }
