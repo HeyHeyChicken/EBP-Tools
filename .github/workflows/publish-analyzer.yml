@@ -21,16 +21,16 @@ on:
                 description: 'macOS Apple Silicon'
                 type: boolean
                 default: true
+            macos_intel:
+                description: 'macOS Intel'
+                type: boolean
+                default: true
             windows:
                 description: 'Windows'
                 type: boolean
                 default: true
             linux:
                 description: 'Linux'
-                type: boolean
-                default: true
-            macos_intel:
-                description: 'macOS Intel (nécessite le runner self-hosted)'
                 type: boolean
                 default: true
 
