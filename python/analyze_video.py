@@ -1602,6 +1602,113 @@ def _match_kill_observations(raw_observations: dict, roster_o: list,
     return out
 
 
+# ---------------------------------------------------------------------------
+# Morts ADMIN / suicides (killer-less)
+# ---------------------------------------------------------------------------
+# Le killfeed rend une sanction ADMIN et un suicide comme une row où l'arme est
+# remplacée par une icône CRÂNE (templates/weapons/admin.png) et le TUÉ est en
+# ROUGE (pas une couleur d'équipe) — invisibles au row-scan normal, qui exige un
+# kill cross-team coloré. On les détecte en ANCRANT sur le crâne (template-match
+# multi-échelle), on OCR le tué rouge, et on distingue admin de suicide par la
+# largeur de la PASTILLE TUEUR à gauche du crâne : l'admin a un large cartouche
+# gris "ADMIN", le suicide n'a pas de pastille tueur (gauche vide/décor).
+# Encodage de sortie : killer = "ADMIN" (admin) ou None (suicide) ; le kill n'est
+# crédité à aucun joueur, mais compte comme une mort pour le tué.
+KF_DEATH_REGION = ((1500, 140), (1920, 470))  # zone de scan crâne (couvre killer+skull+victim)
+KF_DEATH_RED = (200, 70, 80)          # couleur du pseudo tué (rouge), théâtre-indépendant
+KF_DEATH_SKULL_MIN = 0.55             # score CCOEFF_NORMED min du crâne
+KF_DEATH_MIN_OBS = 4                  # persistance min (frames) — écarte les flukes de crâne
+KF_DEATH_ADMIN_PILL_MIN = 55          # largeur médiane min (px) de pastille tueur → admin (sinon suicide)
+KF_ADMIN_KILLER = 'ADMIN'             # valeur du champ killer d'un kill admin (suicide → None)
+
+
+def _detect_death_skulls(frame: np.ndarray, skull_gray: np.ndarray,
+                         region=KF_DEATH_REGION, min_score: float = KF_DEATH_SKULL_MIN):
+    """Localise les icônes CRÂNE (morts admin/suicide) dans la région killfeed par
+    template-matching multi-échelle (CCOEFF_NORMED, robuste à la luminance). Retourne
+    [(x, y, w, h), ...] en coords absolues frame (au plus 2, après NMS)."""
+    (rx1, ry1), (rx2, ry2) = region
+    h, w = frame.shape[:2]
+    rx1 = max(0, rx1); ry1 = max(0, ry1); rx2 = min(w, rx2); ry2 = min(h, ry2)
+    if rx2 <= rx1 or ry2 <= ry1:
+        return []
+    g = cv2.cvtColor(frame[ry1:ry2, rx1:rx2], cv2.COLOR_RGB2GRAY)
+    hits = []
+    for th in (24, 25, 26):
+        tw = max(3, int(round(skull_gray.shape[1] * th / skull_gray.shape[0])))
+        if th > g.shape[0] or tw > g.shape[1]:
+            continue
+        res = cv2.matchTemplate(g, cv2.resize(skull_gray, (tw, th)), cv2.TM_CCOEFF_NORMED)
+        _, mx, _, loc = cv2.minMaxLoc(res)
+        if mx >= min_score:
+            hits.append((mx, rx1 + loc[0], ry1 + loc[1], tw, th))
+    hits.sort(reverse=True)
+    kept = []
+    for s, x, y, tw, th in hits:
+        if all(abs(x - kx) > 25 or abs(y - ky) > 12 for kx, ky, _, _ in kept):
+            kept.append((x, y, tw, th))
+    return kept[:2]
+
+
+def _death_pill_width(frame: np.ndarray, x: int, y: int, h: int) -> int:
+    """Largeur (px) de la pastille tueur gris-clair opaque à gauche du crâne. Large =
+    cartouche 'ADMIN' (kill admin) ; étroite/absente = suicide. On compte les colonnes
+    majoritairement 'pastille' (claires ET neutres) : robuste au décor coloré (saturé)
+    ou sombre, là où la luminance seule est bernée par un fond clair derrière un suicide."""
+    left = frame[max(0, y - 2):y + h + 2, max(0, x - 95):max(1, x - 4)]
+    if left.size == 0:
+        return 0
+    g = cv2.cvtColor(left, cv2.COLOR_RGB2GRAY)
+    s = cv2.cvtColor(left, cv2.COLOR_RGB2HSV)[:, :, 1]
+    col_is_pill = ((g > 70) & (s < 60)).sum(axis=0) >= left.shape[0] * 0.4
+    return int(col_is_pill.sum())
+
+
+def _match_death_observations(death_obs: dict, roster_o: list, roster_b: list,
+                              respawn_window: int = 15) -> list:
+    """Résout les observations de morts (crâne + tué rouge) en events. Le tué (rouge,
+    donc équipe inconnue par la couleur) est matché contre le roster COMBINÉ. Dédup par
+    victime sur la fenêtre de respawn, avec persistance ≥ KF_DEATH_MIN_OBS (écarte les
+    flukes de crâne, souvent OCR'és en un pseudo court). Type via la largeur MÉDIANE de
+    pastille : admin (killer='ADMIN') ou suicide (killer=None).
+
+    Entrée : {elapsed: [{'victim_raw', 'pill_width'}]}. Sortie : arrays au format
+    `_dedup_kills` : [elapsed, killer, victim_slot, None, False]."""
+    combined = {n: n for n in roster_o + roster_b}
+    resolved = []  # (elapsed, victim_slot, pill_width)
+    for elapsed, obs_list in death_obs.items():
+        for obs in obs_list:
+            name, ratio = _match_player_kf(obs['victim_raw'], combined)
+            if name is None or ratio < 0.5:
+                continue
+            if name in roster_o:
+                slot = _player_slot('orange', roster_o.index(name))
+            elif name in roster_b:
+                slot = _player_slot('blue', roster_b.index(name))
+            else:
+                continue
+            resolved.append((int(elapsed), slot, obs.get('pill_width', 0)))
+    resolved.sort()
+
+    out = []
+    used = [False] * len(resolved)
+    for i, (el, slot, pw) in enumerate(resolved):
+        if used[i]:
+            continue
+        cluster = [(el, pw)]; used[i] = True
+        for j in range(i + 1, len(resolved)):
+            el2, slot2, pw2 = resolved[j]
+            if not used[j] and slot2 == slot and el2 - el < respawn_window:
+                cluster.append((el2, pw2)); used[j] = True
+        if len(cluster) < KF_DEATH_MIN_OBS:
+            continue
+        pws = sorted(c[1] for c in cluster)
+        med_pw = pws[len(pws) // 2]
+        killer = KF_ADMIN_KILLER if med_pw >= KF_DEATH_ADMIN_PILL_MIN else None
+        out.append([min(c[0] for c in cluster), killer, slot, None, False])
+    return out
+
+
 def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
                  respawn_window: int = 15) -> list:
     """
@@ -1738,6 +1845,10 @@ def _dedup_kills(observations: dict, window: int = 6, min_observations: int = 1,
             # frame-level dans _finalize_cluster).
             n_hs = sum(1 for c in cluster_events if c['headshot'])
             headshot = n_hs * 2 > len(cluster_events)
+            # Garde-fou : une grenade ne peut pas faire de headshot (l'icône ⊕
+            # a parfois été faux-matchée sur une frame de kill grenade).
+            if weapon == 'grenade':
+                headshot = False
             # Format V3 positional : [elapsed, killer, victim, weapon, headshot].
             # ~3× plus compact en JSON que la version dict, ordre figé. Voir
             # KillsTimelineV3 côté front (game-analysis.model.ts) pour la doc
@@ -6243,6 +6354,11 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
     TEMPLATE_BASE = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     TEMPLATE_DIR = os.path.join(TEMPLATE_BASE, 'templates')
     WEAPON_TEMPLATES = _load_weapon_templates(TEMPLATE_DIR)
+    # Le crâne (admin.png) n'est PAS une arme de joueur : on le sort du pool des
+    # armes normales (sinon un kill joueur peut être étiqueté weapon='admin') et
+    # on le réutilise à part pour la détection des morts admin/suicide.
+    _skull_tpl = WEAPON_TEMPLATES.pop('admin', None)
+    SKULL_GRAY = _skull_tpl[0] if _skull_tpl else None
     HEADSHOT_TEMPLATE = _load_headshot_template(TEMPLATE_DIR)
     if DEBUG:
         _emit({'log': f'[_analyze_chunks] loaded {len(WEAPON_TEMPLATES)} weapon templates, headshot={HEADSHOT_TEMPLATE is not None}'})
@@ -6313,6 +6429,7 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # Le dédup post-process tranche pour ne garder qu'un kill par paire
         # (killer, victim) sur la fenêtre de 5-10 s.
         KILL_OBSERVATIONS = {}   # {elapsed_s: [{'killer': str, 'victim': str, 'killer_raw': str, 'victim_raw': str}, ...]}
+        DEATH_OBSERVATIONS = {}  # {elapsed_s: [{'victim_raw', 'pill_width'}, ...]} — morts ADMIN/suicide
         # %HP par joueur lu sur les cartouches HUD haut. Une obs par frame
         # gameplay; agrégé par median (per-player) en fin de chunk pour
         # encaisser les frames de transition et les artefacts ponctuels.
@@ -6771,6 +6888,21 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
                         'weapon': WEAPON, 'headshot': HEADSHOT,
                     })
 
+                # Morts ADMIN / suicides : rows à icône CRÂNE + tué ROUGE,
+                # invisibles au row-scan normal (pas de kill cross-team coloré).
+                # Ancrage sur le crâne, OCR du tué rouge, largeur de pastille pour
+                # distinguer admin de suicide. Résolu en fin de chunk
+                # (_match_death_observations). SKULL_GRAY None = crâne absent des
+                # templates → feature désactivée proprement.
+                if SKULL_GRAY is not None:
+                    for (SX, SY, SW, SH) in _detect_death_skulls(frame, SKULL_GRAY):
+                        DVBOX = ((SX + SW + 2, SY - 3),
+                                 (min(1920, SX + SW + 185), SY + SH + 3))
+                        DEATH_OBSERVATIONS.setdefault(ELAPSED, []).append({
+                            'victim_raw': _ocr_kill_name(frame, DVBOX, KF_DEATH_RED, tol_color=75),
+                            'pill_width': _death_pill_width(frame, SX, SY, SH),
+                        })
+
             # %HP des joueurs : pixel-only (pas d'OCR), une obs par frame.
             # Skip tant qu'une couleur d'équipe n'est pas résolue (sinon les
             # mesures de la team manquante seraient toutes biaisées).
@@ -6980,11 +7112,15 @@ def _analyze_chunks(video_path: str, settings: dict) -> None:
         # apprises sur les lectures victime, cf. _match_kill_observations),
         # puis dédup multi-frame (un kill reste 5 s à l'écran → ~5 obs).
         # Sortie = un event par kill, daté à l'elapsed le plus tôt observé.
+        ROSTER_O_NAMES = [p['name'] for p in ORANGE_ROSTER if p.get('name')]
+        ROSTER_B_NAMES = [p['name'] for p in BLUE_ROSTER if p.get('name')]
         KILLS_OUT = _dedup_kills(_match_kill_observations(
-            KILL_OBSERVATIONS,
-            [p['name'] for p in ORANGE_ROSTER if p.get('name')],
-            [p['name'] for p in BLUE_ROSTER if p.get('name')],
-        ))
+            KILL_OBSERVATIONS, ROSTER_O_NAMES, ROSTER_B_NAMES))
+        # Morts ADMIN / suicides (killer-less) : résolues séparément (dédup par
+        # victime distinct des kills joueur) puis fusionnées, triées par elapsed.
+        KILLS_OUT.extend(_match_death_observations(
+            DEATH_OBSERVATIONS, ROSTER_O_NAMES, ROSTER_B_NAMES))
+        KILLS_OUT.sort(key=lambda k: k[0])
 
         # %HP par joueur : médiane des observations par seconde, par joueur.
         # Sparse comme score_timeline : on émet uniquement les sec où la
