@@ -2319,6 +2319,15 @@ def _detect_game_loading_frame(frame: np.ndarray) -> bool:
 
 _PLAYING_TOP_CACHE = None  # tuple (gray template) ou (None,) si pas chargeable
 
+# La barre HUD haute est TOUJOURS centrée horizontalement dans la frame
+# (cx = largeur/2 sur tous les enregistrements). On restreint donc la
+# recherche du template aux positions centrées, à ±5 % près. Sans ce filet,
+# un décor très lumineux derrière la barre fait chuter la corrélation et le
+# meilleur match part sur les cartes joueurs de l'overlay caster (~+400 px) ;
+# l'ancre étant mise en cache pour toute la game, toutes les boxes dérivées
+# (nom de map, timer, scores) restent décalées jusqu'à la fin.
+_ANCHOR_CENTER_TOL = 0.05
+
 def _get_playing_top_template():
     """Charge (et cache) le template grayscale de la barre HUD haute (deux pills
     de team name reliées). Sert d'ancre dynamique pour localiser le nom de map
@@ -2356,7 +2365,15 @@ def _find_playing_top_anchor(frame: np.ndarray):
             continue
         resized = cv2.resize(tpl, (tw, th), interpolation=cv2.INTER_AREA)
         res = cv2.matchTemplate(sub, resized, cv2.TM_CCOEFF_NORMED)
-        _, mx, _, loc = cv2.minMaxLoc(res)
+        # Fenêtre des x acceptables pour le coin haut-gauche du match, pour
+        # que le centre de la barre tombe à ±_ANCHOR_CENTER_TOL du centre.
+        MARGIN = gray.shape[1] * _ANCHOR_CENTER_TOL
+        X_LO = max(0, int(gray.shape[1] / 2 - MARGIN - tw / 2))
+        X_HI = min(res.shape[1], int(gray.shape[1] / 2 + MARGIN - tw / 2) + 1)
+        if X_HI <= X_LO:
+            continue
+        _, mx, _, loc = cv2.minMaxLoc(res[:, X_LO:X_HI])
+        loc = (loc[0] + X_LO, loc[1])
         if mx > best:
             best = mx; best_loc = loc; best_size = (th, tw)
     # Seuil bas (0.4) : sur certaines frames le pill droit est occulté
