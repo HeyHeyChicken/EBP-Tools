@@ -613,13 +613,11 @@ function startCapture() {
     startedAt = Date.now();
 
     let resolutionChecked = false;
-    // Le son n'est JAMAIS écrit avant la première image, sans exception ni
-    // délai de secours. ddagrab ne produit une image que lorsque l'écran
-    // change : sur un écran figé, la première peut mettre plusieurs dizaines
-    // de secondes à venir. Un filet qui armerait le son au bout d'un temps
-    // fixe décalerait la piste de tout l'écart restant — c'est exactement ce
-    // qui produisait les 5 s constatées en salle. Et il ne protège de rien :
-    // sans image, il n'y a pas de vidéo à accompagner.
+    // La première image ne commande PLUS l'envoi du son : ffmpeg n'ouvre son
+    // muxer qu'une fois que chacun de ses flux a produit un paquet, donc il
+    // n'annonce jamais d'image tant qu'il n'a pas reçu de son (cf.
+    // arena-audio-service). Elle ne sert plus qu'à l'affichage et au
+    // diagnostic.
     let firstFrameSeen = false;
     PROC.stderr.on('data', (d) => {
         const LINE = d.toString().trim();
@@ -631,20 +629,19 @@ function startCapture() {
             stderrTail.push(LINE);
             if (stderrTail.length > 20) stderrTail.shift();
         }
-        // Première image encodée : les deux pistes partagent enfin la même
-        // origine temporelle, on ouvre le robinet audio.
+        // Première image encodée : l'enregistrement produit réellement de la
+        // vidéo, l'interface cesse d'annoncer l'attente.
         if (!firstFrameSeen && IS_PROGRESS) {
             const FRAME = /frame=\s*(\d+)/.exec(LINE);
             if (FRAME && Number(FRAME[1]) > 0) {
                 firstFrameSeen = true;
                 videoStarted = true;
-                // Ce délai EST le décalage que le son subirait sans armement :
-                // il mesure le temps que ffmpeg met à sortir sa première
-                // image. À comparer au décalage constaté dans le fichier.
+                // Le son démarre, lui, à l'ouverture du tube : ce délai majore
+                // donc le décalage résiduel de la piste audio. À comparer au
+                // décalage constaté dans le fichier.
                 console.log(
                     `[arena-capture] first frame after ${Date.now() - startedAt}ms`
                 );
-                arenaAudioService.beginPacing();
             }
         }
         // Contrôle strict 1080p sur la première ligne de stream vidéo (l'input

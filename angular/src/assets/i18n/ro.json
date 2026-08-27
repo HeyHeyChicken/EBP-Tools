@@ -161,7 +161,7 @@
       },
       "capture": {
         "device": "Sursă video",
-        "waitingFrame": "Se așteaptă prima imagine de la sursă. Captura de ecran produce o imagine doar când ecranul se schimbă: nu se înregistrează nimic cât timp rămâne neschimbat.",
+        "waitingFrame": "Se așteaptă prima imagine de la sursă. Înregistrarea începe imediat ce sosește: dacă acest mesaj persistă, sursa nu produce nicio imagine.",
         "screens": "Ecrane",
         "cameras": "Camere virtuale",
         "refresh": "Reîmprospătează lista",

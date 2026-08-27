@@ -161,7 +161,7 @@
       },
       "capture": {
         "device": "Fonte de vídeo",
-        "waitingFrame": "A aguardar a primeira imagem da fonte. A captura de ecrã só produz uma imagem quando o ecrã muda: nada é gravado enquanto permanecer parado.",
+        "waitingFrame": "A aguardar a primeira imagem da fonte. A gravação começa assim que chegar: se esta mensagem persistir, a fonte não produz qualquer imagem.",
         "screens": "Ecrãs",
         "cameras": "Câmaras virtuais",
         "refresh": "Atualizar a lista",

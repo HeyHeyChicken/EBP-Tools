@@ -58,11 +58,17 @@ let pacedFrom = 0;
 let timer = null;
 let silenceBlock = Buffer.alloc(BYTES_PER_SECOND, 0);
 let receivedBytes = 0;
-// L'écriture n'est ARMÉE qu'à la première image vidéo. Les deux pistes sont
-// horodatées à partir de leur premier échantillon : commencer à écrire du son
-// dès l'ouverture du tube, alors que ffmpeg met encore quelques secondes à
-// initialiser D3D11, le filtergraph et NVENC, plaçait le son en avance de tout
-// ce temps de démarrage — mesuré à ~3 s sur un poste réel.
+// L'écriture est ARMÉE dès que ffmpeg ouvre le tube, et surtout PAS à la
+// première image vidéo : ffmpeg n'ouvre son muxer qu'une fois que CHACUN de ses
+// flux a produit un paquet, donc il n'annonce sa première image qu'après avoir
+// reçu du son. Attendre l'image pour envoyer le son est un cycle : ffmpeg reste
+// bloqué en lecture sur le tube vide, rien n'est écrit dans le spool, et la
+// vidéo n'apparaît qu'à l'arrêt (la fermeture du tube le débloque).
+//
+// Le son est donc horodaté depuis l'ouverture du tube, l'image depuis la
+// première capture de ddagrab : l'écart entre les deux est le décalage résiduel
+// de la piste. Mesuré à ~90 ms sur un poste réel — l'ordre de grandeur des 3 s
+// jadis attribuées à l'initialisation de D3D11 était en réalité ce blocage.
 let pacing = false;
 
 /**
@@ -80,11 +86,12 @@ function start() {
         if (client) client.destroy();
         client = socket;
         // Chaque connexion est un NOUVEAU run de ffmpeg, avec sa propre
-        // origine temporelle : on désarme, sinon `pacedFrom` reste celui du
+        // origine temporelle : on réancre ici, sinon `pacedFrom` reste celui du
         // run précédent et le premier tick déverse d'un coup tout le temps
         // écoulé depuis — soit plusieurs secondes de son collées au début.
-        pacing = false;
         resetPacing();
+        pacing = true;
+        console.log('[arena-audio] pacing armed on ffmpeg connection');
         socket.on('error', () => {});
         socket.on('close', () => {
             if (client === socket) client = null;
@@ -97,21 +104,6 @@ function start() {
     timer = setInterval(pump, TICK_MS);
     console.log(`[arena-audio] listening on ${PIPE_PATH}`);
     return PIPE_PATH;
-}
-
-/**
- * Arme l'écriture : appelé quand la captation confirme sa première image. La
- * file est vidée au passage — elle contient du son déjà ancien, qui serait
- * placé au tout début de l'enregistrement.
- */
-function beginPacing() {
-    // Pas de tube ouvert : la captation est sans piste son (source caméra, ou
-    // plateforme sans loopback). Sortir sans bruit évite d'annoncer un son qui
-    // n'existe pas.
-    if (!server || pacing) return;
-    resetPacing();
-    pacing = true;
-    console.log('[arena-audio] pacing armed on first video frame');
 }
 
 function resetPacing() {
@@ -205,7 +197,6 @@ function getStatus() {
 
 module.exports = {
     start,
-    beginPacing,
     stop,
     writeChunk,
     getPipePath,

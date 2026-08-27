@@ -161,7 +161,7 @@
       },
       "capture": {
         "device": "Source vidéo",
-        "waitingFrame": "En attente de la première image de la source. La capture d'écran ne produit une image que lorsque l'écran change : rien n'est enregistré tant qu'il reste figé.",
+        "waitingFrame": "En attente de la première image de la source. L'enregistrement démarre dès qu'elle arrive : si ce message persiste, la source ne produit aucune image.",
         "screens": "Écrans",
         "cameras": "Caméras virtuelles",
         "refresh": "Rafraîchir la liste",

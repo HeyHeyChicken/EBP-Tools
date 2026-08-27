@@ -161,7 +161,7 @@
       },
       "capture": {
         "device": "Sorgente video",
-        "waitingFrame": "In attesa della prima immagine dalla sorgente. L'acquisizione dello schermo produce un'immagine solo quando lo schermo cambia: finché resta fermo non viene registrato nulla.",
+        "waitingFrame": "In attesa della prima immagine dalla sorgente. La registrazione inizia appena arriva: se questo messaggio persiste, la sorgente non produce alcuna immagine.",
         "screens": "Schermi",
         "cameras": "Fotocamere virtuali",
         "refresh": "Aggiorna l'elenco",
