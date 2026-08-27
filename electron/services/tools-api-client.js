@@ -581,8 +581,17 @@ async function sendTelemetry(payload) {
  * Écrit dans un fichier `.part` renommé à la fin : un téléchargement interrompu ne
  * laisse jamais un mp4 tronqué que l'analyseur prendrait pour une vidéo valide.
  * Pas de retry interne — la boucle du worker relancera la game au prochain tour.
+ *
+ * `onProgress` reçoit l'avancement en 0-1, à chaque paquet reçu — donc très
+ * souvent : c'est à l'appelant de lisser s'il affiche quelque chose. Muet quand
+ * la taille n'est pas annoncée : mieux vaut aucune progression qu'une fausse.
  */
-function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
+function downloadPresignedUrlToFile(
+    presignedUrl,
+    filePath,
+    redirectsLeft = 3,
+    onProgress
+) {
     const URL_OBJ = new URL(presignedUrl);
     const PART_PATH = filePath + '.part';
     const CLIENT = URL_OBJ.protocol === 'http:' ? http : https;
@@ -611,7 +620,8 @@ function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
                     downloadPresignedUrlToFile(
                         res.headers.location,
                         filePath,
-                        redirectsLeft - 1
+                        redirectsLeft - 1,
+                        onProgress
                     ).then(resolve, reject);
                     return;
                 }
@@ -626,6 +636,11 @@ function downloadPresignedUrlToFile(presignedUrl, filePath, redirectsLeft = 3) {
                 let received = 0;
                 res.on('data', (c) => {
                     received += c.length;
+                    if (onProgress && EXPECTED > 0) {
+                        try {
+                            onProgress(received / EXPECTED);
+                        } catch (_) {}
+                    }
                 });
                 // Une coupure de socket n'émet pas toujours 'error' : sans ce garde-fou,
                 // la promesse resterait pendante et le worker attendrait indéfiniment.

@@ -123,6 +123,7 @@
     },
     "notification": {
       "identifying_games": "A identificar os jogos no vídeo...",
+      "pre_analysis": "Pré-análise dos vídeos da sala — {{done}}/{{total}}",
       "manual-cutting": {
         "description": "O seu replay está a ser cortado. Por favor aguarde..."
       },

@@ -13,6 +13,11 @@ const {
     downloadPresignedUrlToFile,
     ApiError
 } = require('./tools-api-client');
+const {
+    createFloatingWindow,
+    deleteFloatingWindow,
+    getMainWindow
+} = require('../core/window-manager');
 
 //#endregion
 
@@ -45,9 +50,89 @@ const CONCURRENCY = 3;
 // analyse de plusieurs heures sur un fichier aberrant.
 const MAX_VIDEO_BYTES = 4 * 1024 * 1024 * 1024;
 
+// Bandes de la barre de progression PAR GAME (0-100), assemblée à partir des
+// phases de `processGame`. Calées sur les durées observées : le téléchargement
+// d'une game de salle prend environ un tiers du temps total, la détection est
+// brève, l'analyse profonde domine.
+const PROGRESS_DOWNLOAD_END = 35;
+const PROGRESS_DETECT_END = 50;
+
 let running = false;
 let timer = null;
 let deps = null;
+
+// Avancement du LOT en cours : une entrée 0-100 par game, `null` entre deux
+// lots. Le worker traite CONCURRENCY games de front pour une seule fenêtre
+// flottante — c'est donc lui qui agrège, et non chaque analyzer qui piloterait
+// la fenêtre à tour de rôle (ils se la voleraient, et la première game terminée
+// la fermerait pour les autres).
+let batchProgress = null;
+// Dernier pourcentage POUSSÉ à la fenêtre. Le téléchargement rappelle à chaque
+// paquet reçu : sans ce garde-fou, on inonderait l'IPC pour redessiner le même
+// entier.
+let lastPushedPercent = -1;
+
+/** Message de la fenêtre flottante, dérivé de l'état du lot. */
+function progressNotification() {
+    const VALUES = Array.from(batchProgress.values());
+    const MEAN = Math.round(
+        VALUES.reduce((sum, v) => sum + v, 0) / VALUES.length
+    );
+    return {
+        percent: MEAN,
+        leftRounded: true,
+        infinite: false,
+        icon: undefined,
+        text: '.view.notification.pre_analysis',
+        textParams: {
+            done: VALUES.filter((v) => v >= 100).length,
+            total: VALUES.length
+        },
+        state: 'info'
+    };
+}
+
+/** Ouvre la fenêtre flottante sur un lot qui démarre (toutes les games à 0). */
+function startBatchProgress(games) {
+    batchProgress = new Map(games.map((g) => [String(g.gameId), 0]));
+    lastPushedPercent = 0;
+    createFloatingWindow(
+        500,
+        150,
+        JSON.stringify(progressNotification())
+    ).catch((e) =>
+        console.warn('[system-worker] fenêtre de progression indisponible', e)
+    );
+}
+
+/**
+ * Avancement d'une game. Les mises à jour transitent par la fenêtre PRINCIPALE,
+ * qui les relaie à la flottante (BroadcastChannel) : sans elle, pas d'affichage.
+ * @param {string|number} gameId
+ * @param {number} percent 0-100, borné.
+ */
+function setGameProgress(gameId, percent) {
+    if (!batchProgress) return;
+    const KEY = String(gameId);
+    if (!batchProgress.has(KEY)) return;
+    batchProgress.set(KEY, Math.max(0, Math.min(100, Math.round(percent))));
+
+    const DATA = progressNotification();
+    if (DATA.percent === lastPushedPercent) return;
+    lastPushedPercent = DATA.percent;
+
+    const WINDOW = getMainWindow();
+    if (WINDOW && !WINDOW.isDestroyed()) {
+        WINDOW.webContents.send('set-notification-data', DATA);
+    }
+}
+
+/** Ferme la fenêtre à la fin d'un lot. Idempotent : appelable sans lot en vol. */
+function endBatchProgress() {
+    if (!batchProgress) return;
+    batchProgress = null;
+    deleteFloatingWindow(false);
+}
 
 /** Dossier de travail des vidéos rapatriées, vidé au fil de l'eau. */
 function workDir() {
@@ -84,7 +169,12 @@ async function processGame(game, systemKey) {
     const VIDEO_PATH = path.join(workDir(), `${game.guid}_${game.terrainId}.mp4`);
     try {
         console.log(`[system-worker] ${game.gameId} — téléchargement (${game.map || 'map inconnue'})`);
-        await downloadPresignedUrlToFile(game.videoUrl, VIDEO_PATH);
+        await downloadPresignedUrlToFile(
+            game.videoUrl,
+            VIDEO_PATH,
+            3,
+            (ratio) => setGameProgress(game.gameId, ratio * PROGRESS_DOWNLOAD_END)
+        );
         const SIZE = fs.statSync(VIDEO_PATH).size;
         if (SIZE === 0 || SIZE > MAX_VIDEO_BYTES) {
             console.warn(`[system-worker] ${game.gameId} : taille inattendue (${SIZE} o), ignorée`);
@@ -94,7 +184,21 @@ async function processGame(game, systemKey) {
         // Phase 1 — bornes réelles de la game dans le fichier. La captation de salle
         // déborde de part et d'autre (pré-game, écran de score), et c'est aussi elle
         // qui détecte le mode : ces valeurs ne peuvent pas venir de la base.
-        const DETECT = await deps.runAnalyzer(VIDEO_PATH, null, {}, false);
+        const DETECT = await deps.runAnalyzer(
+            VIDEO_PATH,
+            null,
+            {},
+            false,
+            false,
+            (percent) =>
+                setGameProgress(
+                    game.gameId,
+                    PROGRESS_DOWNLOAD_END +
+                        ((PROGRESS_DETECT_END - PROGRESS_DOWNLOAD_END) *
+                            percent) /
+                            100
+                )
+        );
         if (DETECT.type === 'error') {
             console.warn(`[system-worker] ${game.gameId} : phase 1 en échec — ${DETECT.message}`);
             return false;
@@ -132,7 +236,18 @@ async function processGame(game, systemKey) {
             bluePlayers: game.bluePlayers || []
         };
         // Pleine priorité : machine dédiée à la pré-analyse, rien à ménager ici.
-        const RESULTS = await deps.runChunkAnalyzer(VIDEO_PATH, null, [CHUNK], {}, null);
+        const RESULTS = await deps.runChunkAnalyzer(
+            VIDEO_PATH,
+            null,
+            [CHUNK],
+            {},
+            (p) =>
+                setGameProgress(
+                    game.gameId,
+                    PROGRESS_DETECT_END +
+                        ((100 - PROGRESS_DETECT_END) * p.percent) / 100
+                )
+        );
         if (RESULTS && RESULTS.error) {
             console.warn(`[system-worker] ${game.gameId} : phase 2 en échec — ${RESULTS.error}`);
             return false;
@@ -158,6 +273,9 @@ async function processGame(game, systemKey) {
         console.error(`[system-worker] ${game.gameId} : échec`, e);
         return false;
     } finally {
+        // Quelle qu'en soit l'issue, la game ne progressera plus : on la marque
+        // terminée, sinon le lot n'atteindrait jamais 100 % après un échec.
+        setGameProgress(game.gameId, 100);
         removeQuietly(VIDEO_PATH);
         removeQuietly(VIDEO_PATH + '.part');
     }
@@ -177,9 +295,11 @@ async function tick(systemKey) {
     try {
         let batch = await fetchPreAnalysisBatch(CONCURRENCY, systemKey);
         while (batch && Array.isArray(batch.games) && batch.games.length > 0) {
+            startBatchProgress(batch.games);
             // processGame absorbe ses propres erreurs (retourne false) : aucun rejet
             // à craindre ici, une game ratée n'emporte pas les autres du lot.
             await Promise.all(batch.games.map((g) => processGame(g, systemKey)));
+            endBatchProgress();
             batch = await fetchPreAnalysisBatch(CONCURRENCY, systemKey);
         }
     } catch (e) {
@@ -190,6 +310,9 @@ async function tick(systemKey) {
         }
         console.error('[system-worker] tour en échec', e);
     } finally {
+        // Un échec en plein lot (clé refusée, réseau coupé) laisserait sinon la
+        // fenêtre affichée sur un pourcentage figé.
+        endBatchProgress();
         running = false;
     }
 }
@@ -217,6 +340,7 @@ function stop() {
         clearInterval(timer);
         timer = null;
     }
+    endBatchProgress();
 }
 
 module.exports = { start, stop };

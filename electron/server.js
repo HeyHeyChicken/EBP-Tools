@@ -1383,7 +1383,14 @@ if (!APP_GOT_THE_LOCK) {
         }
     }
 
-    function runAnalyzer(videoPath, socket, settings, showFloatingProgress, lowPriority) {
+    function runAnalyzer(
+        videoPath,
+        socket,
+        settings,
+        showFloatingProgress,
+        lowPriority,
+        onProgress
+    ) {
         const HEADLESS = !socket;
 
         // Floating window de progression pour la phase de détection. Utile au
@@ -1440,6 +1447,15 @@ if (!APP_GOT_THE_LOCK) {
                         }
                         if (MSG.nbGames) {
                             nbGames = MSG.nbGames;
+                        }
+                        // Progression de la détection → appelant headless (le
+                        // worker de pré-analyse, qui agrège plusieurs games dans
+                        // une seule fenêtre et ne peut donc pas utiliser
+                        // `showFloatingProgress`, propre à UN process).
+                        if (typeof MSG.percent === 'number' && onProgress) {
+                            try {
+                                onProgress(MSG.percent);
+                            } catch (_) {}
                         }
 
                         if (WINDOW && !WINDOW.isDestroyed()) {

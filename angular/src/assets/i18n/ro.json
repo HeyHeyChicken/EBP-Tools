@@ -123,6 +123,7 @@
     },
     "notification": {
       "identifying_games": "Se identifică meciurile din videoclip...",
+      "pre_analysis": "Preanaliză a videoclipurilor din sală — {{done}}/{{total}}",
       "manual-cutting": {
         "description": "Redarea dvs. este în curs de tăiere. Vă rugăm să așteptați..."
       },
