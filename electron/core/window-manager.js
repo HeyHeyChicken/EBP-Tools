@@ -28,6 +28,7 @@ const {
     PROTOCOL_NAME
 } = require('../config/constants');
 const watchFolderService = require('../services/watch-folder-service');
+const arenaCaptureService = require('../services/arena-capture-service');
 const telemetryService = require('../services/telemetry-service');
 const StorageManager = require('./storage-manager');
 
@@ -276,7 +277,13 @@ function createWindow(updateService) {
     function getTrayIcon() {
         const STATUS = watchFolderService.getStatus();
         let suffix = '';
-        if (STATUS.processing.length > 0) {
+        // La captation passe devant : sur un PC de salle c'est l'état qui
+        // compte, et le watch-folder n'y sert pas. Vert FIXE et non clignotant
+        // — la captation est l'état nominal (8 h par jour), pas une alerte ;
+        // un clignotement permanent finirait par ne plus être vu.
+        if (arenaCaptureService.getStatus().running) {
+            suffix = '-recording';
+        } else if (STATUS.processing.length > 0) {
             suffix = '-analyzing';
         } else if (STATUS.failed.length > 0) {
             suffix = '-error';
@@ -474,11 +481,29 @@ function createWindow(updateService) {
         ]);
     }
 
-    TRAY.setToolTip('EBP - Tools');
+    /**
+     * Infobulle : rappelle depuis quand la salle enregistre, l'information la
+     * plus utile au staff qui survole l'icône (l'icône seule dit « ça rec »,
+     * pas « depuis quand »).
+     */
+    function buildTrayTooltip() {
+        const CAPTURE = arenaCaptureService.getStatus();
+        if (!CAPTURE.running || !CAPTURE.startedAt) {
+            return 'EBP - Tools';
+        }
+        const SINCE = new Date(CAPTURE.startedAt).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        return `EBP - Tools - Recording since ${SINCE}`;
+    }
+
+    TRAY.setToolTip(buildTrayTooltip());
     TRAY.setContextMenu(buildContextMenu());
     setInterval(() => {
         TRAY.setContextMenu(buildContextMenu());
         TRAY.setImage(getTrayIcon());
+        TRAY.setToolTip(buildTrayTooltip());
     }, 3000);
 
     if (!IS_MACOS) {
