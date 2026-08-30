@@ -10,6 +10,7 @@ import { ReplayCutterComponent } from './views/replay_cutter/replay_cutter.compo
 import { ReplayDownloaderComponent } from './views/replay_downloader/replay_downloader.component';
 import { NotificationComponent } from './views/notification/notification.component';
 import { ArenaModeComponent } from './views/arena_mode/arena_mode.component';
+import { arenaModeHomeGuard } from './core/guards/arena-mode.guard';
 
 //#endregion
 
@@ -19,7 +20,8 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        component: HomeComponent
+        component: HomeComponent,
+        canActivate: [arenaModeHomeGuard]
       },
       {
         path: 'replay_cutter',
