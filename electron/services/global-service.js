@@ -5,6 +5,7 @@
 //#region Imports
 
 const fs = require('fs');
+const os = require('os');
 const path = require('node:path');
 
 //#endregion
@@ -37,7 +38,26 @@ function safeMapName(mapName) {
         .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Passe un process enfant en priorité BELOW_NORMAL (cross-platform via
+ * os.setPriority ; BELOW_NORMAL_PRIORITY_CLASS sous Windows). Utilisé par le
+ * mode salle : sur le PC de streaming d'une salle, les traitements ne doivent
+ * JAMAIS faire ramer les logiciels de prod — l'OS leur donne les cycles
+ * restants, ils s'allongent seulement quand la machine est occupée. À noter :
+ * ne baisse que la priorité CPU, pas les I/O disque.
+ * @param {import('child_process').ChildProcess} child Process fraîchement spawn.
+ * @param {string} label Préfixe de log en cas d'échec.
+ */
+function lowerProcessPriority(child, label) {
+    try {
+        os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+    } catch (e) {
+        console.warn(`[${label}] setPriority failed:`, e.message);
+    }
+}
+
 module.exports = {
     unlinkSync,
-    safeMapName
+    safeMapName,
+    lowerProcessPriority
 };

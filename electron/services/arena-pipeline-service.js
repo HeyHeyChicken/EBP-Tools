@@ -211,14 +211,17 @@ async function processRun(run) {
     );
     await concatCopySegments(
         SEGMENTS.map((s) => s.path),
-        WINDOW_PATH
+        WINDOW_PATH,
+        true
     );
 
     // Phase 1 (détection uniquement — même code que le watch-folder). Pas de
-    // floating window : le pipeline salle est silencieux. Priorité OS normale
-    // (décision Antoine) : la détection ne doit pas traîner derrière la
-    // captation, sinon les games s'accumulent dans le spool.
-    const DETECT = await deps.runAnalyzer(WINDOW_PATH, null, {}, false, false);
+    // floating window : le pipeline salle est silencieux. Priorité OS
+    // BELOW_NORMAL : sur un PC de salle, les logiciels de prod passent d'abord
+    // — la détection prend les cycles restants. À surveiller : si la machine
+    // est durablement saturée, la détection traîne derrière la captation et
+    // les games s'accumulent dans le spool (~4,5 Go/h).
+    const DETECT = await deps.runAnalyzer(WINDOW_PATH, null, {}, false, true);
     if (DETECT.type === 'error') {
         throw new Error(`Analyzer failed: ${DETECT.message}`);
     }
@@ -293,7 +296,14 @@ async function processRun(run) {
         // déjà au format web (H.264, GOP 1 s) — le lecteur du site lit ces
         // fichiers comme ceux du watch-folder, sans qu'on ait payé un
         // réencodage. Marge de 1 s : la coupe démarre à la keyframe précédente.
-        await cutCopyGame(WINDOW_PATH, OUT, G.start, G.end, ARENA_CUT_MARGIN_S);
+        await cutCopyGame(
+            WINDOW_PATH,
+            OUT,
+            G.start,
+            G.end,
+            ARENA_CUT_MARGIN_S,
+            true
+        );
         // Pas de sidecar : le PC de salle ne fait JAMAIS l'analyse (phase 2), qui
         // reste sur le PC du joueur. Tout ce dont la suite a besoin — arène,
         // gameId après identification, map, bornes absolues — est dans le nom du

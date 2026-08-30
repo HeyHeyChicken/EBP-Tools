@@ -12,7 +12,7 @@ const {
 const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('node:path');
-const { unlinkSync } = require('./global-service');
+const { unlinkSync, lowerProcessPriority } = require('./global-service');
 
 //#endregion
 
@@ -400,6 +400,7 @@ const COPY_MARGIN_SEC = 6;
  * @param {string} outputPath Destination .mp4.
  * @param {number} startSec   Début de game (s) ; reculé de la marge.
  * @param {number} endSec     Fin de game (s) ; avancée de la marge.
+ * @param {boolean} lowPriority Passe ffmpeg en BELOW_NORMAL (mode salle).
  * @returns {Promise<string>} Resolves with outputPath on success.
  */
 async function cutCopyGame(
@@ -410,7 +411,8 @@ async function cutCopyGame(
     // Marge par défaut calibrée pour les VODs au GOP grossier (~4 s). Les
     // captations mode salle ont un GOP de 1 s → marge de 1 s suffisante pour
     // une coupe quasi exacte.
-    marginSec = COPY_MARGIN_SEC
+    marginSec = COPY_MARGIN_SEC,
+    lowPriority = false
 ) {
     if (fs.existsSync(outputPath)) {
         unlinkSync(outputPath);
@@ -441,6 +443,7 @@ async function cutCopyGame(
         );
 
         const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+        if (lowPriority) lowerProcessPriority(FFMPEG, 'FFMPEG cut copy');
 
         FFMPEG.stderr.on('data', (data) => {
             console.log(`[FFMPEG] Cut copy - ${data.toString().trim()}`);
@@ -468,8 +471,9 @@ async function cutCopyGame(
  * fenêtre d'analyse à partir des segments de captation.
  * @param {string[]} inputPaths Segments dans l'ordre chronologique.
  * @param {string} outputPath Fichier de sortie (écrasé s'il existe).
+ * @param {boolean} lowPriority Passe ffmpeg en BELOW_NORMAL (mode salle).
  */
-async function concatCopySegments(inputPaths, outputPath) {
+async function concatCopySegments(inputPaths, outputPath, lowPriority = false) {
     if (fs.existsSync(outputPath)) {
         unlinkSync(outputPath);
     }
@@ -504,6 +508,7 @@ async function concatCopySegments(inputPaths, outputPath) {
         );
 
         const FFMPEG = spawn(FFMPEG_PATH, FFMPEG_ARGS);
+        if (lowPriority) lowerProcessPriority(FFMPEG, 'FFMPEG concat copy');
 
         FFMPEG.stderr.on('data', (data) => {
             console.log(`[FFMPEG] Concat copy - ${data.toString().trim()}`);

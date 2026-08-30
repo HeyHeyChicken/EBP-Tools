@@ -112,7 +112,10 @@ const {
     appendImageTail,
     renderTeamScoreImage
 } = require('./services/video-service');
-const { unlinkSync } = require('./services/global-service');
+const {
+    unlinkSync,
+    lowerProcessPriority
+} = require('./services/global-service');
 const UpdateService = require('./services/update-service');
 const ytDlpService = require('./services/ytdlp-service');
 const denoService = require('./services/deno-service');
@@ -1366,21 +1369,6 @@ if (!APP_GOT_THE_LOCK) {
         UPLOAD_REQUEST.on('error', (err) => console.error('Error:', err));
 
         fs.createReadStream(VIDEO_PATH).pipe(UPLOAD_REQUEST);
-    }
-
-    /**
-     * Passe un process enfant en priorité BELOW_NORMAL (cross-platform via
-     * os.setPriority). Utilisé par le mode salle : sur le PC de streaming
-     * d'une salle, l'analyse ne doit JAMAIS faire ramer l'usage principal —
-     * l'OS lui donne les cycles restants, les traitements s'allongent
-     * seulement quand la machine est occupée.
-     */
-    function lowerProcessPriority(child, label) {
-        try {
-            os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
-        } catch (e) {
-            console.warn(`[${label}] setPriority failed:`, e.message);
-        }
     }
 
     function runAnalyzer(
