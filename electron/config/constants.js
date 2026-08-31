@@ -56,6 +56,48 @@ function getComponentPath(name) {
     return path.join(COMPONENTS_DIR, ENTRY.asset);
 }
 
+/**
+ * Comment lancer l'analyseur : un exécutable seul en temps normal, ou
+ * « interpréteur + script » quand on veut faire tourner les SOURCES du dépôt.
+ *
+ * En développement, `TOOLS_ANALYZER_PYTHON` — chemin d'un interpréteur, absolu
+ * ou relatif à la racine du dépôt — court-circuite le composant téléchargé et
+ * lance `python/analyze_video.py` directement. De quoi voir une modification de
+ * détection dans l'IHM sans reconstruire un bundle de 325 Mo à chaque essai :
+ *
+ *   TOOLS_ANALYZER_PYTHON=python/.venv/bin/python3 npm start
+ *
+ * Deux différences à garder en tête avec le composant gelé : il embarque
+ * tesserocr là où un venv retombe sur pytesseract et sur le tesseract du
+ * système. Une modification qui touche à l'OCR se valide donc sur le BINAIRE,
+ * jamais seulement ici.
+ *
+ * Hors mode dev la variable est ignorée : un build publié ne doit pas dépendre
+ * d'un python installé sur la machine du joueur.
+ * @returns {{command: string, prefixArgs: string[], cwd: string}}
+ */
+function getAnalyzerSpawn() {
+    const OVERRIDE = IS_DEV_MODE ? process.env.TOOLS_ANALYZER_PYTHON : '';
+
+    if (OVERRIDE) {
+        // ROOT_PATH vaut le dossier `electron/` en dev : la racine du dépôt est
+        // son parent, et c'est elle qui sert de repère au chemin donné.
+        const REPOSITORY = path.dirname(ROOT_PATH);
+        const SCRIPT = path.join(REPOSITORY, 'python', 'analyze_video.py');
+        return {
+            command: path.resolve(REPOSITORY, OVERRIDE),
+            prefixArgs: [SCRIPT],
+            cwd: path.dirname(SCRIPT)
+        };
+    }
+
+    return {
+        command: ANALYZER_PATH,
+        prefixArgs: [],
+        cwd: path.dirname(ANALYZER_PATH)
+    };
+}
+
 //#endregion
 
 const EBP_DOMAIN = 'evabattleplan.com';
@@ -160,6 +202,7 @@ module.exports = {
 
     FFMPEG_PATH,
     ANALYZER_PATH,
+    getAnalyzerSpawn,
 
     COMPONENTS,
     COMPONENTS_DIR,

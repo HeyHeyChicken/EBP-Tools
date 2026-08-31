@@ -84,7 +84,7 @@ const {
     ROOT_PATH,
     DEFAULT_VIDEO_HEIGHT,
     FFMPEG_PATH,
-    ANALYZER_PATH,
+    getAnalyzerSpawn,
     PROTOCOL_NAME,
     getCurrentPort,
     EBP_DOMAIN
@@ -1399,13 +1399,21 @@ if (!APP_GOT_THE_LOCK) {
 
         return new Promise((resolve, reject) => {
             const SETTINGS_JSON = JSON.stringify(settings || {});
-            const ARGS = ['detect', videoPath, FFMPEG_PATH, '', SETTINGS_JSON];
+            const RUNNER = getAnalyzerSpawn();
+            const ARGS = [
+                ...RUNNER.prefixArgs,
+                'detect',
+                videoPath,
+                FFMPEG_PATH,
+                '',
+                SETTINGS_JSON
+            ];
             const SPAWN_OPTIONS = {
                 stdio: ['ignore', 'pipe', 'pipe'],
-                cwd: path.dirname(ANALYZER_PATH),
+                cwd: RUNNER.cwd,
                 windowsHide: true
             };
-            const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            const ANALYZER = spawn(RUNNER.command, ARGS, SPAWN_OPTIONS);
             if (lowPriority) lowerProcessPriority(ANALYZER, 'analyzer');
             let BUFFER = '';
             const LINE_QUEUE = [];
@@ -1557,13 +1565,21 @@ if (!APP_GOT_THE_LOCK) {
                 ...(settings || {}),
                 chunks: chunks
             });
-            const ARGS = ['chunks', videoPath, FFMPEG_PATH, '', SETTINGS_JSON];
+            const RUNNER = getAnalyzerSpawn();
+            const ARGS = [
+                ...RUNNER.prefixArgs,
+                'chunks',
+                videoPath,
+                FFMPEG_PATH,
+                '',
+                SETTINGS_JSON
+            ];
             const SPAWN_OPTIONS = {
                 stdio: ['ignore', 'pipe', 'pipe'],
-                cwd: path.dirname(ANALYZER_PATH),
+                cwd: RUNNER.cwd,
                 windowsHide: true
             };
-            const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            const ANALYZER = spawn(RUNNER.command, ARGS, SPAWN_OPTIONS);
             if (lowPriority) lowerProcessPriority(ANALYZER, 'chunk-analyzer');
             let BUFFER = '';
             const LINE_QUEUE = [];
@@ -1699,13 +1715,14 @@ if (!APP_GOT_THE_LOCK) {
      */
     function runScoreboardReader(imagePath) {
         return new Promise((resolve, reject) => {
-            const ARGS = ['scoreboard', imagePath];
+            const RUNNER = getAnalyzerSpawn();
+            const ARGS = [...RUNNER.prefixArgs, 'scoreboard', imagePath];
             const SPAWN_OPTIONS = {
                 stdio: ['ignore', 'pipe', 'pipe'],
-                cwd: path.dirname(ANALYZER_PATH),
+                cwd: RUNNER.cwd,
                 windowsHide: true
             };
-            const ANALYZER = spawn(ANALYZER_PATH, ARGS, SPAWN_OPTIONS);
+            const ANALYZER = spawn(RUNNER.command, ARGS, SPAWN_OPTIONS);
             let BUFFER = '';
             let RESULT = null;
             let ERROR = null;
