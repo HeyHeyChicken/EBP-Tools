@@ -11,8 +11,8 @@ const arenaModeService = require('./arena-mode-service');
 const arenaPipelineService = require('./arena-pipeline-service');
 const {
     requestArenaUploadUrl,
-    requestColorChaosUploadUrl,
-    confirmColorChaosUpload,
+    requestOtherGameUploadUrl,
+    confirmOtherGameUpload,
     confirmArenaUpload,
     uploadFileToPresignedUrl
 } = require('./tools-api-client');
@@ -31,9 +31,11 @@ const {
 // le hook d'import s'en sert pour attacher la vidéo à l'équipe. Fichier +
 // fichier local supprimé une fois l'upload confirmé.
 //
-// Les games Color Chaos suivent le même chemin, mais sans identification (elles
-// n'existent pas côté EVA) : le pipeline les nomme `cc_…` et elles partent dans
-// leur propre zone S3, sur une route dédiée.
+// Les games d'un autre jeu qu'After-H (Color Chaos, Zombies) suivent le même
+// chemin, mais sans identification : aucune n'a de ligne en base côté EBP, il
+// n'y a pas de gameId à leur trouver. Le pipeline les nomme `cc_…` / `zb_…` et
+// elles partent toutes sur la MÊME route « autre jeu », dans leur propre zone
+// S3 — le jeu voyage dans le payload, c'est lui qui décide de la zone.
 //
 // V1 : plus d'analyse phase 2 (killfeed) sur le PC de salle — les joueurs sont
 // déjà connus côté serveur. Le killfeed pourra être rebranché plus tard.
@@ -47,10 +49,16 @@ const {
 // {roomId}_{arenaId}_{gameId}_{SafeMap}_{start}_{end}_{scores}.mp4
 const GAME_FILE_RE =
     /^(\d+)_(\d+)_(\d+)_([A-Za-z0-9-]+)_(\d+)_(\d+)_([^_]+)\.mp4$/;
-// Game Color Chaos : `cc_{roomId}_{arenaId}_{startEpoch}_{endEpoch}.mp4`. Elle
-// arrive ici directement, sans passer par l'identification — ces games
-// n'existent pas côté EVA, il n'y a pas de gameId à leur trouver.
-const COLOR_CHAOS_FILE_RE = /^cc_(\d+)_(\d+)_(\d+)_(\d+)\.mp4$/;
+// Game d'un autre jeu : `{préfixe}_{roomId}_{arenaId}_{startEpoch}_{endEpoch}.mp4`.
+// Elle arrive ici directement, sans passer par l'identification — ces games
+// n'existent pas côté EVA, il n'y a pas de gameId à leur trouver. Le préfixe est
+// le seul endroit où le jeu survit à la découpe (le nom est le seul porteur
+// d'état de la chaîne), d'où la table de correspondance.
+const OTHER_GAME_FILE_RE = /^(cc|zb)_(\d+)_(\d+)_(\d+)_(\d+)\.mp4$/;
+const OTHER_GAME_TYPE = {
+    cc: 'color-chaos',
+    zb: 'zombies'
+};
 const RETRY_BASE_DELAY_MS = 30 * 1000;
 const RETRY_MAX_DELAY_MS = 10 * 60 * 1000;
 // Re-scan périodique de games/ : rattrape les games identifiées par un simple
@@ -91,11 +99,11 @@ function moveToFailed(filePath) {
 
 /**
  * Une game prête à partir : After-H déjà identifiée (7 champs, gameId en 3e
- * position) ou Color Chaos. Une game After-H pas encore identifiée porte un nom
- * à 6 champs et reste donc invisible pour l'uploader.
+ * position) ou game d'un autre jeu. Une game After-H pas encore identifiée porte
+ * un nom à 6 champs et reste donc invisible pour l'uploader.
  */
 function isUploadable(name) {
-    return GAME_FILE_RE.test(name) || COLOR_CHAOS_FILE_RE.test(name);
+    return GAME_FILE_RE.test(name) || OTHER_GAME_FILE_RE.test(name);
 }
 
 /** La vidéo est en place côté S3 : on libère le disque de la salle. */
@@ -159,8 +167,8 @@ function uploadWithPersistentRetry(filePath, gameId, ids, token) {
 }
 
 /**
- * Idem pour une game Color Chaos : le serveur compose la clé à partir de
- * l'epoch de début de game.
+ * Idem pour une game d'un autre jeu : le serveur compose la clé à partir du jeu
+ * et de l'epoch de début de game.
  *
  * La confirmation est DANS la tentative, pas en best-effort comme pour
  * l'After-H : elle est ce qui rend le replay visible dans l'Espace Arena (rien
@@ -168,18 +176,19 @@ function uploadWithPersistentRetry(filePath, gameId, ids, token) {
  * elle échoue, on rejoue tout — le PUT réécrit le même objet, la clé étant
  * déterministe.
  */
-function uploadColorChaosWithPersistentRetry(filePath, startedAtEpoch, ids, token) {
+function uploadOtherGameWithPersistentRetry(filePath, gameType, startedAtEpoch, ids, token) {
     const PAYLOAD = {
         roomId: ids.roomId,
         arenaId: ids.arenaId,
+        gameType,
         startedAtEpoch
     };
     return withPersistentRetry(async () => {
-        const UPLOAD = await requestColorChaosUploadUrl(PAYLOAD, token);
+        const UPLOAD = await requestOtherGameUploadUrl(PAYLOAD, token);
         await uploadFileToPresignedUrl(UPLOAD.url, filePath, {
             contentType: 'video/mp4'
         });
-        await confirmColorChaosUpload(PAYLOAD, token);
+        await confirmOtherGameUpload(PAYLOAD, token);
         return UPLOAD.key;
     });
 }
@@ -197,12 +206,14 @@ async function processGame(filePath) {
     const IDS = { roomId: STATE.roomId, arenaId: STATE.arenaId };
     const NAME = path.basename(filePath);
 
-    const CC = NAME.match(COLOR_CHAOS_FILE_RE);
-    if (CC) {
-        const STARTED_AT = parseInt(CC[3], 10);
-        console.log(`[arena-uploader] processing ${NAME} (Color Chaos)`);
-        const KEY = await uploadColorChaosWithPersistentRetry(
+    const OTHER = NAME.match(OTHER_GAME_FILE_RE);
+    if (OTHER) {
+        const GAME_TYPE = OTHER_GAME_TYPE[OTHER[1]];
+        const STARTED_AT = parseInt(OTHER[4], 10);
+        console.log(`[arena-uploader] processing ${NAME} (${GAME_TYPE})`);
+        const KEY = await uploadOtherGameWithPersistentRetry(
             filePath,
+            GAME_TYPE,
             STARTED_AT,
             IDS,
             TOKEN

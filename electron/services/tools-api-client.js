@@ -392,22 +392,22 @@ function requestArenaUploadUrl(payload, arenaToken) {
 }
 
 /**
- * POST /api/tools/arena/color-chaos/upload-url
- * URL présignée PUT pour un replay Color Chaos. Ces games n'existent pas côté
- * EVA (`game-histories` ne retourne que de l'After-H) : pas de gameId à envoyer,
- * donc une route distincte de `/arena/games/upload-url`. Comme partout, c'est le
- * SERVEUR qui compose la clé — Tools ne fait que fournir l'epoch de DÉBUT de
- * game, celui qui borne déjà le fichier découpé. Clé déterministe → un retry
- * réécrit le même objet.
+ * POST /api/tools/arena/other/upload-url
+ * URL présignée PUT pour un replay d'un jeu AUTRE qu'After-H (Color Chaos,
+ * Zombies, …). Aucun de ces jeux n'a de game en base côté EBP : pas de gameId à
+ * envoyer, donc une route distincte de `/arena/games/upload-url`.
+ * Comme partout, c'est le SERVEUR qui compose la clé — Tools ne fait que
+ * fournir le jeu et l'epoch de DÉBUT de game, celui qui borne déjà le fichier
+ * découpé. Clé déterministe → un retry réécrit le même objet.
  *
  * Auth par clé de salle seule (X-Arena-Token).
  *
- * @param {{roomId:number, arenaId:number, startedAtEpoch:number}} payload
+ * @param {{roomId:number, arenaId:number, gameType:string, startedAtEpoch:number}} payload
  * @param {string} arenaToken
  * @returns {Promise<{url:string, key:string, expiresAt:number}>}
  */
-function requestColorChaosUploadUrl(payload, arenaToken) {
-    return apiRequest('POST', '/arena/color-chaos/upload-url', payload, {
+function requestOtherGameUploadUrl(payload, arenaToken) {
+    return apiRequest('POST', '/arena/other/upload-url', payload, {
         retries: 1,
         requireAuth: false,
         headers: { 'X-Arena-Token': arenaToken }
@@ -415,19 +415,19 @@ function requestColorChaosUploadUrl(payload, arenaToken) {
 }
 
 /**
- * POST /api/tools/arena/color-chaos/confirm-upload
+ * POST /api/tools/arena/other/confirm-upload
  * Le serveur vérifie l'objet en S3 puis l'indexe, ce qui le rend visible dans
  * l'Espace Arena. Contrairement à l'After-H, cette confirmation n'est PAS
  * best-effort : aucune game en base ne permettrait de rattraper l'oubli, et
  * rien ne réconcilie ce préfixe — un replay non confirmé resterait invisible.
  * L'appelant la rejoue donc avec l'upload.
  *
- * @param {{roomId:number, arenaId:number, startedAtEpoch:number}} payload
+ * @param {{roomId:number, arenaId:number, gameType:string, startedAtEpoch:number}} payload
  * @param {string} arenaToken
  * @returns {Promise<void>}
  */
-function confirmColorChaosUpload(payload, arenaToken) {
-    return apiRequest('POST', '/arena/color-chaos/confirm-upload', payload, {
+function confirmOtherGameUpload(payload, arenaToken) {
+    return apiRequest('POST', '/arena/other/confirm-upload', payload, {
         retries: 1,
         requireAuth: false,
         headers: { 'X-Arena-Token': arenaToken }
@@ -781,8 +781,8 @@ module.exports = {
     getArenaLocations,
     sendArenaHeartbeat,
     requestArenaUploadUrl,
-    requestColorChaosUploadUrl,
-    confirmColorChaosUpload,
+    requestOtherGameUploadUrl,
+    confirmOtherGameUpload,
     confirmArenaUpload,
     ingestArenaGames,
     resolveArenaGameId,

@@ -25,8 +25,9 @@ const arenaCaptureService = require('./arena-capture-service');
 //     stream-copy/remux mp4 (la captation encode déjà web-ready : H.264,
 //     GOP 1 s, +faststart au remux — AUCUN réencodage, coupe précise à ±1 s),
 //     nommée `{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{sO}-{sB}.mp4`
-//     — ou `cc_{roomId}_{arenaId}_{startEpoch}_{endEpoch}.mp4` pour une game
-//     Color Chaos, qui n'a ni map ni scores et ne s'identifie pas côté EVA ;
+//     — ou `{préfixe}_{roomId}_{arenaId}_{startEpoch}_{endEpoch}.mp4` pour une
+//     game d'un AUTRE jeu (`cc_` Color Chaos, `zb_` Zombies), qui n'a ni map ni
+//     scores et ne s'identifie pas côté EVA ;
 //   - une game encore en cours à la fin de la fenêtre → invisible pour la
 //     phase 1 → retrouvée au round suivant, quand le segment contenant sa
 //     score frame sera fermé. C'est ça, la gestion du "à cheval sur deux
@@ -55,10 +56,28 @@ const RUN_GAP_TOLERANCE_S = 60;
 // encore. Trop bas, on purge les segments d'une game en cours ; trop haut, le
 // spool grossit (~4,5 Go/h).
 const MAX_GAME_S = 12 * 60 + 180;
+// La même borne pour une game Zombies, qui joue dans une tout autre échelle :
+// 27, 30 et 35 min sur les trois enregistrements de salle chronométrés, plus les
+// ~5 min de pré-game qui précèdent son écran de loading. Cet horizon ne sert QUE
+// quand une game zombie est en cours (cf. `zombiesInProgress`) : le reste du
+// temps le spool reste dimensionné pour de l'After-H, sinon on ferait scanner
+// 45 min de vidéo toutes les 5 min à un PC de salle pour rien.
+const ZOMBIES_MAX_GAME_S = 45 * 60;
 // Au-delà, une game détectée n'est pas « longue » mais FAUSSE : son début a été
 // pris dans la game précédente (cf. le filtre de `processRun`). Seuil distinct
 // et large, il ne sert qu'à écarter les débordements francs.
 const IMPLAUSIBLE_GAME_S = 20 * 60;
+// Pendant Zombies, le début mal détecté serait le loading de la game d'AVANT,
+// soit ~40 min plus tôt : le seuil reste un filet à débordements francs.
+const ZOMBIES_IMPLAUSIBLE_GAME_S = 45 * 60;
+// Préfixe du nom de fichier par jeu autre qu'After-H. Ces games n'existent pas
+// dans le modèle de données EVA : ni map, ni scores, ni identification — elles
+// partagent une même route d'upload, et c'est ce préfixe qui dit laquelle est
+// laquelle. Un jeu absent de cette table est détecté mais pas extrait.
+const OTHER_GAME_PREFIX = {
+    'color-chaos': 'cc',
+    zombies: 'zb'
+};
 // Marge de sécurité avant purge d'un segment sous le watermark.
 const PURGE_MARGIN_S = 60;
 // Tolérance sur la comparaison fin-de-game vs watermark : les epochs sont
@@ -242,9 +261,13 @@ async function processRun(run) {
     // vraisemblance fine, seulement un filet contre les débordements francs.
     const GAMES = (DETECT.games || []).filter((g) => {
         if (g.start === -1 || g.startFallback) return false;
-        if (g.end - g.start > IMPLAUSIBLE_GAME_S) {
+        const LIMIT =
+            (g.gameType ?? 'after-h') === 'zombies'
+                ? ZOMBIES_IMPLAUSIBLE_GAME_S
+                : IMPLAUSIBLE_GAME_S;
+        if (g.end - g.start > LIMIT) {
             console.warn(
-                `[arena-pipeline] implausible game dropped: ${Math.round(g.end - g.start)}s (> ${IMPLAUSIBLE_GAME_S}s) map=${g.map || '?'} — début mal détecté`
+                `[arena-pipeline] implausible game dropped: ${Math.round(g.end - g.start)}s (> ${LIMIT}s) map=${g.map || '?'} — début mal détecté`
             );
             return false;
         }
@@ -260,6 +283,10 @@ async function processRun(run) {
     const CAPTURING = arenaCaptureService.getStatus().running;
 
     let maxExtractedEndEpoch = 0;
+    // Début de la game la plus ancienne DIFFÉRÉE ce round : le watermark ne doit
+    // pas passer devant, sinon on purgerait les segments d'une game qu'on a
+    // décidé de re-découper au round suivant.
+    let deferredStartEpoch = 0;
     let extractedThisRound = 0;
     for (const G of GAMES) {
         const START_EPOCH = WINDOW_START_EPOCH + Math.round(G.start);
@@ -272,19 +299,31 @@ async function processRun(run) {
             console.log(
                 `[arena-pipeline] game ending at ${Math.round(G.end)}s touches window end — deferred to next round`
             );
+            deferredStartEpoch = deferredStartEpoch
+                ? Math.min(deferredStartEpoch, START_EPOCH)
+                : START_EPOCH;
             continue;
         }
 
-        // Color Chaos : ni map, ni scores, et rien à identifier côté EVA. Nom
-        // à part (préfixe `cc_`) — il ne doit surtout pas ressembler au nom
-        // provisoire d'une game After-H, que le service d'identification
-        // essaierait de résoudre en game EVA.
+        // Color Chaos, Zombies : ni map, ni scores, et rien à identifier côté
+        // EVA. Nom à part (préfixe `cc_`, `zb_`) — il ne doit surtout pas
+        // ressembler au nom provisoire d'une game After-H, que le service
+        // d'identification essaierait de résoudre en game EVA.
+        const GAME_TYPE = G.gameType ?? 'after-h';
         const O_SCORE = G.orangeTeam ? G.orangeTeam.score : '?';
         const B_SCORE = G.blueTeam ? G.blueTeam.score : '?';
-        const NAME =
-            (G.gameType ?? 'after-h') === 'after-h'
-                ? `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mp4`
-                : `cc_${STATE.roomId}_${STATE.arenaId}_${START_EPOCH}_${END_EPOCH}.mp4`;
+        let NAME;
+        if (GAME_TYPE === 'after-h') {
+            NAME = `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mp4`;
+        } else if (OTHER_GAME_PREFIX[GAME_TYPE]) {
+            NAME = `${OTHER_GAME_PREFIX[GAME_TYPE]}_${STATE.roomId}_${STATE.arenaId}_${START_EPOCH}_${END_EPOCH}.mp4`;
+        } else {
+            // Jeu détecté par une version plus récente de l'analyseur que de
+            // l'uploader : mieux vaut le laisser dans le spool que produire un
+            // fichier que personne ne saura router.
+            console.warn(`[arena-pipeline] unknown gameType '${GAME_TYPE}' — game ignorée`);
+            continue;
+        }
         const OUT = path.join(GAMES_DIR, NAME);
         // Nom déterministe → dédup entre rounds et après redémarrage.
         if (alreadyExtracted(GAMES_DIR, NAME)) {
@@ -321,10 +360,30 @@ async function processRun(run) {
     const LAST_SEGMENT = SEGMENTS[SEGMENTS.length - 1];
     const WINDOW_END_EPOCH =
         LAST_SEGMENT.epoch + arenaCaptureService.getStatus().segmentSeconds;
+    // Horizon : une game zombie en cours (HUD encore affiché en fin de fenêtre,
+    // outro pas encore vu) a pu commencer 40 min plus tôt. On ne l'étend que
+    // dans ce cas — le tenir en permanence ferait scanner 45 min de vidéo tous
+    // les 5 min sur un PC de salle, pour rien la plupart du temps.
+    const HORIZON_S = DETECT.zombiesInProgress
+        ? ZOMBIES_MAX_GAME_S
+        : MAX_GAME_S;
+    if (DETECT.zombiesInProgress) {
+        console.log('[arena-pipeline] game Zombies en cours — horizon étendu');
+    }
+    // Une game différée fixe un plafond : son outro vient de se terminer, donc
+    // plus rien ne signale « game en cours » et l'horizon est déjà retombé —
+    // sans ce plafond, une game zombie de 35 min différée verrait son début
+    // purgé avant d'être re-découpée au round suivant. Le max final garde le
+    // watermark monotone : il ne recule jamais.
+    const CANDIDATE = Math.max(
+        maxExtractedEndEpoch,
+        WINDOW_END_EPOCH - HORIZON_S
+    );
     watermark = Math.max(
         watermark,
-        maxExtractedEndEpoch,
-        WINDOW_END_EPOCH - MAX_GAME_S
+        deferredStartEpoch
+            ? Math.min(CANDIDATE, deferredStartEpoch - 1)
+            : CANDIDATE
     );
 
     // Purge : segments entièrement sous le watermark (avec marge).
