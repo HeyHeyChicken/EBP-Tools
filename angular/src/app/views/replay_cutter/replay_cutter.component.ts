@@ -39,6 +39,17 @@ import { ReplayCutterBeforeRemovingBordersDialog } from './dialogs/before-removi
 import { ReplayCutterService } from './services/replay-cutter.service';
 
 //#endregion
+
+/**
+ * Nom affiché des jeux autres qu'After-H, qui n'ont pas de map. Un jeu absent de
+ * cette table (analyseur plus récent que l'interface) s'affiche sous son nom
+ * technique plutôt que sous un « ? » qui ne dirait rien.
+ */
+const GAME_TYPE_LABEL: Record<string, string> = {
+  'color-chaos': 'Color Chaos',
+  zombies: 'Zombies'
+};
+
 @Component({
   selector: 'view-replay_cutter',
   templateUrl: './replay_cutter.component.html',
@@ -841,6 +852,14 @@ export class ReplayCutterComponent {
         maxTimePerGame: this.settings.maxTimePerGame
       })
     );
+  }
+
+  /**
+   * Nom affiché d'une game qui n'est pas de l'After-H : ces jeux n'ont pas de
+   * map, c'est leur nom qui en tient lieu dans le tableau.
+   */
+  public gameTypeLabel(gameType: string): string {
+    return GAME_TYPE_LABEL[gameType] ?? gameType;
   }
 
   /**

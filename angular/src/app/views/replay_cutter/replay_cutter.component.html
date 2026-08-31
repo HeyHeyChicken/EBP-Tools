@@ -102,7 +102,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   </th>
                   <th
                     [style.background-image]="
-                      game.gameType === 'color-chaos'
+                      game.gameType !== 'after-h'
                         ? ''
                         : 'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
                           game.map.replaceAll(' ', '_') +
@@ -111,8 +111,8 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   >
                     <span (click)="editGameMap(game)"
                       >{{
-                        game.gameType === 'color-chaos'
-                          ? 'Color Chaos'
+                        game.gameType !== 'after-h'
+                          ? gameTypeLabel(game.gameType)
                           : game.map.trim().length > 0
                             ? game.map
                             : '?'

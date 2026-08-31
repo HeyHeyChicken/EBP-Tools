@@ -325,6 +325,104 @@ CC_OUTRO_MIN_NCC = 0.80                # mesuré 1.00 sur les 6 outros, ≤ 0.06
 # joueur), sans la transition vers le lobby qui le suit.
 CC_CUT_MARGIN_S = 1.0
 
+# ── Zombies ────────────────────────────────────────────────────────────────
+# Encore un autre jeu, coopératif : 8 joueurs verts contre des vagues de zombies,
+# 30 à 35 min par game (contre 12 max en After-H). Comme le Color Chaos, il n'a
+# ni map ni scores exploitables par la phase 2 et n'est borné que par ses deux
+# écrans. La partie existe bien côté EVA (contrairement au Color Chaos, elle
+# remonte dans `game-histories`), mais EBP ne la stocke pas : il n'y a pas plus
+# de game à laquelle la rattacher, et rien à identifier.
+GAME_TYPE_ZOMBIES = 'zombies'
+
+# Outro : bloc titre « AFTER-H / ZOMBIES » du tableau final, matché en niveaux de
+# gris à position fixe. Il coiffe successivement l'écran VICTOIRE et le
+# WORLDWIDE LEADERBOARD, tous deux affichés en fin de game, et ne bouge pas d'un
+# pixel entre les deux ni d'une game à l'autre.
+ZB_OUTRO_BOX = ((795, 85), (1116, 191))
+# Décalage toléré autour des boîtes ci-dessous, en FRACTION des dimensions du
+# frame (2 % = ±38 px en largeur, ±21 px en hauteur sur du 1080p) — le HUD bouge
+# d'une mise à jour du jeu ou d'une salle à l'autre, et l'analyseur tourne aussi
+# sur des vidéos de joueurs au cadrage variable. Exprimé en proportion pour
+# suivre la résolution, comme l'ancre que cherche déjà la détection After-H.
+#
+# Mesuré : les positifs ne bougent pas d'un centième quelle que soit la
+# tolérance, et les faux positifs plafonnent (0.27 sur l'outro, 0.32 sur la
+# pastille dès 20 px, sans plus monter jusqu'à 77 px) — très loin des seuils de
+# 0.80 et 0.60. La position reste malgré tout le premier filtre : on cherche
+# dans une fenêtre de quelques dizaines de pixels, jamais dans le frame entier.
+ZB_MATCH_TOLERANCE_RATIO = 0.02
+ZB_OUTRO_MIN_NCC = 0.80        # mesuré 0.96-1.00 sur les 3 outros, <= 0.37 ailleurs
+# L'outro dure ~17 s, au-delà du défaut de `_scan_while` : sans ça la fin de game
+# serait datée au milieu du tableau, pas à sa disparition.
+ZB_OUTRO_MAX_SPAN_S = 25.0
+
+# Pastille « ZOMBIES » sous le timer, présente pendant TOUTE la game (pré-game
+# compris) et absente partout ailleurs. Sert à répondre « une game zombie est-elle
+# en cours ? » sans avoir à la détecter en entier — le mode salle en a besoin pour
+# savoir jusqu'où remonter avant de purger ses segments.
+ZB_HUD_BOX = ((889, 115), (1033, 153))
+# Mesuré >= 0.88 sur du gameplay zombie, <= 0.39 sur tout le reste (After-H, Jeu
+# d'arme, Match à mort). Le seuil est bas parce que le fond de la pastille est
+# SEMI-TRANSPARENT : la map transparaît entre le texte et la bordure, et un flash
+# blanc (explosion, tir) noie le tout — 1,5 % des frames d'une game passent ainsi
+# sous le seuil. Aucune découpe de template n'y échapperait, le blanc mange aussi
+# les lettres ; c'est le nombre de sondages qui fait la fiabilité.
+ZB_HUD_MIN_NCC = 0.60
+# Sondage « game en cours » : N frames réparties sur la fin de la vidéo, une seule
+# réponse positive suffit à conclure. Ces éclipses sont BRÈVES et isolées — sur une
+# game entière, jamais deux échantillons consécutifs (mesuré à 2 s d'intervalle) —
+# donc il faudrait une minute entière de flash continu pour toutes les manquer.
+ZB_IN_PROGRESS_PROBES = 20
+ZB_IN_PROGRESS_SPAN_S = 60.0
+# Pas de balayage à l'intérieur d'une game zombie quand il n'y a rien à y
+# chercher. Strictement inférieur aux 17 s d'affichage de l'outro : c'est la
+# durée de l'écran, pas la taille du bond, qui garantit qu'on ne l'enjambe pas.
+ZB_HUD_JUMP_S = 15.0
+
+# Remontée vers le DÉBUT d'une game zombie. Tant que le cartouche est affiché on
+# est en plein jeu, donc loin du début : on saute. Le bond reste plus court que
+# l'entre-deux-games (outro + pré-game, plusieurs minutes) — un bond qui
+# l'enjamberait atterrirait dans la game PRÉCÉDENTE, dont le début n'est pas
+# celui qu'on cherche.
+ZB_CARD_JUMP_S = 60.0
+# Le cartouche disparaît aussi quand le joueur est MORT — jusqu'à 14 s mesurées,
+# soit une chance sur quatre de tomber dedans à chaque bond. Avant de conclure
+# qu'on a franchi le début, on re-sonde donc plus loin en arrière : deux
+# absences séparées de cette durée ne peuvent pas être la même mort.
+ZB_CARD_CONFIRM_S = 30.0
+
+# Cartouche du joueur, en bas à droite : affiché pendant tout le jeu, absent
+# pendant le pré-game, sur l'écran de loading et sur l'outro. C'est le seul
+# repère qui sépare « avant » et « après » le début d'une game zombie, et il
+# sert deux fois — à écarter les respawns ci-dessous, et à remonter la game par
+# bonds plus bas.
+ZB_CARD_BOX = ((1650, 820), (1900, 1060))
+# Mesuré sur les trois games de salle : 110 de moyenne en jeu contre AU PLUS 9,1
+# sur 432 échantillons de pré-game. Le seuil est posé au large entre les deux.
+ZB_CARD_MIN_MEAN = 40.0
+
+# Le respawn d'un joueur affiche le MÊME logo A et la MÊME barre de progression
+# que l'écran de loading — `_detect_game_loading_frame` ne les distingue pas. Ce
+# qui les sépare est ailleurs : le vrai écran de loading est posé sur un noir
+# plein et n'affiche PAS le cartouche du joueur, alors qu'un respawn laisse voir
+# la map et garde le cartouche. Trois pavés donc, tous à distance du logo, de la
+# barre et du bandeau haut, tous noirs sur un loading.
+ZB_LOADING_DARK_BOXES = (
+    ((100, 250), (700, 700)),        # à gauche du logo : la map transparaît
+    ((1250, 250), (1850, 700)),      # à droite du logo : idem
+    ZB_CARD_BOX,                     # cartouche du joueur, absent au loading
+)
+# Mesuré 0.00 sur les vrais écrans de loading. Sur un respawn : >= 3.3 sur les
+# pavés latéraux (le pire cas, dans les recoins les plus sombres des maps) et
+# ~118 sur le cartouche, qui est donc le discriminant fort.
+ZB_LOADING_MAX_MEAN = 1.5
+
+# Marge de découpe, même esprit qu'en Color Chaos : la game commence 1 s APRÈS la
+# disparition de l'écran de loading et se termine 2 s AVANT celle du tableau
+# final. Bornes recalées sur trois games de salle chronométrées à la main.
+ZB_CUT_START_MARGIN_S = 1.0
+ZB_CUT_END_MARGIN_S = 2.0
+
 # A-letter patterns for game intro detection — from detectGameIntro() in the service
 _A_PATTERNS = [
     [(1495, 942, 255, 30), (1512, 950, 255, 30), (1495, 962, 255, 30),
@@ -3941,6 +4039,137 @@ def _detect_color_chaos_outro(frame: np.ndarray) -> bool:
     return float(cv2.matchTemplate(REGION, TPL, cv2.TM_CCOEFF_NORMED)[0, 0]) >= CC_OUTRO_MIN_NCC
 
 
+_ZB_TEMPLATE_CACHE = {}
+
+
+def _get_zb_template(name: str):
+    """Charge (et cache) un template Zombies en niveaux de gris."""
+    if name in _ZB_TEMPLATE_CACHE:
+        return _ZB_TEMPLATE_CACHE[name]
+    BASE = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    PATH = os.path.join(BASE, 'templates', 'zombies', name)
+    GRAY = cv2.imread(PATH, cv2.IMREAD_GRAYSCALE) if os.path.isfile(PATH) else None
+    _ZB_TEMPLATE_CACHE[name] = GRAY
+    return GRAY
+
+
+def _match_fixed_box(frame: np.ndarray, box, template,
+                     tolerance_ratio: float = ZB_MATCH_TOLERANCE_RATIO) -> float:
+    """
+    Meilleur NCC d'un template autour d'une position ATTENDUE, en s'autorisant un
+    décalage de `tolerance_ratio` × (largeur, hauteur) du frame dans chaque
+    direction. Retourne -1.0 si la géométrie ne colle pas (frame trop petit,
+    template manquant, ou template qui ne fait plus la taille de sa boîte).
+
+    La position reste le premier filtre : chercher dans une fenêtre de quelques
+    dizaines de pixels autour de l'ancre, et non dans le frame entier, c'est ce
+    qui garde les faux positifs au plancher.
+    """
+    if template is None:
+        return -1.0
+    (X1, Y1), (X2, Y2) = box
+    H, W = frame.shape[:2]
+    if X2 - X1 != template.shape[1] or Y2 - Y1 != template.shape[0]:
+        # Template et boîte ont divergé (retaille du PNG) : mieux vaut ne rien
+        # détecter que comparer deux choses qui ne se correspondent plus.
+        return -1.0
+    TX, TY = int(round(W * tolerance_ratio)), int(round(H * tolerance_ratio))
+    SX1, SY1 = max(0, X1 - TX), max(0, Y1 - TY)
+    SX2, SY2 = min(W, X2 + TX), min(H, Y2 + TY)
+    if SX2 - SX1 < template.shape[1] or SY2 - SY1 < template.shape[0]:
+        return -1.0
+    REGION = cv2.cvtColor(frame[SY1:SY2, SX1:SX2], cv2.COLOR_RGB2GRAY)
+    return float(cv2.matchTemplate(REGION, template, cv2.TM_CCOEFF_NORMED).max())
+
+
+def _detect_zombies_outro(frame: np.ndarray) -> bool:
+    """
+    Détecte le tableau final d'une game Zombies via son bloc titre
+    « AFTER-H / ZOMBIES » — dernier écran affiché, donc fin de la game.
+
+    Détection par FORME (NCC en niveaux de gris), comme l'outro Color Chaos : le
+    titre est blanc mais le décor derrière est celui de la salle de briefing, qui
+    change d'une map à l'autre. Le bloc titre, lui, ne bouge pas.
+    """
+    return _match_fixed_box(
+        frame, ZB_OUTRO_BOX, _get_zb_template('outro_title.png')
+    ) >= ZB_OUTRO_MIN_NCC
+
+
+def _detect_zombies_hud(frame: np.ndarray) -> bool:
+    """
+    Détecte la pastille « ZOMBIES » du HUD, affichée sous le timer du pré-game
+    jusqu'à la fin de la game. Vrai ⇔ on est DANS une game Zombies.
+    """
+    return _match_fixed_box(
+        frame, ZB_HUD_BOX, _get_zb_template('hud_pill.png')
+    ) >= ZB_HUD_MIN_NCC
+
+
+def _detect_zombies_card(frame: np.ndarray) -> bool:
+    """
+    Le cartouche du joueur est-il affiché en bas à droite ? Vrai ⇔ on est DANS le
+    jeu : ni pré-game, ni écran de loading, ni outro — et faux aussi pendant les
+    quelques secondes où le joueur est mort.
+    """
+    (X1, Y1), (X2, Y2) = ZB_CARD_BOX
+    H, W = frame.shape[:2]
+    if X2 > W or Y2 > H:
+        return False
+    REGION = cv2.cvtColor(frame[Y1:Y2, X1:X2], cv2.COLOR_RGB2GRAY)
+    return float(REGION.mean()) >= ZB_CARD_MIN_MEAN
+
+
+def _detect_zombies_loading_frame(frame: np.ndarray) -> bool:
+    """
+    Détecte l'écran de loading qui OUVRE une game Zombies.
+
+    C'est le même que celui de l'After-H (logo A + barre de progression), mais le
+    jeu le réutilise tel quel à chaque respawn de joueur, par-dessus la partie en
+    cours : sur les 35 min d'une game, `_detect_game_loading_frame` seul renvoie
+    donc plusieurs faux débuts, et la remontée à rebours s'arrête sur le premier
+    venu (constaté : une game de 35 min ramenée à 28). Le vrai écran, lui, est
+    posé sur un noir plein — c'est ce fond qu'on vérifie.
+
+    L'ordre des deux tests n'est pas indifférent : le fond coûte 0,2 ms, le
+    template 180 ms (NCC multi-échelle sur presque tout le frame). Le premier
+    écarte tout le gameplay, si bien que le second ne tourne quasiment jamais —
+    et c'est cette remontée frame par frame qui fait l'essentiel du temps
+    d'analyse d'une game zombie.
+    """
+    GRAY = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    H, W = GRAY.shape[:2]
+    for (X1, Y1), (X2, Y2) in ZB_LOADING_DARK_BOXES:
+        if X2 > W or Y2 > H:
+            return False
+        if GRAY[Y1:Y2, X1:X2].mean() > ZB_LOADING_MAX_MEAN:
+            return False
+    return _detect_game_loading_frame(frame)
+
+
+def _zombies_game_in_progress(cap: cv2.VideoCapture, duration: float) -> bool:
+    """
+    Une game Zombies est-elle EN COURS à la fin de la vidéo ?
+
+    Le mode salle analyse une fenêtre glissante et purge derrière lui : il lui
+    faut savoir si les dernières secondes appartiennent à une game qui n'a pas
+    encore montré son outro — auquel cas son début peut être à 35 min en arrière,
+    bien au-delà de l'horizon d'une game After-H.
+
+    On sonde plusieurs frames plutôt qu'une : la pastille disparaît sur ~1,4 % des
+    frames (fondus, transitions), et une seule réponse positive suffit à conclure.
+    """
+    STEP = ZB_IN_PROGRESS_SPAN_S / ZB_IN_PROGRESS_PROBES
+    for I in range(ZB_IN_PROGRESS_PROBES):
+        PROBE = duration - 1.0 - I * STEP
+        if PROBE < 0:
+            break
+        FRAME = _get_frame(cap, PROBE)
+        if FRAME is not None and _detect_zombies_hud(FRAME):
+            return True
+    return False
+
+
 def _scan_while(cap: cv2.VideoCapture, timestamp: float, predicate,
                 step: float = 0.5, max_span: float = 15.0) -> float:
     """
@@ -5547,6 +5776,9 @@ def _new_game(mode: int, game_type: str = GAME_TYPE_AFTER_H) -> dict:
         'minimap': None,  # {'box': ((x1,y1),(x2,y2)), 'score': float, 'scale': float}
         'points': None,  # list of {x,y,w,h,score} — détecté à la 1ère frame de gameplay
         '__timerRef__': None,
+        # Dernier instant où le cartouche du joueur était affiché : borne haute
+        # du début d'une game zombie, cf. la remontée par bonds de `_analyze`.
+        '__cardRef__': None,
         '__nojump__': False,
         'orangeTeam': {
             'score': 0,
@@ -5808,6 +6040,80 @@ def _analyze(
                 _emit({'type': 'game', 'game': CURRENT})
                 CURRENT = None
 
+        # ── Zombies : outro = fin de game ───────────────────────────────────
+        if not FOUND and (CURRENT is None or CURRENT['start'] != -1):
+            if _detect_zombies_outro(FRAME):
+                if DEBUG:
+                    _emit({'log': 'Zombies outro frame found'})
+                FOUND = True
+                JUST_JUMPED = False
+                GAME = _new_game(0, game_type=GAME_TYPE_ZOMBIES)
+                # Dernière frame du tableau final, moins la marge. L'outro dure
+                # plus longtemps que les autres, d'où le max_span élargi.
+                GAME['end'] = _scan_while(
+                    CAP, TIMESTAMP, _detect_zombies_outro,
+                    max_span=ZB_OUTRO_MAX_SPAN_S,
+                ) - ZB_CUT_END_MARGIN_S
+                GAMES.insert(0, GAME)
+                CURRENT = GAME
+
+        # ── Zombies : remontée par bonds tant qu'on est en plein jeu ────────
+        # Une game dure 30 à 35 min qu'il serait absurde de remonter seconde par
+        # seconde alors qu'un seul écran nous intéresse, à son extrémité. Le
+        # cartouche du joueur dit « on est encore en jeu, le début est plus
+        # loin » : tant qu'il est là, on saute.
+        #
+        # Même garantie que le saut par timer de l'After-H, et pour la même
+        # raison : ce n'est pas la taille du bond qui fait la justesse, c'est le
+        # REMBOBINAGE. Dès qu'on atterrit hors du jeu, le début est forcément
+        # entre là et le dernier point vérifié — on y retourne et on marche.
+        if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
+                and CURRENT['gameType'] == GAME_TYPE_ZOMBIES
+                and not CURRENT['__nojump__']):
+            if _detect_zombies_card(FRAME):
+                CURRENT['__cardRef__'] = TIMESTAMP
+                TIMESTAMP -= ZB_CARD_JUMP_S
+                continue
+            # Pas de cartouche. Tant qu'on n'en a jamais vu, on est encore dans
+            # l'outro d'où l'on vient : on marche jusqu'au gameplay.
+            if CURRENT['__cardRef__'] is not None:
+                # Sinon c'est une mort du joueur, ou le début franchi. Une mort
+                # ne dure pas 30 s : un second sondage tranche.
+                CONFIRM = _get_frame(CAP, TIMESTAMP - ZB_CARD_CONFIRM_S)
+                if CONFIRM is not None and _detect_zombies_card(CONFIRM):
+                    if DEBUG:
+                        _emit({'log': f'Zombies card gone at {TIMESTAMP:.0f}s but back 30s earlier — joueur mort, on continue'})
+                    TIMESTAMP -= ZB_CARD_CONFIRM_S
+                    continue
+                if DEBUG:
+                    _emit({'log': f'Zombies start bracketed in [{TIMESTAMP:.0f}s, {CURRENT["__cardRef__"]:.0f}s] → rewind and walk'})
+                TIMESTAMP = CURRENT['__cardRef__']
+                CURRENT['__nojump__'] = True
+                continue
+
+        # ── Zombies : écran de loading = début de game ──────────────────────
+        # Même écran de loading que l'After-H (logo A sur fond noir) : c'est
+        # l'outro trouvé au-dessus qui a déjà tranché de quel jeu il s'agit, on
+        # ne peut donc pas se tromper de game en le consommant ici. Pas de
+        # `_detect_game_playing` ni d'affinage par le timer derrière : les deux
+        # sont écrits pour le HUD After-H.
+        if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
+                and CURRENT['gameType'] == GAME_TYPE_ZOMBIES):
+            if _detect_zombies_loading_frame(FRAME):
+                if DEBUG:
+                    _emit({'log': 'Zombies loading frame found'})
+                FOUND = True
+                JUST_JUMPED = False
+                # Dernière frame du loading, plus la marge : la game commence
+                # quand l'écran s'efface.
+                CURRENT['start'] = _scan_while(
+                    CAP, TIMESTAMP, _detect_zombies_loading_frame,
+                ) + ZB_CUT_START_MARGIN_S
+                if DEBUG:
+                    _emit({'log': f'Zombies game {CURRENT["start"]:.1f}s → {CURRENT["end"]:.1f}s'})
+                _emit({'type': 'game', 'game': CURRENT})
+                CURRENT = None
+
         # ── Game start: loading screen ──────────────────────────────────────
         if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
                 and CURRENT['gameType'] == GAME_TYPE_AFTER_H):
@@ -6015,7 +6321,17 @@ def _analyze(
         # fenêtre de loading/intro étroite (~1-2 s). STEP=2 ailleurs (post-game,
         # entre 2 games sans CURRENT) pour diviser par 2 les seeks inutiles.
         SEARCHING_START = CURRENT is not None and CURRENT['start'] == -1
-        STEP = 1.0 if (JUST_JUMPED or SEARCHING_START) else 2.0
+        if JUST_JUMPED or SEARCHING_START:
+            STEP = 1.0
+        elif not FOUND and _detect_zombies_hud(FRAME):
+            # Game Zombies en cours et rien à y chercher : elle dure 30 à 35 min
+            # qu'il serait absurde de parcourir de 2 s en 2 s. On n'y cherche pas
+            # de début (SEARCHING_START est faux ici), seulement un outro — et
+            # celui-ci reste affiché 17 s, plus longtemps que le bond, donc on ne
+            # peut pas l'enjamber. C'est ce qui rend le bond sûr, pas sa taille.
+            STEP = ZB_HUD_JUMP_S
+        else:
+            STEP = 2.0
         TIMESTAMP -= STEP
 
     # Fallback : pas de loading/intro screen détecté (vidéo déjà pré-coupée
@@ -6033,15 +6349,21 @@ def _analyze(
                 hud_anchor=HUD_ANCHOR,
             )
         else:
-            # Color Chaos : pas de timer in-game exploitable pour affiner, la
-            # game commence au plus tôt au début de la vidéo.
+            # Color Chaos / Zombies : pas de timer in-game exploitable pour
+            # affiner, la game commence au plus tôt au début de la vidéo.
             CURRENT['start'] = 0.0
         CURRENT['startFallback'] = True
         _emit({'type': 'game', 'game': CURRENT})
 
+    # Une game Zombies encore en cours à la fin de la vidéo n'a pas d'outro et
+    # n'apparaît donc dans AUCUNE des games ci-dessus. Le mode salle a pourtant
+    # besoin de le savoir avant de purger ses segments : le début de cette game
+    # peut être 35 min en arrière, cinq fois l'horizon d'une game After-H.
+    ZOMBIES_IN_PROGRESS = _zombies_game_in_progress(CAP, DURATION)
+
     CAP.release()
 
-    _emit({'type': 'done'})
+    _emit({'type': 'done', 'zombiesInProgress': ZOMBIES_IN_PROGRESS})
 
 #region Chunk analysis — phase 2 : score timeline indexée par le timer in-game
 
