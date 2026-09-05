@@ -46,9 +46,19 @@ export class Game {
   //#endregion
 
   /**
-   * Jeu détecté : 'after-h' (défaut), 'color-chaos' ou 'zombies'. Une game d'un
-   * autre jeu n'est bornée que par ses deux écrans — ni map, ni scores, ni
-   * analyse approfondie. `mode` ne concerne que les games After-H.
+   * Jeu détecté : 'after-h' (défaut), 'color-chaos', 'zombies' ou 'gun-game'.
+   *
+   * Ce champ ne dit PAS « a-t-elle une identité EVA ? » mais « que trouve-t-on
+   * sur son écran de fin ? ». Le jeu d'arme est un mode d'After-H à part
+   * entière — sa game existe chez EVA, EBP la stocke, et son replay se rattache
+   * à son guid comme celui d'une Domination. S'il a son propre type, c'est que
+   * son écran de fin ne porte PAS de scores d'équipe : la progression s'y compte
+   * par joueur, et lire les scores aux positions habituelles produirait des
+   * valeurs fausses.
+   *
+   * Color Chaos et Zombies, eux, n'ont rien à quoi se rattacher côté EBP et ne
+   * sont bornés que par leurs deux écrans — ni map, ni scores, ni analyse
+   * approfondie. `mode` ne concerne que les games After-H.
    */
   public gameType: string = 'after-h';
 

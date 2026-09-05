@@ -70,10 +70,20 @@ const IMPLAUSIBLE_GAME_S = 20 * 60;
 // Pendant Zombies, le début mal détecté serait le loading de la game d'AVANT,
 // soit ~40 min plus tôt : le seuil reste un filet à débordements francs.
 const ZOMBIES_IMPLAUSIBLE_GAME_S = 45 * 60;
-// Préfixe du nom de fichier par jeu autre qu'After-H. Ces games n'existent pas
-// dans le modèle de données EVA : ni map, ni scores, ni identification — elles
-// partagent une même route d'upload, et c'est ce préfixe qui dit laquelle est
-// laquelle. Un jeu absent de cette table est détecté mais pas extrait.
+// Modes du jeu After-H. Ils ont une game chez EVA, donc une identité à résoudre
+// et un replay qui vit avec les autres : nom identifiable à 6 champs, puis
+// `statistics/replays/{guid}`. Le jeu d'arme en fait partie — l'analyzer le
+// distingue d'une Domination au libellé de l'écran final, mais pour EVA c'est
+// une game comme une autre, avec sa map, ses scores et son id.
+const AFTER_H_LIKE_TYPES = new Set(['after-h', 'gun-game']);
+// Préfixe du nom de fichier par jeu qui n'est PAS After-H. Ces parties n'ont pas
+// de game chez EVA : rien à identifier, donc un nom qui ne ressemble pas à celui
+// d'une game et une route d'upload à part, où le préfixe dit de quel jeu il
+// s'agit. Un jeu absent de cette table est détecté mais pas extrait.
+//
+// Zombies y figure encore faute d'être importé côté EBP : le jour où ce mode
+// entrera dans T_Games, il rejoindra AFTER_H_LIKE_TYPES et cette table ne
+// contiendra plus que le Color Chaos — le seul vrai « autre jeu ».
 const OTHER_GAME_PREFIX = {
     'color-chaos': 'cc',
     zombies: 'zb'
@@ -309,11 +319,15 @@ async function processRun(run) {
         // EVA. Nom à part (préfixe `cc_`, `zb_`) — il ne doit surtout pas
         // ressembler au nom provisoire d'une game After-H, que le service
         // d'identification essaierait de résoudre en game EVA.
+        //
+        // Le jeu d'arme, lui, EST une game After-H : il prend le nom
+        // identifiable, sans quoi son replay finirait dans une zone à part alors
+        // qu'EBP connaît sa game et son guid.
         const GAME_TYPE = G.gameType ?? 'after-h';
         const O_SCORE = G.orangeTeam ? G.orangeTeam.score : '?';
         const B_SCORE = G.blueTeam ? G.blueTeam.score : '?';
         let NAME;
-        if (GAME_TYPE === 'after-h') {
+        if (AFTER_H_LIKE_TYPES.has(GAME_TYPE)) {
             NAME = `${STATE.roomId}_${STATE.arenaId}_${safeMapName(G.map)}_${START_EPOCH}_${END_EPOCH}_${O_SCORE}-${B_SCORE}.mp4`;
         } else if (OTHER_GAME_PREFIX[GAME_TYPE]) {
             NAME = `${OTHER_GAME_PREFIX[GAME_TYPE]}_${STATE.roomId}_${STATE.arenaId}_${START_EPOCH}_${END_EPOCH}.mp4`;

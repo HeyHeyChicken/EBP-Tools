@@ -102,7 +102,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   </th>
                   <th
                     [style.background-image]="
-                      game.gameType !== 'after-h'
+                      !hasMap(game.gameType)
                         ? ''
                         : 'url(https://evabattleplan.com/back/wp-content/uploads/EVA_Map_' +
                           game.map.replaceAll(' ', '_') +
@@ -111,7 +111,7 @@ See LICENSE for terms. Unauthorized use is prohibited.
                   >
                     <span (click)="editGameMap(game)"
                       >{{
-                        game.gameType !== 'after-h'
+                        !hasMap(game.gameType)
                           ? gameTypeLabel(game.gameType)
                           : game.map.trim().length > 0
                             ? game.map
@@ -123,6 +123,9 @@ See LICENSE for terms. Unauthorized use is prohibited.
                         </div>
                       }
                     </span>
+                    @if (gameModeMention(game.gameType); as mode) {
+                      <em class="game-mode">{{ mode }}</em>
+                    }
                   </th>
                   <td class="infos">
                     <p class="orange">

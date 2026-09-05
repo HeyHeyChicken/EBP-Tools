@@ -148,6 +148,15 @@ table {
   > tbody > tr {
     > th,
     > td {
+      // Mode reconnu par l'analyzer, à côté de la map. Discret : c'est un
+      // témoin de détection, pas une information de premier plan.
+      > .game-mode {
+        display: block;
+        font-size: 0.85em;
+        opacity: 0.6;
+        font-style: normal;
+      }
+
       span {
         cursor: pointer;
         position: relative;

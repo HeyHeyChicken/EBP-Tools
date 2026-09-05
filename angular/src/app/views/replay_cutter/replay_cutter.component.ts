@@ -47,8 +47,14 @@ import { ReplayCutterService } from './services/replay-cutter.service';
  */
 const GAME_TYPE_LABEL: Record<string, string> = {
   'color-chaos': 'Color Chaos',
-  zombies: 'Zombies'
+  zombies: 'Zombies',
+  'gun-game': 'Gun Game'
 };
+// Modes du jeu After-H : ils ont une map, donc un nom et une vignette à afficher.
+// Le jeu d'arme en fait partie — s'il a son propre type, c'est parce que son écran
+// de fin ne porte pas de scores d'équipe, pas parce qu'il n'aurait pas de map.
+// Color Chaos et Zombies, eux, n'en ont aucune : leur nom en tient lieu.
+const AFTER_H_LIKE_TYPES = new Set(['after-h', 'gun-game']);
 
 @Component({
   selector: 'view-replay_cutter',
@@ -855,10 +861,30 @@ export class ReplayCutterComponent {
   }
 
   /**
-   * Nom affiché d'une game qui n'est pas de l'After-H : ces jeux n'ont pas de
-   * map, c'est leur nom qui en tient lieu dans le tableau.
+   * Nom affiché d'un jeu qui n'est pas de l'After-H : ces jeux n'ont pas de map,
+   * c'est leur nom qui en tient lieu dans le tableau.
    */
   public gameTypeLabel(gameType: string): string {
+    return GAME_TYPE_LABEL[gameType] ?? gameType;
+  }
+
+  /** Cette game a-t-elle une map à afficher (nom + vignette) ? */
+  public hasMap(gameType: string): boolean {
+    return AFTER_H_LIKE_TYPES.has(gameType);
+  }
+
+  /**
+   * Mode mentionné à côté de la map, pour les modes d'After-H qui ne sont pas
+   * une game ordinaire — aujourd'hui le seul jeu d'arme.
+   *
+   * Ce n'est pas décoratif : la détection du jeu d'arme repose sur un libellé
+   * lu à l'écran, avec un seuil calibré sur peu d'enregistrements et sur un
+   * TEXTE, que le jeu pourrait traduire. Afficher le mode reconnu rend une
+   * défaillance visible — sans mention, une détection qui ne déclenche pas
+   * passerait inaperçue, la game s'affichant comme une After-H ordinaire.
+   */
+  public gameModeMention(gameType: string): string {
+    if (gameType === 'after-h' || !AFTER_H_LIKE_TYPES.has(gameType)) return '';
     return GAME_TYPE_LABEL[gameType] ?? gameType;
   }
 
