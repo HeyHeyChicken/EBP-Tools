@@ -35,17 +35,27 @@ const POLL_INTERVAL_MS = 90 * 1000;
 const POLL_BACKOFF_MAX_MS = 15 * 60 * 1000;
 const FETCH_LIMIT = 10;
 
-// Requête COMPLÈTE : identique à celle du poller serveur EBP (eva.service
-// `ARENA_GQL_QUERY`), car ce sont ces nœuds bruts que le serveur normalise via
-// `toFullGame` + `upsertEVAGames`.
+// Requête COMPLÈTE : elle doit rester IDENTIQUE à celle du poller serveur EBP
+// (eva.service `ARENA_GQL_QUERY`), car ce sont ces nœuds bruts que le serveur
+// normalise. Deux champs s'y sont ajoutés et ne doivent pas être oubliés ici :
+//  - `rank` dans les stats joueur : le serveur le stocke (T_Game_Players.rank), et
+//    l'ingest REMPLACE le roster — l'omettre écraserait le rang à NULL, sans retour
+//    possible une fois la game marquée vérifiée ;
+//  - la branche `colorChaos` : le jeu de peinture a ses propres tables côté EBP, et
+//    ce poller est l'une des deux sources qui l'alimentent.
+// ⚠️ Attention aux espaces en fin de fragment : deux champs collés ("winnerTeamColor" +
+// "teams") font rejeter la requête ENTIÈRE par EVA, games After-H comprises.
 const GQL_QUERY =
     'query($terrainIds:[Int!],$limit:Int){' +
     'listLastGamesAtLocation(terrainIds:$terrainIds,limit:$limit){' +
-    'gameId endedAt terrainId battleArena{' +
+    'gameId gameType endedAt terrainId battleArena{' +
     'data{duration teamOne{name score}teamTwo{name score}}' +
-    'players{id userId data{niceName team outcome score kills deaths assists inflictedDamage firedAccuracy}}' +
+    'players{id userId data{niceName team rank outcome score kills deaths assists inflictedDamage firedAccuracy}}' +
     'map{id name identifier maxPlayerCount}mode{id identifier category}' +
-    'terrain{id location{id name department identifier country language}}}}}';
+    'terrain{id location{id name department identifier country language}}}' +
+    'colorChaos{gameId terrainId locationId map durationSeconds endedAt winnerTeamColor ' +
+    'teams{color score totalPaintedSurface players{rank userId name score paintedSurface ' +
+    'heals frags breaks isMvpHeals isMvpFrags isMvpPaintedSurface}}}}}';
 
 // Seul état du service : la cadence courante (allongée par le backoff).
 let pollDelayMs = POLL_INTERVAL_MS;
