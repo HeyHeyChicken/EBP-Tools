@@ -13,6 +13,7 @@ const {
     requestArenaUploadUrl,
     requestOtherGameUploadUrl,
     confirmOtherGameUpload,
+    resolveColorChaosGameId,
     confirmArenaUpload,
     uploadFileToPresignedUrl
 } = require('./tools-api-client');
@@ -175,6 +176,14 @@ function uploadWithPersistentRetry(filePath, gameId, ids, token) {
  * ne réconcilie ce préfixe, il n'y a pas de game en base pour rattraper). Si
  * elle échoue, on rejoue tout — le PUT réécrit le même objet, la clé étant
  * déterministe.
+ *
+ * Le Color Chaos, lui, a désormais ses parties stockées côté EBP : on demande
+ * son identité EVA pour l'attacher au replay, sans quoi l'Espace Arena n'aurait
+ * qu'une vidéo nue là où la map, les scores des camps et les joueurs sont en
+ * base. La résolution se fait APRÈS l'envoi, juste avant la confirmation :
+ * c'est le moment le plus tardif, donc celui qui laisse le plus de temps à la
+ * partie pour remonter (le poller de salle pousse toutes les 90 s, le poller
+ * serveur ne repasse que toutes les ~25 min).
  */
 function uploadOtherGameWithPersistentRetry(filePath, gameType, startedAtEpoch, ids, token) {
     const PAYLOAD = {
@@ -188,9 +197,49 @@ function uploadOtherGameWithPersistentRetry(filePath, gameType, startedAtEpoch, 
         await uploadFileToPresignedUrl(UPLOAD.url, filePath, {
             contentType: 'video/mp4'
         });
-        await confirmOtherGameUpload(PAYLOAD, token);
+        const EVA_GAME_ID =
+            gameType === 'color-chaos'
+                ? await resolveColorChaosGameIdSafely(PAYLOAD, token)
+                : null;
+        await confirmOtherGameUpload(
+            EVA_GAME_ID ? { ...PAYLOAD, evaGameId: EVA_GAME_ID } : PAYLOAD,
+            token
+        );
         return UPLOAD.key;
     });
+}
+
+/**
+ * Identité EVA d'une partie Color Chaos, ou `null` si elle n'est pas établie.
+ *
+ * Ne propage JAMAIS : le lien est un bonus, il ne doit pas coûter la
+ * publication du replay. Un serveur en échec ferait rejouer tout l'envoi par le
+ * retry persistant, pour une donnée facultative — et un refus de résolution
+ * (`gameId: null`, partie pas encore remontée ou deux candidates) est une
+ * réponse normale, pas une erreur. La confirmation partira sans guid, et un
+ * éventuel retry retentera la résolution.
+ */
+async function resolveColorChaosGameIdSafely(payload, token) {
+    try {
+        const RES = await resolveColorChaosGameId(
+            {
+                roomId: payload.roomId,
+                arenaId: payload.arenaId,
+                startedAtEpoch: payload.startedAtEpoch
+            },
+            token
+        );
+        if (!RES || !RES.gameId) {
+            console.log(
+                `[arena-uploader] Color Chaos non identifié (${(RES && RES.reason) || 'inconnu'})`
+            );
+            return null;
+        }
+        return RES.gameId;
+    } catch (e) {
+        console.warn(`[arena-uploader] resolve Color Chaos échoué : ${e.message}`);
+        return null;
+    }
 }
 
 /**

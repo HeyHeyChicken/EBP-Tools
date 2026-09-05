@@ -368,6 +368,34 @@ function resolveArenaGameId(payload, arenaToken) {
 }
 
 /**
+ * POST /api/tools/arena/color-chaos/resolve
+ * Pendant du resolve After-H pour une partie Color Chaos : match sur (arène du
+ * token, DÉBUT de partie ±2 min). On compare les débuts parce que c'est ce que
+ * les deux côtés portent nativement — `startedAtEpoch` borne déjà le fichier
+ * découpé, et EBP stocke le début de partie.
+ *
+ * Sans map en garde-fou (Tools ne lit pas celle d'une partie Color Chaos), la
+ * fenêtre est la seule protection : elle est plus serrée que l'écart minimal
+ * entre deux parties d'une même arène, et le serveur refuse dès qu'il a
+ * plusieurs candidats.
+ *
+ * `{gameId: null, reason}` est une réponse NORMALE, pas un échec : la partie
+ * peut n'être pas encore remontée en base. Seule une exception veut dire
+ * « réessayer ».
+ *
+ * @param {{roomId:number, arenaId:number, startedAtEpoch:number}} payload
+ * @param {string} arenaToken
+ * @returns {Promise<{gameId:string|null, reason?:string}>}
+ */
+function resolveColorChaosGameId(payload, arenaToken) {
+    return apiRequest('POST', '/arena/color-chaos/resolve', payload, {
+        retries: 1,
+        requireAuth: false,
+        headers: { 'X-Arena-Token': arenaToken }
+    });
+}
+
+/**
  * POST /api/tools/arena/games/upload-url
  * URL présignée PUT vers `statistics/replays/{guid}.mp4` : l'emplacement ET le
  * nommage définitifs d'un replay, identiques à ceux d'une analyse locale. On
@@ -786,6 +814,7 @@ module.exports = {
     confirmArenaUpload,
     ingestArenaGames,
     resolveArenaGameId,
+    resolveColorChaosGameId,
     persistAnalysis,
     fetchPreAnalysisBatch,
     submitPreAnalysis,
