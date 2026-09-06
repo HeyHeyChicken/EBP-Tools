@@ -407,14 +407,20 @@ ZB_CARD_MIN_MEAN = 40.0
 # plein et n'affiche PAS le cartouche du joueur, alors qu'un respawn laisse voir
 # la map et garde le cartouche. Trois pavés donc, tous à distance du logo, de la
 # barre et du bandeau haut, tous noirs sur un loading.
+# Les pavés latéraux sont COLLÉS au logo : une captation de salle affiche le flux
+# de la caméra de l'arène en bas à droite de son écran de chargement, ce qui
+# mettait en défaut un pavé large de ce côté (39,5 au lieu de 0) et faisait
+# rejeter de vrais chargements. Serrés contre le logo, il faudrait une
+# incrustation centrée sur l'écran pour les tromper — là où le jeu met le sien.
 ZB_LOADING_DARK_BOXES = (
-    ((100, 250), (700, 700)),        # à gauche du logo : la map transparaît
-    ((1250, 250), (1850, 700)),      # à droite du logo : idem
+    ((700, 420), (830, 650)),        # à gauche du logo : la map transparaît
+    ((1090, 420), (1220, 650)),      # à droite du logo : idem
     ZB_CARD_BOX,                     # cartouche du joueur, absent au loading
 )
-# Mesuré 0.00 sur les vrais écrans de loading. Sur un respawn : >= 3.3 sur les
-# pavés latéraux (le pire cas, dans les recoins les plus sombres des maps) et
-# ~118 sur le cartouche, qui est donc le discriminant fort.
+# Mesuré 0.00 sur quatre vrais écrans de loading (trois enregistrements de test
+# et une captation de salle). Sur un respawn : 5.4 et 13.8 sur les pavés
+# latéraux, ~118 sur le cartouche — ce dernier est le discriminant fort, les
+# deux autres sont là pour le cas où le joueur mort n'afficherait pas le sien.
 ZB_LOADING_MAX_MEAN = 1.5
 
 # Marge de découpe, même esprit qu'en Color Chaos : la game commence 1 s APRÈS la
@@ -422,6 +428,38 @@ ZB_LOADING_MAX_MEAN = 1.5
 # final. Bornes recalées sur trois games de salle chronométrées à la main.
 ZB_CUT_START_MARGIN_S = 1.0
 ZB_CUT_END_MARGIN_S = 2.0
+
+# ── Jeu d'arme ─────────────────────────────────────────────────────────────
+# Le seul des « autres jeux » à se présenter comme de l'After-H : même HUD
+# orange/bleu, même écran de loading, et un écran final que le détecteur de
+# score frame reconnaît — au point qu'une game d'arme partait jusqu'ici à
+# l'identification EVA, où elle attendait un gameId qui n'existera jamais.
+#
+# Ce qui la trahit est écrit dessus : l'écran final porte `map / mode` en haut à
+# droite, « Domination » pour une game After-H, « Gun Game » ici. On ne détecte
+# donc pas un nouvel écran, on DISQUALIFIE celui qu'on a déjà trouvé.
+GAME_TYPE_GUN_GAME = 'gun-game'
+
+# Libellé du mode sur l'écran final, cadré au plus près des lettres : le fond
+# est la vue aérienne de la map, donc il change d'une partie à l'autre.
+GG_LABEL_BOX = ((1752, 72), (1868, 104))
+# Mesuré 1.00 et 0.75 sur les deux enregistrements disponibles, contre au plus
+# 0.27 sur une vraie score frame After-H, sur du gameplay et sur les autres
+# jeux. Le seuil est posé au milieu de cet écart.
+#
+# DEUX RÉSERVES, à lever quand le matériel existera. Les deux enregistrements
+# sont sur la MÊME map (Reef Point), donc sur le seul fond testé — d'où le 0.75
+# plutôt qu'un 0.95. Et le libellé est du TEXTE : si le jeu le traduit, il
+# faudra un template par langue (le reste de la mécanique ne bougerait pas).
+GG_LABEL_MIN_NCC = 0.50
+
+# Jeux bornés par le HUD After-H : MÊME écran de loading, même intro de map,
+# même frame de gameplay, même chrono. Seul l'écran de FIN les sépare — et ce
+# qu'on en fait ensuite, une game d'arme n'ayant pas de game EVA à laquelle se
+# rattacher. Que les deux chargements soient identiques n'ambiguïse rien : un
+# loading n'est jamais consulté seul, mais consommé par la game qui attend son
+# début, dont le type est déjà tranché.
+AFTER_H_LIKE_TYPES = (GAME_TYPE_AFTER_H, GAME_TYPE_GUN_GAME)
 
 # A-letter patterns for game intro detection — from detectGameIntro() in the service
 _A_PATTERNS = [
@@ -4106,6 +4144,31 @@ def _detect_zombies_hud(frame: np.ndarray) -> bool:
     ) >= ZB_HUD_MIN_NCC
 
 
+_GG_TEMPLATE_CACHE = {}
+
+
+def _get_gg_template(name: str):
+    """Charge (et cache) un template Jeu d'arme en niveaux de gris."""
+    if name in _GG_TEMPLATE_CACHE:
+        return _GG_TEMPLATE_CACHE[name]
+    BASE = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    PATH = os.path.join(BASE, 'templates', 'gun_game', name)
+    GRAY = cv2.imread(PATH, cv2.IMREAD_GRAYSCALE) if os.path.isfile(PATH) else None
+    _GG_TEMPLATE_CACHE[name] = GRAY
+    return GRAY
+
+
+def _detect_gun_game_label(frame: np.ndarray) -> bool:
+    """
+    L'écran final annonce-t-il « Gun Game » ? Ne se pose que sur une frame déjà
+    reconnue comme écran de fin : c'est ce qui distingue une game d'arme d'une
+    game After-H, les deux partageant le même écran.
+    """
+    return _match_fixed_box(
+        frame, GG_LABEL_BOX, _get_gg_template('end_label.png')
+    ) >= GG_LABEL_MIN_NCC
+
+
 def _detect_zombies_card(frame: np.ndarray) -> bool:
     """
     Le cartouche du joueur est-il affiché en bas à droite ? Vrai ⇔ on est DANS le
@@ -5929,55 +5992,70 @@ def _analyze(
                     _emit({'log': f'Score frame found mode={SCORE_MODE} variant={SF_VARIANT} (HUD offset dx={SF_DX:+.1f}, dy={SF_DY:+.1f})'})
                 FOUND = True
                 JUST_JUMPED = False
-                GAME = _new_game(SCORE_MODE)
+                # Jeu d'arme : MÊME écran de fin que l'After-H, seul le libellé
+                # du mode l'en distingue. C'est bien un mode d'After-H — sa game
+                # existe chez EVA et son replay se rattache à son guid comme
+                # celui d'une Domination, l'identification reste donc son chemin.
+                # Ce qu'on gagne à le reconnaître est ailleurs : son écran de fin
+                # ne porte PAS de scores d'équipe, la progression s'y comptant
+                # par joueur. Sans ce test, l'OCR lirait des scores là où il n'y
+                # en a pas et en inventerait.
+                IS_GUN_GAME = _detect_gun_game_label(FRAME)
+                GAME = _new_game(
+                    SCORE_MODE,
+                    game_type=GAME_TYPE_GUN_GAME if IS_GUN_GAME else GAME_TYPE_AFTER_H,
+                )
                 GAME['end'] = TIMESTAMP - 1
-                _SF_RAW = MODES[SCORE_MODE]['scoreFrame'][SF_VARIANT]
-                # Scores : bbox dynamique trouvé via les chiffres colorés,
-                # translaté de l'offset HUD identifié.
-                OS = _resolve_region(_SF_RAW['orangeScore'], FRAME, SF_DX, SF_DY)
-                BS = _resolve_region(_SF_RAW['blueScore'],   FRAME, SF_DX, SF_DY)
-                for label, box in (('orange score', OS), ('blue score', BS)):
-                    if box is not None:
-                        if DEBUG:
-                            _emit({'log': f'{label} border: {box}'})
-                    else:
-                        if DEBUG:
-                            _emit({'log': f'[border] {label} not found in search region'})
+                # Les scores d'équipe n'ont de sens qu'en After-H : une game
+                # d'arme se joue à la progression d'armes, par joueur.
+                if not IS_GUN_GAME:
+                    _SF_RAW = MODES[SCORE_MODE]['scoreFrame'][SF_VARIANT]
+                    # Scores : bbox dynamique trouvé via les chiffres colorés,
+                    # translaté de l'offset HUD identifié.
+                    OS = _resolve_region(_SF_RAW['orangeScore'], FRAME, SF_DX, SF_DY)
+                    BS = _resolve_region(_SF_RAW['blueScore'],   FRAME, SF_DX, SF_DY)
+                    for label, box in (('orange score', OS), ('blue score', BS)):
+                        if box is not None:
+                            if DEBUG:
+                                _emit({'log': f'{label} border: {box}'})
+                        else:
+                            if DEBUG:
+                                _emit({'log': f'[border] {label} not found in search region'})
 
-                # Les chiffres du score sont eux-mêmes colorés (couleur d'équipe).
-                # On OCR sur un masque couleur — qui isole les chiffres du décor
-                # HUD (silhouette de mascotte, courbes grises) — plutôt qu'un seuil
-                # de luminance qui ne sépare pas l'orange du fond clair derrière.
-                _OS_SPEC = _SF_RAW['orangeScore']
-                _BS_SPEC = _SF_RAW['blueScore']
-                # On vote sur les deux modèles : evadigits et eng se trompent sur
-                # des chiffres différents (evadigits lit parfois 5→0, eng échoue
-                # sur d'autres), mais leurs erreurs ne coïncident pas → le vote
-                # combiné sur (lang × psm) tranche correctement.
-                if OS is not None:
-                    _set_score(GAME, 'orangeTeam', _ocr_color_masked(
-                        FRAME,
-                        OS[0][0], OS[0][1], OS[1][0], OS[1][1],
-                        target_color=_OS_SPEC['colors'],
-                        tol_color=_OS_SPEC.get('tol_color', 20),
-                        whitelist='0123456789%', lang=('evadigits', 'eng'),
-                        checker=_score_checker,
-                    ))
+                    # Les chiffres du score sont eux-mêmes colorés (couleur d'équipe).
+                    # On OCR sur un masque couleur — qui isole les chiffres du décor
+                    # HUD (silhouette de mascotte, courbes grises) — plutôt qu'un seuil
+                    # de luminance qui ne sépare pas l'orange du fond clair derrière.
+                    _OS_SPEC = _SF_RAW['orangeScore']
+                    _BS_SPEC = _SF_RAW['blueScore']
+                    # On vote sur les deux modèles : evadigits et eng se trompent sur
+                    # des chiffres différents (evadigits lit parfois 5→0, eng échoue
+                    # sur d'autres), mais leurs erreurs ne coïncident pas → le vote
+                    # combiné sur (lang × psm) tranche correctement.
+                    if OS is not None:
+                        _set_score(GAME, 'orangeTeam', _ocr_color_masked(
+                            FRAME,
+                            OS[0][0], OS[0][1], OS[1][0], OS[1][1],
+                            target_color=_OS_SPEC['colors'],
+                            tol_color=_OS_SPEC.get('tol_color', 20),
+                            whitelist='0123456789%', lang=('evadigits', 'eng'),
+                            checker=_score_checker,
+                        ))
 
-                if BS is not None:
-                    _set_score(GAME, 'blueTeam', _ocr_color_masked(
-                        FRAME,
-                        BS[0][0], BS[0][1], BS[1][0], BS[1][1],
-                        target_color=_BS_SPEC['colors'],
-                        tol_color=_BS_SPEC.get('tol_color', 20),
-                        whitelist='0123456789%', lang=('evadigits', 'eng'),
-                        checker=_score_checker,
-                    ))
+                    if BS is not None:
+                        _set_score(GAME, 'blueTeam', _ocr_color_masked(
+                            FRAME,
+                            BS[0][0], BS[0][1], BS[1][0], BS[1][1],
+                            target_color=_BS_SPEC['colors'],
+                            tol_color=_BS_SPEC.get('tol_color', 20),
+                            whitelist='0123456789%', lang=('evadigits', 'eng'),
+                            checker=_score_checker,
+                        ))
 
-                if OS is not None:
-                    GAME['orangeTeam']['scoreImage'] = _region_to_base64(FRAME, OS[0][0], OS[0][1], OS[1][0], OS[1][1])
-                if BS is not None:
-                    GAME['blueTeam']['scoreImage']   = _region_to_base64(FRAME, BS[0][0], BS[0][1], BS[1][0], BS[1][1])
+                    if OS is not None:
+                        GAME['orangeTeam']['scoreImage'] = _region_to_base64(FRAME, OS[0][0], OS[0][1], OS[1][0], OS[1][1])
+                    if BS is not None:
+                        GAME['blueTeam']['scoreImage']   = _region_to_base64(FRAME, BS[0][0], BS[0][1], BS[1][0], BS[1][1])
 
                 GAMES.insert(0, GAME)
                 CURRENT = GAME
@@ -6116,7 +6194,7 @@ def _analyze(
 
         # ── Game start: loading screen ──────────────────────────────────────
         if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
-                and CURRENT['gameType'] == GAME_TYPE_AFTER_H):
+                and CURRENT['gameType'] in AFTER_H_LIKE_TYPES):
             if _detect_game_loading_frame(FRAME):
                 if DEBUG:
                     _emit({'log': 'Loading frame found'})
@@ -6152,7 +6230,7 @@ def _analyze(
 
         # ── Game start: map introduction ────────────────────────────────────
         if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
-                and CURRENT['gameType'] == GAME_TYPE_AFTER_H):
+                and CURRENT['gameType'] in AFTER_H_LIKE_TYPES):
             if _detect_game_intro(FRAME):
                 if DEBUG:
                     _emit({'log': 'Game intro frame found'})
@@ -6186,7 +6264,7 @@ def _analyze(
 
         # ── Playing frame: OCR map / team names + timer jump ────────────────
         if (not FOUND and CURRENT is not None and CURRENT['start'] == -1
-                and CURRENT['gameType'] == GAME_TYPE_AFTER_H):
+                and CURRENT['gameType'] in AFTER_H_LIKE_TYPES):
             if _detect_game_playing(FRAME):
                 FOUND = True
                 if DEBUG:
@@ -6342,7 +6420,7 @@ def _analyze(
     # loading frame est soit une game déjà extraite à un round précédent, soit
     # une game entamée avant le début de la captation — jamais exploitable.
     if CURRENT is not None and CURRENT['start'] == -1:
-        if CURRENT['gameType'] == GAME_TYPE_AFTER_H:
+        if CURRENT['gameType'] in AFTER_H_LIKE_TYPES:
             CURRENT['start'] = _refine_game_start_with_timer(
                 CAP, 0.0,
                 MODES[CURRENT['mode']]['gameFrame']['timer'],
