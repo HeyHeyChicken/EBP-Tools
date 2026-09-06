@@ -32,11 +32,11 @@ const {
 // le hook d'import s'en sert pour attacher la vidéo à l'équipe. Fichier +
 // fichier local supprimé une fois l'upload confirmé.
 //
-// Les games d'un autre jeu qu'After-H (Color Chaos, Zombies) suivent le même
-// chemin, mais sans identification : aucune n'a de ligne en base côté EBP, il
-// n'y a pas de gameId à leur trouver. Le pipeline les nomme `cc_…` / `zb_…` et
-// elles partent toutes sur la MÊME route « autre jeu », dans leur propre zone
-// S3 — le jeu voyage dans le payload, c'est lui qui décide de la zone.
+// Les games d'un autre jeu qu'After-H (Color Chaos) suivent le même chemin, mais
+// sans identification : elles n'ont pas de ligne en base côté EBP, il n'y a pas
+// de gameId à leur trouver. Le pipeline les nomme `cc_…` et elles partent sur la
+// route « autre jeu », dans leur propre zone S3 — le jeu voyage dans le payload,
+// c'est lui qui décide de la zone.
 //
 // V1 : plus d'analyse phase 2 (killfeed) sur le PC de salle — les joueurs sont
 // déjà connus côté serveur. Le killfeed pourra être rebranché plus tard.
@@ -55,6 +55,11 @@ const GAME_FILE_RE =
 // n'existent pas côté EVA, il n'y a pas de gameId à leur trouver. Le préfixe est
 // le seul endroit où le jeu survit à la découpe (le nom est le seul porteur
 // d'état de la chaîne), d'où la table de correspondance.
+//
+// `zb` y reste alors que le pipeline n'en produit plus (le Zombies est identifié
+// depuis le 06/09/2026) : les salles peuvent avoir des `zb_…` déjà découpés en
+// attente d'upload, et les retirer d'ici les bloquerait sur le disque pour
+// toujours. À supprimer quand ces reliquats seront partis.
 const OTHER_GAME_FILE_RE = /^(cc|zb)_(\d+)_(\d+)_(\d+)_(\d+)\.mp4$/;
 const OTHER_GAME_TYPE = {
     cc: 'color-chaos',

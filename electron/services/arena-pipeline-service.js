@@ -26,8 +26,8 @@ const arenaCaptureService = require('./arena-capture-service');
 //     GOP 1 s, +faststart au remux — AUCUN réencodage, coupe précise à ±1 s),
 //     nommée `{roomId}_{arenaId}_{SafeMap}_{startEpoch}_{endEpoch}_{sO}-{sB}.mp4`
 //     — ou `{préfixe}_{roomId}_{arenaId}_{startEpoch}_{endEpoch}.mp4` pour une
-//     game d'un AUTRE jeu (`cc_` Color Chaos, `zb_` Zombies), qui n'a ni map ni
-//     scores et ne s'identifie pas côté EVA ;
+//     game d'un AUTRE jeu (`cc_` Color Chaos), qui n'a ni map ni scores et ne
+//     s'identifie pas côté EVA ;
 //   - une game encore en cours à la fin de la fenêtre → invisible pour la
 //     phase 1 → retrouvée au round suivant, quand le segment contenant sa
 //     score frame sera fermé. C'est ça, la gestion du "à cheval sur deux
@@ -75,18 +75,22 @@ const ZOMBIES_IMPLAUSIBLE_GAME_S = 45 * 60;
 // `statistics/replays/{guid}`. Le jeu d'arme en fait partie — l'analyzer le
 // distingue d'une Domination au libellé de l'écran final, mais pour EVA c'est
 // une game comme une autre, avec sa map, ses scores et son id.
-const AFTER_H_LIKE_TYPES = new Set(['after-h', 'gun-game']);
+//
+// Le Zombies (MoonOfTheDead, mode EVA 7) les a rejoints le 06/09/2026, quand ce
+// mode est entré dans T_Games. Il n'a ni map ni scores à lire, mais ça ne le
+// disqualifie pas : le nom porte alors `unknown` et `0-0`, et le resolve traite
+// déjà `unknown` comme « OCR de map en échec » — il désactive le garde-fou map
+// au lieu de refuser. La fin de game suffit à l'identifier.
+const AFTER_H_LIKE_TYPES = new Set(['after-h', 'gun-game', 'zombies']);
 // Préfixe du nom de fichier par jeu qui n'est PAS After-H. Ces parties n'ont pas
 // de game chez EVA : rien à identifier, donc un nom qui ne ressemble pas à celui
 // d'une game et une route d'upload à part, où le préfixe dit de quel jeu il
 // s'agit. Un jeu absent de cette table est détecté mais pas extrait.
 //
-// Zombies y figure encore faute d'être importé côté EBP : le jour où ce mode
-// entrera dans T_Games, il rejoindra AFTER_H_LIKE_TYPES et cette table ne
-// contiendra plus que le Color Chaos — le seul vrai « autre jeu ».
+// Il ne reste que le Color Chaos — le seul vrai « autre jeu », absent du modèle
+// de données EVA.
 const OTHER_GAME_PREFIX = {
-    'color-chaos': 'cc',
-    zombies: 'zb'
+    'color-chaos': 'cc'
 };
 // Marge de sécurité avant purge d'un segment sous le watermark.
 const PURGE_MARGIN_S = 60;
@@ -315,14 +319,16 @@ async function processRun(run) {
             continue;
         }
 
-        // Color Chaos, Zombies : ni map, ni scores, et rien à identifier côté
-        // EVA. Nom à part (préfixe `cc_`, `zb_`) — il ne doit surtout pas
-        // ressembler au nom provisoire d'une game After-H, que le service
-        // d'identification essaierait de résoudre en game EVA.
+        // Color Chaos : ni map, ni scores, et rien à identifier côté EVA. Nom à
+        // part (préfixe `cc_`) — il ne doit surtout pas ressembler au nom
+        // provisoire d'une game After-H, que le service d'identification
+        // essaierait de résoudre en game EVA.
         //
-        // Le jeu d'arme, lui, EST une game After-H : il prend le nom
-        // identifiable, sans quoi son replay finirait dans une zone à part alors
-        // qu'EBP connaît sa game et son guid.
+        // Le jeu d'arme et le Zombies, eux, ONT une game côté EVA : ils prennent
+        // le nom identifiable, sans quoi leur replay finirait dans une zone à
+        // part alors qu'EBP connaît leur game et son guid. Le Zombies n'a ni map
+        // ni scores à y mettre — `unknown` et `0-0` — ce que le resolve sait
+        // traiter (il désactive alors le garde-fou map).
         const GAME_TYPE = G.gameType ?? 'after-h';
         const O_SCORE = G.orangeTeam ? G.orangeTeam.score : '?';
         const B_SCORE = G.blueTeam ? G.blueTeam.score : '?';
